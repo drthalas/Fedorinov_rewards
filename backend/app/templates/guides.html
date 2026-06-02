@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Справочник{% endblock %}
+{% macro render_nodes(nodes) %}
+<ul>
+  {% for node in nodes %}
+  <li>
+    <span>Level {{ node.level }} · #{{ node.id }} · {{ node.name }}</span>
+    {% if node.children %}{{ render_nodes(node.children) }}{% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endmacro %}
+{% block content %}
+<h1>Справочник</h1>
+<section class="grid">
+  <div class="panel">
+    <h2>Звания/специальности</h2>
+    <ul>
+      {% for rank in ranks %}<li>#{{ rank.id }} · {{ rank.name }}</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="panel tree">
+    <h2>Дерево наград и знаков</h2>
+    {{ render_nodes(tree) }}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Награжденные{% endblock %}
+{% block content %}
+<h1>Награжденные</h1>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Фото</th><th>ID</th><th>ФИО</th><th>Дата рождения</th><th>Звание/специальность</th><th>Наград</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for person in persons %}
+      <tr>
+        <td><img class="thumb" src="/media?path={{ person.thumbnail_path | default('', true) | urlencode }}" alt=""></td>
+        <td>{{ person.id }}</td>
+        <td>{{ person.fio }}</td>
+        <td>{{ person.birthday or "" }}</td>
+        <td>{{ person.rank_name or "" }}</td>
+        <td>{{ person.rewards_count }}</td>
+        <td><a href="/persons/{{ person.id }}">Открыть</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

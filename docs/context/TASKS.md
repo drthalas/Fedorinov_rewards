@@ -1,8 +1,24 @@
 # Tasks
 
+## Stage 2A
+
+Status: implemented in the local repository.
+
+Scope:
+
+- Minimal read-only web mirror pages.
+- Repository layer using SQLite `mode=ro`.
+- Safe media endpoint with fallback image behavior.
+- Dashboard, persons, person detail, photos, rewards, marks, guides, search, and health pages.
+
+Remaining validation:
+
+- Keep all future Stage 2B changes read-only until editing/backups are explicitly designed.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.
 - Implement Settings -> Data Source screen.
 - Implement local config storage for selected data directory.
 - Add validation report for connected database and media folders.
+- Stage 2B: improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

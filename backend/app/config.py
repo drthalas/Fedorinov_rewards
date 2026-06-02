@@ -35,6 +35,22 @@ class Settings(BaseModel):
             errors.append("READ_ONLY must remain true during the first stage")
         return errors
 
+    @property
+    def source_dir(self) -> Path:
+        return self.rewards_data_dir / "Source"
+
+    @property
+    def source_mark_dir(self) -> Path:
+        return self.rewards_data_dir / "SourceMark"
+
+    @property
+    def default_dir(self) -> Path:
+        return self.rewards_data_dir / "default"
+
+    @property
+    def nofoto_path(self) -> Path:
+        return self.default_dir / "nofoto.jpg"
+
 
 def _env_path(name: str, default: Optional[str] = None) -> Path:
     value = os.getenv(name, default)

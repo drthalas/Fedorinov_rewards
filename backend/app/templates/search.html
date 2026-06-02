@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Поиск{% endblock %}
+{% block content %}
+<h1>Поиск</h1>
+<form class="form-row" method="get" action="/search">
+  <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер">
+  <button type="submit">Искать</button>
+</form>
+
+<section class="grid">
+  <div class="panel">
+    <h2>Persons</h2>
+    <ul>
+      {% for person in results.persons %}
+      <li><a href="/persons/{{ person.id }}">#{{ person.id }} · {{ person.fio }}</a> · {{ person.rank_name or "" }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>Rewards</h2>
+    <ul>
+      {% for reward in results.rewards %}
+      <li><a href="/rewards/{{ reward.id }}">#{{ reward.id }} · {{ reward.name or "" }}</a> · № {{ reward.number or "" }} · {{ reward.fio }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>Marks</h2>
+    <ul>
+      {% for mark in results.marks %}
+      <li><a href="/marks/{{ mark.id }}">#{{ mark.id }} · {{ mark.name or "" }}</a> · № {{ mark.number or "" }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endblock %}

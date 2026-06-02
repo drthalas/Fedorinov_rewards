@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Награжденный #{{ person.id }}{% endblock %}
+{% block content %}
+<h1>{{ person.fio }}</h1>
+<p><a href="/persons">← к списку</a> · <a href="/persons/{{ person.id }}/photos">Все фото</a></p>
+
+<section class="grid">
+  <div class="panel">
+    <h2>Карточка</h2>
+    <dl class="details">
+      <dt>ID</dt><dd>{{ person.id }}</dd>
+      <dt>ФИО</dt><dd>{{ person.fio }}</dd>
+      <dt>Дата рождения</dt><dd>{{ person.birthday or "" }}</dd>
+      <dt>Звание/специальность</dt><dd>{{ person.rank_name or "" }}</dd>
+    </dl>
+  </div>
+  <div class="panel">
+    <h2>Главное фото</h2>
+    <img class="photo" src="/media?path={{ person.main_foto | default('', true) | urlencode }}" alt="">
+  </div>
+</section>
+
+<h2>Фото</h2>
+<div class="photo-grid">
+  {% for label, path in [
+    ("Фото кавалера", person.person_foto),
+    ("Общее фото наград", person.rewards_foto),
+    ("Фото книжки 1", person.book1_foto),
+    ("Фото книжки 2", person.book2_foto),
+    ("Фото карточки 1", person.card1_foto),
+    ("Фото карточки 2", person.card2_foto)
+  ] %}
+  <div class="card">
+    <img class="photo" src="/media?path={{ path | default('', true) | urlencode }}" alt="">
+    <p>{{ label }}</p>
+  </div>
+  {% endfor %}
+</div>
+
+<h2>Награды</h2>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>ID</th><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for reward in rewards %}
+      <tr>
+        <td>{{ reward.id }}</td>
+        <td>{{ reward.gos or "" }}</td>
+        <td>{{ reward.category or "" }}</td>
+        <td>{{ reward.subcategory or "" }}</td>
+        <td>{{ reward.name or "" }}</td>
+        <td>{{ reward.number or "" }}</td>
+        <td>{{ reward.instock }}</td>
+        <td>{{ reward.date_purchase or "" }}</td>
+        <td>{{ reward.price_purchase or "" }}</td>
+        <td>{{ reward.price_now or "" }}</td>
+        <td><a href="/rewards/{{ reward.id }}">Открыть</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

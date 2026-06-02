@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Знак #{{ mark.id }}{% endblock %}
+{% block content %}
+<h1>Знак #{{ mark.id }}</h1>
+<p><a href="/marks">← к списку</a></p>
+<section class="panel">
+  <dl class="details">
+    <dt>ID</dt><dd>{{ mark.id }}</dd>
+    <dt>Государство</dt><dd>{{ mark.gos or "" }}</dd>
+    <dt>Категория</dt><dd>{{ mark.category or "" }}</dd>
+    <dt>Подкатегория</dt><dd>{{ mark.subcategory or "" }}</dd>
+    <dt>Наименование</dt><dd>{{ mark.name or "" }}</dd>
+    <dt>ID link</dt><dd>{{ mark.id_link or "" }}</dd>
+    <dt>Номер</dt><dd>{{ mark.number or "" }}</dd>
+    <dt>Наличие</dt><dd>{{ mark.instock }}</dd>
+    <dt>Дата покупки</dt><dd>{{ mark.date_purchase or "" }}</dd>
+    <dt>Цена покупки</dt><dd>{{ mark.price_purchase or "" }}</dd>
+    <dt>Текущая цена</dt><dd>{{ mark.price_now or "" }}</dd>
+  </dl>
+</section>
+<h2>Фото</h2>
+<div class="photo-grid">
+  {% for photo in photos %}
+  <div class="card">
+    <img class="photo" src="/media?path={{ photo.path | default('', true) | urlencode }}" alt="">
+    <p>{{ photo.label }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

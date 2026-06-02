@@ -1,0 +1,150 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #1f2933;
+  background: #f7f8fa;
+}
+
+a {
+  color: #0f766e;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.topbar {
+  background: #263238;
+  color: #fff;
+  padding: 14px 24px;
+}
+
+.topbar a {
+  color: #fff;
+  margin-right: 18px;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.header {
+  margin-bottom: 18px;
+}
+
+.muted {
+  color: #667085;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.panel,
+.card {
+  background: #fff;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  border-bottom: 1px solid #e6e9ee;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #eef2f6;
+  font-weight: 700;
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border: 1px solid #d9dee5;
+  background: #fff;
+}
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border: 1px solid #d9dee5;
+  background: #fff;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 8px 14px;
+}
+
+.details dt {
+  font-weight: 700;
+  color: #475467;
+}
+
+.details dd {
+  margin: 0;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.form-row input {
+  flex: 1;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.form-row button {
+  padding: 9px 14px;
+  border: 1px solid #0f766e;
+  border-radius: 4px;
+  background: #0f766e;
+  color: #fff;
+}
+
+.tree ul {
+  margin-top: 6px;
+}
+
+.tree li {
+  margin: 4px 0;
+}

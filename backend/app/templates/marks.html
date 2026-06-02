@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Знаки{% endblock %}
+{% block content %}
+<h1>Знаки</h1>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Фото</th><th>ID</th><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Текущая цена</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for mark in marks %}
+      <tr>
+        <td><img class="thumb" src="/media?path={{ mark.thumbnail_path | default('', true) | urlencode }}" alt=""></td>
+        <td>{{ mark.id }}</td>
+        <td>{{ mark.gos or "" }}</td>
+        <td>{{ mark.category or "" }}</td>
+        <td>{{ mark.subcategory or "" }}</td>
+        <td>{{ mark.name or "" }}</td>
+        <td>{{ mark.number or "" }}</td>
+        <td>{{ mark.instock }}</td>
+        <td>{{ mark.price_now or "" }}</td>
+        <td><a href="/marks/{{ mark.id }}">Открыть</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

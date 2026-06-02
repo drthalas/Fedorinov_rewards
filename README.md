@@ -82,3 +82,41 @@ scripts/run_dev.sh
 ```
 
 The app starts on `127.0.0.1:8080` by default. The first stage is read-only and uses SQLite with `mode=ro`.
+
+## Stage 2A Read-Only Mirror
+
+The minimal web mirror is available at:
+
+- `/` - dashboard and table counts
+- `/persons` - awarded persons list
+- `/persons/{id}` - awarded person card
+- `/persons/{id}/photos` - person and reward photo gallery
+- `/rewards/{id}` - reward card
+- `/marks` - standalone marks list
+- `/marks/{id}` - mark card
+- `/guides` - read-only guide tree
+- `/search` - simple search by name/title/number
+- `/health` - environment diagnostics
+
+Start the backend on the Mac mini:
+
+```sh
+cd ~/Projects/Fedorinov_Rewards/Fedorinov_rewards
+scripts/run_dev.sh
+```
+
+The backend binds to `127.0.0.1:8080`.
+
+Open it from a MacBook through an SSH tunnel:
+
+```sh
+ssh -N -L 8080:127.0.0.1:8080 hermes-mini
+```
+
+Then open:
+
+```text
+http://127.0.0.1:8080
+```
+
+The mirror is read-only. It must not modify `/Users/hermes/Desktop/Rewards`, write to SQLite, copy media files, or run legacy executables.

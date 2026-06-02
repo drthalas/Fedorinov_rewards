@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Fedorinov Rewards{% endblock %}
+{% block content %}
+<section class="header">
+  <h1>Fedorinov Rewards</h1>
+  <p class="muted">Минимальный read-only web mirror старого приложения Rewards / Награды.</p>
+</section>
+
+<section class="grid">
+  <div class="panel">
+    <h2>Статус</h2>
+    <p>Read-only: <strong>{{ settings.read_only }}</strong></p>
+    <p>Data dir: <code>{{ settings.rewards_data_dir }}</code></p>
+    <p>Database: <code>{{ settings.rewards_db_path }}</code></p>
+  </div>
+  <div class="panel">
+    <h2>Навигация</h2>
+    <p><a href="/persons">/persons</a></p>
+    <p><a href="/marks">/marks</a></p>
+    <p><a href="/guides">/guides</a></p>
+    <p><a href="/search">/search</a></p>
+    <p><a href="/health">/health</a></p>
+  </div>
+</section>
+
+<h2>Counts</h2>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+    <tbody>
+      {% for table, count in counts.items() %}
+      <tr><td>{{ table }}</td><td>{{ count if count is not none else "missing" }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if errors %}
+<h2>Errors</h2>
+<ul>
+  {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

@@ -9,3 +9,9 @@ def open_readonly_connection(db_path: Path) -> sqlite3.Connection:
     connection = sqlite3.connect(uri, uri=True)
     connection.row_factory = sqlite3.Row
     return connection
+
+
+def row_to_dict(row: sqlite3.Row | None) -> dict[str, object] | None:
+    if row is None:
+        return None
+    return {key: row[key] for key in row.keys()}

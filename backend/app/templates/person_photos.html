@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Фото награжденного #{{ person.id }}{% endblock %}
+{% block content %}
+<h1>Фото: {{ person.fio }}</h1>
+<p><a href="/persons/{{ person.id }}">← к карточке</a></p>
+<div class="photo-grid">
+  {% for photo in photos %}
+  <div class="card">
+    <img class="photo" src="/media?path={{ photo.path | default('', true) | urlencode }}" alt="">
+    <p>{{ photo.label }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
