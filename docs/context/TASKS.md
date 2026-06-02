@@ -72,13 +72,25 @@ Rule:
 
 ## Stage 3B
 
-Status: next.
+Status: done.
 
 Scope:
 
 - Person CRUD foundation on the safe dev data root.
 - Enforce `WRITE_MODE=true` and recent backup checks before any write route.
 - Keep production/owner data protected until backup/restore validation is mature.
+- Create, update, and delete person records from the web UI in development write mode.
+- Block person delete while rewards still reference the person.
+
+## Stage 3C
+
+Status: next.
+
+Scope:
+
+- Reward CRUD foundation on the safe dev data root.
+- Duplicate-number validation for rewards.
+- Keep media upload/replacement deferred until Stage 3F.
 
 ## Backlog / Future
 

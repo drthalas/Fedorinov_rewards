@@ -18,6 +18,28 @@ a:hover {
   text-decoration: underline;
 }
 
+.button,
+button {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid #0f766e;
+  border-radius: 4px;
+  background: #0f766e;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+.button-danger {
+  border-color: #b42318;
+  background: #b42318;
+}
+
 .topbar {
   background: #263238;
   color: #fff;
@@ -60,6 +82,26 @@ a:hover {
 
 .muted {
   color: #667085;
+}
+
+.notice {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.notice-success {
+  color: #065f46;
+  background: #d1fae5;
+  border-color: #a7f3d0;
+}
+
+.notice-error {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fecaca;
 }
 
 .secondary {
@@ -184,6 +226,47 @@ th {
   border-radius: 4px;
   background: #0f766e;
   color: #fff;
+}
+
+.edit-form {
+  max-width: 720px;
+  background: #fff;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.edit-form label {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.edit-form label span {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 700;
+  color: #475467;
+}
+
+.edit-form input,
+.edit-form select,
+.edit-form textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.actions form {
+  margin: 0;
 }
 
 .badge {

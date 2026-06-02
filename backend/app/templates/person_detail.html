@@ -2,7 +2,16 @@
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
 <h1>{{ person.fio }}</h1>
+{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p><a href="/persons">← к списку</a> · <a href="/persons/{{ person.id }}/photos">Все фото</a></p>
+{% if settings.write_mode %}
+<div class="actions">
+  <a class="button" href="/persons/{{ person.id }}/edit">Изменить</a>
+  <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Удалить награжденного?');">
+    <button class="button-danger" type="submit">Удалить</button>
+  </form>
+</div>
+{% endif %}
 
 <section class="grid">
   <div class="panel">

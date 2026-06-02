@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 3B Person CRUD
+
+- Added guarded person create/edit/delete repository functions using parameterized SQL.
+- Added write-mode checks and recent-backup enforcement before person writes.
+- Added web routes and forms for `/persons/new`, `/persons/{id}/edit`, and `/persons/{id}/delete`.
+- Added write-mode-only buttons on person list/detail pages while keeping read-only mode locked down.
+- Blocked person delete when rewards still reference that person.
+- Added audit logging for person create/update/delete actions.
+- Added unit tests for disabled write mode, create, update, delete, delete-with-rewards blocking, and quoted text handling.
+
 ## Stage 3A Backup and Write-Mode Foundation
 
 - Added `scripts/backup_dev_data.py` to create safe local backups outside Git.

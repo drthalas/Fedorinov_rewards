@@ -124,3 +124,26 @@ http://127.0.0.1:8080
 The mirror is read-only. It must not modify `/Users/hermes/Desktop/Rewards`, write to SQLite, copy media files, or run legacy executables.
 
 Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
+
+## Development Write Mode
+
+Write mode is for the local development stand only. Keep owner preview and production-style runs in read-only mode:
+
+```sh
+WRITE_MODE=false
+```
+
+Before enabling write mode, create and validate a fresh backup:
+
+```sh
+REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards python3 scripts/backup_dev_data.py
+python3 scripts/check_backup.py ~/LocalData/FedorinovRewards/backups/Rewards_backup_YYYYMMDD_HHMMSS.zip
+```
+
+Run development write mode explicitly when testing CRUD:
+
+```sh
+WRITE_MODE=true REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
+```
+
+Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.

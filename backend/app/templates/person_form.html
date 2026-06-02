@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}</h1>
+<p><a href="/persons">← к списку</a>{% if mode == "edit" %} · <a href="/persons/{{ person.id }}">к карточке</a>{% endif %}</p>
+
+{% if error %}
+<section class="notice notice-error">{{ error }}</section>
+{% endif %}
+
+<form class="edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+  <label>
+    <span>ФИО</span>
+    <input name="fio" value="{{ person.fio or '' }}" required>
+  </label>
+  <label>
+    <span>Дата рождения</span>
+    <input name="birthday" value="{{ person.birthday or '' }}" placeholder="YYYY-MM-DD">
+  </label>
+  <label>
+    <span>Звание/специальность</span>
+    <select name="id_rank">
+      <option value="">—</option>
+      {% for rank in ranks %}
+      <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>
+    <span>Link 1</span>
+    <input name="link1" value="{{ person.link1 or '' }}">
+  </label>
+  <label>
+    <span>Link 2</span>
+    <input name="link2" value="{{ person.link2 or '' }}">
+  </label>
+  <label>
+    <span>Комментарий</span>
+    <textarea name="comment" rows="5">{{ person.comment or '' }}</textarea>
+  </label>
+  <div class="actions">
+    <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
+    <a href="{% if mode == 'create' %}/persons{% else %}/persons/{{ person.id }}{% endif %}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

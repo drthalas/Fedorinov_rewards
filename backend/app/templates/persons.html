@@ -2,6 +2,12 @@
 {% block title %}Награжденные{% endblock %}
 {% block content %}
 <h1>Награжденные</h1>
+{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
+{% if settings.write_mode %}
+<p><a class="button" href="/persons/new">Добавить награжденного</a></p>
+{% else %}
+<p class="notice">Редактирование выключено.</p>
+{% endif %}
 <p class="muted">Всего: {{ pagination.total }} · страница {{ pagination.page }} из {{ pagination.total_pages }}</p>
 <div class="table-wrap">
   <table>
