@@ -1,5 +1,13 @@
 # Changelog
 
+## Stage 2A QA Accepted
+
+- Hermes QA passed for Stage 2A.
+- All target pages returned HTTP 200.
+- Broken images: 0.
+- Real media displayed from the stable dev data root.
+- Stable dev data root: `/Users/hermes/LocalData/FedorinovRewards/Rewards`.
+
 ## Dev Data Root Stabilization
 
 - Documented that Desktop-hosted sample data can block on read in the current environment.

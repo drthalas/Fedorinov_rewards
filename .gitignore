@@ -15,6 +15,7 @@ Source/
 SourceMark/
 data/*
 legacy/_external/
+docs/reports/
 
 !data/.gitkeep
 !data/README.md
