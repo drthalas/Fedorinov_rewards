@@ -1,11 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Справочник{% endblock %}
 {% macro render_nodes(nodes) %}
-<ul>
+<ul class="tree-list">
   {% for node in nodes %}
   <li>
-    <span>Level {{ node.level }} · #{{ node.id }} · {{ node.name }}</span>
-    {% if node.children %}{{ render_nodes(node.children) }}{% endif %}
+    {% if node.children %}
+    <details>
+      <summary><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></summary>
+      {{ render_nodes(node.children) }}
+    </details>
+    {% else %}
+    <div class="tree-leaf"><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></div>
+    {% endif %}
   </li>
   {% endfor %}
 </ul>

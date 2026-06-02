@@ -5,9 +5,10 @@
 <p><a href="/persons/{{ person.id }}">← к карточке</a></p>
 <div class="photo-grid">
   {% for photo in photos %}
-  <div class="card">
-    <img class="photo" src="{{ media_url(photo.path) }}" alt="">
+  <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    <img class="photo {{ 'placeholder-image' if not has_media_path(photo.path) else '' }}" src="{{ media_url(photo.path) }}" alt="">
     <p>{{ photo.label }}</p>
+    {% if not has_media_path(photo.path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
   {% endfor %}
 </div>

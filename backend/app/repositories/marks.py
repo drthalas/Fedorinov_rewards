@@ -3,7 +3,12 @@ from pathlib import Path
 from .common import fetch_all, fetch_one
 
 
-def list_marks(db_path: Path) -> list[dict[str, object]]:
+def count_marks(db_path: Path) -> int:
+    row = fetch_one(db_path, "select count(*) as count from mark")
+    return int(row["count"]) if row else 0
+
+
+def list_marks(db_path: Path, limit: int = 25, offset: int = 0) -> list[dict[str, object]]:
     return fetch_all(
         db_path,
         """
@@ -25,7 +30,9 @@ def list_marks(db_path: Path) -> list[dict[str, object]]:
         left join guide_lev_2 g2 on g2.id = m.id_sub_catigory
         left join guide_lev_3 g3 on g3.id = m.id_name
         order by m.id
+        limit ? offset ?
         """,
+        (limit, offset),
     )
 
 

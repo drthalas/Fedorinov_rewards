@@ -9,14 +9,15 @@
     <h2>Карточка</h2>
     <dl class="details">
       <dt>ID</dt><dd>{{ person.id }}</dd>
-      <dt>ФИО</dt><dd>{{ person.fio }}</dd>
-      <dt>Дата рождения</dt><dd>{{ person.birthday or "" }}</dd>
-      <dt>Звание/специальность</dt><dd>{{ person.rank_name or "" }}</dd>
+      <dt>ФИО</dt><dd>{{ person.fio|dash }}</dd>
+      <dt>Дата рождения</dt><dd>{{ person.birthday|format_date }}</dd>
+      <dt>Звание/специальность</dt><dd>{{ person.rank_name|dash }}</dd>
     </dl>
   </div>
   <div class="panel">
     <h2>Главное фото</h2>
-    <img class="photo" src="{{ media_url(person.main_foto) }}" alt="">
+    <img class="photo {{ 'placeholder-image' if not has_media_path(person.main_foto) else '' }}" src="{{ media_url(person.main_foto) }}" alt="">
+    {% if not has_media_path(person.main_foto) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
 </section>
 
@@ -30,9 +31,10 @@
     ("Фото карточки 1", person.card1_foto),
     ("Фото карточки 2", person.card2_foto)
   ] %}
-  <div class="card">
-    <img class="photo" src="{{ media_url(path) }}" alt="">
+  <div class="card {{ 'placeholder-card' if not has_media_path(path) else '' }}">
+    <img class="photo {{ 'placeholder-image' if not has_media_path(path) else '' }}" src="{{ media_url(path) }}" alt="">
     <p>{{ label }}</p>
+    {% if not has_media_path(path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
   {% endfor %}
 </div>
@@ -47,15 +49,15 @@
       {% for reward in rewards %}
       <tr>
         <td>{{ reward.id }}</td>
-        <td>{{ reward.gos or "" }}</td>
-        <td>{{ reward.category or "" }}</td>
-        <td>{{ reward.subcategory or "" }}</td>
-        <td>{{ reward.name or "" }}</td>
-        <td>{{ reward.number or "" }}</td>
-        <td>{{ reward.instock }}</td>
-        <td>{{ reward.date_purchase or "" }}</td>
-        <td>{{ reward.price_purchase or "" }}</td>
-        <td>{{ reward.price_now or "" }}</td>
+        <td>{{ reward.gos|dash }}</td>
+        <td>{{ reward.category|dash }}</td>
+        <td>{{ reward.subcategory|dash }}</td>
+        <td>{{ reward.name|dash }}</td>
+        <td>{{ reward.number|dash }}</td>
+        <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span></td>
+        <td>{{ reward.date_purchase|format_date }}</td>
+        <td>{{ reward.price_purchase|format_money }}</td>
+        <td>{{ reward.price_now|format_money }}</td>
         <td><a href="/rewards/{{ reward.id }}">Открыть</a></td>
       </tr>
       {% endfor %}

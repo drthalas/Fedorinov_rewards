@@ -1,10 +1,38 @@
 from pathlib import Path
 
-from .common import fetch_all
+from .common import fetch_all, fetch_one
 
 
-def search_all(db_path: Path, query: str) -> dict[str, list[dict[str, object]]]:
+def _count(db_path: Path, query: str, params: tuple[object, ...]) -> int:
+    row = fetch_one(db_path, query, params)
+    return int(row["count"]) if row else 0
+
+
+def search_all(db_path: Path, query: str, limit: int = 25) -> dict[str, object]:
     like = f"%{query.strip()}%"
+    counts = {
+        "persons": _count(db_path, "select count(*) as count from person p where p.fio like ?", (like,)),
+        "rewards": _count(
+            db_path,
+            """
+            select count(*) as count
+            from rewards r
+            left join guide_lev_3 g3 on g3.id = r.id_name
+            where g3.name like ? or cast(r.number as text) like ?
+            """,
+            (like, like),
+        ),
+        "marks": _count(
+            db_path,
+            """
+            select count(*) as count
+            from mark m
+            left join guide_lev_3 g3 on g3.id = m.id_name
+            where g3.name like ? or cast(m.number as text) like ?
+            """,
+            (like, like),
+        ),
+    }
 
     persons = fetch_all(
         db_path,
@@ -14,9 +42,9 @@ def search_all(db_path: Path, query: str) -> dict[str, list[dict[str, object]]]:
         left join guide g on g.id = p.id_rank
         where p.fio like ?
         order by p.id
-        limit 100
+        limit ?
         """,
-        (like,),
+        (like, limit),
     )
     rewards = fetch_all(
         db_path,
@@ -27,9 +55,9 @@ def search_all(db_path: Path, query: str) -> dict[str, list[dict[str, object]]]:
         left join guide_lev_3 g3 on g3.id = r.id_name
         where g3.name like ? or cast(r.number as text) like ?
         order by r.id
-        limit 100
+        limit ?
         """,
-        (like, like),
+        (like, like, limit),
     )
     marks = fetch_all(
         db_path,
@@ -39,8 +67,8 @@ def search_all(db_path: Path, query: str) -> dict[str, list[dict[str, object]]]:
         left join guide_lev_3 g3 on g3.id = m.id_name
         where g3.name like ? or cast(m.number as text) like ?
         order by m.id
-        limit 100
+        limit ?
         """,
-        (like, like),
+        (like, like, limit),
     )
-    return {"persons": persons, "rewards": rewards, "marks": marks}
+    return {"persons": persons, "rewards": rewards, "marks": marks, "counts": counts, "limit": limit}

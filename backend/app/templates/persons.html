@@ -2,6 +2,7 @@
 {% block title %}Награжденные{% endblock %}
 {% block content %}
 <h1>Награжденные</h1>
+<p class="muted">Всего: {{ pagination.total }} · страница {{ pagination.page }} из {{ pagination.total_pages }}</p>
 <div class="table-wrap">
   <table>
     <thead>
@@ -10,11 +11,14 @@
     <tbody>
       {% for person in persons %}
       <tr>
-        <td><img class="thumb" src="{{ media_url(person.thumbnail_path) }}" alt=""></td>
+        <td class="{{ 'placeholder-cell' if not has_media_path(person.thumbnail_path) else '' }}">
+          <img class="thumb {{ 'placeholder-image' if not has_media_path(person.thumbnail_path) else '' }}" src="{{ media_url(person.thumbnail_path) }}" alt="">
+          {% if not has_media_path(person.thumbnail_path) %}<div class="photo-caption muted">Нет фото</div>{% endif %}
+        </td>
         <td>{{ person.id }}</td>
-        <td>{{ person.fio }}</td>
-        <td>{{ person.birthday or "" }}</td>
-        <td>{{ person.rank_name or "" }}</td>
+        <td>{{ person.fio|dash }}</td>
+        <td>{{ person.birthday|format_date }}</td>
+        <td>{{ person.rank_name|dash }}</td>
         <td>{{ person.rewards_count }}</td>
         <td><a href="/persons/{{ person.id }}">Открыть</a></td>
       </tr>
@@ -22,4 +26,17 @@
     </tbody>
   </table>
 </div>
+<nav class="pagination">
+  {% if pagination.has_previous %}
+  <a href="/persons?page={{ pagination.previous_page }}&page_size={{ pagination.page_size }}">Назад</a>
+  {% else %}
+  <span>Назад</span>
+  {% endif %}
+  <span>{{ pagination.page }} / {{ pagination.total_pages }}</span>
+  {% if pagination.has_next %}
+  <a href="/persons?page={{ pagination.next_page }}&page_size={{ pagination.page_size }}">Вперед</a>
+  {% else %}
+  <span>Вперед</span>
+  {% endif %}
+</nav>
 {% endblock %}

@@ -6,25 +6,26 @@
 <section class="panel">
   <dl class="details">
     <dt>ID</dt><dd>{{ reward.id }}</dd>
-    <dt>Владелец</dt><dd>{{ reward.person_id }} · {{ reward.fio }}</dd>
-    <dt>Государство</dt><dd>{{ reward.gos or "" }}</dd>
-    <dt>Категория</dt><dd>{{ reward.category or "" }}</dd>
-    <dt>Подкатегория</dt><dd>{{ reward.subcategory or "" }}</dd>
-    <dt>Наименование</dt><dd>{{ reward.name or "" }}</dd>
-    <dt>ID link / ссылки</dt><dd>{{ reward.id_link or "" }}</dd>
-    <dt>Номер</dt><dd>{{ reward.number or "" }}</dd>
-    <dt>Наличие</dt><dd>{{ reward.instock }}</dd>
-    <dt>Дата покупки</dt><dd>{{ reward.date_purchase or "" }}</dd>
-    <dt>Цена покупки</dt><dd>{{ reward.price_purchase or "" }}</dd>
-    <dt>Текущая цена</dt><dd>{{ reward.price_now or "" }}</dd>
+    <dt>Владелец</dt><dd>{{ reward.person_id }} · {{ reward.fio|dash }}</dd>
+    <dt>Государство</dt><dd>{{ reward.gos|dash }}</dd>
+    <dt>Категория</dt><dd>{{ reward.category|dash }}</dd>
+    <dt>Подкатегория</dt><dd>{{ reward.subcategory|dash }}</dd>
+    <dt>Наименование</dt><dd>{{ reward.name|dash }}</dd>
+    <dt>ID link / ссылки</dt><dd class="secondary">{{ reward.id_link|dash }}</dd>
+    <dt>Номер</dt><dd>{{ reward.number|dash }}</dd>
+    <dt>Наличие</dt><dd><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span></dd>
+    <dt>Дата покупки</dt><dd>{{ reward.date_purchase|format_date }}</dd>
+    <dt>Цена покупки</dt><dd>{{ reward.price_purchase|format_money }}</dd>
+    <dt>Текущая цена</dt><dd>{{ reward.price_now|format_money }}</dd>
   </dl>
 </section>
 <h2>Фото</h2>
 <div class="photo-grid">
   {% for photo in photos %}
-  <div class="card">
-    <img class="photo" src="{{ media_url(photo.path) }}" alt="">
+  <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    <img class="photo {{ 'placeholder-image' if not has_media_path(photo.path) else '' }}" src="{{ media_url(photo.path) }}" alt="">
     <p>{{ photo.label }}</p>
+    {% if not has_media_path(photo.path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
   {% endfor %}
 </div>

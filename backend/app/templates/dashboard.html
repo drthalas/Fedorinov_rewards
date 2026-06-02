@@ -9,7 +9,7 @@
 <section class="grid">
   <div class="panel">
     <h2>Статус</h2>
-    <p>Read-only: <strong>{{ settings.read_only }}</strong></p>
+    <p>Read-only: <span class="badge badge-{{ settings.read_only|bool_class }}">{{ settings.read_only|format_bool("Да", "Нет") }}</span></p>
     <p>Data dir: <code>{{ settings.rewards_data_dir }}</code></p>
     <p>Database: <code>{{ settings.rewards_db_path }}</code></p>
   </div>

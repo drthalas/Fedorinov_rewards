@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 2B UX Readability Polish
+
+- Added centralized display helpers for dates, money, booleans, empty values, media presence, and pagination metadata.
+- Replaced technical boolean/date/price output in templates with human-readable labels, `DD.MM.YYYY` dates, and ruble formatting.
+- Added basic pagination to `/persons` and `/marks` with `page` and `page_size` query parameters.
+- Limited `/search` to the first 25 results per group and added per-group counts, preserved query text, empty-query guidance, and no-results messaging.
+- Improved placeholder photo styling and added "Нет фото" captions when a media field is empty.
+- Made `/guides` easier to scan with collapsible nested `details` sections.
+- Kept Stage 2B read-only; editing remains blocked until backup/migration architecture is defined.
+
 ## Stage 2A QA Accepted
 
 - Hermes QA passed for Stage 2A.

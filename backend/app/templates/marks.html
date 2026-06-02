@@ -2,6 +2,7 @@
 {% block title %}Знаки{% endblock %}
 {% block content %}
 <h1>Знаки</h1>
+<p class="muted">Всего: {{ pagination.total }} · страница {{ pagination.page }} из {{ pagination.total_pages }}</p>
 <div class="table-wrap">
   <table>
     <thead>
@@ -10,19 +11,35 @@
     <tbody>
       {% for mark in marks %}
       <tr>
-        <td><img class="thumb" src="{{ media_url(mark.thumbnail_path) }}" alt=""></td>
+        <td class="{{ 'placeholder-cell' if not has_media_path(mark.thumbnail_path) else '' }}">
+          <img class="thumb {{ 'placeholder-image' if not has_media_path(mark.thumbnail_path) else '' }}" src="{{ media_url(mark.thumbnail_path) }}" alt="">
+          {% if not has_media_path(mark.thumbnail_path) %}<div class="photo-caption muted">Нет фото</div>{% endif %}
+        </td>
         <td>{{ mark.id }}</td>
-        <td>{{ mark.gos or "" }}</td>
-        <td>{{ mark.category or "" }}</td>
-        <td>{{ mark.subcategory or "" }}</td>
-        <td>{{ mark.name or "" }}</td>
-        <td>{{ mark.number or "" }}</td>
-        <td>{{ mark.instock }}</td>
-        <td>{{ mark.price_now or "" }}</td>
+        <td>{{ mark.gos|dash }}</td>
+        <td>{{ mark.category|dash }}</td>
+        <td>{{ mark.subcategory|dash }}</td>
+        <td>{{ mark.name|dash }}</td>
+        <td>{{ mark.number|dash }}</td>
+        <td><span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></td>
+        <td>{{ mark.price_now|format_money }}</td>
         <td><a href="/marks/{{ mark.id }}">Открыть</a></td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+<nav class="pagination">
+  {% if pagination.has_previous %}
+  <a href="/marks?page={{ pagination.previous_page }}&page_size={{ pagination.page_size }}">Назад</a>
+  {% else %}
+  <span>Назад</span>
+  {% endif %}
+  <span>{{ pagination.page }} / {{ pagination.total_pages }}</span>
+  {% if pagination.has_next %}
+  <a href="/marks?page={{ pagination.next_page }}&page_size={{ pagination.page_size }}">Вперед</a>
+  {% else %}
+  <span>Вперед</span>
+  {% endif %}
+</nav>
 {% endblock %}

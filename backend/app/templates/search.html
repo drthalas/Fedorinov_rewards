@@ -7,30 +7,46 @@
   <button type="submit">Искать</button>
 </form>
 
+{% if not q.strip() %}
+<section class="panel">
+  <p class="muted">Введите ФИО, название награды или номер. Пустой поиск не загружает весь справочник.</p>
+</section>
+{% else %}
+{% set total_found = results.counts.persons + results.counts.rewards + results.counts.marks %}
+{% if total_found == 0 %}
+<section class="panel">
+  <p>Ничего не найдено.</p>
+</section>
+{% else %}
 <section class="grid">
   <div class="panel">
-    <h2>Persons</h2>
+    <h2>Награжденные</h2>
+    <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.limit }}</p>
     <ul>
       {% for person in results.persons %}
-      <li><a href="/persons/{{ person.id }}">#{{ person.id }} · {{ person.fio }}</a> · {{ person.rank_name or "" }}</li>
+      <li><a href="/persons/{{ person.id }}">#{{ person.id }} · {{ person.fio|dash }}</a> · {{ person.rank_name|dash }} · {{ person.birthday|format_date }}</li>
       {% endfor %}
     </ul>
   </div>
   <div class="panel">
-    <h2>Rewards</h2>
+    <h2>Награды</h2>
+    <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.limit }}</p>
     <ul>
       {% for reward in results.rewards %}
-      <li><a href="/rewards/{{ reward.id }}">#{{ reward.id }} · {{ reward.name or "" }}</a> · № {{ reward.number or "" }} · {{ reward.fio }}</li>
+      <li><a href="/rewards/{{ reward.id }}">#{{ reward.id }} · {{ reward.name|dash }}</a> · № {{ reward.number|dash }} · <span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span> · {{ reward.fio|dash }}</li>
       {% endfor %}
     </ul>
   </div>
   <div class="panel">
-    <h2>Marks</h2>
+    <h2>Знаки</h2>
+    <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.limit }}</p>
     <ul>
       {% for mark in results.marks %}
-      <li><a href="/marks/{{ mark.id }}">#{{ mark.id }} · {{ mark.name or "" }}</a> · № {{ mark.number or "" }}</li>
+      <li><a href="/marks/{{ mark.id }}">#{{ mark.id }} · {{ mark.name|dash }}</a> · № {{ mark.number|dash }} · <span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></li>
       {% endfor %}
     </ul>
   </div>
 </section>
+{% endif %}
+{% endif %}
 {% endblock %}

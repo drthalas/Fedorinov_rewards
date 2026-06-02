@@ -32,12 +32,20 @@ Dev data stabilization:
 
 ## Stage 2B
 
-Status: next.
+Status: done.
 
 Scope:
 
 - UX and readability polish for the read-only mirror.
 - Keep Stage 2B read-only.
+- Format boolean values, dates, prices, and empty fields in templates.
+- Add basic pagination for `/persons` and `/marks`.
+- Limit `/search` results to the first 25 records per group with counts.
+- Make `/guides` easier to read with collapsible tree sections.
+
+Next:
+
+- Hermes QA Stage 2B.
 
 Editing status:
 

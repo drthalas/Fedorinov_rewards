@@ -3,7 +3,12 @@ from pathlib import Path
 from .common import fetch_all, fetch_one
 
 
-def list_persons(db_path: Path) -> list[dict[str, object]]:
+def count_persons(db_path: Path) -> int:
+    row = fetch_one(db_path, "select count(*) as count from person")
+    return int(row["count"]) if row else 0
+
+
+def list_persons(db_path: Path, limit: int = 25, offset: int = 0) -> list[dict[str, object]]:
     return fetch_all(
         db_path,
         """
@@ -21,7 +26,9 @@ def list_persons(db_path: Path) -> list[dict[str, object]]:
         left join rewards r on r.person_id = p.id
         group by p.id
         order by p.id
+        limit ? offset ?
         """,
+        (limit, offset),
     )
 
 

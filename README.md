@@ -23,7 +23,7 @@ cp .env.example .env
 The expected local data location is:
 
 ```sh
-REWARDS_DATA_DIR=/Users/hermes/Desktop/Rewards
+REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards
 ```
 
 Expected files and folders:
@@ -89,10 +89,12 @@ The minimal web mirror is available at:
 
 - `/` - dashboard and table counts
 - `/persons` - awarded persons list
+- `/persons?page=1&page_size=25` - awarded persons list with basic pagination
 - `/persons/{id}` - awarded person card
 - `/persons/{id}/photos` - person and reward photo gallery
 - `/rewards/{id}` - reward card
 - `/marks` - standalone marks list
+- `/marks?page=1&page_size=25` - standalone marks list with basic pagination
 - `/marks/{id}` - mark card
 - `/guides` - read-only guide tree
 - `/search` - simple search by name/title/number
@@ -120,3 +122,5 @@ http://127.0.0.1:8080
 ```
 
 The mirror is read-only. It must not modify `/Users/hermes/Desktop/Rewards`, write to SQLite, copy media files, or run legacy executables.
+
+Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
