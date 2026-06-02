@@ -15,6 +15,12 @@ Remaining validation:
 
 - Keep all future Stage 2B changes read-only until editing/backups are explicitly designed.
 
+Bugfix status:
+
+- Media resolver and template media URL generation fixed for POSIX and Windows-style photo paths.
+- Media endpoint now handles HEAD checks and avoids hanging on unreadable local files.
+- Minimal media resolver tests added.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

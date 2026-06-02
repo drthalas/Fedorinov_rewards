@@ -16,7 +16,7 @@
   </div>
   <div class="panel">
     <h2>Главное фото</h2>
-    <img class="photo" src="/media?path={{ person.main_foto | default('', true) | urlencode }}" alt="">
+    <img class="photo" src="{{ media_url(person.main_foto) }}" alt="">
   </div>
 </section>
 
@@ -31,7 +31,7 @@
     ("Фото карточки 2", person.card2_foto)
   ] %}
   <div class="card">
-    <img class="photo" src="/media?path={{ path | default('', true) | urlencode }}" alt="">
+    <img class="photo" src="{{ media_url(path) }}" alt="">
     <p>{{ label }}</p>
   </div>
   {% endfor %}

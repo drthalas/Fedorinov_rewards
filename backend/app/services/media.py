@@ -19,7 +19,7 @@ def _normalize_db_path(raw_path: str) -> str:
         return ""
     value = value.replace("\\", "/")
     windows = PureWindowsPath(value)
-    if windows.drive:
+    if windows.drive and not Path(value).is_absolute():
         return ""
     return value
 
@@ -44,8 +44,17 @@ def resolve_media_path(settings: Settings, raw_path: object) -> Path | None:
         return resolved if resolved.exists() and resolved.is_file() else fallback_image(settings)
 
     parts = candidate.parts
-    if not parts or parts[0] not in ALLOWED_ROOTS:
+    if not parts:
         return fallback_image(settings)
+
+    if parts[0] not in ALLOWED_ROOTS:
+        for index, part in enumerate(parts):
+            if part in ALLOWED_ROOTS:
+                candidate = Path(*parts[index:])
+                parts = candidate.parts
+                break
+        else:
+            return fallback_image(settings)
 
     resolved = (data_root / candidate).resolve()
     try:

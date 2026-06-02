@@ -6,7 +6,7 @@
 <div class="photo-grid">
   {% for photo in photos %}
   <div class="card">
-    <img class="photo" src="/media?path={{ photo.path | default('', true) | urlencode }}" alt="">
+    <img class="photo" src="{{ media_url(photo.path) }}" alt="">
     <p>{{ photo.label }}</p>
   </div>
   {% endfor %}

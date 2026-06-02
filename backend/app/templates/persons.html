@@ -10,7 +10,7 @@
     <tbody>
       {% for person in persons %}
       <tr>
-        <td><img class="thumb" src="/media?path={{ person.thumbnail_path | default('', true) | urlencode }}" alt=""></td>
+        <td><img class="thumb" src="{{ media_url(person.thumbnail_path) }}" alt=""></td>
         <td>{{ person.id }}</td>
         <td>{{ person.fio }}</td>
         <td>{{ person.birthday or "" }}</td>
