@@ -29,6 +29,25 @@ a:hover {
   margin-right: 18px;
 }
 
+.mode-banner {
+  padding: 8px 24px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.mode-readonly {
+  color: #065f46;
+  background: #d1fae5;
+  border-bottom: 1px solid #a7f3d0;
+}
+
+.mode-write {
+  color: #7a2e0e;
+  background: #ffedd5;
+  border-bottom: 1px solid #fed7aa;
+}
+
 .page {
   max-width: 1280px;
   margin: 0 auto;

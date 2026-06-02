@@ -51,6 +51,35 @@ Editing status:
 
 - Blocked until backup, migration, and editing architecture is designed.
 
+## Stage 3A
+
+Status: done.
+
+Scope:
+
+- Backup script for the safe development data root.
+- Backup validation script.
+- Explicit `WRITE_MODE=false` default.
+- Guarded SQLite write connection helper for future CRUD routes.
+- Backup freshness helper for future write gates.
+- Local audit log helper for future changes.
+- UI mode indicator for read-only vs development write mode.
+- Legacy feature gap map for full functional mirror planning.
+
+Rule:
+
+- All write stages require a fresh backup first.
+
+## Stage 3B
+
+Status: next.
+
+Scope:
+
+- Person CRUD foundation on the safe dev data root.
+- Enforce `WRITE_MODE=true` and recent backup checks before any write route.
+- Keep production/owner data protected until backup/restore validation is mature.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

@@ -19,3 +19,13 @@ SQLite access stays read-only through `mode=ro`. SQL queries are parameterized w
 Media access goes through a `/media` endpoint that resolves paths under `REWARDS_DATA_DIR` only and falls back to `default/nofoto.jpg` when a referenced image is absent.
 
 The web mirror intentionally displays the old application structure first. Redesign, editing, exports, uploads, backups, and DataSourceManager UI are deferred.
+
+## Stage 3A Development Write-Mode Discipline
+
+Development may enable write mode only on a safe local development data root, currently `/Users/hermes/LocalData/FedorinovRewards/Rewards`.
+
+Production and owner data remain protected until backup, restore, and validation workflows are mature.
+
+The full functional mirror should reproduce legacy write operations, but every write stage must use backup-first discipline. Future write routes must require explicit `WRITE_MODE=true`, use guarded write connections, and check that a recent backup exists before changing SQLite or media files.
+
+Audit logging for future write actions should avoid personal data and write to local files outside Git.

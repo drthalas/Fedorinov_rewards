@@ -10,12 +10,16 @@ __pycache__/
 *.pdf
 *.exe
 *.dll
+*.backup.zip
 database/
 Source/
 SourceMark/
 data/*
 legacy/_external/
 docs/reports/
+backups/
+logs/
+Rewards_backup_*.zip
 
 !data/.gitkeep
 !data/README.md

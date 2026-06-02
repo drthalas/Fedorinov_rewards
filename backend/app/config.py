@@ -16,6 +16,8 @@ class Settings(BaseModel):
     app_host: str = "127.0.0.1"
     app_port: int = 8080
     read_only: bool = True
+    write_mode: bool = False
+    require_backup_before_write: bool = True
 
     @property
     def data_dir_exists(self) -> bool:
@@ -31,8 +33,8 @@ class Settings(BaseModel):
             errors.append(f"REWARDS_DATA_DIR does not exist: {self.rewards_data_dir}")
         if not self.db_exists:
             errors.append(f"Rewards database does not exist: {self.rewards_db_path}")
-        if not self.read_only:
-            errors.append("READ_ONLY must remain true during the first stage")
+        if self.write_mode and self.read_only:
+            errors.append("WRITE_MODE=true requires READ_ONLY=false for future write routes")
         return errors
 
     @property
@@ -71,4 +73,6 @@ def get_settings() -> Settings:
         app_host=os.getenv("APP_HOST", "127.0.0.1"),
         app_port=int(os.getenv("APP_PORT", "8080")),
         read_only=os.getenv("READ_ONLY", "true").lower() == "true",
+        write_mode=os.getenv("WRITE_MODE", "false").lower() == "true",
+        require_backup_before_write=os.getenv("REQUIRE_BACKUP_BEFORE_WRITE", "true").lower() == "true",
     )

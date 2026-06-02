@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 3A Backup and Write-Mode Foundation
+
+- Added `scripts/backup_dev_data.py` to create safe local backups outside Git.
+- Added `scripts/check_backup.py` for read-only backup zip validation.
+- Added `WRITE_MODE=false` and `REQUIRE_BACKUP_BEFORE_WRITE=true` environment flags.
+- Added guarded SQLite write connection support for future CRUD routes while keeping existing viewer routes read-only.
+- Added backup freshness and audit service foundations for future write gates.
+- Added a read-only/write-mode UI indicator in the base layout.
+- Added `docs/legacy_feature_gap.md` and updated roadmap/context docs for Stage 3B+ CRUD planning.
+
 ## Stage 2B UX Readability Polish
 
 - Added centralized display helpers for dates, money, booleans, empty values, media presence, and pagination metadata.
