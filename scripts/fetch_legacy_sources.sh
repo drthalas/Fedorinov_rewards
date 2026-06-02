@@ -15,9 +15,12 @@ clone_or_update() {
   else
     git clone "${repo_url}" "${target_dir}"
   fi
+
+  git -C "${target_dir}" remote set-url --push origin DISABLED
 }
 
 clone_or_update "https://github.com/erypalovyury/rewards" "${EXTERNAL_DIR}/rewards"
 clone_or_update "https://github.com/erypalovyury/activation-rewards" "${EXTERNAL_DIR}/activation-rewards"
 
 echo "Legacy sources are available under ${EXTERNAL_DIR}"
+echo "Legacy push URLs are disabled intentionally."
