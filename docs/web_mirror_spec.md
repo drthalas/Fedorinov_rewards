@@ -111,3 +111,21 @@ The Stage 2 web mirror is read-only. It must not write to SQLite, copy media, de
 - Data hidden on first stage: Database contents and media paths beyond configured root.
 - Read-only actions: Refresh diagnostics.
 - Deferred: Repair/migration actions.
+
+## `/settings/data-source` - Data Source Settings
+
+- Purpose: Connect a local Rewards data folder for the current installation.
+- Legacy forms covered: None directly; this is new infrastructure for local-first deployment.
+- Tables read: Optional read-only database validation and safe aggregate diagnostics after the selected folder is checked.
+- Fields shown: Current connected folder, input for a local Rewards folder path, validation status, read-only mode status.
+- Photos shown: None directly; only media validation counts.
+- Data hidden on first stage: Raw personal data, raw photo filenames, comments, links, and database row contents.
+- Read-only actions: Enter or choose a folder path, check connection, save selected path in local config.
+- Validation status:
+  - `database/MyDatabase.sqlite` found or missing;
+  - `Source/` found or missing;
+  - `SourceMark/` found or missing;
+  - `default/nofoto.jpg` found or missing;
+  - photo links total/existing/missing;
+  - read-only mode enabled.
+- Deferred: Full OS-native file picker, data migrations, backups, editing, cloud sync, and any data upload.

@@ -17,7 +17,9 @@ The backend is responsible for configuration, read-only database access, diagnos
 
 ## Local Data
 
-The application reads from `REWARDS_DATA_DIR`, expected to point to `/Users/hermes/Desktop/Rewards` during local testing.
+The application code and user data are separate. The `/Users/hermes/Desktop/Rewards` path is only the current development sample data location, not a permanent production path.
+
+During the first stages, the application can read `REWARDS_DATA_DIR` from `.env`. The code should stay structured so this configuration can later be replaced by a DataSourceManager without rewriting repositories, media handling, or routes.
 
 Expected data layout:
 
@@ -25,6 +27,24 @@ Expected data layout:
 - `Source/`
 - `SourceMark/`
 - `default/`
+
+## DataSourceManager
+
+Future local installations need a DataSourceManager component for connecting the owner's real local Rewards data folder.
+
+Responsibilities:
+
+- store the current path to the local data folder;
+- validate the folder structure;
+- check `database/MyDatabase.sqlite`;
+- check `Source/`, `SourceMark/`, and `default/`;
+- open SQLite only in read-only mode during early stages;
+- show the user the current connection status;
+- save the selected path in local configuration;
+- keep database and photo files local;
+- never upload, sync, or commit user data.
+
+The owner's production database and photos remain on the owner's computer. GitHub stores code and documentation only.
 
 ## Media Service
 
