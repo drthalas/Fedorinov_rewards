@@ -35,6 +35,14 @@ The current development sample data folder is:
 
 This path is only for local development and testing. It must not be treated as a permanent application path.
 
+If Desktop files block on read, do not use Desktop as the active development data root. Prefer a stable local non-Desktop copy:
+
+```text
+~/LocalData/FedorinovRewards/Rewards
+```
+
+Point local `.env` at that copy and keep `READ_ONLY=true`. Do not delete or modify the Desktop sample while creating the stable copy. If `Rewards.zip` or the Desktop folder blocks on read, stop the copy attempt and investigate the local filesystem state before retrying.
+
 The owner's production data will be selected locally on the owner's computer. The real owner database, photos, generated files, and local configuration remain outside Git and outside cloud storage unless the owner explicitly chooses another workflow.
 
 Never hardcode the development sample path into business logic. For the first web mirror stage, `.env` and `REWARDS_DATA_DIR` are acceptable. Future local installations should use a DataSourceManager and a settings screen to save the selected data directory in local config.

@@ -21,6 +21,12 @@ Bugfix status:
 - Media endpoint now handles HEAD checks and avoids hanging on unreadable local files.
 - Minimal media resolver tests added.
 
+Dev data stabilization:
+
+- Desktop sample data can block on read in the current environment.
+- Prefer `~/LocalData/FedorinovRewards/Rewards` as the stable non-Desktop dev data root when a readable local copy is available.
+- Keep the stable copy outside Git and keep `.env` uncommitted.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

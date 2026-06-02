@@ -1,5 +1,11 @@
 # Changelog
 
+## Dev Data Root Stabilization
+
+- Documented that Desktop-hosted sample data can block on read in the current environment.
+- Recommended `~/LocalData/FedorinovRewards/Rewards` as the stable non-Desktop development data root when a readable local copy is available.
+- Kept real data, `.env`, and copied media/database files outside Git.
+
 ## Stage 2A Media Resolver Bugfix
 
 - Fixed media URL generation by centralizing `/media` links in a Jinja helper.
