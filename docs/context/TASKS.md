@@ -145,6 +145,8 @@ QA:
 - Stage 3E QA passed.
 - `HEAD /legacy` fixed.
 - Windows ZIP with `/legacy` rebuilt.
+- Windows media endpoint bugfix applied for owner preview.
+- Windows ZIP rebuilt with media fix.
 
 Deferred:
 

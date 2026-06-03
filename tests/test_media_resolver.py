@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from backend.app.config import Settings
-from backend.app.services.media import resolve_media_path
+from backend.app.services.media import resolve_media, resolve_media_path
 
 
 class MediaResolverTests(unittest.TestCase):
@@ -27,6 +27,14 @@ class MediaResolverTests(unittest.TestCase):
 
             self.assertEqual(resolve_media_path(settings, "Source/1/1/FotoFront.jpg"), media.resolve())
             self.assertEqual(resolve_media_path(settings, "Source\\1\\1\\FotoFront.jpg"), media.resolve())
+            self.assertEqual(resolve_media_path(settings, "Source%5C1%5C1%5CFotoFront.jpg"), media.resolve())
+
+            resolution = resolve_media(settings, "Source/1/1/FotoFront.jpg")
+            self.assertFalse(resolution.fallback)
+            self.assertTrue(resolution.exists)
+            self.assertTrue(resolution.is_file)
+            self.assertTrue(resolution.readable)
+            self.assertEqual(resolution.suffix, ".jpg")
 
     def test_rejects_traversal_and_outside_absolute_paths(self) -> None:
         with TemporaryDirectory() as tmp:
@@ -37,6 +45,7 @@ class MediaResolverTests(unittest.TestCase):
             settings = self.make_settings(root)
 
             self.assertEqual(resolve_media_path(settings, "../database/MyDatabase.sqlite"), fallback)
+            self.assertEqual(resolve_media_path(settings, "Source/../database/MyDatabase.sqlite"), fallback)
             self.assertEqual(resolve_media_path(settings, "/etc/passwd"), fallback)
 
     def test_allows_absolute_path_inside_data_root(self) -> None:

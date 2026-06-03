@@ -1,5 +1,13 @@
 # Changelog
 
+## Windows Media Endpoint Bugfix
+
+- Replaced `/media` subprocess file reads with cross-platform `FileResponse` serving.
+- Added explicit Python read-check before serving real media or falling back.
+- Added `/media-debug?path=...` diagnostics for input path, normalized path, resolved absolute path, data root, existence, file/readability flags, suffix, and fallback reason.
+- Added tests for POSIX paths, Windows backslash paths, URL-encoded backslash paths, and traversal rejection.
+- Rebuilt the Windows preview package with the media fix and `/legacy` interface included.
+
 ## Stage 3E Legacy Desktop Layout Mirror
 
 - Added separate `/legacy` route for a desktop-style mirror of the old Windows main form.
