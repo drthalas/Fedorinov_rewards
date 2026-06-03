@@ -10,6 +10,9 @@
 - Kept existing `/persons`, `/rewards`, `/marks`, `/guides`, `/search`, and CRUD routes unchanged.
 - Added `docs/legacy_ui_inventory.md` for the legacy desktop UI inventory.
 - Kept PDF export, photo upload/replace/delete, Guides CRUD, and full svod/filter parity deferred.
+- Stage 3E QA passed.
+- Fixed explicit `HEAD /legacy` support for QA checks.
+- Rebuilt the Windows preview package with the `/legacy` route and templates included.
 
 ## Stage 2C Windows Portable Preview Package
 

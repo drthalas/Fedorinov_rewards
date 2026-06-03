@@ -137,8 +137,14 @@ Scope:
 
 Next:
 
-- Rebuild Windows preview package with `/legacy`.
-- Owner QA for legacy-style desktop mirror.
+- Send rebuilt Windows preview package to owner.
+- Owner Windows preview QA.
+
+QA:
+
+- Stage 3E QA passed.
+- `HEAD /legacy` fixed.
+- Windows ZIP with `/legacy` rebuilt.
 
 Deferred:
 

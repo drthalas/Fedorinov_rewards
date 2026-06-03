@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Response
 
 from ..config import PROJECT_ROOT, get_settings
 from ..repositories.common import fetch_one, table_counts
@@ -121,3 +121,14 @@ def legacy_index(
         context["summary"] = _legacy_summary(settings.rewards_db_path)
 
     return templates.TemplateResponse(request, "legacy.html", context)
+
+
+@router.head("/legacy")
+def legacy_head(
+    tab: str = "rewards",
+    person_id: int | None = None,
+    mark_id: int | None = None,
+    q: str = "",
+    message: str = "",
+):
+    return Response(status_code=200)
