@@ -2,7 +2,17 @@
 {% block title %}Знак #{{ mark.id }}{% endblock %}
 {% block content %}
 <h1>Знак #{{ mark.id }}</h1>
+{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p><a href="/marks">← к списку</a></p>
+{% if settings.write_mode %}
+<div class="actions">
+  <a class="button" href="/marks/{{ mark.id }}/edit">Изменить</a>
+  <form method="post" action="/marks/{{ mark.id }}/delete" onsubmit="return confirm('Удалить знак? Фото и папки не будут удалены.');">
+    <input type="hidden" name="confirm" value="true">
+    <button class="button-danger" type="submit">Удалить</button>
+  </form>
+</div>
+{% endif %}
 <section class="panel">
   <dl class="details">
     <dt>ID</dt><dd>{{ mark.id }}</dd>

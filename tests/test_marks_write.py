@@ -1,0 +1,120 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import os
+import sqlite3
+import unittest
+
+from backend.app.config import Settings
+from backend.app.repositories.marks_write import (
+    MarkWriteData,
+    create_mark,
+    delete_mark,
+    update_mark,
+)
+from backend.app.services.write_guard import WriteBlockedError
+
+
+class MarkWriteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.db_path = self.root / "database" / "MyDatabase.sqlite"
+        self.db_path.parent.mkdir(parents=True)
+        os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
+        self._create_db()
+
+    def tearDown(self) -> None:
+        os.environ.pop("REWARDS_AUDIT_LOG", None)
+        self.tmp.cleanup()
+
+    def settings(self, write_mode: bool = True) -> Settings:
+        return Settings(
+            rewards_data_dir=self.root,
+            rewards_db_path=self.db_path,
+            read_only=not write_mode,
+            write_mode=write_mode,
+            require_backup_before_write=False,
+        )
+
+    def _create_db(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                create table mark (
+                    id integer primary key autoincrement,
+                    id_gos integer,
+                    id_catigory integer,
+                    id_sub_catigory integer,
+                    id_name integer,
+                    id_link text,
+                    number integer,
+                    instock boolean,
+                    date_purchase date,
+                    price_purchase integer,
+                    price_now integer,
+                    front_foto varchar,
+                    back_foto varchar,
+                    book1_foto varchar,
+                    book2_foto varchar
+                )
+                """
+            )
+
+    def fetch_mark(self, mark_id: int) -> sqlite3.Row | None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            return connection.execute("select * from mark where id = ?", (mark_id,)).fetchone()
+
+    def test_write_mode_disabled_blocks_create_update_delete(self) -> None:
+        settings = self.settings(write_mode=False)
+        data = MarkWriteData(number=1)
+        with self.assertRaises(WriteBlockedError):
+            create_mark(settings, data)
+        with self.assertRaises(WriteBlockedError):
+            update_mark(settings, 1, data)
+        with self.assertRaises(WriteBlockedError):
+            delete_mark(settings, 1, confirm=True)
+
+    def test_create_mark_works(self) -> None:
+        mark_id = create_mark(
+            self.settings(),
+            MarkWriteData(id_gos=1, id_catigory=2, id_sub_catigory=3, id_name=4, number=77, instock=True),
+        )
+        row = self.fetch_mark(mark_id)
+        self.assertIsNotNone(row)
+        self.assertEqual(row["number"], 77)
+        self.assertEqual(row["instock"], 1)
+
+    def test_update_mark_works(self) -> None:
+        mark_id = create_mark(self.settings(), MarkWriteData(number=1, price_now=100))
+        update_mark(
+            self.settings(),
+            mark_id,
+            MarkWriteData(number=2, price_purchase=500, price_now=700, instock=False),
+        )
+        row = self.fetch_mark(mark_id)
+        self.assertEqual(row["number"], 2)
+        self.assertEqual(row["price_purchase"], 500)
+        self.assertEqual(row["price_now"], 700)
+        self.assertEqual(row["instock"], 0)
+
+    def test_delete_mark_removes_row_but_not_media_folder(self) -> None:
+        media_dir = self.root / "SourceMark" / "1"
+        media_dir.mkdir(parents=True)
+        (media_dir / "FotoFront.jpg").write_bytes(b"fake")
+        mark_id = create_mark(self.settings(), MarkWriteData(front_foto="SourceMark/1/FotoFront.jpg"))
+        delete_mark(self.settings(), mark_id, confirm=True)
+        self.assertIsNone(self.fetch_mark(mark_id))
+        self.assertTrue(media_dir.exists())
+        self.assertTrue((media_dir / "FotoFront.jpg").exists())
+
+    def test_sql_handles_quotes_and_text(self) -> None:
+        text = "Link 'single' and \"double\""
+        mark_id = create_mark(self.settings(), MarkWriteData(id_link=text, front_foto="SourceMark/quoted path.jpg"))
+        row = self.fetch_mark(mark_id)
+        self.assertEqual(row["id_link"], text)
+        self.assertEqual(row["front_foto"], "SourceMark/quoted path.jpg")
+
+
+if __name__ == "__main__":
+    unittest.main()

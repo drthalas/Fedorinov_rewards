@@ -2,6 +2,12 @@
 {% block title %}Знаки{% endblock %}
 {% block content %}
 <h1>Знаки</h1>
+{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
+{% if settings.write_mode %}
+<p><a class="button" href="/marks/new">Добавить знак</a></p>
+{% else %}
+<p class="notice">Редактирование выключено.</p>
+{% endif %}
 <p class="muted">Всего: {{ pagination.total }} · страница {{ pagination.page }} из {{ pagination.total_pages }}</p>
 <div class="table-wrap">
   <table>
@@ -23,7 +29,10 @@
         <td>{{ mark.number|dash }}</td>
         <td><span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></td>
         <td>{{ mark.price_now|format_money }}</td>
-        <td><a href="/marks/{{ mark.id }}">Открыть</a></td>
+        <td>
+          <a href="/marks/{{ mark.id }}">Открыть</a>
+          {% if settings.write_mode %} · <a href="/marks/{{ mark.id }}/edit">Изменить</a>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

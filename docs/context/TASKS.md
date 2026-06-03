@@ -96,12 +96,26 @@ Scope:
 
 ## Stage 3D
 
-Status: next.
+Status: done.
 
 Scope:
 
 - Mark CRUD foundation on the safe dev data root.
+- Create, update, and delete standalone marks from the web UI in development write mode.
+- Enforce `WRITE_MODE=true` and recent backup checks before mark writes.
+- Delete only `mark` rows and leave `SourceMark` folders/files untouched.
 - Keep media upload/replacement deferred until Stage 3F.
+
+## Stage 3E
+
+Status: next.
+
+Scope:
+
+- Guides CRUD foundation on the safe dev data root.
+- Rank guide CRUD.
+- Reward/mark tree guide CRUD.
+- Preserve reference integrity for person, rewards, and mark rows.
 
 ## Backlog / Future
 

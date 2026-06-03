@@ -14,9 +14,13 @@ def list_marks(db_path: Path, limit: int = 25, offset: int = 0) -> list[dict[str
         """
         select
             m.id,
+            m.id_gos,
             g0.name as gos,
+            m.id_catigory,
             g1.name as category,
+            m.id_sub_catigory,
             g2.name as subcategory,
+            m.id_name,
             g3.name as name,
             m.number,
             m.instock,

@@ -24,9 +24,9 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add mark | Form1, Form3 | Not implemented | Inserts `mark`, duplicate-number checks needed | Stage 3D | yes | yes |
-| Edit mark | Form3 | Not implemented | Updates classification, price, stock, links, dates | Stage 3D | yes | yes |
-| Delete mark | Form1, Form3 | Not implemented | Removes standalone row and may leave media files | Stage 3D after validation | yes | yes |
+| Add mark | Form1, Form3 | Implemented in web dev write mode | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D | yes | yes |
+| Edit mark | Form3 | Implemented in web dev write mode | Updates classification, price, stock, links, dates | Stage 3D | yes | yes |
+| Delete mark | Form1, Form3 | Implemented in web dev write mode | Deletes DB row only; SourceMark folders/files are preserved | Stage 3D | yes | yes |
 
 ## Guides
 
