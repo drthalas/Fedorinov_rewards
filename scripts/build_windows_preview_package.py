@@ -49,6 +49,7 @@ FILES_TO_COPY = [
     Path("scripts") / "check_media_links.py",
     Path("scripts") / "backup_dev_data.py",
     Path("scripts") / "check_backup.py",
+    Path("HELP_RU.md"),
     Path("README.md"),
     Path("docs") / "WINDOWS_PREVIEW_RUNBOOK.md",
     Path("docs") / "WINDOWS_OWNER_CHECKLIST.md",
