@@ -49,6 +49,9 @@
 </div>
 
 <h2>Награды</h2>
+{% if settings.write_mode %}
+<p><a class="button" href="/persons/{{ person.id }}/rewards/new">Добавить награду</a></p>
+{% endif %}
 <div class="table-wrap">
   <table>
     <thead>
@@ -67,7 +70,10 @@
         <td>{{ reward.date_purchase|format_date }}</td>
         <td>{{ reward.price_purchase|format_money }}</td>
         <td>{{ reward.price_now|format_money }}</td>
-        <td><a href="/rewards/{{ reward.id }}">Открыть</a></td>
+        <td>
+          <a href="/rewards/{{ reward.id }}">Открыть</a>
+          {% if settings.write_mode %} · <a href="/rewards/{{ reward.id }}/edit">Изменить</a>{% endif %}
+        </td>
       </tr>
       {% endfor %}
     </tbody>

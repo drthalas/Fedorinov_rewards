@@ -2,7 +2,17 @@
 {% block title %}Награда #{{ reward.id }}{% endblock %}
 {% block content %}
 <h1>Награда #{{ reward.id }}</h1>
+{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p><a href="/persons/{{ reward.person_id }}">← к владельцу</a></p>
+{% if settings.write_mode %}
+<div class="actions">
+  <a class="button" href="/rewards/{{ reward.id }}/edit">Изменить</a>
+  <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Удалить награду? Фото и папки не будут удалены.');">
+    <input type="hidden" name="confirm" value="true">
+    <button class="button-danger" type="submit">Удалить</button>
+  </form>
+</div>
+{% endif %}
 <section class="panel">
   <dl class="details">
     <dt>ID</dt><dd>{{ reward.id }}</dd>

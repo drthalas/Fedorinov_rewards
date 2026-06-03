@@ -15,10 +15,10 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add reward | Form2, Form3 | Not implemented | Inserts `rewards`, duplicate-number checks needed | Stage 3C | yes | yes |
-| Edit reward | Form2, Form3 | Not implemented | Updates classification, price, stock, links, dates | Stage 3C | yes | yes |
-| Delete reward | Form2 | Not implemented | Removes row and may leave media files | Stage 3C after validation | yes | yes |
-| Reward photos | Form3, Form4 | Read-only display only | File copy/replace/delete and path updates | Stage 3F | yes | yes |
+| Add reward | Form2, Form3 | Implemented in web dev write mode | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C | yes | yes |
+| Edit reward | Form2, Form3 | Implemented in web dev write mode | Updates classification, price, stock, links, dates | Stage 3C | yes | yes |
+| Delete reward | Form2 | Implemented in web dev write mode | Deletes DB row only; media folders/files are preserved | Stage 3C | yes | yes |
+| Reward photos | Form3, Form4 | Read-only display only | Upload/replace/delete and path management deferred | Stage 3F | yes | yes |
 
 ## Marks
 

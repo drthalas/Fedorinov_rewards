@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from contextlib import closing
 
 from ..config import Settings
 from ..db import open_write_connection
@@ -63,7 +64,7 @@ def _as_params(data: PersonWriteData) -> tuple[object, ...]:
 
 def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
-    with open_write_connection(settings.rewards_db_path, settings.write_mode) as connection:
+    with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute(
             """
             insert into person (fio, birthday, id_rank, link1, link2, comment)
@@ -79,7 +80,7 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
 
 def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:
     ensure_write_allowed(settings)
-    with open_write_connection(settings.rewards_db_path, settings.write_mode) as connection:
+    with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute(
             """
             update person
@@ -96,7 +97,7 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
 
 def delete_person(settings: Settings, person_id: int) -> None:
     ensure_write_allowed(settings)
-    with open_write_connection(settings.rewards_db_path, settings.write_mode) as connection:
+    with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         reward_count = connection.execute(
             "select count(*) as count from rewards where person_id = ?",
             (person_id,),

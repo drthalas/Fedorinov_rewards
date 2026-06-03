@@ -84,12 +84,23 @@ Scope:
 
 ## Stage 3C
 
-Status: next.
+Status: done.
 
 Scope:
 
 - Reward CRUD foundation on the safe dev data root.
-- Duplicate-number validation for rewards.
+- Create, update, and delete rewards from the web UI in development write mode.
+- Enforce `WRITE_MODE=true` and recent backup checks before reward writes.
+- Delete only `rewards` rows and leave media folders/files untouched.
+- Keep media upload/replacement deferred until Stage 3F.
+
+## Stage 3D
+
+Status: next.
+
+Scope:
+
+- Mark CRUD foundation on the safe dev data root.
 - Keep media upload/replacement deferred until Stage 3F.
 
 ## Backlog / Future

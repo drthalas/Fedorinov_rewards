@@ -248,6 +248,21 @@ th {
   color: #475467;
 }
 
+.edit-form .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-form .checkbox-row input {
+  width: auto;
+}
+
+.edit-form .checkbox-row span {
+  display: inline;
+  margin-bottom: 0;
+}
+
 .edit-form input,
 .edit-form select,
 .edit-form textarea {

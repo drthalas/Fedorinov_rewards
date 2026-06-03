@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 3C Reward CRUD
+
+- Added guarded reward create/edit/delete repository functions using parameterized SQL.
+- Added write-mode and recent-backup enforcement before reward writes.
+- Added web routes and forms for `/persons/{person_id}/rewards/new`, `/rewards/{reward_id}/edit`, and `/rewards/{reward_id}/delete`.
+- Added write-mode-only reward add/edit/delete buttons while keeping read-only mode locked down.
+- Kept photo fields as readonly text and did not upload, replace, or delete media files.
+- Added audit logging for reward create/update/delete actions without personal data.
+- Added unit tests for disabled write mode, create, update, delete, media folder preservation, quote handling, and nonexistent person validation.
+
 ## Stage 3B Person CRUD
 
 - Added guarded person create/edit/delete repository functions using parameterized SQL.
