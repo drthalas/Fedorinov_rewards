@@ -6,10 +6,21 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add person | Form1, Form2 | Not implemented | Creates `person` row and media folder expectations | Stage 3B | yes | yes |
-| Edit person | Form2 | Not implemented | Changes personal fields, links, comments, rank, dates | Stage 3B | yes | yes |
-| Delete person | Form1, Form2 | Not implemented | May orphan rewards/media or delete connected rows | Stage 3B after validation | yes | yes |
+| Add person | Form1, Form2 | Implemented in web dev write mode | Creates `person` row and media folder expectations | Stage 3B | yes | yes |
+| Edit person | Form2 | Implemented in web dev write mode | Changes personal fields, links, comments, rank, dates | Stage 3B | yes | yes |
+| Delete person | Form1, Form2 | Implemented in web dev write mode; blocks delete while rewards exist | May orphan rewards/media if parity is expanded later | Stage 3B | yes | yes |
 | Person photos | Form2, Form4 | Read-only display only | File copy/replace/delete and path updates | Stage 3F | yes | yes |
+
+## Legacy Desktop Layout
+
+| Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
+| --- | --- | --- | --- | --- | --- | --- |
+| Main desktop shell | Form1 | Implemented as `/legacy` separate route | Layout parity only; no direct writes | Stage 3E | no | no |
+| Rewards tab layout | Form1 | Implemented as `/legacy?tab=rewards` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
+| Search tab layout | Form1 | Implemented as `/legacy?tab=search` with grouped results | Legacy field/match filters still incomplete | Stage 3E plus Stage 3H | no | no |
+| Marks tab layout | Form1 | Implemented as `/legacy?tab=marks` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
+| Summary tab basic aggregates | Form1 | Implemented as `/legacy?tab=summary` basic counts/sums | Full dynamic matrix/export parity deferred | Stage 3E plus Stage 3H | no | no |
+| About tab | Form1, StringCipher | Implemented as `/legacy?tab=about` preview/status page | Activation/licensing workflow deferred | Stage 3E | no | no |
 
 ## Rewards
 
@@ -32,8 +43,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Rank guide CRUD | Form5 | Read-only `/guides` section | Person rank references can become invalid | Stage 3E | yes | yes |
-| Reward tree guide CRUD | Form6 | Read-only collapsible tree | Rewards/marks references and `id_link` backfill can change | Stage 3E | yes | yes |
+| Rank guide CRUD | Form5 | Read-only `/guides` section | Person rank references can become invalid | Future Guides CRUD | yes | yes |
+| Reward tree guide CRUD | Form6 | Read-only collapsible tree | Rewards/marks references and `id_link` backfill can change | Future Guides CRUD | yes | yes |
 
 ## Photos
 

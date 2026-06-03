@@ -1,0 +1,319 @@
+{% extends "base.html" %}
+{% block title %}Legacy UI · Fedorinov Rewards{% endblock %}
+{% block content %}
+<section class="legacy-shell">
+  <div class="legacy-window-title">Fedorinov Rewards Web Preview · Legacy desktop mirror</div>
+
+  <nav class="legacy-tabs">
+    {% for tab_id, label in tabs %}
+      <a class="{% if tab == tab_id %}active{% endif %}" href="/legacy?tab={{ tab_id }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if message == "pdf_not_implemented" %}
+    <div class="notice">PDF export будет реализован позже. Сейчас кнопка оставлена как заглушка legacy-интерфейса.</div>
+  {% endif %}
+
+  {% if not settings.db_exists %}
+    <div class="notice notice-error">База не найдена: {{ settings.rewards_db_path }}</div>
+  {% elif tab == "rewards" %}
+    <div class="legacy-layout">
+      <aside class="legacy-sidebar">
+        <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
+        <div class="legacy-toolbar">
+          <a class="tool-button" href="/guides" title="Справочник">📚 Справочник</a>
+          {% if settings.write_mode %}
+            <a class="tool-button" href="/persons/new" title="Добавить">➕ Добавить</a>
+            {% if selected_person %}
+              <a class="tool-button" href="/persons/{{ selected_person.id }}/edit" title="Изменить">✏️ Изменить</a>
+              <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Подтвердите удаление награжденного')">
+                <button class="tool-button danger" type="submit">❌ Удалить</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <span class="tool-button disabled">➕ Добавить</span>
+            <span class="tool-button disabled">✏️ Изменить</span>
+            <span class="tool-button disabled">❌ Удалить</span>
+          {% endif %}
+        </div>
+        <div class="legacy-list">
+          {% for person in persons %}
+            <a class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" href="/legacy?tab=rewards&person_id={{ person.id }}">
+              <span>{{ person.fio|dash }}</span>
+              <small>{{ person.rewards_count }} нагр.</small>
+            </a>
+          {% else %}
+            <div class="legacy-empty">Нет записей.</div>
+          {% endfor %}
+        </div>
+      </aside>
+
+      <section class="legacy-main">
+        {% if selected_person %}
+          <div class="legacy-split-header">
+            <div>
+              <h1>{{ selected_person.fio|dash }}</h1>
+              <p class="secondary">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_date }}</p>
+            </div>
+            <div class="legacy-actions">
+              <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
+              <a class="button" href="/persons/{{ selected_person.id }}/photos">Все фото</a>
+            </div>
+          </div>
+
+          <section class="legacy-block">
+            <div class="legacy-block-head">
+              <h2>Перечень наград</h2>
+              <div class="legacy-toolbar">
+                {% if settings.write_mode %}
+                  <a class="tool-button" href="/persons/{{ selected_person.id }}/rewards/new">➕ Добавить награду</a>
+                {% else %}
+                  <span class="tool-button disabled">➕ Добавить награду</span>
+                  <span class="tool-button disabled">✏️ Изменить</span>
+                  <span class="tool-button disabled">❌ Удалить</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="legacy-table-wrap">
+              <table class="legacy-table">
+                <thead>
+                  <tr>
+                    <th>Наименование</th>
+                    <th>Номер</th>
+                    <th>Наличие</th>
+                    <th>Дата покупки</th>
+                    <th>Цена покупки</th>
+                    <th>Текущая цена</th>
+                    {% if settings.write_mode %}<th>Действия</th>{% endif %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for reward in person_rewards %}
+                    <tr>
+                      <td><a href="/rewards/{{ reward.id }}">{{ reward.name|dash }}</a></td>
+                      <td>{{ reward.number|dash }}</td>
+                      <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
+                      <td>{{ reward.date_purchase|format_date }}</td>
+                      <td>{{ reward.price_purchase|format_money }}</td>
+                      <td>{{ reward.price_now|format_money }}</td>
+                      {% if settings.write_mode %}
+                        <td class="compact-actions">
+                          <a href="/rewards/{{ reward.id }}/edit">✏️</a>
+                          <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Подтвердите удаление награды')">
+                            <input type="hidden" name="confirm" value="true">
+                            <button type="submit" class="link-button">❌</button>
+                          </form>
+                        </td>
+                      {% endif %}
+                    </tr>
+                  {% else %}
+                    <tr><td colspan="{% if settings.write_mode %}7{% else %}6{% endif %}">Награды не найдены.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <div class="legacy-bottom-grid">
+            <section class="legacy-block">
+              <h2>Ссылки</h2>
+              <dl class="legacy-links">
+                <dt>Ссылка на сайт "Память народа"</dt>
+                <dd>{{ selected_person.link1|dash }}</dd>
+                <dt>Ссылка на сайт "Форум коллекционеров"</dt>
+                <dd>{{ selected_person.link2|dash }}</dd>
+                <dt>Комментарий</dt>
+                <dd>{{ selected_person.comment|dash }}</dd>
+              </dl>
+              <a class="button disabled-button" href="/legacy?tab=about&message=pdf_not_implemented">Сформировать буклет</a>
+              <p class="secondary">PDF export будет реализован позже.</p>
+            </section>
+
+            <section class="legacy-block">
+              <h2>Фото</h2>
+              <div class="legacy-photo-strip">
+                <figure>
+                  <img class="legacy-photo" src="{{ media_url(selected_person.main_foto) }}" alt="Главное фото">
+                  <figcaption>Главное фото</figcaption>
+                </figure>
+                <figure>
+                  <img class="legacy-photo" src="{{ media_url(selected_person.rewards_foto) }}" alt="Общее фото наград">
+                  <figcaption>Общее фото наград</figcaption>
+                </figure>
+              </div>
+              <a href="/persons/{{ selected_person.id }}/photos">Все фото</a>
+            </section>
+          </div>
+        {% else %}
+          <div class="notice">Выберите награжденного.</div>
+        {% endif %}
+      </section>
+    </div>
+  {% elif tab == "search" %}
+    <section class="legacy-tab-panel">
+      <h1>Поиск</h1>
+      <form class="legacy-search-form" method="get" action="/legacy">
+        <input type="hidden" name="tab" value="search">
+        <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер">
+        <button type="submit">Найти</button>
+      </form>
+      {% if not q.strip() %}
+        <div class="notice">Введите строку поиска. При пустом запросе список не загружается.</div>
+      {% elif search_results %}
+        <div class="legacy-results-grid">
+          <section class="legacy-block">
+            <h2>Награждённые ({{ search_results.counts.persons }})</h2>
+            {% for person in search_results.persons %}
+              <p><a href="/legacy?tab=rewards&person_id={{ person.id }}">{{ person.fio|dash }}</a> <span class="secondary">{{ person.rank_name|dash }}</span></p>
+            {% else %}
+              <p class="secondary">Не найдено.</p>
+            {% endfor %}
+          </section>
+          <section class="legacy-block">
+            <h2>Награды ({{ search_results.counts.rewards }})</h2>
+            {% for reward in search_results.rewards %}
+              <p><a href="/rewards/{{ reward.id }}">{{ reward.name|dash }}</a> <span class="secondary">№ {{ reward.number|dash }}</span></p>
+            {% else %}
+              <p class="secondary">Не найдено.</p>
+            {% endfor %}
+          </section>
+          <section class="legacy-block">
+            <h2>Знаки ({{ search_results.counts.marks }})</h2>
+            {% for mark in search_results.marks %}
+              <p><a href="/legacy?tab=marks&mark_id={{ mark.id }}">{{ mark.name|dash }}</a> <span class="secondary">№ {{ mark.number|dash }}</span></p>
+            {% else %}
+              <p class="secondary">Не найдено.</p>
+            {% endfor %}
+          </section>
+        </div>
+        <p class="secondary">Показаны первые {{ search_results.limit }} результатов в каждой группе.</p>
+      {% endif %}
+    </section>
+  {% elif tab == "marks" %}
+    <div class="legacy-layout legacy-layout-marks">
+      <aside class="legacy-sidebar">
+        <div class="legacy-panel-title">Знаки ({{ marks_total or marks|length }})</div>
+        <div class="legacy-toolbar">
+          {% if settings.write_mode %}
+            <a class="tool-button" href="/marks/new">➕ Добавить знак</a>
+            {% if selected_mark %}
+              <a class="tool-button" href="/marks/{{ selected_mark.id }}/edit">✏️ Изменить</a>
+              <form method="post" action="/marks/{{ selected_mark.id }}/delete" onsubmit="return confirm('Подтвердите удаление знака')">
+                <input type="hidden" name="confirm" value="true">
+                <button class="tool-button danger" type="submit">❌ Удалить</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <span class="tool-button disabled">➕ Добавить знак</span>
+            <span class="tool-button disabled">✏️ Изменить</span>
+            <span class="tool-button disabled">❌ Удалить</span>
+          {% endif %}
+        </div>
+        <div class="legacy-list">
+          {% for mark in marks %}
+            <a class="legacy-list-row {% if selected_mark and mark.id == selected_mark.id %}selected-row{% endif %}" href="/legacy?tab=marks&mark_id={{ mark.id }}">
+              <span>{{ mark.name|dash }}</span>
+              <small>№ {{ mark.number|dash }}</small>
+            </a>
+          {% else %}
+            <div class="legacy-empty">Нет знаков.</div>
+          {% endfor %}
+        </div>
+      </aside>
+      <section class="legacy-main">
+        {% if selected_mark %}
+          <div class="legacy-split-header">
+            <div>
+              <h1>{{ selected_mark.name|dash }}</h1>
+              <p class="secondary">ID {{ selected_mark.id }} · № {{ selected_mark.number|dash }}</p>
+            </div>
+            <a class="button" href="/marks/{{ selected_mark.id }}">Карточка</a>
+          </div>
+          <div class="legacy-bottom-grid">
+            <section class="legacy-block">
+              <h2>Карточка знака</h2>
+              <dl class="details">
+                <dt>Государство</dt><dd>{{ selected_mark.gos|dash }}</dd>
+                <dt>Категория</dt><dd>{{ selected_mark.category|dash }}</dd>
+                <dt>Подкатегория</dt><dd>{{ selected_mark.subcategory|dash }}</dd>
+                <dt>Наименование</dt><dd>{{ selected_mark.name|dash }}</dd>
+                <dt>Номер</dt><dd>{{ selected_mark.number|dash }}</dd>
+                <dt>Наличие</dt><dd><span class="badge badge-{{ selected_mark.instock|bool_class }}">{{ selected_mark.instock|format_bool }}</span></dd>
+                <dt>Дата покупки</dt><dd>{{ selected_mark.date_purchase|format_date }}</dd>
+                <dt>Цена покупки</dt><dd>{{ selected_mark.price_purchase|format_money }}</dd>
+                <dt>Текущая цена</dt><dd>{{ selected_mark.price_now|format_money }}</dd>
+              </dl>
+            </section>
+            <section class="legacy-block">
+              <h2>Фото</h2>
+              <div class="legacy-photo-strip">
+                {% for photo in selected_mark_photos[:2] %}
+                  <figure>
+                    <img class="legacy-photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+                    <figcaption>{{ photo.label }}</figcaption>
+                  </figure>
+                {% endfor %}
+              </div>
+            </section>
+          </div>
+        {% else %}
+          <div class="notice">Выберите знак.</div>
+        {% endif %}
+      </section>
+    </div>
+  {% elif tab == "summary" %}
+    <section class="legacy-tab-panel">
+      <h1>Свод.таблица</h1>
+      {% if summary %}
+        <div class="grid">
+          <div class="card"><strong>Награждённых</strong><br>{{ summary.counts.person }}</div>
+          <div class="card"><strong>Наград</strong><br>{{ summary.counts.rewards }}</div>
+          <div class="card"><strong>Знаков</strong><br>{{ summary.counts.mark }}</div>
+        </div>
+        <div class="legacy-table-wrap">
+          <table class="legacy-table">
+            <thead>
+              <tr>
+                <th>Раздел</th>
+                <th>В наличии</th>
+                <th>Нет</th>
+                <th>Сумма покупки</th>
+                <th>Текущая сумма</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Награды</td>
+                <td>{{ summary.rewards.in_stock }}</td>
+                <td>{{ summary.rewards.not_in_stock }}</td>
+                <td>{{ summary.rewards.price_purchase_sum|format_money }}</td>
+                <td>{{ summary.rewards.price_now_sum|format_money }}</td>
+              </tr>
+              <tr>
+                <td>Знаки</td>
+                <td>{{ summary.marks.in_stock }}</td>
+                <td>{{ summary.marks.not_in_stock }}</td>
+                <td>{{ summary.marks.price_purchase_sum|format_money }}</td>
+                <td>{{ summary.marks.price_now_sum|format_money }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="secondary">Legacy CSV/PDF export и фильтры сводной таблицы будут реализованы позже.</p>
+      {% endif %}
+    </section>
+  {% elif tab == "about" %}
+    <section class="legacy-tab-panel">
+      <h1>О программе</h1>
+      <dl class="details">
+        <dt>Название</dt><dd>Fedorinov Rewards Web Preview</dd>
+        <dt>Режим</dt><dd>{% if settings.write_mode %}WRITE MODE{% else %}READ ONLY{% endif %}</dd>
+        <dt>Data dir</dt><dd>{{ settings.rewards_data_dir }}</dd>
+        <dt>Commit</dt><dd>{{ commit }}</dd>
+      </dl>
+      <div class="notice">Это preview web-зеркала старого Windows-приложения. Данные остаются локально, облако не используется.</div>
+      <div class="notice">PDF export, загрузка/замена фото и CRUD справочников пока отложены.</div>
+    </section>
+  {% endif %}
+</section>
+{% endblock %}

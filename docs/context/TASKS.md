@@ -124,14 +124,28 @@ Scope:
 
 ## Stage 3E
 
-Status: next.
+Status: done.
 
 Scope:
 
-- Guides CRUD foundation on the safe dev data root.
-- Rank guide CRUD.
-- Reward/mark tree guide CRUD.
-- Preserve reference integrity for person, rewards, and mark rows.
+- Legacy desktop layout mirror as a separate `/legacy` route.
+- Top legacy tabs for rewards, search, marks, summary, and about.
+- Left person list plus selected person's reward table, links/comment block, booklet placeholder, and photo block.
+- Marks tab with standalone mark list, selected mark card, photo block, and write-mode-gated CRUD links.
+- Basic summary counts/sums.
+- Existing standalone routes remain unchanged.
+
+Next:
+
+- Rebuild Windows preview package with `/legacy`.
+- Owner QA for legacy-style desktop mirror.
+
+Deferred:
+
+- Guides CRUD.
+- Photo upload/replace/delete.
+- PDF/CSV export parity.
+- Full legacy filters and svod matrix parity.
 
 ## Backlog / Future
 
@@ -139,4 +153,7 @@ Scope:
 - Implement Settings -> Data Source screen.
 - Implement local config storage for selected data directory.
 - Add validation report for connected database and media folders.
+- Implement Guides CRUD with backup/write-mode gates.
+- Implement Photo upload/replace/delete.
+- Implement PDF export parity.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

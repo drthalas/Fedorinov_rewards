@@ -1,5 +1,16 @@
 # Changelog
 
+## Stage 3E Legacy Desktop Layout Mirror
+
+- Added separate `/legacy` route for a desktop-style mirror of the old Windows main form.
+- Added legacy-style tabs for `Награды`, `Поиск`, `Знаки`, `Свод.таблица`, and `О программе`.
+- Added rewards tab layout with left person list, selected person reward table, links/comment block, booklet placeholder, and photo block.
+- Added marks tab layout with standalone mark list, selected mark detail, photo block, and write-mode-gated CRUD links.
+- Added basic summary counts and price/stock aggregates.
+- Kept existing `/persons`, `/rewards`, `/marks`, `/guides`, `/search`, and CRUD routes unchanged.
+- Added `docs/legacy_ui_inventory.md` for the legacy desktop UI inventory.
+- Kept PDF export, photo upload/replace/delete, Guides CRUD, and full svod/filter parity deferred.
+
 ## Stage 2C Windows Portable Preview Package
 
 - Added Windows `.bat` and PowerShell launch scripts for portable preview startup.

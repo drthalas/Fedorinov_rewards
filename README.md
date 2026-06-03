@@ -98,6 +98,7 @@ The minimal web mirror is available at:
 - `/marks/{id}` - mark card
 - `/guides` - read-only guide tree
 - `/search` - simple search by name/title/number
+- `/legacy` - legacy-style desktop mirror with old top tabs and compact master/detail layout
 - `/health` - environment diagnostics
 
 Start the backend on the Mac mini:
@@ -124,6 +125,16 @@ http://127.0.0.1:8080
 The mirror is read-only. It must not modify `/Users/hermes/Desktop/Rewards`, write to SQLite, copy media files, or run legacy executables.
 
 Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
+
+The legacy-style desktop mirror is available at:
+
+- `/legacy?tab=rewards` - old main rewards tab structure with person list, selected rewards, links, booklet placeholder, and photos.
+- `/legacy?tab=search` - grouped search in the legacy tab shell.
+- `/legacy?tab=marks` - standalone marks tab with selected mark detail.
+- `/legacy?tab=summary` - basic summary counts and price/stock totals.
+- `/legacy?tab=about` - preview status, mode, data directory, and commit.
+
+CRUD buttons inside `/legacy` are visible only in development write mode and reuse the existing guarded person, reward, and mark routes.
 
 ## Development Write Mode
 
