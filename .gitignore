@@ -20,6 +20,9 @@ docs/reports/
 backups/
 logs/
 Rewards_backup_*.zip
+dist/
+FedorinovRewards_WebPreview*.zip
+*.preview.zip
 
 !data/.gitkeep
 !data/README.md

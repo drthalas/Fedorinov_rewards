@@ -155,3 +155,40 @@ Current development write-mode CRUD:
 - Mark photo path fields are preserved as text only; upload, replacement, and media deletion are deferred to Stage 3F.
 
 Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.
+
+## Windows Portable Preview
+
+The first Windows owner preview is a portable ZIP, not an installer. It contains application code, startup scripts, and Windows runbook documents only. Owner data, SQLite databases, photos, backups, `.env`, `.venv`, legacy sources, and generated reports are not included.
+
+Build the preview package:
+
+```sh
+python3 scripts/build_windows_preview_package.py
+python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_v0.1.zip
+```
+
+The package is written to:
+
+```text
+dist/FedorinovRewards_WebPreview_v0.1.zip
+```
+
+On Windows:
+
+1. Unpack the ZIP.
+2. Install Python 3.11+ with `Add Python to PATH`.
+3. Run `start_windows.bat`.
+4. On first run, edit `.env` and set `REWARDS_DATA_DIR` to the local Rewards data folder.
+5. Run `start_windows.bat` again and open `http://127.0.0.1:8080`.
+
+Windows preview defaults are:
+
+```text
+READ_ONLY=true
+WRITE_MODE=false
+REQUIRE_BACKUP_BEFORE_WRITE=true
+APP_HOST=127.0.0.1
+APP_PORT=8080
+```
+
+For temporary button testing on a copied data folder, create and validate a backup first, then set `WRITE_MODE=true` and `READ_ONLY=false` in local `.env`. Return to read-only mode after testing.

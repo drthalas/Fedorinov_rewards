@@ -1,5 +1,14 @@
 # Changelog
 
+## Stage 2C Windows Portable Preview Package
+
+- Added Windows `.bat` and PowerShell launch scripts for portable preview startup.
+- Added `.env.windows.example` with read-only defaults and owner data path instructions.
+- Added Russian Windows preview runbook and owner checklist.
+- Added package builder for `dist/FedorinovRewards_WebPreview_v0.1.zip`.
+- Added package safety checker that blocks real data, backups, `.env`, `.venv`, media, archives, binaries, legacy sources, and local reports.
+- Documented that the Windows preview is code-only and owner data remains outside the package.
+
 ## Stage 3D Mark CRUD
 
 - Added guarded mark create/edit/delete repository functions using parameterized SQL.

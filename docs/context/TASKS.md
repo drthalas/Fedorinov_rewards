@@ -51,6 +51,22 @@ Editing status:
 
 - Blocked until backup, migration, and editing architecture is designed.
 
+## Stage 2C
+
+Status: done.
+
+Scope:
+
+- Windows portable preview package for owner QA.
+- Double-click Windows launch scripts for `.bat` and PowerShell.
+- Windows `.env` template with read-only defaults.
+- Russian Windows preview runbook and owner checklist.
+- Package builder and package safety checker.
+
+Next:
+
+- Owner Windows preview QA.
+
 ## Stage 3A
 
 Status: done.
