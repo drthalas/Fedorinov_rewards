@@ -66,15 +66,63 @@ The ZIP must not contain:
 
 ## Dry-run publication
 
+### GitHub Actions
+
+Recommended release path:
+
+1. Push the committed version to `main`.
+2. Open GitHub -> Actions -> Manual Release.
+3. Click `Run workflow`.
+4. Enter the version from `backend/app/version.py`.
+5. Run first with:
+
+```text
+publish=false
+```
+
+The workflow builds:
+
+```text
+dist/FedorinovRewards_WebPreview_vX.Y.Z.zip
+dist/latest.json
+```
+
+and uploads both files as workflow artifacts without creating a GitHub Release.
+
+After checking the artifacts, run the workflow again with:
+
+```text
+publish=true
+```
+
+The workflow creates:
+
+```text
+tag: vX.Y.Z
+title: Награды и награждённые vX.Y.Z
+```
+
+and uploads the ZIP plus `latest.json` as release assets. The workflow refuses to overwrite an existing release.
+
+The workflow uses the standard GitHub Actions `GITHUB_TOKEN` only inside GitHub Actions. The owner's computer does not need a GitHub token.
+
+After publication, the application checks:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
+```
+
+### Local dry-run
+
 ```sh
 python3 scripts/publish_github_release.py --dry-run
 ```
 
 Dry-run prints the tag, title, notes path, and assets without creating a GitHub Release.
 
-## Publish release
+## Local publish release
 
-Real publication uses local GitHub CLI authentication on the developer machine:
+Manual local publication is still available, but GitHub Actions is preferred. Local publication uses local GitHub CLI authentication on the developer machine:
 
 ```sh
 python3 scripts/publish_github_release.py

@@ -1,0 +1,122 @@
+name: Manual Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 0.1.1"
+        required: true
+      publish:
+        description: "Set to true to publish release"
+        required: true
+        default: "false"
+      prerelease:
+        description: "Mark as prerelease"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release input
+        run: |
+          APP_VERSION="$(python3 - <<'PY'
+          from backend.app.version import APP_VERSION
+          print(APP_VERSION)
+          PY
+          )"
+          if [ "${{ github.event.inputs.version }}" != "$APP_VERSION" ]; then
+            echo "Input version ${{ github.event.inputs.version }} does not match APP_VERSION $APP_VERSION"
+            exit 1
+          fi
+          if [ ! -f "release_notes/${{ github.event.inputs.version }}.md" ]; then
+            echo "Missing release notes: release_notes/${{ github.event.inputs.version }}.md"
+            exit 1
+          fi
+
+      - name: Build release package
+        run: python3 scripts/build_release_package.py --version "${{ github.event.inputs.version }}"
+
+      - name: Safety check package
+        run: python3 scripts/check_package_safety.py "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip"
+
+      - name: Validate latest.json
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          version = "${{ github.event.inputs.version }}"
+          manifest_path = Path("dist/latest.json")
+          zip_path = Path(f"dist/FedorinovRewards_WebPreview_v{version}.zip")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          text = manifest_path.read_text(encoding="utf-8")
+          expected_url = f"https://github.com/drthalas/Fedorinov_rewards/releases/download/v{version}/FedorinovRewards_WebPreview_v{version}.zip"
+          digest = hashlib.sha256(zip_path.read_bytes()).hexdigest()
+          checks = {
+              "version": manifest.get("version") == version,
+              "download_url": manifest.get("download_url") == expected_url,
+              "sha256": manifest.get("sha256") == digest,
+              "notes": bool(manifest.get("notes")),
+              "no_local_path": "/Users/hermes" not in text,
+              "no_token": "token" not in text.lower(),
+              "no_data_paths": all(value not in text for value in ["database/", "Source/", "SourceMark/"]),
+          }
+          for name, ok in checks.items():
+              print(f"{name}: {str(ok).lower()}")
+          if not all(checks.values()):
+              raise SystemExit(1)
+          PY
+
+      - name: Upload release package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: FedorinovRewards-release-${{ github.event.inputs.version }}
+          path: |
+            dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip
+            dist/latest.json
+          if-no-files-found: error
+
+      - name: Dry-run summary
+        if: ${{ github.event.inputs.publish != 'true' }}
+        run: |
+          echo "Dry-run release package built, not published." >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifacts are available from this workflow run." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check release does not already exist
+        if: ${{ github.event.inputs.publish == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${{ github.event.inputs.version }}" >/dev/null 2>&1; then
+            echo "Release v${{ github.event.inputs.version }} already exists. Refusing to overwrite."
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        if: ${{ github.event.inputs.publish == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRERELEASE_FLAG=""
+          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+          gh release create "v${{ github.event.inputs.version }}" \
+            --title "Награды и награждённые v${{ github.event.inputs.version }}" \
+            --notes-file "release_notes/${{ github.event.inputs.version }}.md" \
+            $PRERELEASE_FLAG \
+            "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip" \
+            "dist/latest.json"

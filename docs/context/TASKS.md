@@ -323,7 +323,7 @@ Next:
 
 ## Stage 4A.1
 
-Status: done/current.
+Status: done.
 
 Scope:
 
@@ -336,6 +336,25 @@ Scope:
 Next:
 
 - Publish the first public GitHub Release after explicit confirmation.
+- Stage 4B: one-click updater.
+
+## Stage 4A.2
+
+Status: done/current.
+
+Scope:
+
+- Added a manual GitHub Actions release workflow.
+- Release workflow is triggered only by `workflow_dispatch`, never automatically on push.
+- Workflow validates input version against `APP_VERSION`.
+- Workflow builds versioned ZIP and `latest.json`, runs package safety checks, validates manifest fields, and uploads artifacts.
+- With `publish=false`, workflow performs a dry-run artifact build only.
+- With `publish=true`, workflow publishes a GitHub Release using standard GitHub Actions `GITHUB_TOKEN`.
+
+Next:
+
+- Run Manual Release workflow with `publish=false` and inspect artifacts.
+- Run Manual Release workflow with `publish=true` only after explicit release confirmation.
 - Stage 4B: one-click updater.
 
 ## Backlog / Future

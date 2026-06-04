@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -61,6 +62,8 @@ def release_notes(version: str = APP_VERSION) -> list[str]:
 
 
 def build_release_package(version: str = APP_VERSION) -> dict[str, object]:
+    if version != APP_VERSION:
+        raise ValueError(f"requested version {version} does not match APP_VERSION {APP_VERSION}")
     if DIST_ROOT.exists():
         rmtree(DIST_ROOT)
     DIST_ROOT.mkdir(parents=True, exist_ok=True)
@@ -92,8 +95,15 @@ def build_release_package(version: str = APP_VERSION) -> dict[str, object]:
     }
 
 
-def main() -> int:
-    result = build_release_package()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Build versioned release ZIP and latest.json assets.")
+    parser.add_argument("--version", default=APP_VERSION, help="Release version. Must match backend.app.version.APP_VERSION.")
+    args = parser.parse_args(argv)
+    try:
+        result = build_release_package(args.version)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
     for key, value in result.items():
         print(f"{key}: {value}")
     return 0

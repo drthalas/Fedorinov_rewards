@@ -291,6 +291,14 @@ python3 scripts/publish_github_release.py
 
 Publication uses local `gh` CLI authentication on the developer machine. Do not commit GitHub tokens. See `docs/RELEASE_PROCESS.md`.
 
+Preferred publication path is the manual GitHub Actions workflow:
+
+```text
+.github/workflows/manual_release.yml
+```
+
+Run it from GitHub -> Actions -> Manual Release. First use `publish=false` to build and inspect artifacts. Run again with `publish=true` only when the release is ready. Releases are not published automatically on push.
+
 ## Windows Portable Preview
 
 The first Windows owner preview is a portable ZIP, not an installer. It contains application code, startup scripts, and Windows runbook documents only. Owner data, SQLite databases, photos, backups, `.env`, `.venv`, legacy sources, and generated reports are not included.

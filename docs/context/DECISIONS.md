@@ -96,3 +96,13 @@ Each release should include:
 GitHub tokens are never committed. Publishing can use local `gh` CLI authentication on the developer machine, while owner-side update checks remain token-free.
 
 Owner data, `.env`, database, media folders, backups, logs, and generated reports are not included in release assets.
+
+## Manual GitHub Actions Release Workflow
+
+GitHub Releases are published manually through a `workflow_dispatch` GitHub Actions workflow, not automatically on push.
+
+The workflow has a dry-run mode (`publish=false`) that builds and uploads artifacts without creating a release. Real publication requires `publish=true` and uses the standard GitHub Actions `GITHUB_TOKEN` inside GitHub Actions.
+
+The workflow validates the requested release version against `backend/app/version.py`, refuses missing release notes, and refuses to overwrite an existing GitHub Release.
+
+Owner-side update checks still do not require any token.

@@ -1,5 +1,13 @@
 # Changelog
 
+## Stage 4A.2 Manual GitHub Release Workflow
+
+- Added `.github/workflows/manual_release.yml` for manual release packaging and publishing.
+- Workflow runs only through `workflow_dispatch`; releases are not published on push.
+- Workflow validates input version against `APP_VERSION`, builds versioned ZIP and `latest.json`, runs safety checks, validates manifest content, and uploads artifacts.
+- `publish=false` performs dry-run artifact build only.
+- `publish=true` publishes the GitHub Release with standard GitHub Actions `GITHUB_TOKEN`.
+
 ## Stage 4A.1 GitHub Release Package Publishing
 
 - Added `scripts/print_version.py` for the current app name/version.

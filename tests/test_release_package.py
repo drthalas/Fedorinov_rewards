@@ -8,6 +8,9 @@ import unittest
 from scripts import build_release_package, publish_github_release
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 class ReleasePackageTests(unittest.TestCase):
     def test_build_release_package_creates_versioned_zip_and_manifest(self) -> None:
         with TemporaryDirectory() as tmpdir:
@@ -51,6 +54,10 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertNotIn("Source/", manifest_text)
             self.assertNotIn("SourceMark/", manifest_text)
 
+    def test_build_release_package_rejects_version_mismatch(self) -> None:
+        with self.assertRaises(ValueError):
+            build_release_package.build_release_package("9.9.9")
+
     def test_publish_dry_run_does_not_call_gh(self) -> None:
         with TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)
@@ -70,6 +77,19 @@ class ReleasePackageTests(unittest.TestCase):
 
             self.assertEqual(code, 0)
             run_gh.assert_not_called()
+
+    def test_manual_release_workflow_is_manual_and_safe_by_default(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "manual_release.yml").read_text(encoding="utf-8")
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("\n  push:", workflow)
+        self.assertIn("contents: write", workflow)
+        self.assertIn('default: "false"', workflow)
+        self.assertIn("publish != 'true'", workflow)
+        self.assertIn("publish == 'true'", workflow)
+        self.assertIn("actions/upload-artifact", workflow)
+        self.assertIn("gh release create", workflow)
+        self.assertIn("Input version", workflow)
+        self.assertIn("APP_VERSION", workflow)
 
 
 if __name__ == "__main__":
