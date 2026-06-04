@@ -3,11 +3,15 @@
 {% block content %}
 <h1>{{ person.fio }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-<p><a href="/persons">← к списку</a> · <a href="/persons/{{ person.id }}/photos">Все фото</a></p>
+<p>
+  <a href="{{ return_to or '/persons' }}">← к списку</a>
+  · <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Все фото</a>
+</p>
 {% if settings.write_mode %}
 <div class="actions">
-  <a class="button" href="/persons/{{ person.id }}/edit">Изменить</a>
+  <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
   <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Удалить награжденного?');">
+    {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>
 </div>
@@ -81,7 +85,7 @@
 
 <h2>Награды</h2>
 {% if settings.write_mode %}
-<p><a class="button" href="/persons/{{ person.id }}/rewards/new">Добавить награду</a></p>
+<p><a class="button" href="/persons/{{ person.id }}/rewards/new{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Добавить награду</a></p>
 {% endif %}
 <div class="table-wrap">
   <table>
@@ -103,7 +107,7 @@
         <td>{{ reward.price_now|format_money }}</td>
         <td>
           <a href="/rewards/{{ reward.id }}">Открыть</a>
-          {% if settings.write_mode %} · <a href="/rewards/{{ reward.id }}/edit">Изменить</a>{% endif %}
+          {% if settings.write_mode %} · <a href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>{% endif %}
         </td>
       </tr>
       {% endfor %}

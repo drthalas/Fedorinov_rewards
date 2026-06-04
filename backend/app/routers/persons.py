@@ -117,16 +117,23 @@ async def person_create(request: Request):
 
 
 @router.get("/persons/{person_id}")
-def person_detail(request: Request, person_id: int, status: str = ""):
+def person_detail(request: Request, person_id: int, status: str = "", return_to: str = ""):
     settings = get_settings()
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
+    safe_back = safe_return_to(return_to)
     return templates.TemplateResponse(
         request,
         "person_detail.html",
-        {"settings": settings, "person": person, "rewards": rewards, "status_message": STATUS_MESSAGES.get(status)},
+        {
+            "settings": settings,
+            "person": person,
+            "rewards": rewards,
+            "status_message": STATUS_MESSAGES.get(status),
+            "return_to": safe_back,
+        },
     )
 
 
@@ -204,7 +211,7 @@ async def person_delete(request: Request, person_id: int):
 
 
 @router.get("/persons/{person_id}/photos")
-def person_photos(request: Request, person_id: int, index: int | None = None):
+def person_photos(request: Request, person_id: int, index: int | None = None, return_to: str = ""):
     settings = get_settings()
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
@@ -212,6 +219,7 @@ def person_photos(request: Request, person_id: int, index: int | None = None):
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     photos = person_photo_items(person, rewards)
     available_photos = [photo for photo in photos if photo.get("path")]
+    safe_back = safe_return_to(return_to)
     current_photo = None
     previous_index = None
     next_index = None
@@ -231,5 +239,6 @@ def person_photos(request: Request, person_id: int, index: int | None = None):
             "current_photo": current_photo,
             "previous_index": previous_index,
             "next_index": next_index,
+            "return_to": safe_back,
         },
     )
