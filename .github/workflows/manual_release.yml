@@ -14,6 +14,10 @@ on:
         description: "Mark as prerelease"
         required: false
         default: "false"
+      notify:
+        description: "Show local Telegram notification command"
+        required: false
+        default: "false"
 
 permissions:
   contents: write
@@ -120,3 +124,10 @@ jobs:
             $PRERELEASE_FLAG \
             "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip" \
             "dist/latest.json"
+
+      - name: Telegram notification instructions
+        if: ${{ github.event.inputs.publish == 'true' && github.event.inputs.notify == 'true' }}
+        run: |
+          echo "Telegram notification is sent from the Mac mini, not from GitHub Actions." >> "$GITHUB_STEP_SUMMARY"
+          echo "Run after confirmation:" >> "$GITHUB_STEP_SUMMARY"
+          echo "python3 scripts/send_release_notification.py --version ${{ github.event.inputs.version }} --send" >> "$GITHUB_STEP_SUMMARY"

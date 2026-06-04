@@ -271,7 +271,9 @@ UPDATE_DOWNLOAD_DIR=updates/downloads
 UPDATE_EXTRACT_DIR=updates/extracted
 ```
 
-One-click update installation is available from `/legacy?tab=about` after checking updates. When a newer release is available, the app shows an `Обновить` button. The updater downloads the release ZIP, verifies SHA256, creates an application backup under `updates/backups`, preserves `.env`, and copies only allowed application files. It does not touch `database/`, `Source/`, `SourceMark/`, `default/`, backups, logs, or owner data. Automatic restart is deferred; after a successful update, close the launch window and start the app again.
+One-click update installation is available from `/legacy?tab=about` after checking updates. When a newer release is available, the app shows an `Обновить` button. The page shows progress steps while the update runs: checking, downloading, verifying, backing up, installing, and done. Status is also available at `/updates/status`.
+
+The updater downloads the release ZIP, verifies SHA256, creates an application backup under `updates/backups`, preserves `.env`, and copies only allowed application files. It does not touch `database/`, `Source/`, `SourceMark/`, `default/`, backups, logs, or owner data. Automatic restart is deferred; after a successful update, close the launch window and start the app again.
 
 CLI helpers:
 
@@ -290,7 +292,7 @@ Release assets are generated from the current `APP_VERSION`:
 ```sh
 python3 scripts/print_version.py
 python3 scripts/build_release_package.py
-python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_v0.1.0.zip
+python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_vX.Y.Z.zip
 python3 scripts/publish_github_release.py --dry-run
 ```
 
@@ -306,6 +308,16 @@ python3 scripts/publish_github_release.py
 ```
 
 Publication uses local `gh` CLI authentication on the developer machine. Do not commit GitHub tokens. See `docs/RELEASE_PROCESS.md`.
+
+Release Telegram notifications are sent from the Mac mini through the existing colorizer/SAVBot setup, not from GitHub Actions:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send-test-to-copy-only
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
+```
+
+Real notifications require separate confirmation. Tokens and chat ids remain local.
 
 Preferred publication path is the manual GitHub Actions workflow:
 

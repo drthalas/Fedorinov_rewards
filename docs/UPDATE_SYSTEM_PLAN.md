@@ -36,6 +36,17 @@ Implemented one-click update flow:
 5. Replace only application code, templates, scripts, and documentation.
 6. Show a clear result telling the user to restart the application manually.
 
+Stage 4B.1 adds visible progress while the update runs:
+
+- `checking`: проверяем новую версию;
+- `downloading`: скачиваем обновление;
+- `verifying`: проверяем файл;
+- `backing_up`: создаём резервную копию;
+- `installing`: устанавливаем обновление;
+- `success` / `error`: показываем результат.
+
+The current status is stored locally in `updates/update_status.json` and exposed through `GET /updates/status`. A second update request is blocked while one update is already running.
+
 Automatic restart is deferred. The owner should close the `start_windows.bat` window and start it again after a successful update.
 
 If file replacement fails, the updater attempts to restore files from the application backup and returns a clear error.
@@ -61,3 +72,13 @@ The updater must not touch:
 - `updates/`
 
 Owner data remains local and separate from application code.
+
+## Release notifications
+
+Release Telegram notifications are generated from `latest.json` or `release_notes/X.Y.Z.md` and sent through the same local colorizer/SAVBot setup as daily reports.
+
+- Sergey receives the main notification.
+- Alexander receives a copy.
+- Dry-run is required before real sending.
+- Real sending requires separate confirmation.
+- Telegram tokens and real chat ids stay local and ignored by Git.

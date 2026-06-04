@@ -140,17 +140,75 @@ class UpdaterTests(unittest.TestCase):
             self.assertNotIn(".env", names)
             self.assertNotIn("database/MyDatabase.sqlite", names)
 
+    def test_update_status_idle_by_default_and_success_after_apply(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            settings = self._settings(root)
+            self._write_current_app(settings.app_install_dir)
+            local_zip = root / "update.zip"
+            checksum = self._make_update_zip(local_zip)
+            manifest = self._manifest(local_zip, checksum)
+
+            self.assertEqual(updater.read_update_status(settings)["status"], "idle")
+
+            def fake_downloader(url: str, destination: Path, timeout: int) -> Path:
+                destination.write_bytes(local_zip.read_bytes())
+                return destination
+
+            with patch.object(updater, "check_for_updates", return_value=manifest):
+                result = updater.apply_update(settings, dry_run=False, zip_downloader=fake_downloader)
+
+            status = updater.read_update_status(settings)
+            self.assertTrue(result["ok"])
+            self.assertEqual(status["status"], "success")
+            self.assertEqual(status["step"], "success")
+
+    def test_second_update_blocked_when_status_running(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            settings = self._settings(Path(tmpdir))
+            self._write_current_app(settings.app_install_dir)
+            updater.write_update_status(settings, "running", "downloading")
+            with self.assertRaisesRegex(updater.UpdateError, "Обновление уже выполняется"):
+                updater.apply_update(settings, dry_run=False)
+
+    def test_error_status_after_apply_failure(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            settings = self._settings(root)
+            self._write_current_app(settings.app_install_dir)
+            manifest = self._manifest(root / "unused.zip", "a" * 64)
+
+            def failing_downloader(url: str, destination: Path, timeout: int) -> Path:
+                raise updater.UpdateError("download failed")
+
+            with patch.object(updater, "check_for_updates", return_value=manifest):
+                with self.assertRaises(updater.UpdateError):
+                    updater.apply_update(settings, dry_run=False, zip_downloader=failing_downloader)
+
+            status = updater.read_update_status(settings)
+            self.assertEqual(status["status"], "error")
+            self.assertEqual(status["step"], "error")
+            self.assertIn("download failed", str(status["error"]))
+
     def test_updates_apply_route_requires_post(self) -> None:
         routes = [route for route in app.routes if getattr(route, "path", None) == "/updates/apply"]
         methods = set().union(*(getattr(route, "methods", set()) for route in routes))
         self.assertIn("POST", methods)
         self.assertNotIn("GET", methods)
 
+    def test_updates_status_route_registered(self) -> None:
+        routes = [route for route in app.routes if getattr(route, "path", None) == "/updates/status"]
+        methods = set().union(*(getattr(route, "methods", set()) for route in routes))
+        self.assertIn("GET", methods)
+
     def test_legacy_about_template_has_update_form_in_available_branch(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text()
         self.assertIn('action="/updates/apply"', template)
         self.assertIn('name="confirm_update"', template)
         self.assertIn("Доступно обновление", template)
+        self.assertIn("data-update-progress", template)
+        self.assertIn("Проверяем новую версию", template)
+        self.assertIn("Скачиваем обновление", template)
 
 
 if __name__ == "__main__":

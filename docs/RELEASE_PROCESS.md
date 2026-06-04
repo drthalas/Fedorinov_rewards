@@ -114,6 +114,30 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The updater downloads the ZIP from the public release, checks SHA256, creates an application backup, preserves `.env`, replaces application files, and asks the owner to restart the app manually.
 
+## Telegram release notification
+
+After a successful publication, prepare the Telegram release notification on the Mac mini. The Telegram bot token stays local and is not stored in GitHub Actions.
+
+First preview the message:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
+```
+
+After separate confirmation, send a test only to Alexander:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send-test-to-copy-only
+```
+
+After separate confirmation for the real release notification, send to Sergey and copy Alexander:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
+```
+
+Do not send release notifications automatically from GitHub Actions. The workflow can print a local command reminder, but real Telegram messages are sent only from the Mac mini after confirmation.
+
 ### Local dry-run
 
 ```sh

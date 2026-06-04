@@ -497,7 +497,7 @@
                 <summary>Проверочная сумма SHA256</summary>
                 <p class="secondary">{{ update_check.sha256|default("—") }}</p>
               </details>
-              <form method="post" action="/updates/apply" onsubmit="return confirm('Установить обновление? После установки нужно перезапустить приложение.')">
+              <form class="update-apply-form" data-update-form method="post" action="/updates/apply" onsubmit="return confirm('Установить обновление? После установки нужно перезапустить приложение.')">
                 <label class="summary-checkbox">
                   <input type="checkbox" name="confirm_update" value="true" required>
                   <span>Я понимаю, что после обновления нужно перезапустить приложение.</span>
@@ -505,6 +505,19 @@
                 <p class="secondary">Перед обновлением программа сохранит текущую версию. Данные и фотографии не будут затронуты.</p>
                 <button type="submit">Обновить</button>
               </form>
+              <div class="update-progress" data-update-progress hidden>
+                <div class="notice">Идёт обновление. Не закрывайте окно.</div>
+                <ol class="update-steps">
+                  <li data-update-step="checking">Проверяем новую версию</li>
+                  <li data-update-step="downloading">Скачиваем обновление</li>
+                  <li data-update-step="verifying">Проверяем файл</li>
+                  <li data-update-step="backing_up">Создаём резервную копию</li>
+                  <li data-update-step="installing">Устанавливаем обновление</li>
+                  <li data-update-step="success">Готово</li>
+                </ol>
+                <p class="update-progress-message" data-update-message></p>
+                <p class="update-progress-error" data-update-error hidden></p>
+              </div>
             {% else %}
               <div class="notice notice-success">Установлена актуальная версия.</div>
             {% endif %}

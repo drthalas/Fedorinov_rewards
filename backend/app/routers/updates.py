@@ -4,7 +4,7 @@ from urllib.parse import parse_qs
 
 from ..config import get_settings
 from ..services.update_checker import check_for_updates
-from ..services.updater import UpdateError, apply_update
+from ..services.updater import UpdateError, apply_update, read_update_status
 from ..version import APP_NAME, APP_VERSION
 from .templates import templates
 
@@ -23,6 +23,11 @@ def version_info() -> dict[str, str]:
 @router.get("/updates/check")
 def updates_check() -> dict[str, object]:
     return check_for_updates(get_settings())
+
+
+@router.get("/updates/status")
+def updates_status() -> dict[str, object]:
+    return read_update_status(get_settings())
 
 
 async def _read_form(request: Request) -> dict[str, str]:

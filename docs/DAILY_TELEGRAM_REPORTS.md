@@ -84,6 +84,39 @@ python3 scripts/send_daily_report.py --send-test-to-copy-only
 
 This does not send a message to Sergey.
 
+## Release Notifications
+
+The same colorizer/SAVBot setup can send a short notification when a new
+application version is published.
+
+- Sergey receives the main release notification.
+- Alexander receives a copy.
+- The message uses the project name "Награды и награждённые".
+- The message explains how to update from `О программе`.
+- The message must not include tokens, local paths, database contents, photos,
+  or internal implementation terms.
+
+Preview without sending:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
+```
+
+After separate confirmation, send a test only to Alexander:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send-test-to-copy-only
+```
+
+After separate confirmation for the real notification:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
+```
+
+Release notification logs are written to ignored
+`logs/release_notifications.jsonl`.
+
 ## Enable launchd
 
 Copy the template:

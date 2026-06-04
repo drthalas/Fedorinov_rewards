@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 4B.1 Update Progress and Release Notifications
+
+- Bumped application version to `0.1.1` for the owner updater test release.
+- Added visible update progress UI after clicking `Обновить`.
+- Added `/updates/status` with current update status, step, message, timestamps, and error.
+- Added protection against starting a second update while one update is already running.
+- Added `release_notes/0.1.1.md`.
+- Added Telegram release notification generator and sender using the existing local colorizer/SAVBot configuration.
+- Kept real GitHub Release publication and real Telegram sending behind separate confirmation.
+
 ## Daily Telegram Report Timezone Scheduling Fix
 
 - Changed scheduled daily Telegram reports to use `Europe/Moscow` explicitly instead of the Mac mini local timezone.

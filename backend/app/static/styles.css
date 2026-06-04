@@ -1124,6 +1124,42 @@ th {
   color: #667085;
 }
 
+.update-progress {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid #b6d7a8;
+  background: #f3faef;
+}
+
+.update-steps {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  padding-left: 22px;
+}
+
+.update-steps li {
+  color: #667085;
+}
+
+.update-steps li.is-current {
+  color: #14532d;
+  font-weight: 700;
+}
+
+.update-steps li.is-done {
+  color: #166534;
+}
+
+.update-steps li.is-error,
+.update-progress-error {
+  color: #b42318;
+}
+
+.update-progress-message {
+  font-weight: 700;
+}
+
 @media (max-width: 900px) {
   .legacy-layout,
   .legacy-layout-marks,

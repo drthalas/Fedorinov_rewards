@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import fnmatch
 import json
 from pathlib import Path
@@ -64,6 +64,78 @@ class UpdatePlan:
     download_url: str | None
     sha256: str | None
     notes: list[str]
+
+
+UPDATE_STEPS = {
+    "idle": "Ожидание",
+    "checking": "Проверяем новую версию",
+    "downloading": "Скачиваем обновление",
+    "verifying": "Проверяем файл",
+    "backing_up": "Создаём резервную копию",
+    "installing": "Устанавливаем обновление",
+    "success": "Готово",
+    "error": "Ошибка обновления",
+}
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def update_status_path(settings: Settings) -> Path:
+    return settings.app_install_dir / "updates" / "update_status.json"
+
+
+def default_update_status() -> dict[str, object]:
+    return {
+        "status": "idle",
+        "step": "idle",
+        "message": UPDATE_STEPS["idle"],
+        "error": None,
+        "started_at": None,
+        "finished_at": None,
+    }
+
+
+def read_update_status(settings: Settings) -> dict[str, object]:
+    path = update_status_path(settings)
+    if not path.exists():
+        return default_update_status()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return default_update_status()
+    status = default_update_status()
+    status.update({key: data.get(key) for key in status if key in data})
+    return status
+
+
+def write_update_status(
+    settings: Settings,
+    status: str,
+    step: str,
+    message: str | None = None,
+    error: str | None = None,
+) -> dict[str, object]:
+    path = update_status_path(settings)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    previous = read_update_status(settings)
+    started_at = previous.get("started_at") if previous.get("status") == "running" else _now_iso()
+    finished_at = None if status == "running" else _now_iso()
+    payload = {
+        "status": status,
+        "step": step,
+        "message": message or UPDATE_STEPS.get(step, step),
+        "error": error,
+        "started_at": started_at,
+        "finished_at": finished_at,
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return payload
+
+
+def update_is_running(settings: Settings) -> bool:
+    return read_update_status(settings).get("status") == "running"
 
 
 def sha256_file(path: Path) -> str:
@@ -236,54 +308,71 @@ def apply_update(
     if not settings.update_check_enabled:
         raise UpdateError("Проверка обновлений выключена.")
 
-    plan = build_update_plan(settings, current_version=current_version)
-    result: dict[str, object] = {
-        "ok": False,
-        "dry_run": dry_run,
-        "current_version": plan.current_version,
-        "latest_version": plan.latest_version,
-        "update_available": plan.update_available,
-        "download_url": plan.download_url,
-        "backup_path": None,
-        "copied_files": 0,
-        "message": "",
-    }
-    if not plan.update_available:
-        result["message"] = "Обновлений нет. Установлена актуальная версия."
-        result["ok"] = True
-        return result
-    if not plan.download_url or not plan.sha256:
-        raise UpdateError("В latest.json нет download_url или sha256.")
-
-    if dry_run:
-        result["ok"] = True
-        result["message"] = "Доступно обновление. Dry-run: файлы приложения не изменены."
-        return result
-
-    settings.update_download_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = settings.update_download_dir / f"FedorinovRewards_WebPreview_v{plan.latest_version}.zip"
-    zip_downloader(plan.download_url, zip_path, settings.update_timeout_seconds)
-    verified_sha = verify_zip_sha256(zip_path, plan.sha256)
-    package_root = extract_update_zip(zip_path, settings.update_extract_dir)
-    backup_path = create_app_backup(settings)
+    if not dry_run and update_is_running(settings):
+        raise UpdateError("Обновление уже выполняется.")
 
     try:
-        copied = copy_package_files(package_root, settings.app_install_dir)
-    except Exception as exc:
-        try:
-            restore_backup(backup_path, settings.app_install_dir)
-        except Exception as rollback_exc:
-            raise UpdateError(f"Обновление не удалось, rollback тоже не завершился: {rollback_exc}") from exc
-        raise UpdateError(f"Обновление не удалось, текущая версия восстановлена из backup: {exc}") from exc
-
-    result.update(
-        {
-            "ok": True,
-            "sha256": verified_sha,
-            "backup_path": str(backup_path),
-            "copied_files": copied,
-            "message": "Обновление установлено. Закройте окно запуска и запустите start_windows.bat снова.",
+        if not dry_run:
+            write_update_status(settings, "running", "checking")
+        plan = build_update_plan(settings, current_version=current_version)
+        result: dict[str, object] = {
+            "ok": False,
+            "dry_run": dry_run,
+            "current_version": plan.current_version,
+            "latest_version": plan.latest_version,
+            "update_available": plan.update_available,
+            "download_url": plan.download_url,
+            "backup_path": None,
+            "copied_files": 0,
+            "message": "",
         }
-    )
-    write_update_log(settings, result)
-    return result
+        if not plan.update_available:
+            result["message"] = "Обновлений нет. Установлена актуальная версия."
+            result["ok"] = True
+            if not dry_run:
+                write_update_status(settings, "success", "success", str(result["message"]))
+            return result
+        if not plan.download_url or not plan.sha256:
+            raise UpdateError("В latest.json нет download_url или sha256.")
+
+        if dry_run:
+            result["ok"] = True
+            result["message"] = "Доступно обновление. Dry-run: файлы приложения не изменены."
+            return result
+
+        settings.update_download_dir.mkdir(parents=True, exist_ok=True)
+        zip_path = settings.update_download_dir / f"FedorinovRewards_WebPreview_v{plan.latest_version}.zip"
+        write_update_status(settings, "running", "downloading")
+        zip_downloader(plan.download_url, zip_path, settings.update_timeout_seconds)
+        write_update_status(settings, "running", "verifying")
+        verified_sha = verify_zip_sha256(zip_path, plan.sha256)
+        package_root = extract_update_zip(zip_path, settings.update_extract_dir)
+        write_update_status(settings, "running", "backing_up")
+        backup_path = create_app_backup(settings)
+
+        try:
+            write_update_status(settings, "running", "installing")
+            copied = copy_package_files(package_root, settings.app_install_dir)
+        except Exception as exc:
+            try:
+                restore_backup(backup_path, settings.app_install_dir)
+            except Exception as rollback_exc:
+                raise UpdateError(f"Обновление не удалось, rollback тоже не завершился: {rollback_exc}") from exc
+            raise UpdateError(f"Обновление не удалось, текущая версия восстановлена из backup: {exc}") from exc
+
+        result.update(
+            {
+                "ok": True,
+                "sha256": verified_sha,
+                "backup_path": str(backup_path),
+                "copied_files": copied,
+                "message": "Обновление установлено. Закройте окно запуска и запустите start_windows.bat снова.",
+            }
+        )
+        write_update_log(settings, result)
+        write_update_status(settings, "success", "success", str(result["message"]))
+        return result
+    except Exception as exc:
+        if not dry_run:
+            write_update_status(settings, "error", "error", str(exc), str(exc))
+        raise

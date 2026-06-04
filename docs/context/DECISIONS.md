@@ -118,3 +118,7 @@ The updater must verify SHA256 from `latest.json`, validate ZIP structure, rejec
 The updater must not touch owner data, SQLite databases, `Source`, `SourceMark`, `default`, backups, logs, `.venv`, local reports, or local update folders.
 
 Automatic restart is deferred. After a successful update, the user closes the launch window and starts the application again.
+
+The update UI should show progress while an update is running. Progress is stored locally in `updates/update_status.json` and exposed through `/updates/status`; this ignored local status file must not contain owner data.
+
+Release Telegram notifications are sent from the Mac mini through the existing colorizer/SAVBot setup after separate confirmation. GitHub Actions can show the local command to run, but it does not send Telegram messages because the Telegram token stays local.

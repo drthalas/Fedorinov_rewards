@@ -52,6 +52,8 @@ FILES_TO_COPY = [
     Path("scripts") / "check_backup.py",
     Path("scripts") / "check_update.py",
     Path("scripts") / "apply_update.py",
+    Path("scripts") / "generate_release_telegram_message.py",
+    Path("scripts") / "send_release_notification.py",
     Path("HELP_RU.md"),
     Path("README.md"),
     Path("docs") / "WINDOWS_PREVIEW_RUNBOOK.md",

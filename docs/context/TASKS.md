@@ -358,7 +358,7 @@ Next:
 
 ## Stage 4B
 
-Status: done/current.
+Status: done.
 
 Scope:
 
@@ -373,6 +373,28 @@ Next:
 
 - Owner QA on Windows with a newer test release.
 - Improve rollback reporting and optional restart helper after Windows QA.
+
+## Stage 4B.1
+
+Status: done/current.
+
+Scope:
+
+- Bumped `APP_VERSION` to `0.1.1` for owner updater QA.
+- Added update progress status persisted in `updates/update_status.json`.
+- Added `/updates/status`.
+- Updated the `О программе` update form to show progress steps while update installation runs.
+- Blocked duplicate update starts while one update is already running.
+- Added release notes for `0.1.1`.
+- Added Telegram release notification generator and sender using the existing colorizer/SAVBot setup.
+- Added dry-run and copy-only test modes for release notifications.
+
+Next:
+
+- Build and inspect the `v0.1.1` release package.
+- Publish real GitHub Release `v0.1.1` only after confirmation.
+- Send real Telegram release notification only after confirmation.
+- Owner QA: update from bootstrap `0.1.0` to `0.1.1`.
 
 ## Daily Telegram Report Timezone Scheduling
 
