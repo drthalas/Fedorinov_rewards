@@ -101,6 +101,23 @@ The minimal web mirror is available at:
 - `/legacy` - legacy-style desktop mirror with old top tabs and compact master/detail layout
 - `/health` - environment diagnostics
 
+Search supports legacy-like query parameters:
+
+- `q` - search value.
+- `scope` - `all`, `persons`, `rewards`, or `marks`.
+- `mode` - `contains`, `starts`, or `exact`.
+
+Examples:
+
+```text
+/search?q=Андрос&scope=persons&mode=contains
+/search?q=орден&scope=rewards&mode=contains
+/legacy?tab=search&q=андреев&scope=all&mode=contains
+/search.csv?q=Андрос&scope=all&mode=contains
+```
+
+The search is read-only, supports lowercase Cyrillic matching, groups results by persons/rewards/marks, and limits each group to the first 25 UI results.
+
 Start the backend on the Mac mini:
 
 ```sh

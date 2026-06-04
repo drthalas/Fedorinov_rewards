@@ -1,5 +1,16 @@
 # Changelog
 
+## Stage 3G Search Rewrite
+
+- Replaced the old SQLite `LIKE`-only search with a shared repository for `/search` and `/legacy?tab=search`.
+- Fixed lowercase and partial Cyrillic search by using Python Unicode normalization with `casefold()`.
+- Search now covers persons, rewards, and marks with joined guide names and owner names where appropriate.
+- Added `scope=all/persons/rewards/marks` and `mode=contains/starts/exact`.
+- Updated `/search` UI with legacy-like category, condition, value, search, and reset controls.
+- Updated legacy search tab with matching controls, grouped tables, counts, and clickable rows.
+- Added read-only `/search.csv` export with UTF-8 BOM for Excel compatibility.
+- Added tests for Cyrillic partial search, lowercase search, reward/mark number search, empty query behavior, quote handling, and legacy route registration.
+
 ## Stage 3F Photo Viewer and Photo Management
 
 - Added clickable photos and a large `/photo/view` viewer that uses the existing safe `/media` endpoint.

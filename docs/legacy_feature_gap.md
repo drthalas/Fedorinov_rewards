@@ -17,7 +17,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | --- | --- | --- | --- | --- | --- | --- |
 | Main desktop shell | Form1 | Implemented as `/legacy` separate route | Layout parity only; no direct writes | Stage 3E | no | no |
 | Rewards tab layout | Form1 | Implemented as `/legacy?tab=rewards` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
-| Search tab layout | Form1 | Implemented as `/legacy?tab=search` with grouped results | Legacy field/match filters still incomplete | Stage 3E plus Stage 3H | no | no |
+| Search tab layout | Form1 | Reworked in Stage 3G with category, condition, value, grouped result tables, counts, and reset | Context auto-submit JS still deferred | Stage 3G plus later UI polish | no | no |
 | Marks tab layout | Form1 | Implemented as `/legacy?tab=marks` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
 | Summary tab basic aggregates | Form1 | Implemented as `/legacy?tab=summary` basic counts/sums | Full dynamic matrix/export parity deferred | Stage 3E plus Stage 3H | no | no |
 | About tab | Form1, StringCipher | Implemented as `/legacy?tab=about` preview/status page | Activation/licensing workflow deferred | Stage 3E | no | no |
@@ -67,7 +67,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Legacy filters | Form1 | Basic search only | Query parity and protected-field display rules | Stage 3H | no | no |
+| Legacy filters | Form1 | Search filters implemented for all/persons/rewards/marks and contains/starts/exact | Full legacy svod/filter matrix still deferred | Stage 3G plus Stage 3H | no | no |
+| Search CSV export | Form1 | Implemented as read-only `/search.csv` | Output parity with legacy export can still be refined | Stage 3G | no | no |
 | Summary tables | Form1 | Dashboard counts only | Aggregate parity and export expectations | Stage 3H | no | no |
 
 ## Activation / Licensing

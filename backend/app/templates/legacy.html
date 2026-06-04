@@ -163,39 +163,100 @@
       <h1>Поиск</h1>
       <form class="legacy-search-form" method="get" action="/legacy">
         <input type="hidden" name="tab" value="search">
-        <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер">
-        <button type="submit">Найти</button>
+        <label>
+          <span>Категория поиска</span>
+          <select name="scope">
+            <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
+            <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
+            <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>
+            <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
+          </select>
+        </label>
+        <label>
+          <span>Условие поиска</span>
+          <select name="mode">
+            <option value="contains" {% if mode == "contains" %}selected{% endif %}>содержит</option>
+            <option value="starts" {% if mode == "starts" %}selected{% endif %}>начинается с</option>
+            <option value="exact" {% if mode == "exact" %}selected{% endif %}>точное совпадение</option>
+          </select>
+        </label>
+        <label class="search-value">
+          <span>Значение</span>
+          <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер">
+        </label>
+        <button type="submit">Искать</button>
+        <a class="button secondary-button" href="/legacy?tab=search">Сброс</a>
       </form>
       {% if not q.strip() %}
         <div class="notice">Введите строку поиска. При пустом запросе список не загружается.</div>
       {% elif search_results %}
-        <div class="legacy-results-grid">
+        <p class="secondary">Найдено строк: {{ search_results.total }} · время: {{ search_results.elapsed_ms }} ms · <a href="/search.csv?q={{ q|urlencode }}&scope={{ scope }}&mode={{ mode }}">CSV export</a></p>
+        {% if search_results.total == 0 %}
+          <div class="notice">Ничего не найдено.</div>
+        {% else %}
           <section class="legacy-block">
             <h2>Награждённые ({{ search_results.counts.persons }})</h2>
-            {% for person in search_results.persons %}
-              <p><a href="/legacy?tab=rewards&person_id={{ person.id }}">{{ person.fio|dash }}</a> <span class="secondary">{{ person.rank_name|dash }}</span></p>
-            {% else %}
-              <p class="secondary">Не найдено.</p>
-            {% endfor %}
+            <div class="legacy-table-wrap">
+              <table class="legacy-table">
+                <thead><tr><th>ID</th><th>ФИО</th><th>Звание/специальность</th><th>Дата рождения</th></tr></thead>
+                <tbody>
+                  {% for person in search_results.persons %}
+                  <tr>
+                    <td>{{ person.id }}</td>
+                    <td><a href="/legacy?tab=rewards&person_id={{ person.id }}">{{ person.fio|dash }}</a></td>
+                    <td>{{ person.rank_name|dash }}</td>
+                    <td>{{ person.birthday|format_date }}</td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4">Не найдено.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </section>
           <section class="legacy-block">
             <h2>Награды ({{ search_results.counts.rewards }})</h2>
-            {% for reward in search_results.rewards %}
-              <p><a href="/rewards/{{ reward.id }}">{{ reward.name|dash }}</a> <span class="secondary">№ {{ reward.number|dash }}</span></p>
-            {% else %}
-              <p class="secondary">Не найдено.</p>
-            {% endfor %}
+            <div class="legacy-table-wrap">
+              <table class="legacy-table">
+                <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Владелец</th><th>Наличие</th></tr></thead>
+                <tbody>
+                  {% for reward in search_results.rewards %}
+                  <tr>
+                    <td>{{ reward.id }}</td>
+                    <td><a href="/rewards/{{ reward.id }}">{{ reward.name|dash }}</a></td>
+                    <td>{{ reward.number|dash }}</td>
+                    <td>{{ reward.fio|dash }}</td>
+                    <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="5">Не найдено.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </section>
           <section class="legacy-block">
             <h2>Знаки ({{ search_results.counts.marks }})</h2>
-            {% for mark in search_results.marks %}
-              <p><a href="/legacy?tab=marks&mark_id={{ mark.id }}">{{ mark.name|dash }}</a> <span class="secondary">№ {{ mark.number|dash }}</span></p>
-            {% else %}
-              <p class="secondary">Не найдено.</p>
-            {% endfor %}
+            <div class="legacy-table-wrap">
+              <table class="legacy-table">
+                <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Наличие</th></tr></thead>
+                <tbody>
+                  {% for mark in search_results.marks %}
+                  <tr>
+                    <td>{{ mark.id }}</td>
+                    <td><a href="/legacy?tab=marks&mark_id={{ mark.id }}">{{ mark.name|dash }}</a></td>
+                    <td>{{ mark.number|dash }}</td>
+                    <td><span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool }}</span></td>
+                  </tr>
+                  {% else %}
+                  <tr><td colspan="4">Не найдено.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </section>
-        </div>
-        <p class="secondary">Показаны первые {{ search_results.limit }} результатов в каждой группе.</p>
+          <p class="secondary">Показаны первые {{ search_results.limit }} результатов в каждой группе.</p>
+        {% endif %}
       {% endif %}
     </section>
   {% elif tab == "marks" %}

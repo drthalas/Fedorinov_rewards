@@ -62,6 +62,8 @@ def legacy_index(
     person_id: int | None = None,
     mark_id: int | None = None,
     q: str = "",
+    scope: str = "all",
+    mode: str = "contains",
     message: str = "",
 ):
     settings = get_settings()
@@ -84,6 +86,8 @@ def legacy_index(
         "selected_mark": None,
         "selected_mark_photos": [],
         "q": q,
+        "scope": scope,
+        "mode": mode,
         "search_results": None,
         "summary": None,
         "commit": _current_commit(),
@@ -115,7 +119,10 @@ def legacy_index(
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
 
     if active_tab == "search" and q.strip():
-        context["search_results"] = search_all(settings.rewards_db_path, q, limit=25)
+        search_results = search_all(settings.rewards_db_path, q, limit=25, scope=scope, mode=mode)
+        context["search_results"] = search_results
+        context["scope"] = search_results["scope"]
+        context["mode"] = search_results["mode"]
 
     if active_tab == "summary":
         context["summary"] = _legacy_summary(settings.rewards_db_path)
@@ -129,6 +136,8 @@ def legacy_head(
     person_id: int | None = None,
     mark_id: int | None = None,
     q: str = "",
+    scope: str = "all",
+    mode: str = "contains",
     message: str = "",
 ):
     return Response(status_code=200)

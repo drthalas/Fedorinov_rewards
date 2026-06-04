@@ -180,6 +180,24 @@ Deferred:
 - Guides CRUD.
 - PDF/CSV export parity.
 
+## Stage 3G
+
+Status: done.
+
+Scope:
+
+- Reworked `/search` and `/legacy?tab=search` to use one shared search repository.
+- Fixed case-insensitive Cyrillic partial search with Python Unicode normalization.
+- Added legacy-like filters: search category, condition, value, search button, and reset button.
+- Added `scope=all/persons/rewards/marks` and `mode=contains/starts/exact`.
+- Added grouped counts and first-25 result limits per group.
+- Added read-only `/search.csv` export for current search results.
+
+Next:
+
+- Hermes / owner QA for search behavior.
+- Guides CRUD or remaining legacy UI parity items.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

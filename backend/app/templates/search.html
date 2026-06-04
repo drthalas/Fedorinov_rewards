@@ -2,51 +2,82 @@
 {% block title %}Поиск{% endblock %}
 {% block content %}
 <h1>Поиск</h1>
-<form class="form-row" method="get" action="/search">
-  <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер">
-  <button type="submit">Искать</button>
+<form class="search-controls" method="get" action="/search">
+  <label>
+    <span>Категория поиска</span>
+    <select name="scope">
+      <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
+      <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
+      <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>
+      <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
+    </select>
+  </label>
+  <label>
+    <span>Условие</span>
+    <select name="mode">
+      <option value="contains" {% if mode == "contains" %}selected{% endif %}>содержит</option>
+      <option value="starts" {% if mode == "starts" %}selected{% endif %}>начинается с</option>
+      <option value="exact" {% if mode == "exact" %}selected{% endif %}>точное совпадение</option>
+    </select>
+  </label>
+  <label class="search-value">
+    <span>Значение</span>
+    <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер">
+  </label>
+  <div class="search-buttons">
+    <button type="submit">Искать</button>
+    <a class="button secondary-button" href="/search">Сброс</a>
+  </div>
 </form>
 
 {% if not q.strip() %}
 <section class="panel">
-  <p class="muted">Введите ФИО, название награды или номер. Пустой поиск не загружает весь справочник.</p>
+  <p class="muted">Введите часть ФИО, названия, номера или справочника. Пустой поиск не загружает весь справочник.</p>
 </section>
 {% else %}
-{% set total_found = results.counts.persons + results.counts.rewards + results.counts.marks %}
+{% set total_found = results.total %}
 {% if total_found == 0 %}
 <section class="panel">
   <p>Ничего не найдено.</p>
 </section>
 {% else %}
+<p class="muted">Найдено строк: {{ total_found }} · время: {{ results.elapsed_ms }} ms · <a href="/search.csv?q={{ q|urlencode }}&scope={{ scope }}&mode={{ mode }}">CSV export</a></p>
 <section class="grid">
   <div class="panel">
     <h2>Награжденные</h2>
-    <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.limit }}</p>
+    <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.counts.persons }}</p>
     <ul>
       {% for person in results.persons %}
       <li><a href="/persons/{{ person.id }}">#{{ person.id }} · {{ person.fio|dash }}</a> · {{ person.rank_name|dash }} · {{ person.birthday|format_date }}</li>
+      {% else %}
+      <li class="muted">Не найдено.</li>
       {% endfor %}
     </ul>
   </div>
   <div class="panel">
     <h2>Награды</h2>
-    <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.limit }}</p>
+    <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.counts.rewards }}</p>
     <ul>
       {% for reward in results.rewards %}
       <li><a href="/rewards/{{ reward.id }}">#{{ reward.id }} · {{ reward.name|dash }}</a> · № {{ reward.number|dash }} · <span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span> · {{ reward.fio|dash }}</li>
+      {% else %}
+      <li class="muted">Не найдено.</li>
       {% endfor %}
     </ul>
   </div>
   <div class="panel">
     <h2>Знаки</h2>
-    <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.limit }}</p>
+    <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.counts.marks }}</p>
     <ul>
       {% for mark in results.marks %}
       <li><a href="/marks/{{ mark.id }}">#{{ mark.id }} · {{ mark.name|dash }}</a> · № {{ mark.number|dash }} · <span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></li>
+      {% else %}
+      <li class="muted">Не найдено.</li>
       {% endfor %}
     </ul>
   </div>
 </section>
+<p class="muted">По каждой группе показаны первые {{ results.limit }} результатов.</p>
 {% endif %}
 {% endif %}
 {% endblock %}
