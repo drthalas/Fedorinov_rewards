@@ -140,6 +140,30 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertEqual(result["rewards"], [])
         self.assertEqual(result["marks"], [])
 
+    def test_empty_query_with_persons_scope_returns_persons(self) -> None:
+        result = search_all(self.db_path, "", scope="persons")
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["counts"]["persons"], 1)
+        self.assertEqual(result["persons"][0]["id"], 1)
+        self.assertEqual(result["rewards"], [])
+        self.assertEqual(result["marks"], [])
+
+    def test_empty_query_with_rewards_scope_returns_rewards(self) -> None:
+        result = search_all(self.db_path, "", scope="rewards")
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["counts"]["rewards"], 1)
+        self.assertEqual(result["rewards"][0]["id"], 10)
+        self.assertEqual(result["persons"], [])
+        self.assertEqual(result["marks"], [])
+
+    def test_empty_query_with_marks_scope_returns_marks(self) -> None:
+        result = search_all(self.db_path, "", scope="marks")
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["counts"]["marks"], 1)
+        self.assertEqual(result["marks"][0]["id"], 20)
+        self.assertEqual(result["persons"], [])
+        self.assertEqual(result["rewards"], [])
+
     def test_query_with_quotes_is_safe(self) -> None:
         result = search_all(self.db_path, "Андросов ' OR 1=1 --", scope="all")
         self.assertEqual(result["total"], 0)
@@ -151,6 +175,14 @@ class SearchRepositoryTests(unittest.TestCase):
             if getattr(route, "path", None) == "/legacy" and "GET" in getattr(route, "methods", set())
         ]
         self.assertTrue(methods)
+
+    def test_search_templates_disable_browser_autocomplete(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn('autocomplete="off"', search_template)
+        self.assertIn('autocomplete="off"', legacy_template)
+        self.assertIn('scope == "all"', legacy_template)
 
 
 if __name__ == "__main__":

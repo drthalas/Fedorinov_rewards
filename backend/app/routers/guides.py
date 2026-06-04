@@ -1,4 +1,4 @@
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -32,6 +32,9 @@ STATUS_MESSAGES = {
     "guide_updated": "Элемент справочника сохранён.",
     "guide_deleted": "Элемент справочника удалён.",
     "delete_blocked": "Удаление заблокировано: значение используется или имеет дочерние записи.",
+    "rank_delete_used": "Нельзя удалить: это звание используется в карточках награждённых.",
+    "guide_delete_children": "Нельзя удалить: у этого раздела есть дочерние записи.",
+    "guide_delete_used": "Нельзя удалить: это значение используется в наградах или знаках.",
 }
 
 LEVEL_LABELS = {
@@ -53,14 +56,26 @@ def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
 
 
-def _context(settings, request: Request, return_to: str = "", status: str = "", error: str | None = None):
+def _context(settings, request: Request, return_to: str = "", status: str = "", error: str | None = None, section: str = ""):
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     tree = guide_tree(settings.rewards_db_path) if settings.db_exists else []
+    safe_return = safe_return_to(return_to)
+    safe_section = section if section in {"ranks", "tree"} else ""
+    guides_self = "/guides"
+    query: dict[str, str] = {}
+    if safe_section:
+        query["section"] = safe_section
+    if safe_return:
+        query["return_to"] = safe_return
+    if query:
+        guides_self += "?" + urlencode(query)
     return {
         "settings": settings,
         "ranks": ranks,
         "tree": tree,
-        "return_to": safe_return_to(return_to),
+        "return_to": safe_return,
+        "section": safe_section,
+        "guides_self": guides_self,
         "status_message": STATUS_MESSAGES.get(status),
         "error": error,
     }
@@ -73,9 +88,9 @@ def _parent_options(settings, level: int) -> list[dict[str, object]]:
 
 
 @router.get("/guides")
-def guides_index(request: Request, return_to: str = "", status: str = ""):
+def guides_index(request: Request, return_to: str = "", status: str = "", section: str = ""):
     settings = get_settings()
-    return templates.TemplateResponse(request, "guides.html", _context(settings, request, return_to, status))
+    return templates.TemplateResponse(request, "guides.html", _context(settings, request, return_to, status, section=section))
 
 
 @router.get("/guides/ranks/new")
@@ -155,7 +170,7 @@ async def rank_delete(request: Request, rank_id: int):
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except GuideDeleteBlockedError:
-        target = with_status(return_to, "delete_blocked") if return_to else "/guides?status=delete_blocked"
+        target = with_status(return_to, "rank_delete_used") if return_to else "/guides?status=rank_delete_used"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -282,8 +297,9 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
         delete_guide_level_item(settings, level, item_id)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except GuideDeleteBlockedError:
-        target = with_status(return_to, "delete_blocked") if return_to else "/guides?status=delete_blocked"
+    except GuideDeleteBlockedError as exc:
+        status_code = "guide_delete_children" if "дочер" in str(exc).lower() else "guide_delete_used"
+        target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

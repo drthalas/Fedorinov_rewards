@@ -104,8 +104,9 @@ class GuideWriteTests(unittest.TestCase):
         rank_id = create_rank(self.settings(), RankGuideData(name="USED RANK"))
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into person (id_rank) values (?)", (rank_id,))
-        with self.assertRaises(GuideDeleteBlockedError):
+        with self.assertRaises(GuideDeleteBlockedError) as blocked:
             delete_rank(self.settings(), rank_id)
+        self.assertIn("карточках награждённых", str(blocked.exception))
         self.assertIsNotNone(self.fetch_one("guide", rank_id))
 
     def test_create_update_delete_guide_level_works(self) -> None:
@@ -125,8 +126,9 @@ class GuideWriteTests(unittest.TestCase):
     def test_delete_guide_level_with_children_blocked(self) -> None:
         parent_id = create_guide_level_item(self.settings(), GuideLevelData(level=0, name="Parent", parent_id=-1))
         create_guide_level_item(self.settings(), GuideLevelData(level=1, name="Child", parent_id=parent_id))
-        with self.assertRaises(GuideDeleteBlockedError):
+        with self.assertRaises(GuideDeleteBlockedError) as blocked:
             delete_guide_level_item(self.settings(), 0, parent_id)
+        self.assertIn("дочерние записи", str(blocked.exception))
         self.assertIsNotNone(self.fetch_one("guide_lev_0", parent_id))
 
     def test_delete_guide_level_used_by_rewards_or_marks_blocked(self) -> None:
@@ -136,14 +138,16 @@ class GuideWriteTests(unittest.TestCase):
         level3_id = create_guide_level_item(self.settings(), GuideLevelData(level=3, name="Used name", parent_id=level2_id))
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into rewards (id_name) values (?)", (level3_id,))
-        with self.assertRaises(GuideDeleteBlockedError):
+        with self.assertRaises(GuideDeleteBlockedError) as blocked_reward:
             delete_guide_level_item(self.settings(), 3, level3_id)
+        self.assertIn("наградах или знаках", str(blocked_reward.exception))
 
         level2_mark_id = create_guide_level_item(self.settings(), GuideLevelData(level=2, name="Used category", parent_id=level1_id))
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into mark (id_sub_catigory) values (?)", (level2_mark_id,))
-        with self.assertRaises(GuideDeleteBlockedError):
+        with self.assertRaises(GuideDeleteBlockedError) as blocked_mark:
             delete_guide_level_item(self.settings(), 2, level2_mark_id)
+        self.assertIn("наградах или знаках", str(blocked_mark.exception))
 
     def test_safe_return_to_rejects_external_urls(self) -> None:
         self.assertEqual(safe_return_to("/guides?return_to=%2Flegacy%3Ftab%3Drewards"), "/guides?return_to=%2Flegacy%3Ftab%3Drewards")

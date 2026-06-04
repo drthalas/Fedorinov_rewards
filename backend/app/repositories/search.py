@@ -8,7 +8,7 @@ from .common import fetch_all
 
 VALID_SCOPES = {"all", "persons", "rewards", "marks"}
 VALID_MODES = {"contains", "starts", "exact"}
-DEFAULT_LIMIT = 25
+DEFAULT_LIMIT = 50
 
 
 def _normalize(value: object) -> str:
@@ -133,24 +133,26 @@ def search_all(
     cleaned_mode = _clean_mode(mode)
     safe_limit = max(1, min(int(limit), 100))
     needle = _normalize(cleaned_query)
-    if not needle:
-        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit)
-
     persons: list[dict[str, object]] = []
     rewards: list[dict[str, object]] = []
     marks: list[dict[str, object]] = []
 
+    if not needle and cleaned_scope == "all":
+        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit)
+
     if cleaned_scope in {"all", "persons"}:
-        persons = [
+        person_rows = _person_rows(db_path)
+        persons = person_rows if not needle else [
             row
-            for row in _person_rows(db_path)
+            for row in person_rows
             if _row_matches(row, ("fio", "birthday", "rank_name"), needle, cleaned_mode)
         ]
 
     if cleaned_scope in {"all", "rewards"}:
-        rewards = [
+        reward_rows = _reward_rows(db_path)
+        rewards = reward_rows if not needle else [
             row
-            for row in _reward_rows(db_path)
+            for row in reward_rows
             if _row_matches(
                 row,
                 ("number", "name", "gos", "category", "subcategory", "fio", "id_link"),
@@ -160,9 +162,10 @@ def search_all(
         ]
 
     if cleaned_scope in {"all", "marks"}:
-        marks = [
+        mark_rows = _mark_rows(db_path)
+        marks = mark_rows if not needle else [
             row
-            for row in _mark_rows(db_path)
+            for row in mark_rows
             if _row_matches(row, ("number", "name", "gos", "category", "subcategory", "id_link"), needle, cleaned_mode)
         ]
 

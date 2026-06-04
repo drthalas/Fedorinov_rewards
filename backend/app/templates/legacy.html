@@ -228,7 +228,7 @@
   {% elif tab == "search" %}
     <section class="legacy-tab-panel">
       <h1>Поиск</h1>
-      <form class="legacy-search-form" method="get" action="/legacy">
+      <form class="legacy-search-form" method="get" action="/legacy" autocomplete="off">
         <input type="hidden" name="tab" value="search">
         <label>
           <span>Категория поиска</span>
@@ -249,20 +249,22 @@
         </label>
         <label class="search-value">
           <span>Значение</span>
-          <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер">
+          <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер" autocomplete="off">
         </label>
         <button type="submit">Искать</button>
         <a class="button secondary-button" href="/legacy?tab=search">Сброс</a>
       </form>
-      {% if not q.strip() %}
-        <div class="notice">Введите строку поиска. При пустом запросе список не загружается.</div>
+      {% if not q.strip() and scope == "all" %}
+        <div class="notice">Введите строку поиска или выберите конкретную категорию. Если оставить поле пустым и выбрать категорию, будут показаны все записи выбранной категории.</div>
       {% elif search_results %}
         <p class="secondary">Найдено строк: {{ search_results.total }} · время: {{ search_results.elapsed_ms }} ms · <a href="/search.csv?q={{ q|urlencode }}&scope={{ scope }}&mode={{ mode }}">CSV export</a></p>
         {% if search_results.total == 0 %}
           <div class="notice">Ничего не найдено.</div>
         {% else %}
+          {% if scope in ["all", "persons"] %}
           <section class="legacy-block">
             <h2>Награждённые ({{ search_results.counts.persons }})</h2>
+            <p class="secondary">Показаны первые {{ search_results.persons|length }} из {{ search_results.counts.persons }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
                 <thead><tr><th>ID</th><th>ФИО</th><th>Звание/специальность</th><th>Дата рождения</th></tr></thead>
@@ -281,8 +283,11 @@
               </table>
             </div>
           </section>
+          {% endif %}
+          {% if scope in ["all", "rewards"] %}
           <section class="legacy-block">
             <h2>Награды ({{ search_results.counts.rewards }})</h2>
+            <p class="secondary">Показаны первые {{ search_results.rewards|length }} из {{ search_results.counts.rewards }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
                 <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Владелец</th><th>Наличие</th></tr></thead>
@@ -302,8 +307,11 @@
               </table>
             </div>
           </section>
+          {% endif %}
+          {% if scope in ["all", "marks"] %}
           <section class="legacy-block">
             <h2>Знаки ({{ search_results.counts.marks }})</h2>
+            <p class="secondary">Показаны первые {{ search_results.marks|length }} из {{ search_results.counts.marks }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
                 <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Наличие</th></tr></thead>
@@ -322,6 +330,7 @@
               </table>
             </div>
           </section>
+          {% endif %}
           <p class="secondary">Показаны первые {{ search_results.limit }} результатов в каждой группе.</p>
         {% endif %}
       {% endif %}

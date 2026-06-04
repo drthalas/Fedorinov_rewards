@@ -246,8 +246,8 @@ def legacy_index(
         context["selected_mark"] = selected_mark
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
 
-    if active_tab == "search" and q.strip():
-        search_results = search_all(settings.rewards_db_path, q, limit=25, scope=scope, mode=mode)
+    if active_tab == "search" and (q.strip() or scope != "all"):
+        search_results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode)
         context["search_results"] = search_results
         context["scope"] = search_results["scope"]
         context["mode"] = search_results["mode"]

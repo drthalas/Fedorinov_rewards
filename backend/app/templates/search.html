@@ -2,7 +2,7 @@
 {% block title %}Поиск{% endblock %}
 {% block content %}
 <h1>Поиск</h1>
-<form class="search-controls" method="get" action="/search">
+<form class="search-controls" method="get" action="/search" autocomplete="off">
   <label>
     <span>Категория поиска</span>
     <select name="scope">
@@ -22,7 +22,7 @@
   </label>
   <label class="search-value">
     <span>Значение</span>
-    <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер">
+    <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер" autocomplete="off">
   </label>
   <div class="search-buttons">
     <button type="submit">Искать</button>
@@ -30,11 +30,12 @@
   </div>
 </form>
 
-{% if not q.strip() %}
+{% if not q.strip() and scope == "all" %}
 <section class="panel">
-  <p class="muted">Введите часть ФИО, названия, номера или справочника. Пустой поиск не загружает весь справочник.</p>
+  <p class="muted">Введите часть ФИО, названия, номера или справочника. Если оставить поле пустым и выбрать категорию, будут показаны все записи выбранной категории.</p>
 </section>
-{% else %}
+{% endif %}
+{% if q.strip() or (scope != "all" and results.total > 0) %}
 {% set total_found = results.total %}
 {% if total_found == 0 %}
 <section class="panel">
@@ -43,6 +44,7 @@
 {% else %}
 <p class="muted">Найдено строк: {{ total_found }} · время: {{ results.elapsed_ms }} ms · <a href="/search.csv?q={{ q|urlencode }}&scope={{ scope }}&mode={{ mode }}">CSV export</a></p>
 <section class="grid">
+  {% if scope in ["all", "persons"] %}
   <div class="panel">
     <h2>Награжденные</h2>
     <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.counts.persons }}</p>
@@ -54,6 +56,8 @@
       {% endfor %}
     </ul>
   </div>
+  {% endif %}
+  {% if scope in ["all", "rewards"] %}
   <div class="panel">
     <h2>Награды</h2>
     <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.counts.rewards }}</p>
@@ -65,6 +69,8 @@
       {% endfor %}
     </ul>
   </div>
+  {% endif %}
+  {% if scope in ["all", "marks"] %}
   <div class="panel">
     <h2>Знаки</h2>
     <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.counts.marks }}</p>
@@ -76,6 +82,7 @@
       {% endfor %}
     </ul>
   </div>
+  {% endif %}
 </section>
 <p class="muted">По каждой группе показаны первые {{ results.limit }} результатов.</p>
 {% endif %}

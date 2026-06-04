@@ -431,6 +431,24 @@ Next:
 - QA the main `Награды` screen with owner examples such as rank plus specific reward.
 - Add dependent/cascading selects later so country narrows category, category narrows subcategory, and subcategory narrows reward names.
 
+## Iteration 2: Search UX and Contextual Guides
+
+Status: done/current.
+
+Scope:
+
+- Disabled browser autocomplete on `/search` and `/legacy?tab=search` search fields.
+- Changed empty-query search behavior: `scope=persons`, `scope=rewards`, and `scope=marks` show all records in the selected category; `scope=all` still shows guidance instead of loading everything.
+- Increased search UI limit to the first 50 results and show how many rows are displayed out of total matches.
+- Specific search scopes render only their own table instead of empty tables for other groups.
+- Updated person/reward/mark forms so guide links open the relevant guide block and preserve return back to the form.
+- Improved guide delete-blocked messages for used ranks, nodes with children, and nodes used by rewards/marks.
+
+Next:
+
+- Owner QA for empty category searches and form-to-guide return flow.
+- Database-backed live search suggestions/datalist remain deferred.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

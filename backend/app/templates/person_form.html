@@ -12,6 +12,7 @@
 {% endif %}
 
 <form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+  {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
@@ -27,7 +28,7 @@
       </label>
     </div>
     <label>
-      <span>Звание / специальность · <a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник</a></span>
+      <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a></span>
       <select name="id_rank">
         <option value="">—</option>
         {% for rank in ranks %}

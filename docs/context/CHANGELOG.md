@@ -166,6 +166,16 @@
 - Added package safety checker that blocks real data, backups, `.env`, `.venv`, media, archives, binaries, legacy sources, and local reports.
 - Documented that the Windows preview is code-only and owner data remains outside the package.
 
+## Iteration 2 Search UX and Contextual Guides
+
+- Disabled browser autocomplete in normal and legacy search forms.
+- Empty search with a selected category now shows all records in that category, while empty `all` search stays guarded.
+- Search UI now shows the first 50 results and displays shown-vs-total counts.
+- Specific search categories render only their own result table.
+- Form guide links now jump to rank or guide-tree blocks and preserve return back to the form.
+- Guide delete-blocked messages are more specific.
+- Database-backed search suggestions remain deferred.
+
 ## Iteration 1 Legacy Rewards Filters and Totals
 
 - Added main `Награды` filters for rank/specialty and reward guide levels.

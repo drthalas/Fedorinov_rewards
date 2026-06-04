@@ -12,10 +12,11 @@
 {% endif %}
 
 <form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
+  {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Справочник награды</legend>
-    <p class="secondary"><a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник наград</a></p>
+    <p class="secondary"><a href="/guides?section=tree&return_to={{ form_return_path|urlencode }}#guide-tree">Открыть справочник наград</a></p>
     <div class="form-grid two-columns">
       <label>
         <span>Государство</span>

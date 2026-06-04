@@ -14,9 +14,7 @@ router = APIRouter()
 @router.get("/search")
 def search_index(request: Request, q: str = "", scope: str = "all", mode: str = "contains"):
     settings = get_settings()
-    results = search_all(settings.rewards_db_path, "", limit=25, scope=scope, mode=mode)
-    if q.strip() and settings.db_exists:
-        results = search_all(settings.rewards_db_path, q, limit=25, scope=scope, mode=mode)
+    results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode) if settings.db_exists else search_all(settings.rewards_db_path, "", limit=50, scope=scope, mode=mode)
     return templates.TemplateResponse(
         request,
         "search.html",
@@ -27,7 +25,7 @@ def search_index(request: Request, q: str = "", scope: str = "all", mode: str = 
 @router.get("/search.csv")
 def search_csv(q: str = "", scope: str = "all", mode: str = "contains"):
     settings = get_settings()
-    results = search_all(settings.rewards_db_path, q, limit=100, scope=scope, mode=mode) if q.strip() else None
+    results = search_all(settings.rewards_db_path, q, limit=100, scope=scope, mode=mode) if settings.db_exists and (q.strip() or scope != "all") else None
     output = StringIO()
     output.write("\ufeff")
     writer = csv.writer(output)

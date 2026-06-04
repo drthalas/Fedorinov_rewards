@@ -136,7 +136,11 @@ Examples:
 /search.csv?q=Андрос&scope=all&mode=contains
 ```
 
-The search is read-only, supports lowercase Cyrillic matching, groups results by persons/rewards/marks, and limits each group to the first 25 UI results.
+The search is read-only, supports lowercase Cyrillic matching, groups results by persons/rewards/marks, and limits each group to the first 50 UI results.
+
+Search fields disable browser history autocomplete. If `q` is empty and `scope=persons`, `scope=rewards`, or `scope=marks`, the UI shows the first 50 records from that selected category. If `scope=all` and `q` is empty, the UI shows guidance instead of loading everything. Database-backed live suggestions are deferred.
+
+Guide links from person, reward, and mark forms are contextual: rank fields open the rank/specialty guide block, and reward/mark fields open the shared reward/mark guide tree. The guide page preserves `return_to`, so after adding or editing a guide value the user can return to the form.
 
 Summary supports read-only filter parameters:
 

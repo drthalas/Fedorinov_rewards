@@ -9,10 +9,10 @@
       <summary><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></summary>
       {% if settings.write_mode %}
       <div class="tree-actions">
-        {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Добавить дочерний</a>{% endif %}
-        <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Изменить</a>
+        {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
+        <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
-          <input type="hidden" name="return_to" value="/guides{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">
+          <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
       </div>
@@ -24,10 +24,10 @@
       <span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span>
       {% if settings.write_mode %}
       <span class="tree-actions">
-        {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Добавить дочерний</a>{% endif %}
-        <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Изменить</a>
+        {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
+        <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
-          <input type="hidden" name="return_to" value="/guides{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">
+          <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
       </span>
@@ -44,11 +44,11 @@
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
 <section class="grid">
-  <div class="panel">
+  <div class="panel" id="ranks">
     <div class="legacy-block-head">
       <h2>Звания/специальности</h2>
       {% if settings.write_mode %}
-      <a class="tool-button" href="/guides/ranks/new?return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Добавить</a>
+      <a class="tool-button" href="/guides/ranks/new?return_to={{ guides_self|urlencode }}">Добавить</a>
       {% else %}
       <span class="tool-button disabled">Добавить</span>
       {% endif %}
@@ -59,9 +59,9 @@
         <span>#{{ rank.id }} · {{ rank.name }}</span>
         {% if settings.write_mode %}
         <span class="tree-actions">
-          <a href="/guides/ranks/{{ rank.id }}/edit?return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Изменить</a>
+          <a href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
           <form method="post" action="/guides/ranks/{{ rank.id }}/delete" onsubmit="return confirm('Удалить звание/специальность?');">
-            <input type="hidden" name="return_to" value="/guides{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">
+            <input type="hidden" name="return_to" value="{{ guides_self }}">
             <button class="link-button" type="submit">Удалить</button>
           </form>
         </span>
@@ -70,11 +70,11 @@
       {% endfor %}
     </ul>
   </div>
-  <div class="panel tree">
+  <div class="panel tree" id="guide-tree">
     <div class="legacy-block-head">
       <h2>Дерево наград и знаков</h2>
       {% if settings.write_mode %}
-      <a class="tool-button" href="/guides/levels/0/new?return_to={{ ('/guides' ~ ('?return_to=' ~ return_to|urlencode if return_to else ''))|urlencode }}">Добавить государство</a>
+      <a class="tool-button" href="/guides/levels/0/new?return_to={{ guides_self|urlencode }}">Добавить государство</a>
       {% else %}
       <span class="tool-button disabled">Добавить</span>
       {% endif %}
