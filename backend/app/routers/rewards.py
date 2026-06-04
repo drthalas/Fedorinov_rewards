@@ -13,6 +13,7 @@ from ..repositories.rewards_write import (
     reward_data_from_mapping,
     update_reward,
 )
+from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -66,6 +67,7 @@ def reward_new(request: Request, person_id: int):
             "person": person,
             "reward": reward,
             "guides": _guide_options(settings),
+            "photo_controls": [],
             "error": None,
         },
     )
@@ -91,6 +93,7 @@ async def reward_create(request: Request, person_id: int):
                 "person": person,
                 "reward": {"person_id": person_id, **form_values},
                 "guides": _guide_options(settings),
+                "photo_controls": [],
                 "error": str(exc),
             },
             status_code=400,
@@ -134,6 +137,7 @@ def reward_edit(request: Request, reward_id: int):
             "person": person,
             "reward": reward,
             "guides": _guide_options(settings),
+            "photo_controls": photo_items("reward", reward),
             "error": None,
         },
     )
@@ -161,6 +165,7 @@ async def reward_update(request: Request, reward_id: int):
                 "person": person,
                 "reward": {**reward, **form_values},
                 "guides": _guide_options(settings),
+                "photo_controls": photo_items("reward", reward),
                 "error": str(exc),
             },
             status_code=400,

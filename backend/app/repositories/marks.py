@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from .common import fetch_all, fetch_one
+from ..services.photos import MARK_PHOTO_FIELDS
 
 
 def count_marks(db_path: Path) -> int:
@@ -73,8 +74,6 @@ def get_mark(db_path: Path, mark_id: int) -> dict[str, object] | None:
 
 def mark_photo_items(mark: dict[str, object]) -> list[dict[str, object]]:
     return [
-        {"label": "Фото знака: аверс", "path": mark.get("front_foto")},
-        {"label": "Фото знака: реверс", "path": mark.get("back_foto")},
-        {"label": "Фото книжки 1", "path": mark.get("book1_foto")},
-        {"label": "Фото книжки 2", "path": mark.get("book2_foto")},
+        {"field": item.field, "label": item.label, "path": mark.get(item.field)}
+        for item in MARK_PHOTO_FIELDS
     ]

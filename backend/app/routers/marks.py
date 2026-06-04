@@ -13,6 +13,7 @@ from ..repositories.marks_write import (
     update_mark,
 )
 from ..services.display import pagination
+from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -84,6 +85,7 @@ def mark_new(request: Request):
             "mode": "create",
             "mark": {"instock": False},
             "guides": _guide_options(settings),
+            "photo_controls": [],
             "error": None,
         },
     )
@@ -107,6 +109,7 @@ async def mark_create(request: Request):
                 "mode": "create",
                 "mark": form_values,
                 "guides": _guide_options(settings),
+                "photo_controls": [],
                 "error": str(exc),
             },
             status_code=400,
@@ -143,7 +146,14 @@ def mark_edit(request: Request, mark_id: int):
     return templates.TemplateResponse(
         request,
         "mark_form.html",
-        {"settings": settings, "mode": "edit", "mark": mark, "guides": _guide_options(settings), "error": None},
+        {
+            "settings": settings,
+            "mode": "edit",
+            "mark": mark,
+            "guides": _guide_options(settings),
+            "photo_controls": photo_items("mark", mark),
+            "error": None,
+        },
     )
 
 
@@ -166,6 +176,7 @@ async def mark_update(request: Request, mark_id: int):
                 "mode": "edit",
                 "mark": {**mark, **form_values},
                 "guides": _guide_options(settings),
+                "photo_controls": photo_items("mark", mark),
                 "error": str(exc),
             },
             status_code=400,

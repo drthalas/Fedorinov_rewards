@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from .common import fetch_one
+from ..services.photos import REWARD_PHOTO_FIELDS
 
 
 def get_reward(db_path: Path, reward_id: int) -> dict[str, object] | None:
@@ -44,9 +45,6 @@ def get_reward(db_path: Path, reward_id: int) -> dict[str, object] | None:
 
 def reward_photo_items(reward: dict[str, object]) -> list[dict[str, object]]:
     return [
-        {"label": "Фото награды: аверс", "path": reward.get("front_foto")},
-        {"label": "Фото награды: реверс", "path": reward.get("back_foto")},
-        {"label": "Фото книжки 1", "path": reward.get("book1_foto")},
-        {"label": "Фото книжки 2", "path": reward.get("book2_foto")},
-        {"label": "Наградной лист", "path": reward.get("reward_list")},
+        {"field": item.field, "label": item.label, "path": reward.get(item.field)}
+        for item in REWARD_PHOTO_FIELDS
     ]

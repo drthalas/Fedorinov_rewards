@@ -57,7 +57,7 @@
             </div>
             <div class="legacy-actions">
               <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
-              <a class="button" href="/persons/{{ selected_person.id }}/photos">Все фото</a>
+              <a class="button" href="/persons/{{ selected_person.id }}/photos">Показать все фото</a>
             </div>
           </div>
 
@@ -132,16 +132,25 @@
             <section class="legacy-block">
               <h2>Фото</h2>
               <div class="legacy-photo-strip">
-                <figure>
-                  <img class="legacy-photo" src="{{ media_url(selected_person.main_foto) }}" alt="Главное фото">
-                  <figcaption>Главное фото</figcaption>
-                </figure>
-                <figure>
-                  <img class="legacy-photo" src="{{ media_url(selected_person.rewards_foto) }}" alt="Общее фото наград">
-                  <figcaption>Общее фото наград</figcaption>
-                </figure>
+                {% for label, path in [
+                  ("Фото кавалера", selected_person.person_foto),
+                  ("Главное фото", selected_person.main_foto),
+                  ("Общее фото наград", selected_person.rewards_foto)
+                ] %}
+                  <figure class="{{ 'placeholder-card' if not has_media_path(path) else '' }}">
+                    {% if has_media_path(path) %}
+                    <a class="photo-link" href="{{ photo_view_url(path, label, '/legacy?tab=rewards&person_id=' ~ selected_person.id) }}">
+                      <img class="legacy-photo" src="{{ media_url(path) }}" alt="{{ label }}">
+                    </a>
+                    {% else %}
+                    <img class="legacy-photo placeholder-image" src="{{ media_url(path) }}" alt="">
+                    <figcaption class="muted">Нет фото</figcaption>
+                    {% endif %}
+                    <figcaption>{{ label }}</figcaption>
+                  </figure>
+                {% endfor %}
               </div>
-              <a href="/persons/{{ selected_person.id }}/photos">Все фото</a>
+              <a href="/persons/{{ selected_person.id }}/photos">Показать все фото</a>
             </section>
           </div>
         {% else %}
@@ -247,9 +256,16 @@
             <section class="legacy-block">
               <h2>Фото</h2>
               <div class="legacy-photo-strip">
-                {% for photo in selected_mark_photos[:2] %}
-                  <figure>
-                    <img class="legacy-photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+                {% for photo in selected_mark_photos %}
+                  <figure class="{{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+                    {% if has_media_path(photo.path) %}
+                    <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/legacy?tab=marks&mark_id=' ~ selected_mark.id) }}">
+                      <img class="legacy-photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+                    </a>
+                    {% else %}
+                    <img class="legacy-photo placeholder-image" src="{{ media_url(photo.path) }}" alt="">
+                    <figcaption class="muted">Нет фото</figcaption>
+                    {% endif %}
                     <figcaption>{{ photo.label }}</figcaption>
                   </figure>
                 {% endfor %}

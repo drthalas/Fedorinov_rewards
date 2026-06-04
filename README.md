@@ -162,8 +162,13 @@ Current development write-mode CRUD:
 - Person create/edit/delete.
 - Reward create/edit/delete for rewards attached to a person.
 - Mark create/edit/delete for standalone marks.
-- Reward photo path fields are preserved as text only; upload, replacement, and media deletion are deferred to Stage 3F.
-- Mark photo path fields are preserved as text only; upload, replacement, and media deletion are deferred to Stage 3F.
+- Click any displayed photo to open the large photo viewer.
+- `/persons/{id}/photos` includes a gallery and previous/next slideshow.
+- Person, reward, and mark edit forms include photo upload/replace controls in `WRITE_MODE=true`.
+- Photo clear/unlink removes only the SQLite field value. It does not delete the physical file.
+- Browser clipboard paste is prepared as a disabled control and documented for a later Clipboard API implementation.
+
+Photo upload/clear remains guarded by the same backup-first rule as CRUD. Keep owner preview read-only unless testing on a backed-up copied data folder.
 
 Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.
 

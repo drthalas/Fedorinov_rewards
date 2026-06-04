@@ -192,6 +192,124 @@ th {
   font-size: 12px;
 }
 
+.photo-link {
+  display: block;
+  color: inherit;
+}
+
+.photo-link:hover {
+  text-decoration: none;
+}
+
+.photo-viewer {
+  display: grid;
+  gap: 14px;
+}
+
+.photo-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.photo-viewer-image {
+  max-width: 100%;
+  max-height: 78vh;
+  object-fit: contain;
+  border: 1px solid #d9dee5;
+  background: #fff;
+}
+
+.slideshow {
+  margin-bottom: 16px;
+}
+
+.slideshow-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.slideshow-image {
+  width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border: 1px solid #d9dee5;
+  background: #fff;
+}
+
+.photo-manage-section {
+  max-width: 980px;
+  margin-top: 18px;
+}
+
+.photo-manage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.photo-manage-card {
+  padding: 12px;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.photo-manage-label {
+  margin: 8px 0;
+  font-weight: 700;
+}
+
+.photo-manage-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.photo-upload-form {
+  margin: 0;
+}
+
+.mini-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 30px;
+  padding: 5px 8px;
+  border: 1px solid #0f766e;
+  border-radius: 4px;
+  color: #fff;
+  background: #0f766e;
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mini-button.danger {
+  border-color: #b42318;
+  background: #b42318;
+}
+
+.mini-button.disabled {
+  color: #667085;
+  border-color: #cbd5e1;
+  background: #eef2f6;
+  cursor: not-allowed;
+}
+
+.sr-only-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .details {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -619,7 +737,7 @@ th {
 
 .legacy-photo-strip {
   display: grid;
-  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
   gap: 8px;
   padding: 10px;
 }

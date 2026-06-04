@@ -151,9 +151,34 @@ QA:
 Deferred:
 
 - Guides CRUD.
-- Photo upload/replace/delete.
 - PDF/CSV export parity.
 - Full legacy filters and svod matrix parity.
+
+## Stage 3F
+
+Status: done.
+
+Scope:
+
+- Clickable photos and large photo viewer for standalone and `/legacy` pages.
+- Person photo gallery slideshow with previous/next navigation.
+- Legacy rewards tab photo block now shows person photo, main photo, and rewards photo.
+- Human-readable photo labels replace technical photo path labels.
+- Development write-mode photo upload/replace and clear/unlink controls for person, reward, and mark edit forms.
+- Photo writes require `WRITE_MODE=true` and the existing backup-first guard.
+- Physical media files are not deleted when photo fields are cleared.
+
+Next:
+
+- Hermes / owner QA for Stage 3F photo workflow.
+- Rebuild Windows preview package after QA if needed.
+
+Deferred:
+
+- Full browser clipboard paste implementation.
+- Physical media deletion workflow.
+- Guides CRUD.
+- PDF/CSV export parity.
 
 ## Backlog / Future
 
@@ -162,6 +187,7 @@ Deferred:
 - Implement local config storage for selected data directory.
 - Add validation report for connected database and media folders.
 - Implement Guides CRUD with backup/write-mode gates.
-- Implement Photo upload/replace/delete.
+- Implement full Clipboard API photo paste.
+- Implement physical photo delete only after restore workflow is mature.
 - Implement PDF export parity.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

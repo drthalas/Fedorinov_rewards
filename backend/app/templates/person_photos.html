@@ -3,10 +3,29 @@
 {% block content %}
 <h1>Фото: {{ person.fio }}</h1>
 <p><a href="/persons/{{ person.id }}">← к карточке</a></p>
+{% if current_photo %}
+<section class="slideshow panel">
+  <div class="slideshow-nav">
+    <a class="button" href="/persons/{{ person.id }}/photos?index={{ previous_index }}">Предыдущее</a>
+    <a class="button" href="/persons/{{ person.id }}/photos?index={{ next_index }}">Следующее</a>
+    <a href="/persons/{{ person.id }}/photos">Вернуться к галерее</a>
+  </div>
+  <a class="photo-link" href="{{ photo_view_url(current_photo.path, current_photo.label, '/persons/' ~ person.id ~ '/photos?index=' ~ next_index) }}">
+    <img class="slideshow-image" src="{{ media_url(current_photo.path) }}" alt="{{ current_photo.label }}">
+  </a>
+  <p class="photo-caption">{{ current_photo.label }}</p>
+</section>
+{% endif %}
 <div class="photo-grid">
   {% for photo in photos %}
   <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    {% if has_media_path(photo.path) %}
+    <a class="photo-link" href="/persons/{{ person.id }}/photos?index={{ available_photos.index(photo) }}">
+      <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+    </a>
+    {% else %}
     <img class="photo {{ 'placeholder-image' if not has_media_path(photo.path) else '' }}" src="{{ media_url(photo.path) }}" alt="">
+    {% endif %}
     <p>{{ photo.label }}</p>
     {% if not has_media_path(photo.path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>

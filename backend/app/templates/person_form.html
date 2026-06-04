@@ -43,4 +43,7 @@
     <a href="{% if mode == 'create' %}/persons{% else %}/persons/{{ person.id }}{% endif %}">Отмена</a>
   </div>
 </form>
+{% with photo_entity_type="person", photo_entity_id=person.id %}
+  {% include "photo_management.html" %}
+{% endwith %}
 {% endblock %}

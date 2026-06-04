@@ -14,6 +14,7 @@ from ..repositories.persons_write import (
     update_person,
 )
 from ..services.display import pagination
+from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -72,7 +73,7 @@ def person_new(request: Request):
     return templates.TemplateResponse(
         request,
         "person_form.html",
-        {"settings": settings, "mode": "create", "person": {}, "ranks": ranks, "error": None},
+        {"settings": settings, "mode": "create", "person": {}, "ranks": ranks, "photo_controls": [], "error": None},
     )
 
 
@@ -90,7 +91,14 @@ async def person_create(request: Request):
         return templates.TemplateResponse(
             request,
             "person_form.html",
-            {"settings": settings, "mode": "create", "person": form_values, "ranks": ranks, "error": str(exc)},
+            {
+                "settings": settings,
+                "mode": "create",
+                "person": form_values,
+                "ranks": ranks,
+                "photo_controls": [],
+                "error": str(exc),
+            },
             status_code=400,
         )
     return RedirectResponse(f"/persons/{person_id}?status=created", status_code=303)
@@ -122,7 +130,14 @@ def person_edit(request: Request, person_id: int):
     return templates.TemplateResponse(
         request,
         "person_form.html",
-        {"settings": settings, "mode": "edit", "person": person, "ranks": ranks, "error": None},
+        {
+            "settings": settings,
+            "mode": "edit",
+            "person": person,
+            "ranks": ranks,
+            "photo_controls": photo_items("person", person),
+            "error": None,
+        },
     )
 
 
@@ -141,7 +156,14 @@ async def person_update(request: Request, person_id: int):
         return templates.TemplateResponse(
             request,
             "person_form.html",
-            {"settings": settings, "mode": "edit", "person": person, "ranks": ranks, "error": str(exc)},
+            {
+                "settings": settings,
+                "mode": "edit",
+                "person": person,
+                "ranks": ranks,
+                "photo_controls": photo_items("person", person),
+                "error": str(exc),
+            },
             status_code=400,
         )
     return RedirectResponse(f"/persons/{person_id}?status=updated", status_code=303)
@@ -162,15 +184,32 @@ def person_delete(request: Request, person_id: int):
 
 
 @router.get("/persons/{person_id}/photos")
-def person_photos(request: Request, person_id: int):
+def person_photos(request: Request, person_id: int, index: int | None = None):
     settings = get_settings()
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     photos = person_photo_items(person, rewards)
+    available_photos = [photo for photo in photos if photo.get("path")]
+    current_photo = None
+    previous_index = None
+    next_index = None
+    if index is not None and available_photos:
+        safe_index = max(0, min(index, len(available_photos) - 1))
+        current_photo = available_photos[safe_index]
+        previous_index = safe_index - 1 if safe_index > 0 else len(available_photos) - 1
+        next_index = safe_index + 1 if safe_index < len(available_photos) - 1 else 0
     return templates.TemplateResponse(
         request,
         "person_photos.html",
-        {"settings": settings, "person": person, "photos": photos},
+        {
+            "settings": settings,
+            "person": person,
+            "photos": photos,
+            "available_photos": available_photos,
+            "current_photo": current_photo,
+            "previous_index": previous_index,
+            "next_index": next_index,
+        },
     )

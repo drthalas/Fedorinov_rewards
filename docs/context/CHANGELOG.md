@@ -1,5 +1,17 @@
 # Changelog
 
+## Stage 3F Photo Viewer and Photo Management
+
+- Added clickable photos and a large `/photo/view` viewer that uses the existing safe `/media` endpoint.
+- Added slideshow navigation to `/persons/{id}/photos` while keeping the photo grid.
+- Updated legacy rewards photo block to show `Фото кавалера`, `Главное фото`, and `Общее фото наград`.
+- Replaced technical photo path labels with owner-facing Russian labels.
+- Added write-mode-only photo upload/replace controls to person, reward, and mark edit forms.
+- Added write-mode-only photo clear/unlink controls that clear SQLite fields without deleting physical files.
+- Added guarded `/photos/upload` and `/photos/clear` endpoints with backup-first enforcement, field whitelists, extension checks, and 25 MB file limit.
+- Added `python-multipart` dependency for browser file upload.
+- Added `docs/photo_management_plan.md` and unit tests for photo upload/clear on temporary SQLite data.
+
 ## Windows Media Endpoint Bugfix
 
 - Replaced `/media` subprocess file reads with cross-platform `FileResponse` serving.

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from .common import fetch_all, fetch_one
+from ..services.photos import PERSON_PHOTO_FIELDS, REWARD_PHOTO_FIELDS
 
 
 def count_persons(db_path: Path) -> int:
@@ -95,23 +96,11 @@ def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]
 
 def person_photo_items(person: dict[str, object], rewards: list[dict[str, object]]) -> list[dict[str, object]]:
     items = [
-        {"label": "Главное фото", "path": person.get("main_foto")},
-        {"label": "Фото кавалера", "path": person.get("person_foto")},
-        {"label": "Общее фото наград", "path": person.get("rewards_foto")},
-        {"label": "Фото книжки 1", "path": person.get("book1_foto")},
-        {"label": "Фото книжки 2", "path": person.get("book2_foto")},
-        {"label": "Фото карточки 1", "path": person.get("card1_foto")},
-        {"label": "Фото карточки 2", "path": person.get("card2_foto")},
+        {"field": item.field, "label": item.label, "path": person.get(item.field)}
+        for item in PERSON_PHOTO_FIELDS
     ]
     for reward in rewards:
         reward_name = reward.get("name") or f"Награда #{reward.get('id')}"
-        items.extend(
-            [
-                {"label": f"{reward_name}: аверс", "path": reward.get("front_foto")},
-                {"label": f"{reward_name}: реверс", "path": reward.get("back_foto")},
-                {"label": f"{reward_name}: книжка 1", "path": reward.get("book1_foto")},
-                {"label": f"{reward_name}: книжка 2", "path": reward.get("book2_foto")},
-                {"label": f"{reward_name}: наградной лист", "path": reward.get("reward_list")},
-            ]
-        )
+        for item in REWARD_PHOTO_FIELDS:
+            items.append({"field": item.field, "label": f"{reward_name}: {item.label}", "path": reward.get(item.field)})
     return items

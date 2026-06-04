@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .config import PROJECT_ROOT
-from .routers import dashboard, guides, health, legacy, marks, media, persons, rewards, search
+from .routers import dashboard, guides, health, legacy, marks, media, persons, photos, rewards, search
 
 
 app = FastAPI(title="Fedorinov Rewards", version="0.2.0")
@@ -17,3 +17,4 @@ app.include_router(guides.router)
 app.include_router(search.router)
 app.include_router(health.router)
 app.include_router(media.router)
+app.include_router(photos.router)

@@ -13,7 +13,18 @@ def media_url(path: object) -> str:
     return str(URL(path="/media").include_query_params(path=value))
 
 
+def photo_view_url(path: object, label: object = "", back: object = "") -> str:
+    value = path if isinstance(path, str) else ""
+    query = {"path": value}
+    if isinstance(label, str) and label:
+        query["label"] = label
+    if isinstance(back, str) and back.startswith("/"):
+        query["back"] = back
+    return str(URL(path="/photo/view").include_query_params(**query))
+
+
 templates.env.globals["media_url"] = media_url
+templates.env.globals["photo_view_url"] = photo_view_url
 templates.env.globals["has_media_path"] = has_media_path
 templates.env.filters["bool_class"] = bool_class
 templates.env.filters["dash"] = dash_if_empty

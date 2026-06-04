@@ -70,18 +70,8 @@
     <input name="price_now" value="{{ mark.price_now or '' }}" inputmode="numeric">
   </label>
 
-  <h2>Фото paths</h2>
-  <p class="muted">Stage 3D не загружает, не заменяет и не удаляет фото. Эти пути сохраняются как текст.</p>
-  {% for field, label in [
-    ("front_foto", "Аверс"),
-    ("back_foto", "Реверс"),
-    ("book1_foto", "Книжка 1"),
-    ("book2_foto", "Книжка 2")
-  ] %}
-  <label>
-    <span>{{ label }}</span>
-    <input name="{{ field }}" value="{{ mark[field] or '' }}" readonly>
-  </label>
+  {% for photo in photo_controls %}
+  <input type="hidden" name="{{ photo.field }}" value="{{ mark[photo.field] or '' }}">
   {% endfor %}
 
   <div class="actions">
@@ -89,4 +79,7 @@
     <a href="{% if mode == 'create' %}/marks{% else %}/marks/{{ mark.id }}{% endif %}">Отмена</a>
   </div>
 </form>
+{% with photo_entity_type="mark", photo_entity_id=mark.id %}
+  {% include "photo_management.html" %}
+{% endwith %}
 {% endblock %}

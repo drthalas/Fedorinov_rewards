@@ -18,8 +18,14 @@
       {% for person in persons %}
       <tr>
         <td class="{{ 'placeholder-cell' if not has_media_path(person.thumbnail_path) else '' }}">
+          {% if has_media_path(person.thumbnail_path) %}
+          <a class="photo-link" href="{{ photo_view_url(person.thumbnail_path, 'Фото кавалера', '/persons') }}">
+            <img class="thumb" src="{{ media_url(person.thumbnail_path) }}" alt="Фото кавалера">
+          </a>
+          {% else %}
           <img class="thumb {{ 'placeholder-image' if not has_media_path(person.thumbnail_path) else '' }}" src="{{ media_url(person.thumbnail_path) }}" alt="">
-          {% if not has_media_path(person.thumbnail_path) %}<div class="photo-caption muted">Нет фото</div>{% endif %}
+          <div class="photo-caption muted">Нет фото</div>
+          {% endif %}
         </td>
         <td>{{ person.id }}</td>
         <td>{{ person.fio|dash }}</td>

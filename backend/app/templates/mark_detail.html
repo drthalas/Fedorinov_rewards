@@ -32,7 +32,13 @@
 <div class="photo-grid">
   {% for photo in photos %}
   <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    {% if has_media_path(photo.path) %}
+    <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/marks/' ~ mark.id) }}">
+      <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+    </a>
+    {% else %}
     <img class="photo {{ 'placeholder-image' if not has_media_path(photo.path) else '' }}" src="{{ media_url(photo.path) }}" alt="">
+    {% endif %}
     <p>{{ photo.label }}</p>
     {% if not has_media_path(photo.path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
