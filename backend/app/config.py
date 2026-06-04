@@ -21,6 +21,10 @@ class Settings(BaseModel):
     update_check_enabled: bool = True
     update_manifest_url: str = "https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json"
     update_timeout_seconds: int = 10
+    app_install_dir: Path = PROJECT_ROOT
+    update_backup_dir: Path = PROJECT_ROOT / "updates" / "backups"
+    update_download_dir: Path = PROJECT_ROOT / "updates" / "downloads"
+    update_extract_dir: Path = PROJECT_ROOT / "updates" / "extracted"
 
     @property
     def data_dir_exists(self) -> bool:
@@ -75,12 +79,28 @@ def _env_int(name: str, default: str) -> int:
         return int(default)
 
 
+def _env_path_relative_to(name: str, base: Path, default: str) -> Path:
+    raw_value = os.getenv(name, default).strip()
+    expanded = Path(os.path.expandvars(raw_value)).expanduser()
+    if expanded.is_absolute():
+        return expanded
+    return base / expanded
+
+
+def _env_optional_path(name: str, default: Path) -> Path:
+    raw_value = os.getenv(name, "").strip()
+    if not raw_value:
+        return default
+    return Path(os.path.expandvars(raw_value)).expanduser()
+
+
 def get_settings() -> Settings:
     data_dir = _env_path("REWARDS_DATA_DIR", "/Users/hermes/Desktop/Rewards")
     db_path = _env_path(
         "REWARDS_DB_PATH",
         str(data_dir / "database" / "MyDatabase.sqlite"),
     )
+    app_install_dir = _env_optional_path("APP_INSTALL_DIR", PROJECT_ROOT)
     return Settings(
         rewards_data_dir=data_dir,
         rewards_db_path=db_path,
@@ -95,4 +115,8 @@ def get_settings() -> Settings:
             "https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json",
         ).strip(),
         update_timeout_seconds=_env_int("UPDATE_TIMEOUT_SECONDS", "10"),
+        app_install_dir=app_install_dir,
+        update_backup_dir=_env_path_relative_to("UPDATE_BACKUP_DIR", app_install_dir, "updates/backups"),
+        update_download_dir=_env_path_relative_to("UPDATE_DOWNLOAD_DIR", app_install_dir, "updates/downloads"),
+        update_extract_dir=_env_path_relative_to("UPDATE_EXTRACT_DIR", app_install_dir, "updates/extracted"),
     )

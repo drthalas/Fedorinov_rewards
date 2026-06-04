@@ -1,5 +1,15 @@
 # Changelog
 
+## Stage 4B One-Click Update Installer
+
+- Added safe updater service for public GitHub Release ZIP installation.
+- Added POST-only `/updates/apply` route with confirmation.
+- Added update button in `/legacy?tab=about` when a newer version is available.
+- Updater verifies SHA256, validates ZIP structure, rejects forbidden paths, creates an app backup, and copies only allowed application files.
+- `.env`, database, media folders, backups, logs, and owner data are preserved.
+- Added CLI helpers `scripts/check_update.py` and `scripts/apply_update.py`.
+- Kept automatic restart deferred; users are instructed to restart the app manually.
+
 ## Stage 4A.2 Manual GitHub Release Workflow
 
 - Added `.github/workflows/manual_release.yml` for manual release packaging and publishing.

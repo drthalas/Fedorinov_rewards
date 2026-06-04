@@ -112,7 +112,8 @@ class UpdateCheckerTests(unittest.TestCase):
         legacy_router = (ROOT / "backend" / "app" / "routers" / "legacy.py").read_text()
         self.assertIn("Обновления", template)
         self.assertIn("Проверить обновления", template)
-        self.assertIn("Установка обновления будет добавлена следующим этапом", template)
+        self.assertIn('method="post" action="/updates/apply"', template)
+        self.assertIn("Данные и фотографии не будут затронуты", template)
         self.assertIn("check_for_updates(settings)", legacy_router)
         self.assertIn("check_updates", legacy_router)
 

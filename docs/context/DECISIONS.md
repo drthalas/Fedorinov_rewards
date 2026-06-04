@@ -106,3 +106,13 @@ The workflow has a dry-run mode (`publish=false`) that builds and uploads artifa
 The workflow validates the requested release version against `backend/app/version.py`, refuses missing release notes, and refuses to overwrite an existing GitHub Release.
 
 Owner-side update checks still do not require any token.
+
+## One-Click Updater Safety
+
+The application may install public GitHub Release ZIP updates only through an explicit POST action with user confirmation.
+
+The updater must verify SHA256 from `latest.json`, validate ZIP structure, reject forbidden paths, create an application backup, preserve `.env`, and copy only allowed application files.
+
+The updater must not touch owner data, SQLite databases, `Source`, `SourceMark`, `default`, backups, logs, `.venv`, local reports, or local update folders.
+
+Automatic restart is deferred. After a successful update, the user closes the launch window and starts the application again.

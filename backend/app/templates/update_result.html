@@ -1,0 +1,20 @@
+{% extends "legacy_base.html" %}
+{% block title %}Результат обновления{% endblock %}
+{% block content %}
+  <section class="legacy-tab-panel">
+    <h1>Результат обновления</h1>
+    {% if result.ok %}
+      <div class="notice notice-success">{{ result.message }}</div>
+    {% else %}
+      <div class="notice notice-error">{{ result.message or result.error }}</div>
+    {% endif %}
+    <dl class="details">
+      <dt>Текущая версия</dt><dd>{{ result.current_version|default("—") }}</dd>
+      <dt>Новая версия</dt><dd>{{ result.latest_version|default("—") }}</dd>
+      <dt>Backup приложения</dt><dd>{{ result.backup_path|default("—") }}</dd>
+      <dt>Скопировано файлов</dt><dd>{{ result.copied_files|default(0) }}</dd>
+    </dl>
+    <p class="secondary">База, фотографии и локальный .env не должны изменяться при обновлении.</p>
+    <p><a class="button" href="/legacy?tab=about&check_updates=1">Вернуться в “О программе”</a></p>
+  </section>
+{% endblock %}

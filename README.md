@@ -257,7 +257,7 @@ The update checker reads a public GitHub Release manifest:
 https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
-No GitHub token is required because releases are public. The checker does not upload or read owner data, photos, `database/`, `Source/`, or `SourceMark/`. Stage 4A only reports whether an update is available. Downloading and installing updates is deferred to Stage 4B.
+No GitHub token is required because releases are public. The checker and updater do not upload or read owner data, photos, `database/`, `Source/`, or `SourceMark/`.
 
 Relevant environment settings:
 
@@ -265,7 +265,23 @@ Relevant environment settings:
 UPDATE_CHECK_ENABLED=true
 UPDATE_MANIFEST_URL=https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 UPDATE_TIMEOUT_SECONDS=10
+APP_INSTALL_DIR=
+UPDATE_BACKUP_DIR=updates/backups
+UPDATE_DOWNLOAD_DIR=updates/downloads
+UPDATE_EXTRACT_DIR=updates/extracted
 ```
+
+One-click update installation is available from `/legacy?tab=about` after checking updates. When a newer release is available, the app shows an `Обновить` button. The updater downloads the release ZIP, verifies SHA256, creates an application backup under `updates/backups`, preserves `.env`, and copies only allowed application files. It does not touch `database/`, `Source/`, `SourceMark/`, `default/`, backups, logs, or owner data. Automatic restart is deferred; after a successful update, close the launch window and start the app again.
+
+CLI helpers:
+
+```sh
+python3 scripts/check_update.py
+python3 scripts/apply_update.py --dry-run
+python3 scripts/apply_update.py --apply
+```
+
+`apply_update.py` defaults to dry-run unless `--apply` is passed.
 
 ## Release Package
 

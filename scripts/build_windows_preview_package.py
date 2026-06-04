@@ -23,6 +23,7 @@ EXCLUDED_NAMES = {
     "SourceMark",
     "backups",
     "dist",
+    "updates",
     "__pycache__",
 }
 EXCLUDED_PATHS = {
@@ -49,6 +50,8 @@ FILES_TO_COPY = [
     Path("scripts") / "check_media_links.py",
     Path("scripts") / "backup_dev_data.py",
     Path("scripts") / "check_backup.py",
+    Path("scripts") / "check_update.py",
+    Path("scripts") / "apply_update.py",
     Path("HELP_RU.md"),
     Path("README.md"),
     Path("docs") / "WINDOWS_PREVIEW_RUNBOOK.md",

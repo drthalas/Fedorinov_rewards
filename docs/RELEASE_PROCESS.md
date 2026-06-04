@@ -112,6 +112,8 @@ After publication, the application checks:
 https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
+After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The updater downloads the ZIP from the public release, checks SHA256, creates an application backup, preserves `.env`, replaces application files, and asks the owner to restart the app manually.
+
 ### Local dry-run
 
 ```sh

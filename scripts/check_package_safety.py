@@ -17,6 +17,7 @@ FORBIDDEN_DIR_PARTS = {
     "Source",
     "SourceMark",
     "backups",
+    "updates",
 }
 FORBIDDEN_PATH_PREFIXES = [
     ("legacy", "_external"),

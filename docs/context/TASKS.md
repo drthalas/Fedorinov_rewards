@@ -340,7 +340,7 @@ Next:
 
 ## Stage 4A.2
 
-Status: done/current.
+Status: done.
 
 Scope:
 
@@ -353,9 +353,26 @@ Scope:
 
 Next:
 
-- Run Manual Release workflow with `publish=false` and inspect artifacts.
-- Run Manual Release workflow with `publish=true` only after explicit release confirmation.
-- Stage 4B: one-click updater.
+- First release `v0.1.0` has been published.
+- Continue with one-click updater QA.
+
+## Stage 4B
+
+Status: done/current.
+
+Scope:
+
+- Added one-click update installer behind POST `/updates/apply`.
+- Updater downloads public release ZIP, verifies SHA256, validates package structure, creates app backup, and copies only allowed application files.
+- `.env`, owner data, database, media folders, backups, logs, and local update folders are preserved.
+- `/legacy?tab=about` shows an `Обновить` form only when a newer version is available.
+- Added CLI helpers: `scripts/check_update.py` and `scripts/apply_update.py`.
+- Auto-restart is deferred; the user is told to restart the app manually.
+
+Next:
+
+- Owner QA on Windows with a newer test release.
+- Improve rollback reporting and optional restart helper after Windows QA.
 
 ## Backlog / Future
 
@@ -366,5 +383,4 @@ Next:
 - Implement full Clipboard API photo paste.
 - Implement physical photo delete only after restore workflow is mature.
 - Implement PDF export parity.
-- Implement Stage 4B one-click updater.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

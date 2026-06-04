@@ -27,15 +27,23 @@ See `docs/RELEASE_PROCESS.md` for build, safety check, dry-run, and publication 
 
 ## Stage 4B: one-click updater
 
-Future one-click update flow:
+Implemented one-click update flow:
 
 1. Download the preview ZIP into a temporary folder.
 2. Verify the downloaded ZIP SHA256 against `latest.json`.
 3. Create a backup of the current application folder.
 4. Preserve local configuration files, especially `.env`.
 5. Replace only application code, templates, scripts, and documentation.
-6. Restart the local application.
-7. Roll back to the previous application folder if update validation fails.
+6. Show a clear result telling the user to restart the application manually.
+
+Automatic restart is deferred. The owner should close the `start_windows.bat` window and start it again after a successful update.
+
+If file replacement fails, the updater attempts to restore files from the application backup and returns a clear error.
+
+The updater has two entry points:
+
+- UI: `О программе -> Проверить обновления -> Обновить`
+- CLI: `python3 scripts/apply_update.py --dry-run` or `python3 scripts/apply_update.py --apply`
 
 ## Data safety
 
@@ -46,8 +54,10 @@ The updater must not touch:
 - `SourceMark/`
 - `default/`
 - `.env`
+- `.env.daily-report`
 - backups
 - owner/user data folders
 - generated local logs
+- `updates/`
 
 Owner data remains local and separate from application code.

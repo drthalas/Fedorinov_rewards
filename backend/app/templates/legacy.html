@@ -484,6 +484,7 @@
               <div class="notice notice-error">{{ update_check.error }}</div>
             {% elif update_check.update_available %}
               <div class="notice notice-success">Доступно обновление {{ update_check.latest_version }}.</div>
+              <p class="secondary">Текущая версия: {{ update_check.current_version }} · Новая версия: {{ update_check.latest_version }}</p>
               {% if update_check.released_at %}<p class="secondary">Дата релиза: {{ update_check.released_at }}</p>{% endif %}
               {% if update_check.notes %}
                 <ul>
@@ -492,8 +493,18 @@
                   {% endfor %}
                 </ul>
               {% endif %}
-              <span class="button disabled-button">Обновить</span>
-              <p class="secondary">Установка обновления будет добавлена следующим этапом.</p>
+              <details>
+                <summary>Проверочная сумма SHA256</summary>
+                <p class="secondary">{{ update_check.sha256|default("—") }}</p>
+              </details>
+              <form method="post" action="/updates/apply" onsubmit="return confirm('Установить обновление? После установки нужно перезапустить приложение.')">
+                <label class="summary-checkbox">
+                  <input type="checkbox" name="confirm_update" value="true" required>
+                  <span>Я понимаю, что после обновления нужно перезапустить приложение.</span>
+                </label>
+                <p class="secondary">Перед обновлением программа сохранит текущую версию. Данные и фотографии не будут затронуты.</p>
+                <button type="submit">Обновить</button>
+              </form>
             {% else %}
               <div class="notice notice-success">Установлена актуальная версия.</div>
             {% endif %}
