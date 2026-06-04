@@ -26,6 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--send-test-to-copy-only", action="store_true")
     parser.add_argument("--send", action="store_true")
+    parser.add_argument("--correction", action="store_true")
     return parser.parse_args(_normalize_argv())
 
 
@@ -58,10 +59,10 @@ def append_log(version: str, recipient_role: str, recipient_id: int, status: str
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def build_message(version: str, manifest: str, release_notes: str) -> str:
+def build_message(version: str, manifest: str, release_notes: str, correction: bool = False) -> str:
     manifest_path = Path(manifest) if manifest else None
     notes_path = Path(release_notes) if release_notes else None
-    return generator.build_message(version, manifest_path, notes_path)
+    return generator.build_message(version, manifest_path, notes_path, correction=correction)
 
 
 def print_dry_run(version: str, message: str, primary_id: int, copy_ids: list[int]) -> None:
@@ -77,7 +78,7 @@ def main() -> int:
     args = parse_args()
     config = daily.merged_config()
     primary_id, copy_ids = daily.resolve_recipients(config)
-    message = build_message(args.version, args.manifest, args.release_notes)
+    message = build_message(args.version, args.manifest, args.release_notes, correction=args.correction)
 
     if args.dry_run or not args.send and not args.send_test_to_copy_only:
         print_dry_run(args.version, message, primary_id, copy_ids)

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.1 Release Notes Correction
+
+- Expanded `release_notes/0.1.1.md` to include all owner-facing improvements from the release: rewards filters, totals, search, contextual guides, return navigation, and update progress.
+- Added release notification correction mode for sending an explicit follow-up when a prior release notification was incomplete.
+- Updated release process documentation to require reviewing full user-visible release notes before sending Telegram notifications.
+
 ## Stage 4B.1 Update Progress and Release Notifications
 
 - Bumped application version to `0.1.1` for the owner updater test release.

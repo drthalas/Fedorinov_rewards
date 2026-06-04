@@ -22,6 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--version", required=True)
     parser.add_argument("--manifest", default="")
     parser.add_argument("--release-notes", default="")
+    parser.add_argument("--correction", action="store_true")
     return parser.parse_args(_normalize_argv())
 
 
@@ -51,23 +52,43 @@ def sanitize_note(value: str) -> str:
     return text.strip(" .") or "В этой версии внесены улучшения и исправления"
 
 
-def load_notes(version: str, manifest: Path | None = None, release_notes: Path | None = None) -> list[str]:
+def load_notes(
+    version: str,
+    manifest: Path | None = None,
+    release_notes: Path | None = None,
+    limit: int = 8,
+) -> list[str]:
     notes = notes_from_manifest(manifest) if manifest else []
     if not notes:
         notes = notes_from_markdown(release_notes or PROJECT_ROOT / "release_notes" / f"{version}.md")
     if not notes:
         notes = ["В этой версии внесены улучшения и исправления"]
-    return [sanitize_note(note) for note in notes[:8]]
+    return [sanitize_note(note) for note in notes[:limit]]
 
 
-def build_message(version: str, manifest: Path | None = None, release_notes: Path | None = None) -> str:
-    notes = load_notes(version, manifest, release_notes)
-    lines = [
-        f"Вышла новая версия проекта “{PROJECT_TITLE}” — v{version}.",
-        "",
-        "Что добавлено:",
-        "",
-    ]
+def build_message(
+    version: str,
+    manifest: Path | None = None,
+    release_notes: Path | None = None,
+    correction: bool = False,
+) -> str:
+    notes = load_notes(version, manifest, release_notes, limit=9 if correction else 8)
+    if correction:
+        lines = [
+            f"Уточнение по версии проекта “{PROJECT_TITLE}” — v{version}.",
+            "",
+            "В предыдущем сообщении был неполный список изменений. Ниже полный список того, что вошло в версию.",
+            "",
+            "Что добавлено:",
+            "",
+        ]
+    else:
+        lines = [
+            f"Вышла новая версия проекта “{PROJECT_TITLE}” — v{version}.",
+            "",
+            "Что добавлено:",
+            "",
+        ]
     lines.extend(f"{index}. {note}." for index, note in enumerate(notes, start=1))
     lines.extend(
         [
@@ -95,7 +116,7 @@ def main() -> int:
     args = parse_args()
     manifest = Path(args.manifest) if args.manifest else None
     release_notes = Path(args.release_notes) if args.release_notes else None
-    print(build_message(args.version, manifest, release_notes))
+    print(build_message(args.version, manifest, release_notes, correction=args.correction))
     return 0
 
 

@@ -118,6 +118,8 @@ After the owner opens `О программе` and clicks `Проверить о�
 
 After a successful publication, prepare the Telegram release notification on the Mac mini. The Telegram bot token stays local and is not stored in GitHub Actions.
 
+Before sending, review `release_notes/X.Y.Z.md` and make sure it covers all user-visible release changes, not only the last technical task. The notification should mention the real owner-facing improvements in plain language.
+
 First preview the message:
 
 ```sh
@@ -134,6 +136,13 @@ After separate confirmation for the real release notification, send to Sergey an
 
 ```sh
 python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
+```
+
+If an incomplete notification was already sent, send a corrected follow-up only after explicit confirmation:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run --correction
+python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send --correction
 ```
 
 Do not send release notifications automatically from GitHub Actions. The workflow can print a local command reminder, but real Telegram messages are sent only from the Mac mini after confirmation.
