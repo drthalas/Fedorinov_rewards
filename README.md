@@ -81,13 +81,22 @@ Run the local FastAPI backend:
 scripts/run_dev.sh
 ```
 
-The app starts on `127.0.0.1:8080` by default. The first stage is read-only and uses SQLite with `mode=ro`.
+The app starts on `127.0.0.1:8080` by default. Opening `http://127.0.0.1:8080` redirects to the primary legacy-style working interface at `/legacy?tab=rewards`.
 
 ## Stage 2A Read-Only Mirror
 
-The minimal web mirror is available at:
+The primary interface is:
 
-- `/` - dashboard and table counts
+- `/` - redirects to `/legacy?tab=rewards`
+- `/legacy?tab=rewards` - main rewards workspace
+- `/legacy?tab=search` - legacy-style search
+- `/legacy?tab=marks` - standalone marks workspace
+- `/legacy?tab=summary` - basic summary counts and price/stock totals
+- `/legacy?tab=about` - preview status
+
+Supporting/technical routes remain available:
+
+- `/dashboard` - diagnostics dashboard and table counts
 - `/persons` - awarded persons list
 - `/persons?page=1&page_size=25` - awarded persons list with basic pagination
 - `/persons/{id}` - awarded person card
@@ -98,7 +107,6 @@ The minimal web mirror is available at:
 - `/marks/{id}` - mark card
 - `/guides` - read-only guide tree
 - `/search` - simple search by name/title/number
-- `/legacy` - legacy-style desktop mirror with old top tabs and compact master/detail layout
 - `/health` - environment diagnostics
 
 Search supports legacy-like query parameters:
@@ -139,7 +147,7 @@ Then open:
 http://127.0.0.1:8080
 ```
 
-The mirror is read-only. It must not modify `/Users/hermes/Desktop/Rewards`, write to SQLite, copy media files, or run legacy executables.
+The root URL opens the legacy UI. Forms launched from legacy buttons carry a safe `return_to` value, so save/delete actions return to the same legacy tab and selected record when possible.
 
 Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
 
@@ -214,14 +222,14 @@ On Windows:
 4. On first run, edit `.env` and set `REWARDS_DATA_DIR` to the local Rewards data folder.
 5. Run `start_windows.bat` again and open `http://127.0.0.1:8080`.
 
-Windows preview defaults are:
+Windows preview defaults are now the working preview mode:
 
 ```text
-READ_ONLY=true
-WRITE_MODE=false
+READ_ONLY=false
+WRITE_MODE=true
 REQUIRE_BACKUP_BEFORE_WRITE=true
 APP_HOST=127.0.0.1
 APP_PORT=8080
 ```
 
-For temporary button testing on a copied data folder, create and validate a backup first, then set `WRITE_MODE=true` and `READ_ONLY=false` in local `.env`. Return to read-only mode after testing.
+Backup-first protection remains enabled. Before editing real data, create and validate a backup. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.

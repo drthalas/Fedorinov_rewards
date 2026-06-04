@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if mode == "create" %}Добавить награду{% else %}Изменить награду #{{ reward.id }}{% endif %}</h1>
 <p>
-  {% if person %}<a href="/persons/{{ person.id }}">← к награжденному</a>{% endif %}
+  {% if person %}<a href="{{ return_to or '/persons/' ~ person.id }}">← Вернуться</a>{% endif %}
   {% if mode == "edit" %} · <a href="/rewards/{{ reward.id }}">к карточке награды</a>{% endif %}
 </p>
 
@@ -12,6 +12,7 @@
 {% endif %}
 
 <form class="edit-form" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
+  <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <label>
     <span>Государство</span>
     <select name="id_gos">
@@ -79,7 +80,7 @@
 
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
-    <a href="{% if mode == 'create' %}/persons/{{ person.id }}{% else %}/rewards/{{ reward.id }}{% endif %}">Отмена</a>
+    <a href="{{ return_to or ('/persons/' ~ person.id if mode == 'create' else '/rewards/' ~ reward.id) }}">Отмена</a>
   </div>
 </form>
 {% with photo_entity_type="reward", photo_entity_id=reward.id %}

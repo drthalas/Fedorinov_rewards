@@ -13,6 +13,7 @@ from ..repositories.rewards_write import (
     reward_data_from_mapping,
     update_reward,
 )
+from ..services.navigation import safe_return_to, with_status
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -50,7 +51,7 @@ def _guide_options(settings):
 
 
 @router.get("/persons/{person_id}/rewards/new")
-def reward_new(request: Request, person_id: int):
+def reward_new(request: Request, person_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
@@ -68,6 +69,7 @@ def reward_new(request: Request, person_id: int):
             "reward": reward,
             "guides": _guide_options(settings),
             "photo_controls": [],
+            "return_to": safe_return_to(return_to),
             "error": None,
         },
     )
@@ -77,6 +79,7 @@ def reward_new(request: Request, person_id: int):
 async def reward_create(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
         data = reward_data_from_mapping(form_values)
         create_reward(settings, person_id, data)
@@ -94,11 +97,13 @@ async def reward_create(request: Request, person_id: int):
                 "reward": {"person_id": person_id, **form_values},
                 "guides": _guide_options(settings),
                 "photo_controls": [],
+                "return_to": return_to,
                 "error": str(exc),
             },
             status_code=400,
         )
-    return RedirectResponse(f"/persons/{person_id}?status=reward_created", status_code=303)
+    target = with_status(return_to, "reward_created") if return_to else f"/persons/{person_id}?status=reward_created"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/rewards/{reward_id}")
@@ -120,7 +125,7 @@ def reward_detail(request: Request, reward_id: int, status: str = ""):
 
 
 @router.get("/rewards/{reward_id}/edit")
-def reward_edit(request: Request, reward_id: int):
+def reward_edit(request: Request, reward_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
@@ -138,6 +143,7 @@ def reward_edit(request: Request, reward_id: int):
             "reward": reward,
             "guides": _guide_options(settings),
             "photo_controls": photo_items("reward", reward),
+            "return_to": safe_return_to(return_to),
             "error": None,
         },
     )
@@ -147,6 +153,7 @@ def reward_edit(request: Request, reward_id: int):
 async def reward_update(request: Request, reward_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
         data = reward_data_from_mapping(form_values)
         update_reward(settings, reward_id, data)
@@ -166,21 +173,25 @@ async def reward_update(request: Request, reward_id: int):
                 "reward": {**reward, **form_values},
                 "guides": _guide_options(settings),
                 "photo_controls": photo_items("reward", reward),
+                "return_to": return_to,
                 "error": str(exc),
             },
             status_code=400,
         )
-    return RedirectResponse(f"/rewards/{reward_id}?status=updated", status_code=303)
+    target = with_status(return_to, "updated") if return_to else f"/rewards/{reward_id}?status=updated"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/rewards/{reward_id}/delete")
 async def reward_delete(request: Request, reward_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
         person_id = delete_reward(settings, reward_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return RedirectResponse(f"/persons/{person_id}?status=reward_deleted", status_code=303)
+    target = with_status(return_to, "reward_deleted") if return_to else f"/persons/{person_id}?status=reward_deleted"
+    return RedirectResponse(target, status_code=303)

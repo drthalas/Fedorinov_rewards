@@ -2,13 +2,17 @@
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}</h1>
-<p><a href="/persons">← к списку</a>{% if mode == "edit" %} · <a href="/persons/{{ person.id }}">к карточке</a>{% endif %}</p>
+<p>
+  <a href="{{ return_to or '/persons' }}">← Вернуться</a>
+  {% if mode == "edit" %} · <a href="/persons/{{ person.id }}">к карточке</a>{% endif %}
+</p>
 
 {% if error %}
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
 <form class="edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+  <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <label>
     <span>ФИО</span>
     <input name="fio" value="{{ person.fio or '' }}" required>
@@ -40,7 +44,7 @@
   </label>
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
-    <a href="{% if mode == 'create' %}/persons{% else %}/persons/{{ person.id }}{% endif %}">Отмена</a>
+    <a href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
   </div>
 </form>
 {% with photo_entity_type="person", photo_entity_id=person.id %}

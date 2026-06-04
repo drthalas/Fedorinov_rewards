@@ -5,19 +5,13 @@ from fastapi.responses import RedirectResponse
 from starlette.datastructures import UploadFile
 
 from ..config import get_settings
+from ..services.navigation import safe_return_to
 from ..services.photos import MAX_PHOTO_BYTES, PhotoValidationError, clear_photo, save_photo
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
 
 router = APIRouter()
-
-
-def _safe_return_url(value: object, default: str = "/") -> str:
-    text = str(value or "").strip()
-    if text.startswith("/") and not text.startswith("//"):
-        return text
-    return default
 
 
 async def _read_urlencoded(request: Request) -> dict[str, object]:
@@ -27,8 +21,9 @@ async def _read_urlencoded(request: Request) -> dict[str, object]:
 
 
 @router.get("/photo/view")
-def photo_view(request: Request, path: str = "", label: str = "", back: str = "/"):
+def photo_view(request: Request, path: str = "", label: str = "", back: str = "/", return_to: str = ""):
     settings = get_settings()
+    safe_back = safe_return_to(return_to) or safe_return_to(back, "/")
     return templates.TemplateResponse(
         request,
         "photo_view.html",
@@ -36,7 +31,7 @@ def photo_view(request: Request, path: str = "", label: str = "", back: str = "/
             "settings": settings,
             "path": path,
             "label": label or "Фото",
-            "back": _safe_return_url(back),
+            "return_to": safe_back,
         },
     )
 
@@ -51,7 +46,7 @@ async def photo_upload(request: Request):
 
     entity_type = str(form.get("entity_type") or "")
     photo_field = str(form.get("photo_field") or "")
-    return_url = _safe_return_url(form.get("return_url"))
+    return_url = safe_return_to(form.get("return_to")) or safe_return_to(form.get("return_url"), "/")
     try:
         entity_id = int(str(form.get("entity_id") or ""))
     except ValueError as exc:
@@ -80,7 +75,7 @@ async def photo_clear(request: Request):
     form = await _read_urlencoded(request)
     entity_type = str(form.get("entity_type") or "")
     photo_field = str(form.get("photo_field") or "")
-    return_url = _safe_return_url(form.get("return_url"))
+    return_url = safe_return_to(form.get("return_to")) or safe_return_to(form.get("return_url"), "/")
     try:
         entity_id = int(str(form.get("entity_id") or ""))
     except ValueError as exc:

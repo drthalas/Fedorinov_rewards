@@ -1,4 +1,5 @@
 {% if mode == "edit" and settings.write_mode and photo_controls %}
+{% set current_form_url = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 <section class="photo-manage-section">
   <h2>Фото</h2>
   <p class="muted">Кнопка “+” добавляет или заменяет привязку фото. Кнопка “×” убирает привязку в базе; файл на диске не удаляется.</p>
@@ -6,7 +7,7 @@
     {% for photo in photo_controls %}
     <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
       {% if has_media_path(photo.path) %}
-      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, request.url.path) }}">
+      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, current_form_url) }}">
         <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
       {% else %}
@@ -19,7 +20,7 @@
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
-          <input type="hidden" name="return_url" value="{{ request.url.path }}">
+          <input type="hidden" name="return_url" value="{{ current_form_url }}">
           <label class="mini-button" title="Добавить или заменить">
             +
             <input class="sr-only-file" name="file" type="file" accept=".jpg,.jpeg,.png,.webp,image/*" onchange="this.form.submit()">
@@ -29,7 +30,7 @@
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
-          <input type="hidden" name="return_url" value="{{ request.url.path }}">
+          <input type="hidden" name="return_url" value="{{ current_form_url }}">
           <button class="mini-button danger" type="submit" title="Убрать привязку">×</button>
         </form>
         <button class="mini-button disabled" type="button" title="Clipboard paste будет реализован позже" disabled>Вставить из буфера</button>

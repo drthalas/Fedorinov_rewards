@@ -14,6 +14,16 @@ from .templates import templates
 router = APIRouter()
 
 VALID_TABS = {"rewards", "search", "marks", "summary", "about"}
+STATUS_MESSAGES = {
+    "created": "Награждённый добавлен.",
+    "updated": "Изменения сохранены.",
+    "deleted": "Запись удалена.",
+    "delete_blocked": "Нельзя удалить: у награждённого есть награды.",
+    "reward_created": "Награда добавлена.",
+    "reward_deleted": "Награда удалена.",
+    "mark_created": "Знак добавлен.",
+    "mark_deleted": "Знак удалён.",
+}
 
 
 def _current_commit() -> str:
@@ -64,6 +74,7 @@ def legacy_index(
     q: str = "",
     scope: str = "all",
     mode: str = "contains",
+    status: str = "",
     message: str = "",
 ):
     settings = get_settings()
@@ -79,6 +90,7 @@ def legacy_index(
             ("about", "О программе"),
         ],
         "message": message,
+        "status_message": STATUS_MESSAGES.get(status),
         "persons": [],
         "selected_person": None,
         "person_rewards": [],

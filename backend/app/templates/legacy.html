@@ -13,6 +13,9 @@
   {% if message == "pdf_not_implemented" %}
     <div class="notice">PDF export будет реализован позже. Сейчас кнопка оставлена как заглушка legacy-интерфейса.</div>
   {% endif %}
+  {% if status_message %}
+    <div class="notice notice-success">{{ status_message }}</div>
+  {% endif %}
 
   {% if not settings.db_exists %}
     <div class="notice notice-error">База не найдена: {{ settings.rewards_db_path }}</div>
@@ -21,12 +24,15 @@
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
         <div class="legacy-toolbar">
+          {% set rewards_tab_return = "/legacy?tab=rewards" %}
           <a class="tool-button" href="/guides" title="Справочник">📚 Справочник</a>
           {% if settings.write_mode %}
-            <a class="tool-button" href="/persons/new" title="Добавить">➕ Добавить</a>
+            <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
             {% if selected_person %}
-              <a class="tool-button" href="/persons/{{ selected_person.id }}/edit" title="Изменить">✏️ Изменить</a>
+              {% set selected_person_return = "/legacy?tab=rewards&person_id=" ~ selected_person.id %}
+              <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
               <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Подтвердите удаление награжденного')">
+                <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
                 <button class="tool-button danger" type="submit">❌ Удалить</button>
               </form>
             {% endif %}
@@ -50,6 +56,7 @@
 
       <section class="legacy-main">
         {% if selected_person %}
+          {% set selected_person_return = "/legacy?tab=rewards&person_id=" ~ selected_person.id %}
           <div class="legacy-split-header">
             <div>
               <h1>{{ selected_person.fio|dash }}</h1>
@@ -66,7 +73,7 @@
               <h2>Перечень наград</h2>
               <div class="legacy-toolbar">
                 {% if settings.write_mode %}
-                  <a class="tool-button" href="/persons/{{ selected_person.id }}/rewards/new">➕ Добавить награду</a>
+                  <a class="tool-button" href="/persons/{{ selected_person.id }}/rewards/new?return_to={{ selected_person_return|urlencode }}">➕ Добавить награду</a>
                 {% else %}
                   <span class="tool-button disabled">➕ Добавить награду</span>
                   <span class="tool-button disabled">✏️ Изменить</span>
@@ -98,9 +105,10 @@
                       <td>{{ reward.price_now|format_money }}</td>
                       {% if settings.write_mode %}
                         <td class="compact-actions">
-                          <a href="/rewards/{{ reward.id }}/edit">✏️</a>
+                          <a href="/rewards/{{ reward.id }}/edit?return_to={{ selected_person_return|urlencode }}">✏️</a>
                           <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Подтвердите удаление награды')">
                             <input type="hidden" name="confirm" value="true">
+                            <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                             <button type="submit" class="link-button">❌</button>
                           </form>
                         </td>
@@ -264,12 +272,15 @@
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title">Знаки ({{ marks_total or marks|length }})</div>
         <div class="legacy-toolbar">
+          {% set marks_tab_return = "/legacy?tab=marks" %}
           {% if settings.write_mode %}
-            <a class="tool-button" href="/marks/new">➕ Добавить знак</a>
+            <a class="tool-button" href="/marks/new?return_to={{ marks_tab_return|urlencode }}">➕ Добавить знак</a>
             {% if selected_mark %}
-              <a class="tool-button" href="/marks/{{ selected_mark.id }}/edit">✏️ Изменить</a>
+              {% set selected_mark_return = "/legacy?tab=marks&mark_id=" ~ selected_mark.id %}
+              <a class="tool-button" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">✏️ Изменить</a>
               <form method="post" action="/marks/{{ selected_mark.id }}/delete" onsubmit="return confirm('Подтвердите удаление знака')">
                 <input type="hidden" name="confirm" value="true">
+                <input type="hidden" name="return_to" value="{{ marks_tab_return }}">
                 <button class="tool-button danger" type="submit">❌ Удалить</button>
               </form>
             {% endif %}
@@ -384,7 +395,7 @@
       <h1>О программе</h1>
       <dl class="details">
         <dt>Название</dt><dd>Fedorinov Rewards Web Preview</dd>
-        <dt>Режим</dt><dd>{% if settings.write_mode %}WRITE MODE{% else %}READ ONLY{% endif %}</dd>
+        <dt>Режим</dt><dd>{% if settings.write_mode %}Рабочий режим{% else %}Режим просмотра{% endif %}</dd>
         <dt>Data dir</dt><dd>{{ settings.rewards_data_dir }}</dd>
         <dt>Commit</dt><dd>{{ commit }}</dd>
       </dl>

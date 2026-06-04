@@ -13,13 +13,13 @@ def media_url(path: object) -> str:
     return str(URL(path="/media").include_query_params(path=value))
 
 
-def photo_view_url(path: object, label: object = "", back: object = "") -> str:
+def photo_view_url(path: object, label: object = "", return_to: object = "") -> str:
     value = path if isinstance(path, str) else ""
     query = {"path": value}
     if isinstance(label, str) and label:
         query["label"] = label
-    if isinstance(back, str) and back.startswith("/"):
-        query["back"] = back
+    if isinstance(return_to, str) and return_to.startswith("/"):
+        query["return_to"] = return_to
     return str(URL(path="/photo/view").include_query_params(**query))
 
 

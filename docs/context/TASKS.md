@@ -198,6 +198,22 @@ Next:
 - Hermes / owner QA for search behavior.
 - Guides CRUD or remaining legacy UI parity items.
 
+## Legacy UI Primary Interface
+
+Status: done.
+
+Scope:
+
+- `/` redirects to `/legacy?tab=rewards`.
+- Legacy UI is the primary user workflow; standalone pages remain as supporting/technical pages.
+- Top navigation no longer presents Legacy UI as a separate mode.
+- Forms opened from `/legacy` carry safe `return_to` values and redirect back to the legacy tab/selected record after save/delete.
+- Windows preview defaults to editable working preview mode with backup-first guard enabled.
+
+Next:
+
+- QA navigation/back flow from legacy tabs through person/reward/mark forms.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

@@ -38,4 +38,14 @@ The package contains code, startup scripts, and documentation only. Owner data, 
 
 Python 3.11+ is an acceptable prerequisite for the first preview. A dedicated installer, launcher, updater, or bundled runtime can be considered later after owner QA confirms the preview workflow.
 
-Windows preview defaults stay read-only with `READ_ONLY=true` and `WRITE_MODE=false`. Temporary write-mode button checks require a backup first and must use local `.env` only.
+Windows preview originally started read-only. After the legacy UI became the primary workflow, the preview defaults moved to visible working buttons with backup-first protection still enabled.
+
+## Legacy UI Primary Workflow
+
+The legacy desktop mirror is now the primary user interface. Opening `/` redirects to `/legacy?tab=rewards`.
+
+The existing standalone pages such as `/persons`, `/marks`, `/search`, `/dashboard`, and detail pages remain available as supporting and technical routes, but the owner-facing workflow should start from `/legacy`.
+
+The Windows portable preview defaults to editable working mode with `READ_ONLY=false` and `WRITE_MODE=true`, while keeping `REQUIRE_BACKUP_BEFORE_WRITE=true`, `write_guard`, and audit logging enabled. This makes buttons visible for owner preview without removing backup-first protection.
+
+Forms opened from `/legacy` must carry a sanitized internal `return_to` URL so successful create/update/delete actions return to the correct legacy tab and selected record.

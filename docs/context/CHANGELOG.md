@@ -1,5 +1,15 @@
 # Changelog
 
+## Legacy UI Primary Interface
+
+- Changed `/` to redirect to `/legacy?tab=rewards`.
+- Updated top navigation so the legacy mirror is presented as the main application, not a separate mode.
+- Added safe `return_to` navigation for person, reward, mark, and photo flows opened from `/legacy`.
+- Person, reward, and mark create/edit/delete actions now return to the relevant legacy tab when `return_to` is present.
+- Updated mode text to Russian user-facing labels: `Рабочий режим` and `Режим просмотра`.
+- Changed Windows preview defaults to `READ_ONLY=false`, `WRITE_MODE=true`, with `REQUIRE_BACKUP_BEFORE_WRITE=true` still enabled.
+- Kept `write_guard`, backup-first policy, and audit logging intact.
+
 ## Stage 3G Search Rewrite
 
 - Replaced the old SQLite `LIKE`-only search with a shared repository for `/search` and `/legacy?tab=search`.

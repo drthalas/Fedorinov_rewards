@@ -14,6 +14,7 @@ from ..repositories.persons_write import (
     update_person,
 )
 from ..services.display import pagination
+from ..services.navigation import safe_return_to, with_status
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -65,7 +66,7 @@ def persons_index(request: Request, page: int = 1, page_size: int = 25, status: 
 
 
 @router.get("/persons/new")
-def person_new(request: Request):
+def person_new(request: Request, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
@@ -73,21 +74,30 @@ def person_new(request: Request):
     return templates.TemplateResponse(
         request,
         "person_form.html",
-        {"settings": settings, "mode": "create", "person": {}, "ranks": ranks, "photo_controls": [], "error": None},
+        {
+            "settings": settings,
+            "mode": "create",
+            "person": {},
+            "ranks": ranks,
+            "photo_controls": [],
+            "return_to": safe_return_to(return_to),
+            "error": None,
+        },
     )
 
 
 @router.post("/persons/new")
 async def person_create(request: Request):
     settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
-        data = person_data_from_mapping(await _read_form(request))
+        data = person_data_from_mapping(form_values)
         person_id = create_person(settings, data)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonValidationError as exc:
         ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
-        form_values = await _read_form(request)
         return templates.TemplateResponse(
             request,
             "person_form.html",
@@ -97,11 +107,13 @@ async def person_create(request: Request):
                 "person": form_values,
                 "ranks": ranks,
                 "photo_controls": [],
+                "return_to": return_to,
                 "error": str(exc),
             },
             status_code=400,
         )
-    return RedirectResponse(f"/persons/{person_id}?status=created", status_code=303)
+    target = with_status(return_to, "created") if return_to else f"/persons/{person_id}?status=created"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/persons/{person_id}")
@@ -119,7 +131,7 @@ def person_detail(request: Request, person_id: int, status: str = ""):
 
 
 @router.get("/persons/{person_id}/edit")
-def person_edit(request: Request, person_id: int):
+def person_edit(request: Request, person_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
@@ -136,6 +148,7 @@ def person_edit(request: Request, person_id: int):
             "person": person,
             "ranks": ranks,
             "photo_controls": photo_items("person", person),
+            "return_to": safe_return_to(return_to),
             "error": None,
         },
     )
@@ -145,6 +158,7 @@ def person_edit(request: Request, person_id: int):
 async def person_update(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
         data = person_data_from_mapping(form_values)
         update_person(settings, person_id, data)
@@ -162,25 +176,31 @@ async def person_update(request: Request, person_id: int):
                 "person": person,
                 "ranks": ranks,
                 "photo_controls": photo_items("person", person),
+                "return_to": return_to,
                 "error": str(exc),
             },
             status_code=400,
         )
-    return RedirectResponse(f"/persons/{person_id}?status=updated", status_code=303)
+    target = with_status(return_to, "updated") if return_to else f"/persons/{person_id}?status=updated"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/persons/{person_id}/delete")
-def person_delete(request: Request, person_id: int):
+async def person_delete(request: Request, person_id: int):
     settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
     try:
         delete_person(settings, person_id)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonDeleteBlockedError:
-        return RedirectResponse(f"/persons/{person_id}?status=delete_blocked", status_code=303)
+        target = with_status(return_to, "delete_blocked") if return_to else f"/persons/{person_id}?status=delete_blocked"
+        return RedirectResponse(target, status_code=303)
     except PersonValidationError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return RedirectResponse("/persons?status=deleted", status_code=303)
+    target = with_status(return_to, "deleted") if return_to else "/persons?status=deleted"
+    return RedirectResponse(target, status_code=303)
 
 
 @router.get("/persons/{person_id}/photos")

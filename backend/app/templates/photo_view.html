@@ -4,7 +4,7 @@
 <section class="photo-viewer">
   <div class="photo-viewer-header">
     <h1>{{ label }}</h1>
-    <a class="button" href="{{ back }}">Назад</a>
+    <a class="button" href="{{ return_to }}">Назад</a>
   </div>
   {% if has_media_path(path) %}
     <img class="photo-viewer-image" src="{{ media_url(path) }}" alt="{{ label }}">

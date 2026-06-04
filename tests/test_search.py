@@ -19,7 +19,8 @@ class SearchRepositoryTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _create_db(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        connection = sqlite3.connect(self.db_path)
+        try:
             connection.execute("create table guide (id integer primary key, name text)")
             connection.execute("create table guide_lev_0 (id integer primary key, idl integer, name text)")
             connection.execute("create table guide_lev_1 (id integer primary key, idl integer, name text)")
@@ -109,6 +110,9 @@ class SearchRepositoryTests(unittest.TestCase):
                 values (20, 1, 1, 1, 1, 42, 0, 'mark-link')
                 """
             )
+            connection.commit()
+        finally:
+            connection.close()
 
     def test_search_persons_by_partial_cyrillic_last_name(self) -> None:
         result = search_all(self.db_path, "Андрос", scope="persons")

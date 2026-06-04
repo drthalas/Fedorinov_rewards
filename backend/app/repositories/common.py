@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 
@@ -19,13 +20,13 @@ TABLES_TO_COUNT = [
 
 
 def fetch_all(db_path: Path, query: str, params: Iterable[object] = ()) -> list[dict[str, object]]:
-    with open_readonly_connection(db_path) as connection:
+    with closing(open_readonly_connection(db_path)) as connection:
         rows = connection.execute(query, tuple(params)).fetchall()
     return [row_to_dict(row) for row in rows if row is not None]
 
 
 def fetch_one(db_path: Path, query: str, params: Iterable[object] = ()) -> dict[str, object] | None:
-    with open_readonly_connection(db_path) as connection:
+    with closing(open_readonly_connection(db_path)) as connection:
         row = connection.execute(query, tuple(params)).fetchone()
     return row_to_dict(row)
 
@@ -33,7 +34,7 @@ def fetch_one(db_path: Path, query: str, params: Iterable[object] = ()) -> dict[
 def table_counts(db_path: Path, tables: list[str] | None = None) -> dict[str, int | None]:
     counts: dict[str, int | None] = {}
     selected = tables or TABLES_TO_COUNT
-    with open_readonly_connection(db_path) as connection:
+    with closing(open_readonly_connection(db_path)) as connection:
         existing = {
             row["name"]
             for row in connection.execute(
@@ -50,7 +51,7 @@ def table_counts(db_path: Path, tables: list[str] | None = None) -> dict[str, in
 
 def db_readable(db_path: Path) -> bool:
     try:
-        with open_readonly_connection(db_path) as connection:
+        with closing(open_readonly_connection(db_path)) as connection:
             connection.execute("select 1").fetchone()
         return True
     except sqlite3.Error:
