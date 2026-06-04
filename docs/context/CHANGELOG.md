@@ -1,5 +1,14 @@
 # Changelog
 
+## Stage 4A.1 GitHub Release Package Publishing
+
+- Added `scripts/print_version.py` for the current app name/version.
+- Added `scripts/build_release_package.py` to generate versioned Windows ZIP assets and `dist/latest.json`.
+- Added `release_notes/0.1.0.md` for human-readable release notes.
+- Added `scripts/publish_github_release.py` with dry-run support and local `gh` CLI checks.
+- Added release process documentation and tests for manifest safety, SHA256 matching, and publish dry-run.
+- Kept real GitHub Release publication disabled unless explicitly confirmed.
+
 ## Stage 4A Public GitHub Update Checker
 
 - Added a single application version source and `/version`.

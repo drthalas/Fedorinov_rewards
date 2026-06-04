@@ -305,7 +305,7 @@ Next:
 
 ## Stage 4A
 
-Status: done/current.
+Status: done.
 
 Scope:
 
@@ -320,6 +320,23 @@ Next:
 
 - Publish the first GitHub Release with Windows portable ZIP and `latest.json`.
 - Stage 4B: one-click updater with download, SHA256 validation, application backup, `.env` preservation, replacement, restart, and rollback.
+
+## Stage 4A.1
+
+Status: done/current.
+
+Scope:
+
+- Added release package builder for versioned Windows ZIP assets.
+- Added generated `dist/latest.json` manifest with version, public download URL, SHA256, date, and notes.
+- Added release notes file for `0.1.0`.
+- Added GitHub Release publish script with `--dry-run` and local `gh` CLI checks.
+- Documented the release process and kept real publication behind explicit confirmation.
+
+Next:
+
+- Publish the first public GitHub Release after explicit confirmation.
+- Stage 4B: one-click updater.
 
 ## Backlog / Future
 

@@ -81,3 +81,18 @@ No GitHub token is needed or stored on the owner's computer. The update checker 
 The manifest must include version, public download URL, SHA256, release date, and user-facing notes. Owner data remains separate from application code and must not be touched by update checks or future update installation.
 
 One-click installation is deferred to Stage 4B and must preserve `.env`, avoid database/media folders, validate SHA256, create an application backup, and support rollback.
+
+## GitHub Release Package Publishing
+
+Release packages are published through public GitHub Releases in `drthalas/Fedorinov_rewards`.
+
+Each release should include:
+
+- versioned Windows portable ZIP;
+- `latest.json` manifest.
+
+`latest.json` is a generated release asset, not a committed real manifest. It must contain the public ZIP URL, SHA256, version, release date, and owner-facing notes.
+
+GitHub tokens are never committed. Publishing can use local `gh` CLI authentication on the developer machine, while owner-side update checks remain token-free.
+
+Owner data, `.env`, database, media folders, backups, logs, and generated reports are not included in release assets.

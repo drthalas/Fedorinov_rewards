@@ -267,6 +267,30 @@ UPDATE_MANIFEST_URL=https://github.com/drthalas/Fedorinov_rewards/releases/lates
 UPDATE_TIMEOUT_SECONDS=10
 ```
 
+## Release Package
+
+Release assets are generated from the current `APP_VERSION`:
+
+```sh
+python3 scripts/print_version.py
+python3 scripts/build_release_package.py
+python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_v0.1.0.zip
+python3 scripts/publish_github_release.py --dry-run
+```
+
+Generated release assets:
+
+- `dist/FedorinovRewards_WebPreview_vX.Y.Z.zip`
+- `dist/latest.json`
+
+Real GitHub Release publication is done only after confirmation:
+
+```sh
+python3 scripts/publish_github_release.py
+```
+
+Publication uses local `gh` CLI authentication on the developer machine. Do not commit GitHub tokens. See `docs/RELEASE_PROCESS.md`.
+
 ## Windows Portable Preview
 
 The first Windows owner preview is a portable ZIP, not an installer. It contains application code, startup scripts, and Windows runbook documents only. Owner data, SQLite databases, photos, backups, `.env`, `.venv`, legacy sources, and generated reports are not included.
