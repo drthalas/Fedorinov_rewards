@@ -24,6 +24,7 @@ class DailyReportTests(unittest.TestCase):
             generator,
             "git_subjects_for_date",
             return_value=[
+                "Add daily Telegram progress reports",
                 "Stage 3G search rewrite",
                 "Make legacy UI single shell and add photo lightbox",
             ],
@@ -32,6 +33,7 @@ class DailyReportTests(unittest.TestCase):
 
         self.assertIn("Доброе утро!", text)
         self.assertIn("Награды и награждённые", text)
+        self.assertIn("ежедневный утренний отчёт", text)
         self.assertIn("исправили поиск по фамилиям", text)
         self.assertIn("фото открываются крупно прямо на странице", text)
         for forbidden in generator.BANNED_TERMS:

@@ -29,6 +29,10 @@ BANNED_TERMS = [
 
 CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
     (
+        "Add daily Telegram progress reports",
+        ["настроили ежедневный утренний отчёт в Telegram;"],
+    ),
+    (
         "Make legacy UI single shell and add photo lightbox",
         [
             "убрали лишнюю внешнюю оболочку: основной экран теперь выглядит как единая рабочая программа;",
@@ -63,6 +67,14 @@ CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
     (
         "Fix legacy HEAD support and rebuild Windows preview",
         ["подготовили обновлённый Windows-архив для проверки владельцем;"],
+    ),
+    (
+        "Add Russian help to Windows preview package",
+        ["добавили русскую инструкцию для проверки на Windows;"],
+    ),
+    (
+        "Stage 2C Windows portable preview package",
+        ["подготовили Windows-архив для проверки без включения данных;"],
     ),
     (
         "Stage 3E legacy desktop layout mirror",
