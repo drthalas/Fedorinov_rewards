@@ -49,3 +49,13 @@ The existing standalone pages such as `/persons`, `/marks`, `/search`, `/dashboa
 The Windows portable preview defaults to editable working mode with `READ_ONLY=false` and `WRITE_MODE=true`, while keeping `REQUIRE_BACKUP_BEFORE_WRITE=true`, `write_guard`, and audit logging enabled. This makes buttons visible for owner preview without removing backup-first protection.
 
 Forms opened from `/legacy` must carry a sanitized internal `return_to` URL so successful create/update/delete actions return to the correct legacy tab and selected record.
+
+## Daily Telegram Reports
+
+Daily progress reports are sent through the existing colorizer/SAVBot Telegram bot instead of creating a separate bot.
+
+The report is addressed to Sergey as the primary recipient at 09:00, with the same report copied to Alexander for quality control.
+
+Report text uses the public project name "Награды и награждённые" and avoids internal implementation terms, local paths, database contents, photos, tokens, and personal data.
+
+The Telegram bot token, real chat ids, real launchd plist, `.env.daily-report`, and send logs remain local and are not committed. The first real send to Sergey requires separate confirmation before enabling primary delivery.

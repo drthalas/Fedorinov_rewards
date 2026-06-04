@@ -236,3 +236,27 @@ APP_PORT=8080
 ```
 
 Backup-first protection remains enabled. Before editing real data, create and validate a backup. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.
+
+## Daily Telegram Reports
+
+Daily progress reports for the project name `Награды и награждённые` can be generated and sent through the existing colorizer/SAVBot Telegram bot.
+
+Preview the report without sending anything:
+
+```sh
+python3 scripts/send_daily_report.py --dry-run
+```
+
+Send a confirmed test only to the copy recipient:
+
+```sh
+python3 scripts/send_daily_report.py --send-test-to-copy-only
+```
+
+Local configuration is kept in ignored `.env.daily-report`. The sender can read the existing colorizer bot token from `~/Projects/picture-colorizer/.env` without printing it. The launchd template for 09:00 daily delivery is:
+
+```text
+deploy/launchd/com.fedorinov.daily-report.plist.example
+```
+
+See `docs/DAILY_TELEGRAM_REPORTS.md` for setup, safety rules, and launchd enable/disable commands.

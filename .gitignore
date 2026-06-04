@@ -1,4 +1,5 @@
 .env
+.env.daily-report
 __pycache__/
 .venv/
 *.sqlite

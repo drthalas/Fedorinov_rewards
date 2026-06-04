@@ -230,6 +230,24 @@ Next:
 
 - QA legacy shell and photo modal behavior.
 
+## Daily Telegram Reports
+
+Status: done.
+
+Scope:
+
+- Daily Russian progress report generator for the project name "Награды и награждённые".
+- Telegram sender uses the existing colorizer/SAVBot token from `picture-colorizer`.
+- Primary recipient is Sergey; copy recipient is Alexander.
+- Dry-run mode prints the safe report text and masked recipient ids without sending messages.
+- Launchd template schedules the report every day at 09:00.
+- Real tokens, chat ids, and send logs stay outside Git.
+
+Next:
+
+- Confirm the first real send policy before enabling daily primary sends.
+- Optional one-time test send to Alexander only after explicit confirmation.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

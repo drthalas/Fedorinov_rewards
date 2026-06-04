@@ -1,5 +1,13 @@
 # Changelog
 
+## Daily Telegram Reports
+
+- Added a safe daily Telegram report generator for the project name `Награды и награждённые`.
+- Added a sender that uses the existing colorizer/SAVBot Telegram bot token without committing or printing the token.
+- Added dry-run support, copy-only test-send support, local ignored configuration, and ignored JSONL send logs.
+- Added a launchd plist example for daily 09:00 delivery on the Mac mini.
+- Documented that the first real send to Sergey requires separate confirmation.
+
 ## Legacy Shell Cleanup And Photo Lightbox
 
 - Moved `/legacy` to a dedicated `legacy_base.html` layout so the primary working interface no longer renders inside the global web navigation shell.
