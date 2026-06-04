@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  </head>
+  <body class="legacy-body">
+    <header class="legacy-app-header">
+      <div class="legacy-titlebar">
+        <span>Fedorinov Rewards</span>
+        {% if settings is defined and settings.write_mode %}
+        <span class="legacy-mode legacy-mode-write">Рабочий режим</span>
+        {% else %}
+        <span class="legacy-mode legacy-mode-readonly">Режим просмотра</span>
+        {% endif %}
+      </div>
+      <nav class="legacy-tabs" aria-label="Разделы">
+        {% for tab_id, label in tabs %}
+          <a class="{% if tab == tab_id %}active{% endif %}" href="/legacy?tab={{ tab_id }}">{{ label }}</a>
+        {% endfor %}
+      </nav>
+    </header>
+    <main class="legacy-shell">
+      {% block content %}{% endblock %}
+    </main>
+    {% include "_lightbox.html" %}
+  </body>
+</html>

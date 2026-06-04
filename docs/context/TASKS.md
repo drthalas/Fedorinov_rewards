@@ -214,6 +214,22 @@ Next:
 
 - QA navigation/back flow from legacy tabs through person/reward/mark forms.
 
+## Legacy UI Shell And Photo Modal
+
+Status: done.
+
+Scope:
+
+- `/legacy` now uses a dedicated legacy shell without the global web navigation.
+- Legacy tabs are the only top-level navigation inside the main working interface.
+- The legacy workspace fills the page instead of appearing as a nested card inside the web preview layout.
+- Photo clicks now open an inline modal/lightbox over the current page.
+- The existing `/photo/view` route remains only as a fallback/technical route.
+
+Next:
+
+- QA legacy shell and photo modal behavior.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

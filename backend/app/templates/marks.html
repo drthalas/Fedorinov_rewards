@@ -18,8 +18,14 @@
       {% for mark in marks %}
       <tr>
         <td class="{{ 'placeholder-cell' if not has_media_path(mark.thumbnail_path) else '' }}">
+          {% if has_media_path(mark.thumbnail_path) %}
+          <a class="photo-link" href="{{ photo_view_url(mark.thumbnail_path, 'Фото знака', '/marks') }}">
+            <img class="thumb" src="{{ media_url(mark.thumbnail_path) }}" alt="Фото знака">
+          </a>
+          {% else %}
           <img class="thumb {{ 'placeholder-image' if not has_media_path(mark.thumbnail_path) else '' }}" src="{{ media_url(mark.thumbnail_path) }}" alt="">
-          {% if not has_media_path(mark.thumbnail_path) %}<div class="photo-caption muted">Нет фото</div>{% endif %}
+          <div class="photo-caption muted">Нет фото</div>
+          {% endif %}
         </td>
         <td>{{ mark.id }}</td>
         <td>{{ mark.gos|dash }}</td>

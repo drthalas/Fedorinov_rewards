@@ -1,5 +1,13 @@
 # Changelog
 
+## Legacy Shell Cleanup And Photo Lightbox
+
+- Moved `/legacy` to a dedicated `legacy_base.html` layout so the primary working interface no longer renders inside the global web navigation shell.
+- Kept only the legacy tabs (`Награды`, `Поиск`, `Знаки`, `Свод.таблица`, `О программе`) and compact mode status in the main legacy UI.
+- Added a shared inline photo lightbox for standalone pages and `/legacy`.
+- Photo clicks now open an enlarged image over the current page without changing URL or leaving the selected legacy tab.
+- Kept `/photo/view` as a fallback/technical route.
+
 ## Legacy UI Primary Interface
 
 - Changed `/` to redirect to `/legacy?tab=rewards`.

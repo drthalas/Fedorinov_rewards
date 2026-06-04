@@ -81,7 +81,7 @@ Run the local FastAPI backend:
 scripts/run_dev.sh
 ```
 
-The app starts on `127.0.0.1:8080` by default. Opening `http://127.0.0.1:8080` redirects to the primary legacy-style working interface at `/legacy?tab=rewards`.
+The app starts on `127.0.0.1:8080` by default. Opening `http://127.0.0.1:8080` redirects to the primary legacy-style working interface at `/legacy?tab=rewards`. The legacy interface uses its own single shell with the old-style tabs as the main navigation, not a nested web-preview page.
 
 ## Stage 2A Read-Only Mirror
 
@@ -149,6 +149,8 @@ http://127.0.0.1:8080
 
 The root URL opens the legacy UI. Forms launched from legacy buttons carry a safe `return_to` value, so save/delete actions return to the same legacy tab and selected record when possible.
 
+Displayed photos open in an inline lightbox over the current page. Closing the lightbox keeps the user in the same tab and selected record. The older `/photo/view` route remains available only as a fallback/technical viewer.
+
 Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
 
 The legacy-style desktop mirror is available at:
@@ -188,6 +190,7 @@ Current development write-mode CRUD:
 - Reward create/edit/delete for rewards attached to a person.
 - Mark create/edit/delete for standalone marks.
 - Click any displayed photo to open the large photo viewer.
+- Photo clicks open an inline modal/lightbox without leaving the current page.
 - `/persons/{id}/photos` includes a gallery and previous/next slideshow.
 - Person, reward, and mark edit forms include photo upload/replace controls in `WRITE_MODE=true`.
 - Photo clear/unlink removes only the SQLite field value. It does not delete the physical file.

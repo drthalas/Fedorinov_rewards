@@ -1,15 +1,6 @@
-{% extends "base.html" %}
+{% extends "legacy_base.html" %}
 {% block title %}Legacy UI · Fedorinov Rewards{% endblock %}
 {% block content %}
-<section class="legacy-shell">
-  <div class="legacy-window-title">Fedorinov Rewards Web Preview · Legacy desktop mirror</div>
-
-  <nav class="legacy-tabs">
-    {% for tab_id, label in tabs %}
-      <a class="{% if tab == tab_id %}active{% endif %}" href="/legacy?tab={{ tab_id }}">{{ label }}</a>
-    {% endfor %}
-  </nav>
-
   {% if message == "pdf_not_implemented" %}
     <div class="notice">PDF export будет реализован позже. Сейчас кнопка оставлена как заглушка legacy-интерфейса.</div>
   {% endif %}
@@ -403,5 +394,4 @@
       <div class="notice">PDF export, загрузка/замена фото и CRUD справочников пока отложены.</div>
     </section>
   {% endif %}
-</section>
 {% endblock %}
