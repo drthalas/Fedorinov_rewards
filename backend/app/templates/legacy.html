@@ -14,13 +14,63 @@
     <div class="legacy-layout">
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
+        <form class="legacy-rewards-filters" method="get" action="/legacy">
+          <input type="hidden" name="tab" value="rewards">
+          <label>
+            <span>Звание / специальность</span>
+            <select name="rank_id">
+              <option value="">Все</option>
+              {% for item in rewards_filter_options.ranks %}
+                <option value="{{ item.id }}" {% if rewards_filters.rank_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Страна награды</span>
+            <select name="country_id">
+              <option value="">Все</option>
+              {% for item in rewards_filter_options.countries %}
+                <option value="{{ item.id }}" {% if rewards_filters.country_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Категория</span>
+            <select name="category_id">
+              <option value="">Все</option>
+              {% for item in rewards_filter_options.categories %}
+                <option value="{{ item.id }}" {% if rewards_filters.category_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Подкатегория</span>
+            <select name="subcategory_id">
+              <option value="">Все</option>
+              {% for item in rewards_filter_options.subcategories %}
+                <option value="{{ item.id }}" {% if rewards_filters.subcategory_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Наименование</span>
+            <select name="name_id">
+              <option value="">Все</option>
+              {% for item in rewards_filter_options.names %}
+                <option value="{{ item.id }}" {% if rewards_filters.name_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <div class="legacy-filter-actions">
+            <button class="tool-button" type="submit">Показать</button>
+            <a class="tool-button" href="/legacy?tab=rewards">Сброс</a>
+          </div>
+        </form>
         <div class="legacy-toolbar">
-          {% set rewards_tab_return = "/legacy?tab=rewards" %}
           <a class="tool-button" href="/guides?return_to={{ rewards_tab_return|urlencode }}" title="Справочник">📚 Справочник</a>
           {% if settings.write_mode %}
             <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
             {% if selected_person %}
-              {% set selected_person_return = "/legacy?tab=rewards&person_id=" ~ selected_person.id %}
               <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
               <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Подтвердите удаление награжденного')">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
@@ -35,7 +85,7 @@
         </div>
         <div class="legacy-list">
           {% for person in persons %}
-            <a class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" href="/legacy?tab=rewards&person_id={{ person.id }}">
+            <a class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" href="{{ person.legacy_url }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}">
               <span>{{ person.fio|dash }}</span>
               <small>{{ person.rewards_count }} нагр.</small>
             </a>
@@ -47,7 +97,6 @@
 
       <section class="legacy-main">
         {% if selected_person %}
-          {% set selected_person_return = "/legacy?tab=rewards&person_id=" ~ selected_person.id %}
           <div class="legacy-split-header">
             <div>
               <h1>{{ selected_person.fio|dash }}</h1>
@@ -118,9 +167,15 @@
               <h2>Ссылки</h2>
               <dl class="legacy-links">
                 <dt>Ссылка на сайт "Память народа"</dt>
-                <dd>{{ selected_person.link1|dash }}</dd>
+                <dd>
+                  {% set link_url = safe_external_url(selected_person.link1) %}
+                  {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link1 }}</a>{% else %}{{ selected_person.link1|dash }}{% endif %}
+                </dd>
                 <dt>Ссылка на сайт "Форум коллекционеров"</dt>
-                <dd>{{ selected_person.link2|dash }}</dd>
+                <dd>
+                  {% set link_url = safe_external_url(selected_person.link2) %}
+                  {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link2 }}</a>{% else %}{{ selected_person.link2|dash }}{% endif %}
+                </dd>
                 <dt>Комментарий</dt>
                 <dd>{{ selected_person.comment|dash }}</dd>
               </dl>
@@ -159,6 +214,15 @@
         {% else %}
           <div class="notice">Выберите награжденного.</div>
         {% endif %}
+        <section class="legacy-totals-panel" aria-label="Итоги">
+          <div><span>Награждённых</span><strong>{{ rewards_totals.persons_total }}</strong></div>
+          <div><span>Наград</span><strong>{{ rewards_totals.rewards_total }}</strong></div>
+          <div><span>В наличии</span><strong>{{ rewards_totals.in_stock }}</strong></div>
+          <div><span>Нет в наличии</span><strong>{{ rewards_totals.not_in_stock }}</strong></div>
+          <div><span>Цена покупки</span><strong>{{ rewards_totals.price_purchase_sum|format_money }}</strong></div>
+          <div><span>Текущая цена</span><strong>{{ rewards_totals.price_now_sum|format_money }}</strong></div>
+          <div><span>Последняя покупка</span><strong>{{ rewards_totals.last_purchase_date|format_date }}</strong></div>
+        </section>
       </section>
     </div>
   {% elif tab == "search" %}

@@ -413,6 +413,24 @@ Next:
 - Observe the next scheduled run at 09:00 Europe/Moscow.
 - Keep real send logs local and ignored.
 
+## Iteration 1: Legacy Rewards Filters and Totals
+
+Status: done/current.
+
+Scope:
+
+- Added filters above the main `Награды` person list: rank/specialty, country, category, subcategory, and reward name.
+- Filters can be combined, including rank plus reward name, to find people matching both conditions.
+- Added totals for the current filtered result: people, rewards, stock counts, purchase/current price sums, and latest purchase date.
+- Added double-click behavior on the person list: single click selects a person, double click opens the person card.
+- Made displayed URL fields clickable only for safe `http`/`https` links.
+- Added Escape-as-back behavior on edit forms while keeping Escape reserved for the photo modal when it is open.
+
+Next:
+
+- QA the main `Награды` screen with owner examples such as rank plus specific reward.
+- Add dependent/cascading selects later so country narrows category, category narrows subcategory, and subcategory narrows reward names.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

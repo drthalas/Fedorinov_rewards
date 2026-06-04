@@ -2,7 +2,7 @@
 {% block title %}{% if mode == "create" %}Добавить знак{% else %}Изменить знак #{{ mark.id }}{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if mode == "create" %}Добавить знак{% else %}Изменить знак #{{ mark.id }}{% endif %}</h1>
-<p><a href="{{ return_to or '/marks' }}">← Вернуться</a>{% if mode == "edit" %} · <a href="/marks/{{ mark.id }}">к карточке знака</a>{% endif %}</p>
+<p><a data-escape-back href="{{ return_to or '/marks' }}">← Вернуться</a>{% if mode == "edit" %} · <a href="/marks/{{ mark.id }}">к карточке знака</a>{% endif %}</p>
 
 {% if error %}
 <section class="notice notice-error">{{ error }}</section>
@@ -89,7 +89,7 @@
 
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
-    <a href="{{ return_to or ('/marks' if mode == 'create' else '/marks/' ~ mark.id) }}">Отмена</a>
+    <a data-escape-back href="{{ return_to or ('/marks' if mode == 'create' else '/marks/' ~ mark.id) }}">Отмена</a>
   </div>
 </form>
 {% with photo_entity_type="mark", photo_entity_id=mark.id %}

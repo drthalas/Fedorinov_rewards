@@ -6,8 +6,14 @@ from starlette.datastructures import URL
 
 from ..config import PROJECT_ROOT, get_settings
 from ..repositories.common import fetch_one, table_counts
+from ..repositories.legacy_rewards import (
+    legacy_rewards_filter_options,
+    legacy_rewards_totals,
+    list_legacy_reward_persons,
+    normalized_legacy_rewards_filters,
+)
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
-from ..repositories.persons import count_persons, get_person, list_person_rewards, list_persons
+from ..repositories.persons import get_person, list_person_rewards
 from ..repositories.search import search_all
 from ..repositories.summary import (
     normalized_summary_filters,
@@ -51,6 +57,27 @@ def _summary_query_params(filters) -> dict[str, object]:
     if filters.include_marks:
         params["include_marks"] = "true"
     return params
+
+
+def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, object]:
+    params: dict[str, object] = {"tab": "rewards"}
+    if person_id is not None:
+        params["person_id"] = person_id
+    if filters.rank_id is not None:
+        params["rank_id"] = filters.rank_id
+    if filters.country_id is not None:
+        params["country_id"] = filters.country_id
+    if filters.category_id is not None:
+        params["category_id"] = filters.category_id
+    if filters.subcategory_id is not None:
+        params["subcategory_id"] = filters.subcategory_id
+    if filters.name_id is not None:
+        params["name_id"] = filters.name_id
+    return params
+
+
+def _legacy_rewards_url(filters, person_id: int | None = None) -> str:
+    return str(URL(path="/legacy").include_query_params(**_rewards_query_params(filters, person_id)))
 
 
 def _current_commit() -> str:
@@ -103,6 +130,7 @@ def legacy_index(
     mode: str = "contains",
     status: str = "",
     message: str = "",
+    rank_id: str | None = None,
     country_id: str | None = None,
     category_id: str | None = None,
     subcategory_id: str | None = None,
@@ -113,6 +141,13 @@ def legacy_index(
 ):
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
+    rewards_filters = normalized_legacy_rewards_filters(
+        rank_id=rank_id,
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+    )
     context: dict[str, object] = {
         "settings": settings,
         "tab": active_tab,
@@ -128,6 +163,30 @@ def legacy_index(
         "persons": [],
         "selected_person": None,
         "person_rewards": [],
+        "persons_total": 0,
+        "rewards_filters": rewards_filters,
+        "rewards_filter_options": {"ranks": [], "countries": [], "categories": [], "subcategories": [], "names": []},
+        "rewards_filter_active": any(
+            value is not None
+            for value in (
+                rewards_filters.rank_id,
+                rewards_filters.country_id,
+                rewards_filters.category_id,
+                rewards_filters.subcategory_id,
+                rewards_filters.name_id,
+            )
+        ),
+        "rewards_tab_return": _legacy_rewards_url(rewards_filters),
+        "selected_person_return": _legacy_rewards_url(rewards_filters, person_id) if person_id is not None else _legacy_rewards_url(rewards_filters),
+        "rewards_totals": {
+            "persons_total": 0,
+            "rewards_total": 0,
+            "in_stock": 0,
+            "not_in_stock": 0,
+            "price_purchase_sum": 0,
+            "price_now_sum": 0,
+            "last_purchase_date": None,
+        },
         "marks": [],
         "selected_mark": None,
         "selected_mark_photos": [],
@@ -158,21 +217,28 @@ def legacy_index(
     if not settings.db_exists:
         return templates.TemplateResponse(request, "legacy.html", context)
 
-    persons_total = count_persons(settings.rewards_db_path)
-    persons = list_persons(settings.rewards_db_path, limit=max(persons_total, 1), offset=0)
+    context["rewards_filter_options"] = legacy_rewards_filter_options(settings.rewards_db_path)
+    persons = list_legacy_reward_persons(settings.rewards_db_path, rewards_filters)
+    for person in persons:
+        row_id = int(person["id"])
+        person["legacy_url"] = _legacy_rewards_url(rewards_filters, row_id)
+        person["detail_url"] = str(URL(path=f"/persons/{row_id}").include_query_params(return_to=person["legacy_url"]))
     context["persons"] = persons
-    context["persons_total"] = persons_total
+    context["persons_total"] = len(persons)
+    context["rewards_totals"] = legacy_rewards_totals(settings.rewards_db_path, rewards_filters)
 
     marks_total = count_marks(settings.rewards_db_path)
     marks = list_marks(settings.rewards_db_path, limit=max(marks_total, 1), offset=0)
     context["marks"] = marks
     context["marks_total"] = marks_total
 
-    selected_person_id = person_id or (int(persons[0]["id"]) if persons else None)
+    person_ids = {int(row["id"]) for row in persons}
+    selected_person_id = person_id if person_id in person_ids else (int(persons[0]["id"]) if persons else None)
     if selected_person_id is not None:
         selected_person = get_person(settings.rewards_db_path, selected_person_id)
         context["selected_person"] = selected_person
         context["person_rewards"] = list_person_rewards(settings.rewards_db_path, selected_person_id)
+        context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
 
     selected_mark_id = mark_id or (int(marks[0]["id"]) if marks else None)
     if selected_mark_id is not None:

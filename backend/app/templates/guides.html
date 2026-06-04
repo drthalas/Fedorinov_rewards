@@ -40,7 +40,7 @@
 {% endmacro %}
 {% block content %}
 <h1>Справочник</h1>
-{% if return_to %}<p><a href="{{ return_to }}">← Вернуться</a></p>{% endif %}
+{% if return_to %}<p><a data-escape-back href="{{ return_to }}">← Вернуться</a></p>{% endif %}
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
 <section class="grid">

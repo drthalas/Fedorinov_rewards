@@ -21,7 +21,11 @@
     <dt>Категория</dt><dd>{{ reward.category|dash }}</dd>
     <dt>Подкатегория</dt><dd>{{ reward.subcategory|dash }}</dd>
     <dt>Наименование</dt><dd>{{ reward.name|dash }}</dd>
-    <dt>ID link / ссылки</dt><dd class="secondary">{{ reward.id_link|dash }}</dd>
+    <dt>Ссылка / доп. поле</dt>
+    <dd class="secondary">
+      {% set link_url = safe_external_url(reward.id_link) %}
+      {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ reward.id_link }}</a>{% else %}{{ reward.id_link|dash }}{% endif %}
+    </dd>
     <dt>Номер</dt><dd>{{ reward.number|dash }}</dd>
     <dt>Наличие</dt><dd><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span></dd>
     <dt>Дата покупки</dt><dd>{{ reward.date_purchase|format_date }}</dd>

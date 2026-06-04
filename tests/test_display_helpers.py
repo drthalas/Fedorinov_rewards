@@ -1,13 +1,20 @@
 import unittest
 
-from backend.app.services.display import format_bool, format_date, format_money, pagination
+from backend.app.services.display import format_bool, format_date, format_money, pagination, safe_external_url
 
 
 class DisplayHelperTests(unittest.TestCase):
     def test_format_date(self) -> None:
         self.assertEqual(format_date("1913-05-09"), "09.05.1913")
+        self.assertEqual(format_date("1913"), "1913")
         self.assertEqual(format_date(""), "—")
         self.assertEqual(format_date("bad date"), "—")
+
+    def test_safe_external_url(self) -> None:
+        self.assertEqual(safe_external_url("https://example.com/path"), "https://example.com/path")
+        self.assertEqual(safe_external_url("http://example.com"), "http://example.com")
+        self.assertEqual(safe_external_url("javascript:alert(1)"), "")
+        self.assertEqual(safe_external_url("/internal"), "")
 
     def test_format_money(self) -> None:
         self.assertEqual(format_money(40000), "40 000 ₽")

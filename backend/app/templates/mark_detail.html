@@ -20,7 +20,11 @@
     <dt>Категория</dt><dd>{{ mark.category|dash }}</dd>
     <dt>Подкатегория</dt><dd>{{ mark.subcategory|dash }}</dd>
     <dt>Наименование</dt><dd>{{ mark.name|dash }}</dd>
-    <dt>ID link</dt><dd class="secondary">{{ mark.id_link|dash }}</dd>
+    <dt>Ссылка / доп. поле</dt>
+    <dd class="secondary">
+      {% set link_url = safe_external_url(mark.id_link) %}
+      {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ mark.id_link }}</a>{% else %}{{ mark.id_link|dash }}{% endif %}
+    </dd>
     <dt>Номер</dt><dd>{{ mark.number|dash }}</dd>
     <dt>Наличие</dt><dd><span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></dd>
     <dt>Дата покупки</dt><dd>{{ mark.date_purchase|format_date }}</dd>

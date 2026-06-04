@@ -166,6 +166,15 @@
 - Added package safety checker that blocks real data, backups, `.env`, `.venv`, media, archives, binaries, legacy sources, and local reports.
 - Documented that the Windows preview is code-only and owner data remains outside the package.
 
+## Iteration 1 Legacy Rewards Filters and Totals
+
+- Added main `Награды` filters for rank/specialty and reward guide levels.
+- Added filtered totals at the bottom of the main rewards screen.
+- Added double-click from the person list to the person card.
+- Made URL fields clickable only when they are safe `http`/`https` links.
+- Added Escape navigation back from edit forms without breaking photo modal Escape behavior.
+- Kept APP_VERSION at `0.1.1`; no release was published and no Telegram release notification was sent.
+
 ## Stage 3D Mark CRUD
 
 - Added guarded mark create/edit/delete repository functions using parameterized SQL.

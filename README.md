@@ -111,6 +111,16 @@ Supporting/technical routes remain available:
 - `/version` - current application name and version
 - `/updates/check` - public GitHub Release update check
 
+The main rewards workspace supports filters above the person list:
+
+- `rank_id` - rank/specialty from the rank guide.
+- `country_id` - reward country.
+- `category_id` - reward category.
+- `subcategory_id` - reward subcategory.
+- `name_id` - reward name.
+
+Filters can be combined, for example rank plus a specific reward name. The totals panel at the bottom of the rewards workspace reflects the current filtered selection. Person rows use single click to select and double click to open the person card. Dependent/cascading select narrowing is planned as a later UX polish; backend filtering already accepts the combined parameters.
+
 Search supports legacy-like query parameters:
 
 - `q` - search value.
@@ -171,6 +181,8 @@ http://127.0.0.1:8080
 The root URL opens the legacy UI. Forms launched from legacy buttons carry a safe `return_to` value, so save/delete actions return to the same legacy tab and selected record when possible.
 
 Displayed photos open in an inline lightbox over the current page. Closing the lightbox keeps the user in the same tab and selected record. The older `/photo/view` route remains available only as a fallback/technical viewer.
+
+Displayed URL fields are clickable only for safe `http`/`https` links and open in a new tab. Edit forms support Escape as a shortcut for the existing `Вернуться` action; when the photo lightbox is open, Escape closes the photo instead.
 
 Stage 2B keeps the same read-only mirror and improves readability only: dates are shown as `DD.MM.YYYY`, prices as rubles, stock values as badges, guide sections are collapsible, and search results are limited to the first 25 items per group.
 

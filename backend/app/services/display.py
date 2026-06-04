@@ -1,5 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+import re
+from urllib.parse import urlsplit
 
 
 DASH = "—"
@@ -32,6 +34,11 @@ def format_date(value: object) -> str:
             return datetime.strptime(text[:10], fmt).strftime("%d.%m.%Y")
         except ValueError:
             continue
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    if re.fullmatch(r"\d{4}[-/]\d{2}", text):
+        year, month = re.split(r"[-/]", text)
+        return f"{month}.{year}"
     return DASH
 
 
@@ -80,6 +87,18 @@ def bool_class(value: object) -> str:
 
 def has_media_path(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def safe_external_url(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if not text:
+        return ""
+    parsed = urlsplit(text)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return text
+    return ""
 
 
 def clamp_page(value: int, minimum: int = 1) -> int:

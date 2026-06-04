@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}</h1>
 <p>
-  <a href="{{ return_to or '/persons' }}">← Вернуться</a>
+  <a data-escape-back href="{{ return_to or '/persons' }}">← Вернуться</a>
   {% if mode == "edit" %} · <a href="/persons/{{ person.id }}">к карточке</a>{% endif %}
 </p>
 
@@ -22,7 +22,8 @@
       </label>
       <label>
         <span>Дата рождения / год рождения</span>
-        <input name="birthday" value="{{ person.birthday or '' }}" placeholder="YYYY-MM-DD">
+        <input name="birthday" value="{{ person.birthday or '' }}" placeholder="ДД.ММ.ГГГГ или YYYY-MM-DD">
+        {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_date }}</small>{% endif %}
       </label>
     </div>
     <label>
@@ -60,7 +61,7 @@
 
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
-    <a href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
+    <a data-escape-back href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
   </div>
 </form>
 {% with photo_entity_type="person", photo_entity_id=person.id %}

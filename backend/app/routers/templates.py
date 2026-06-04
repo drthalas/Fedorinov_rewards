@@ -2,7 +2,15 @@ from fastapi.templating import Jinja2Templates
 from starlette.datastructures import URL
 
 from ..config import PROJECT_ROOT
-from ..services.display import bool_class, dash_if_empty, format_bool, format_date, format_money, has_media_path
+from ..services.display import (
+    bool_class,
+    dash_if_empty,
+    format_bool,
+    format_date,
+    format_money,
+    has_media_path,
+    safe_external_url,
+)
 
 
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
@@ -26,6 +34,7 @@ def photo_view_url(path: object, label: object = "", return_to: object = "") -> 
 templates.env.globals["media_url"] = media_url
 templates.env.globals["photo_view_url"] = photo_view_url
 templates.env.globals["has_media_path"] = has_media_path
+templates.env.globals["safe_external_url"] = safe_external_url
 templates.env.filters["bool_class"] = bool_class
 templates.env.filters["dash"] = dash_if_empty
 templates.env.filters["format_bool"] = format_bool
