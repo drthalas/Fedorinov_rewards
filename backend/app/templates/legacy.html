@@ -348,41 +348,116 @@
     <section class="legacy-tab-panel">
       <h1>Свод.таблица</h1>
       {% if summary %}
+        <form class="summary-filter-form" method="get" action="/legacy">
+          <input type="hidden" name="tab" value="summary">
+          <label>
+            <span>Страна</span>
+            <select name="country_id">
+              <option value="">Все</option>
+              {% for item in summary_options.countries %}
+              <option value="{{ item.id }}" {% if item.id == summary_filters.country_id %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Категория</span>
+            <select name="category_id">
+              <option value="">Все</option>
+              {% for item in summary_options.categories %}
+              <option value="{{ item.id }}" {% if item.id == summary_filters.category_id %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Подкатегория</span>
+            <select name="subcategory_id">
+              <option value="">Все</option>
+              {% for item in summary_options.subcategories %}
+              <option value="{{ item.id }}" {% if item.id == summary_filters.subcategory_id %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Наименование</span>
+            <select name="name_id">
+              <option value="">Все</option>
+              {% for item in summary_options.names %}
+              <option value="{{ item.id }}" {% if item.id == summary_filters.name_id %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>
+            <span>Дополнительно</span>
+            <select name="extra">
+              <option value="">Все</option>
+              {% for item in summary_options.extras %}
+              <option value="{{ item.id }}" {% if item.id|string == summary_filters.extra|string %}selected{% endif %}>{{ item.name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="summary-checkbox">
+            <input type="checkbox" name="include_marks" value="true" {% if summary_filters.include_marks %}checked{% endif %}>
+            <span>Знаки</span>
+          </label>
+          <div class="summary-filter-actions">
+            <button type="submit">Показать</button>
+            <a class="button secondary-button" href="/legacy?tab=summary">Сброс</a>
+            <a class="button secondary-button" href="{{ summary_csv_url }}">CSV</a>
+            <span class="button secondary-button disabled-button">PDF</span>
+          </div>
+        </form>
+        <p class="secondary">PDF-экспорт будет добавлен следующим этапом.</p>
         <div class="grid">
           <div class="card"><strong>Награждённых</strong><br>{{ summary.counts.person }}</div>
           <div class="card"><strong>Наград</strong><br>{{ summary.counts.rewards }}</div>
           <div class="card"><strong>Знаков</strong><br>{{ summary.counts.mark }}</div>
         </div>
-        <div class="legacy-table-wrap">
-          <table class="legacy-table">
+        <div class="legacy-table-wrap summary-matrix-wrap">
+          <table class="legacy-table summary-matrix">
             <thead>
               <tr>
-                <th>Раздел</th>
+                <th>Страна</th>
+                <th>Категория</th>
+                <th>Подкатегория</th>
+                <th>Наименование</th>
+                <th>Всего</th>
                 <th>В наличии</th>
-                <th>Нет</th>
-                <th>Сумма покупки</th>
-                <th>Текущая сумма</th>
+                <th>Нет в наличии</th>
+                <th>Цена покупки</th>
+                <th>Текущая цена</th>
+                <th>Последняя дата приобретения</th>
               </tr>
             </thead>
             <tbody>
+              {% for row in summary_rows %}
               <tr>
-                <td>Награды</td>
-                <td>{{ summary.rewards.in_stock }}</td>
-                <td>{{ summary.rewards.not_in_stock }}</td>
-                <td>{{ summary.rewards.price_purchase_sum|format_money }}</td>
-                <td>{{ summary.rewards.price_now_sum|format_money }}</td>
+                <td>{{ row.country|dash }}</td>
+                <td>{{ row.category|dash }}</td>
+                <td>{{ row.subcategory|dash }}</td>
+                <td>{{ row.name|dash }}</td>
+                <td class="number-cell">{{ row.total }}</td>
+                <td class="number-cell stock-yes">{{ row.in_stock }}</td>
+                <td class="number-cell stock-no">{{ row.not_in_stock }}</td>
+                <td class="number-cell">{{ row.price_purchase_sum|format_money }}</td>
+                <td class="number-cell">{{ row.price_now_sum|format_money }}</td>
+                <td>{{ row.last_purchase_date|format_date }}</td>
               </tr>
-              <tr>
-                <td>Знаки</td>
-                <td>{{ summary.marks.in_stock }}</td>
-                <td>{{ summary.marks.not_in_stock }}</td>
-                <td>{{ summary.marks.price_purchase_sum|format_money }}</td>
-                <td>{{ summary.marks.price_now_sum|format_money }}</td>
+              {% else %}
+              <tr><td colspan="10">По выбранным фильтрам записей нет.</td></tr>
+              {% endfor %}
+              <tr class="summary-total-row">
+                <td colspan="4">Итого</td>
+                <td class="number-cell">{{ summary_totals.total }}</td>
+                <td class="number-cell">{{ summary_totals.in_stock }}</td>
+                <td class="number-cell">{{ summary_totals.not_in_stock }}</td>
+                <td class="number-cell">{{ summary_totals.price_purchase_sum|format_money }}</td>
+                <td class="number-cell">{{ summary_totals.price_now_sum|format_money }}</td>
+                <td>—</td>
               </tr>
             </tbody>
           </table>
         </div>
-        <p class="secondary">Legacy CSV/PDF export и фильтры сводной таблицы будут реализованы позже.</p>
+        <p class="secondary">По умолчанию таблица показывает награды. Чтобы включить знаки, отметьте “Знаки” и нажмите “Показать”.</p>
       {% endif %}
     </section>
   {% elif tab == "about" %}

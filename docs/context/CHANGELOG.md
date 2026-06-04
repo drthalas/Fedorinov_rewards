@@ -1,5 +1,14 @@
 # Changelog
 
+## Stage 3J Summary Table and CSV Export
+
+- Reworked `/legacy?tab=summary` from basic counts into a filterable summary matrix.
+- Added filters for country, category, subcategory, name, extra/link level, and optional standalone marks.
+- Added compact green matrix styling with totals, stock counts, purchase/current price sums, and last purchase date.
+- Added read-only `/summary.csv` export with UTF-8 BOM and the same filters as the UI.
+- Kept PDF export as a disabled placeholder for the next export stage.
+- Added tests for summary filters, mark inclusion, CSV output, route registration, and parameter placeholders.
+
 ## Stage 3I Form Parity and Biography
 
 - Added an idempotent migration script for a separate `person.biography` column.

@@ -286,6 +286,23 @@ Next:
 - Hermes QA for form readability and biography workflow.
 - Decide next parity stage: PDF export, summary table parity, or remaining legacy form details.
 
+## Stage 3J
+
+Status: done/current.
+
+Scope:
+
+- Legacy summary tab now has guide-level filters for country, category, subcategory, name, and extra/link level.
+- Summary tab can include standalone marks when `include_marks=true`.
+- Added compact green matrix-style summary rows with totals, stock counts, purchase/current prices, and last purchase date.
+- Added read-only `/summary.csv` export using the same filters and UTF-8 BOM for Excel compatibility.
+- PDF export remains a disabled placeholder for a later dedicated PDF stage.
+
+Next:
+
+- Hermes QA for summary filters and CSV export.
+- Next parity candidate: PDF export for summary/person booklet.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

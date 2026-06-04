@@ -91,7 +91,7 @@ The primary interface is:
 - `/legacy?tab=rewards` - main rewards workspace
 - `/legacy?tab=search` - legacy-style search
 - `/legacy?tab=marks` - standalone marks workspace
-- `/legacy?tab=summary` - basic summary counts and price/stock totals
+- `/legacy?tab=summary` - filtered summary matrix with counts, stock, prices, and CSV export
 - `/legacy?tab=about` - preview status
 
 Supporting/technical routes remain available:
@@ -126,6 +126,25 @@ Examples:
 
 The search is read-only, supports lowercase Cyrillic matching, groups results by persons/rewards/marks, and limits each group to the first 25 UI results.
 
+Summary supports read-only filter parameters:
+
+- `country_id`
+- `category_id`
+- `subcategory_id`
+- `name_id`
+- `extra`
+- `include_marks=true`
+
+Examples:
+
+```text
+/legacy?tab=summary&include_marks=true
+/legacy?tab=summary&country_id=1
+/summary.csv?include_marks=true
+```
+
+The summary CSV export uses UTF-8 with BOM for Excel compatibility and does not include photos or personal comments.
+
 Start the backend on the Mac mini:
 
 ```sh
@@ -158,7 +177,7 @@ The legacy-style desktop mirror is available at:
 - `/legacy?tab=rewards` - old main rewards tab structure with person list, selected rewards, links, booklet placeholder, and photos.
 - `/legacy?tab=search` - grouped search in the legacy tab shell.
 - `/legacy?tab=marks` - standalone marks tab with selected mark detail.
-- `/legacy?tab=summary` - basic summary counts and price/stock totals.
+- `/legacy?tab=summary` - filtered green summary matrix with optional marks and CSV export.
 - `/legacy?tab=about` - preview status, mode, data directory, and commit.
 
 CRUD buttons inside `/legacy` are visible only in development write mode and reuse the existing guarded person, reward, and mark routes.

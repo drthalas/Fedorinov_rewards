@@ -2,12 +2,20 @@ from pathlib import Path
 import subprocess
 
 from fastapi import APIRouter, Request, Response
+from starlette.datastructures import URL
 
 from ..config import PROJECT_ROOT, get_settings
 from ..repositories.common import fetch_one, table_counts
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
 from ..repositories.persons import count_persons, get_person, list_person_rewards, list_persons
 from ..repositories.search import search_all
+from ..repositories.summary import (
+    normalized_summary_filters,
+    summary_csv_text,
+    summary_guide_options,
+    summary_rows,
+    summary_totals,
+)
 from .templates import templates
 
 
@@ -24,6 +32,23 @@ STATUS_MESSAGES = {
     "mark_created": "Знак добавлен.",
     "mark_deleted": "Знак удалён.",
 }
+
+
+def _summary_query_params(filters) -> dict[str, object]:
+    params: dict[str, object] = {}
+    if filters.country_id is not None:
+        params["country_id"] = filters.country_id
+    if filters.category_id is not None:
+        params["category_id"] = filters.category_id
+    if filters.subcategory_id is not None:
+        params["subcategory_id"] = filters.subcategory_id
+    if filters.name_id is not None:
+        params["name_id"] = filters.name_id
+    if filters.extra:
+        params["extra"] = filters.extra
+    if filters.include_marks:
+        params["include_marks"] = "true"
+    return params
 
 
 def _current_commit() -> str:
@@ -76,6 +101,12 @@ def legacy_index(
     mode: str = "contains",
     status: str = "",
     message: str = "",
+    country_id: int | None = None,
+    category_id: int | None = None,
+    subcategory_id: int | None = None,
+    name_id: int | None = None,
+    extra: str = "",
+    include_marks: bool = False,
 ):
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
@@ -102,6 +133,18 @@ def legacy_index(
         "mode": mode,
         "search_results": None,
         "summary": None,
+        "summary_filters": normalized_summary_filters(
+            country_id=country_id,
+            category_id=category_id,
+            subcategory_id=subcategory_id,
+            name_id=name_id,
+            extra=extra,
+            include_marks=include_marks,
+        ),
+        "summary_options": {"countries": [], "categories": [], "subcategories": [], "names": [], "extras": []},
+        "summary_rows": [],
+        "summary_totals": {"total": 0, "in_stock": 0, "not_in_stock": 0, "price_purchase_sum": 0, "price_now_sum": 0},
+        "summary_csv_url": "/summary.csv",
         "commit": _current_commit(),
     }
 
@@ -138,8 +181,41 @@ def legacy_index(
 
     if active_tab == "summary":
         context["summary"] = _legacy_summary(settings.rewards_db_path)
+        context["summary_options"] = summary_guide_options(settings.rewards_db_path)
+        rows = summary_rows(settings.rewards_db_path, context["summary_filters"])
+        context["summary_rows"] = rows
+        context["summary_totals"] = summary_totals(rows)
+        context["summary_csv_url"] = str(URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"])))
 
     return templates.TemplateResponse(request, "legacy.html", context)
+
+
+@router.get("/summary.csv")
+def summary_csv(
+    country_id: int | None = None,
+    category_id: int | None = None,
+    subcategory_id: int | None = None,
+    name_id: int | None = None,
+    extra: str = "",
+    include_marks: bool = False,
+):
+    settings = get_settings()
+    rows = []
+    if settings.db_exists:
+        filters = normalized_summary_filters(
+            country_id=country_id,
+            category_id=category_id,
+            subcategory_id=subcategory_id,
+            name_id=name_id,
+            extra=extra,
+            include_marks=include_marks,
+        )
+        rows = summary_rows(settings.rewards_db_path, filters)
+    return Response(
+        content=summary_csv_text(rows),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
+    )
 
 
 @router.head("/legacy")
