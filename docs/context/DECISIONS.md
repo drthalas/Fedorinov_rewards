@@ -60,6 +60,8 @@ Report text uses the public project name "Награды и награждённ
 
 The Telegram bot token, real chat ids, real launchd plist, `.env.daily-report`, and send logs remain local and are not committed. The first real send to Sergey requires separate confirmation before enabling primary delivery.
 
+Scheduled delivery must use `Europe/Moscow` explicitly. `launchd` uses the Mac mini local timezone, so it should only wake the script at a regular interval; `scripts/send_daily_report.py --scheduled` decides whether current Moscow time is inside the configured 09:00 send window and skips duplicates using the local send log.
+
 ## Person Biography Field
 
 The short biography is stored as a separate `person.biography` SQLite column instead of overloading the existing `person.comment` field.

@@ -12,6 +12,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true", help="Print report and recipients without sending.")
     parser.add_argument("--send-test", action="store_true", help="Send a test report to all configured recipients.")
     parser.add_argument("--send-test-to-copy-only", action="store_true", help="Send a test report only to copy recipients.")
+    parser.add_argument("--scheduled", action="store_true", help="Send only inside the configured report timezone window.")
     return parser.parse_args(_normalize_argv())
 
 
@@ -133,6 +135,92 @@ def mask_id(value: int) -> str:
     return text[:2] + "*" * (len(text) - 4) + text[-2:]
 
 
+def config_int(config: dict[str, str], key: str, default: int) -> int:
+    value = config.get(key, "").strip()
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise RuntimeError(f"{key} must be an integer") from exc
+
+
+def report_timezone(config: dict[str, str]) -> ZoneInfo:
+    name = config.get("REPORT_TIMEZONE", "Europe/Moscow").strip() or "Europe/Moscow"
+    try:
+        return ZoneInfo(name)
+    except ZoneInfoNotFoundError as exc:
+        raise RuntimeError(f"Invalid REPORT_TIMEZONE: {name}") from exc
+
+
+def scheduled_report_date(now: dt.datetime) -> dt.date:
+    return now.date() - dt.timedelta(days=1)
+
+
+def load_successful_sends(log_path: Path = LOG_PATH) -> set[tuple[str, int, str]]:
+    if not log_path.exists():
+        return set()
+    values: set[tuple[str, int, str]] = set()
+    for line in log_path.read_text(errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            item = json.loads(line)
+            status = str(item.get("status") or "")
+            if status != "sent":
+                continue
+            role = str(item.get("recipient_role") or "")
+            recipient_id = int(item.get("recipient_id"))
+            report_date = str(item.get("report_date") or "")
+        except (ValueError, TypeError, json.JSONDecodeError):
+            continue
+        values.add((role, recipient_id, report_date))
+    return values
+
+
+def scheduled_status(
+    config: dict[str, str],
+    report_date: dt.date,
+    primary_id: int,
+    copy_ids: list[int],
+    now: dt.datetime | None = None,
+    log_path: Path = LOG_PATH,
+) -> dict[str, object]:
+    tz = report_timezone(config)
+    current = (now or dt.datetime.now(dt.timezone.utc)).astimezone(tz)
+    send_hour = config_int(config, "REPORT_SEND_HOUR", 9)
+    send_minute = config_int(config, "REPORT_SEND_MINUTE", 0)
+    window_minutes = config_int(config, "REPORT_SEND_WINDOW_MINUTES", 15)
+    target = current.replace(hour=send_hour, minute=send_minute, second=0, microsecond=0)
+    delta_minutes = (current - target).total_seconds() / 60
+    inside_window = 0 <= delta_minutes < window_minutes
+    sent = load_successful_sends(log_path)
+    report_date_text = report_date.isoformat()
+    primary_sent = ("primary", primary_id, report_date_text) in sent
+    copy_sent_count = sum(1 for copy_id in copy_ids if ("copy", copy_id, report_date_text) in sent)
+    all_copy_sent = bool(copy_ids) and copy_sent_count == len(copy_ids)
+    already_sent = primary_sent and all_copy_sent
+    if not inside_window:
+        reason = "outside_window"
+    elif already_sent:
+        reason = "already_sent"
+    else:
+        reason = "inside_window"
+    return {
+        "timezone": str(tz.key),
+        "now": current.isoformat(),
+        "target_time": f"{send_hour:02d}:{send_minute:02d}",
+        "window_minutes": window_minutes,
+        "inside_window": inside_window,
+        "already_sent": already_sent,
+        "primary_sent": primary_sent,
+        "copy_sent_count": copy_sent_count,
+        "copy_total": len(copy_ids),
+        "would_send": inside_window and not already_sent,
+        "reason": reason,
+    }
+
+
 def send_message(token: str, chat_id: int, text: str) -> str:
     payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text, "disable_web_page_preview": "true"}).encode()
     request = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=payload, method="POST")
@@ -167,13 +255,41 @@ def build_report(report_date: dt.date) -> str:
     return generator.build_report(report_date)
 
 
+def print_scheduled_status(status: dict[str, object], report_date: dt.date) -> None:
+    print("SCHEDULED CHECK: no Telegram messages sent.")
+    print(f"report_date: {report_date.isoformat()}")
+    print(f"timezone: {status['timezone']}")
+    print(f"moscow_now: {status['now']}")
+    print(f"target_time: {status['target_time']} {status['timezone']}")
+    print(f"window_minutes: {status['window_minutes']}")
+    print(f"inside_window: {str(status['inside_window']).lower()}")
+    print(f"already_sent: {str(status['already_sent']).lower()}")
+    print(f"would_send: {str(status['would_send']).lower()}")
+    print(f"reason: {status['reason']}")
+
+
 def main() -> int:
     args = parse_args()
     generator = _load_generate_module()
-    report_date = dt.date.fromisoformat(args.report_date) if args.report_date else generator.default_report_date()
-    report_text = generator.build_report(report_date)
     config = merged_config()
     primary_id, copy_ids = resolve_recipients(config)
+    if args.scheduled and not args.report_date:
+        report_date = scheduled_report_date(dt.datetime.now(report_timezone(config)))
+    else:
+        report_date = dt.date.fromisoformat(args.report_date) if args.report_date else generator.default_report_date()
+    report_text = generator.build_report(report_date)
+
+    schedule: dict[str, object] | None = None
+    already_sent: set[tuple[str, int, str]] = set()
+    if args.scheduled:
+        schedule = scheduled_status(config, report_date, primary_id, copy_ids)
+        if args.dry_run:
+            print_scheduled_status(schedule, report_date)
+            return 0
+        if not schedule["would_send"]:
+            print_scheduled_status(schedule, report_date)
+            return 0
+        already_sent = load_successful_sends()
 
     if args.dry_run:
         print("DRY RUN: no Telegram messages sent.")
@@ -201,17 +317,24 @@ def main() -> int:
         raise RuntimeError("Primary Telegram send is not confirmed. Set REPORT_PRIMARY_SEND_CONFIRMED=true only after separate approval.")
 
     primary_error = ""
-    try:
-        send_message(token, primary_id, report_text)
-        append_log(report_date, "primary", primary_id, "sent_test" if args.send_test else "sent", report_text)
-    except Exception as exc:
-        primary_error = type(exc).__name__
-        append_log(report_date, "primary", primary_id, "failed", report_text, primary_error)
+    report_date_text = report_date.isoformat()
+    if args.scheduled and ("primary", primary_id, report_date_text) in already_sent:
+        print("primary already sent for this report date; skipping primary recipient")
+    else:
+        try:
+            send_message(token, primary_id, report_text)
+            append_log(report_date, "primary", primary_id, "sent_test" if args.send_test else "sent", report_text)
+        except Exception as exc:
+            primary_error = type(exc).__name__
+            append_log(report_date, "primary", primary_id, "failed", report_text, primary_error)
 
     copy_text = report_text
     if primary_error:
         copy_text = f"Не удалось отправить основной отчёт Сергею: {primary_error}\n\n{report_text}"
     for copy_id in copy_ids:
+        if args.scheduled and ("copy", copy_id, report_date_text) in already_sent:
+            print(f"copy recipient {mask_id(copy_id)} already sent for this report date; skipping")
+            continue
         try:
             send_message(token, copy_id, copy_text)
             append_log(report_date, "copy", copy_id, "sent_test" if args.send_test else "sent", report_text)

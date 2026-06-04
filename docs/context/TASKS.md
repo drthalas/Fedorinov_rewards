@@ -374,6 +374,23 @@ Next:
 - Owner QA on Windows with a newer test release.
 - Improve rollback reporting and optional restart helper after Windows QA.
 
+## Daily Telegram Report Timezone Scheduling
+
+Status: done/current.
+
+Scope:
+
+- Diagnosed that the previous launchd schedule used the Mac mini local timezone instead of Moscow time.
+- Added `--scheduled` mode with explicit `REPORT_TIMEZONE=Europe/Moscow`.
+- Added `REPORT_SEND_HOUR`, `REPORT_SEND_MINUTE`, and `REPORT_SEND_WINDOW_MINUTES`.
+- Added duplicate protection so frequent launchd wakeups do not resend the same daily report.
+- Updated the launchd template to run every 15 minutes and let the script decide whether it is inside the Moscow 09:00 window.
+
+Next:
+
+- Observe the next scheduled run at 09:00 Europe/Moscow.
+- Keep real send logs local and ignored.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

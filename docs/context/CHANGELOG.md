@@ -1,5 +1,14 @@
 # Changelog
 
+## Daily Telegram Report Timezone Scheduling Fix
+
+- Changed scheduled daily Telegram reports to use `Europe/Moscow` explicitly instead of the Mac mini local timezone.
+- Added `--scheduled` mode to send only inside the configured Moscow 09:00 window.
+- Added dedupe checks against `logs/daily_reports.jsonl` so hourly/interval launchd wakeups do not send duplicates.
+- Updated the launchd template to run every 15 minutes and let the script decide whether it is time to send.
+- Added scheduled dry-run diagnostics that report Moscow time, target time, window status, and whether a send would happen.
+- No Telegram messages are sent by the scheduled dry-run.
+
 ## Stage 4B One-Click Update Installer
 
 - Added safe updater service for public GitHub Release ZIP installation.

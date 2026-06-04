@@ -12,15 +12,13 @@
   <array>
     <string>/usr/bin/python3</string>
     <string>scripts/send_daily_report.py</string>
+    <string>--scheduled</string>
   </array>
 
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Hour</key>
-    <integer>9</integer>
-    <key>Minute</key>
-    <integer>0</integer>
-  </dict>
+  <!-- launchd uses the Mac local timezone. Run often and let the script
+       send only inside REPORT_TIMEZONE/REPORT_SEND_HOUR. -->
+  <key>StartInterval</key>
+  <integer>900</integer>
 
   <key>StandardOutPath</key>
   <string>/Users/hermes/Projects/Fedorinov_Rewards/Fedorinov_rewards/logs/daily-report.out.log</string>

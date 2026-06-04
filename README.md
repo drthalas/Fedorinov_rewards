@@ -368,7 +368,7 @@ Send a confirmed test only to the copy recipient:
 python3 scripts/send_daily_report.py --send-test-to-copy-only
 ```
 
-Local configuration is kept in ignored `.env.daily-report`. The sender can read the existing colorizer bot token from `~/Projects/picture-colorizer/.env` without printing it. The launchd template for 09:00 daily delivery is:
+Local configuration is kept in ignored `.env.daily-report`. The sender can read the existing colorizer bot token from `~/Projects/picture-colorizer/.env` without printing it. Scheduled delivery is timezone-aware and defaults to `REPORT_TIMEZONE=Europe/Moscow`, `REPORT_SEND_HOUR=9`, and a 15-minute send window. The launchd template wakes the script every 15 minutes and the script sends only inside the Moscow 09:00 window:
 
 ```text
 deploy/launchd/com.fedorinov.daily-report.plist.example

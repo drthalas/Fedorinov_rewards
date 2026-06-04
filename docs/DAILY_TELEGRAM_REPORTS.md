@@ -2,7 +2,7 @@
 
 The project can send a daily Russian progress report for the project named "Награды и награждённые".
 
-The report is intended to arrive every day at 09:00:
+The report is intended to arrive every day at 09:00 Europe/Moscow:
 
 - Sergey receives the main report.
 - Alexander receives a copy for quality control.
@@ -44,12 +44,28 @@ Before the first real daily send to Sergey, set this only after separate confirm
 REPORT_PRIMARY_SEND_CONFIRMED=true
 ```
 
+Scheduled delivery is timezone-aware. The Mac mini can stay in any local
+timezone; the script checks Moscow time before sending:
+
+```text
+REPORT_TIMEZONE=Europe/Moscow
+REPORT_SEND_HOUR=9
+REPORT_SEND_MINUTE=0
+REPORT_SEND_WINDOW_MINUTES=15
+```
+
 ## Dry Run
 
 Preview the report without sending Telegram messages:
 
 ```sh
 python3 scripts/send_daily_report.py --dry-run
+```
+
+Preview the scheduled gate without sending Telegram messages:
+
+```sh
+python3 scripts/send_daily_report.py --scheduled --dry-run
 ```
 
 Generate a report for a specific date:
@@ -85,7 +101,7 @@ launchctl load ~/Library/LaunchAgents/com.fedorinov.daily-report.plist
 The template runs:
 
 ```sh
-python3 scripts/send_daily_report.py
+python3 scripts/send_daily_report.py --scheduled
 ```
 
 from:
@@ -94,7 +110,9 @@ from:
 ~/Projects/Fedorinov_Rewards/Fedorinov_rewards
 ```
 
-at 09:00 every day.
+every 15 minutes. The script sends only when the current time in
+`REPORT_TIMEZONE` is inside the configured 09:00 window and the report has not
+already been sent for that report date.
 
 ## Disable launchd
 
