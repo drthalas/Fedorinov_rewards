@@ -1,5 +1,16 @@
 # Changelog
 
+## Stage 3H Guides CRUD
+
+- Added guarded add/edit/delete support for the rank/specialty guide used by person cards.
+- Added guarded add/edit/delete support for award/mark tree levels `guide_lev_0` through `guide_lev_4`.
+- Kept all guide writes behind `WRITE_MODE=true` and the existing backup-first guard.
+- Blocked rank deletion when the rank is used by person records.
+- Blocked tree node deletion when a node has children or is referenced by rewards/marks.
+- Updated `/guides` with write-mode-only toolbar actions, edit/delete forms, and safe return navigation.
+- Added guide links from person, reward, mark, and legacy forms back to `/guides`.
+- Added unit tests for guide writes, protected deletes, write-mode blocking, and return URL safety.
+
 ## Daily Telegram Reports
 
 - Added a safe daily Telegram report generator for the project name `Награды и награждённые`.

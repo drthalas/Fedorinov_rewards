@@ -44,8 +44,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Rank guide CRUD | Form5 | Read-only `/guides` section | Person rank references can become invalid | Future Guides CRUD | yes | yes |
-| Reward tree guide CRUD | Form6 | Read-only collapsible tree | Rewards/marks references and `id_link` backfill can change | Future Guides CRUD | yes | yes |
+| Rank guide CRUD | Form5 | Implemented in web dev write mode on `/guides`; delete is blocked while person cards use the value | Person rank references can become invalid if protection is bypassed | Stage 3H | yes | yes |
+| Reward tree guide CRUD | Form6 | Implemented in web dev write mode for `guide_lev_0` through `guide_lev_4`; delete is blocked for nodes with children or reward/mark references | Rewards/marks references and `id_link` backfill can change | Stage 3H | yes | yes |
 
 ## Photos
 

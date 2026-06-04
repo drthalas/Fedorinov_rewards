@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность #{{ rank.id }}{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность #{{ rank.id }}{% endif %}</h1>
+<p><a href="{{ return_to or '/guides' }}">← Вернуться</a></p>
+{% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
+<form class="edit-form" method="post" action="{% if mode == 'create' %}/guides/ranks/new{% else %}/guides/ranks/{{ rank.id }}/edit{% endif %}">
+  <input type="hidden" name="return_to" value="{{ return_to or '' }}">
+  <label>
+    <span>Название</span>
+    <input name="name" value="{{ rank.name or '' }}" required>
+  </label>
+  <div class="actions">
+    <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
+    <a href="{{ return_to or '/guides' }}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

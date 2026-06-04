@@ -16,7 +16,7 @@
         <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
         <div class="legacy-toolbar">
           {% set rewards_tab_return = "/legacy?tab=rewards" %}
-          <a class="tool-button" href="/guides" title="Справочник">📚 Справочник</a>
+          <a class="tool-button" href="/guides?return_to={{ rewards_tab_return|urlencode }}" title="Справочник">📚 Справочник</a>
           {% if settings.write_mode %}
             <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
             {% if selected_person %}

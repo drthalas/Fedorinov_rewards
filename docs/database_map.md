@@ -45,6 +45,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `name`.
 - Media path fields: None.
 - Relationships: `person.id_rank` references `guide.id`.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked while any `person.id_rank` references the value.
 - Potentially personal fields: None expected, but labels should still be treated as local collection metadata.
 - Safe Stage 2 fields: `id`, `name`.
 - Protected block: None expected.
@@ -55,6 +56,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `idl`, `name`.
 - Media path fields: None.
 - Relationships: Parent root uses `idl = -1`; `guide_lev_1.idl` points to this table.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked while child level-1 records exist or rewards/marks reference `id_gos`.
 - Potentially personal fields: None expected.
 - Safe Stage 2 fields: `id`, `name`, child count.
 - Protected block: None expected.
@@ -65,6 +67,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `idl`, `name`.
 - Media path fields: None.
 - Relationships: `idl` references `guide_lev_0.id`; `guide_lev_2.idl` points to this table.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked while child level-2 records exist or rewards/marks reference `id_catigory`.
 - Potentially personal fields: None expected.
 - Safe Stage 2 fields: `id`, `name`, parent id, child count.
 - Protected block: None expected.
@@ -75,6 +78,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `idl`, `name`.
 - Media path fields: None.
 - Relationships: `idl` references `guide_lev_1.id`; `guide_lev_3.idl` points to this table.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked while child level-3 records exist or rewards/marks reference `id_sub_catigory`.
 - Potentially personal fields: None expected.
 - Safe Stage 2 fields: `id`, `name`, parent id, child count.
 - Protected block: None expected.
@@ -85,6 +89,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `idl`, `name`.
 - Media path fields: None.
 - Relationships: `idl` references `guide_lev_2.id`; `rewards.id_name` and `mark.id_name` point to this table; `guide_lev_4.idl` points to this table.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked while child level-4 records exist or rewards/marks reference `id_name`.
 - Potentially personal fields: None expected.
 - Safe Stage 2 fields: `id`, `name`, parent id, reward count, mark count.
 - Protected block: None expected.
@@ -95,6 +100,7 @@ This map is based on read-only schema inspection and legacy code review. It does
 - Key fields: `id`, `idl`, `name`.
 - Media path fields: None.
 - Relationships: `idl` references `guide_lev_3.id`; legacy Form6 aggregates these values into `rewards.id_link` and `mark.id_link`.
+- Stage 3H write behavior: add/edit/delete is available only in guarded write mode; delete is blocked when the link/source text is still present in reward or mark `id_link` values.
 - Potentially personal fields: Link/source text can expose collection research sources.
 - Safe Stage 2 fields: Presence/count of links.
 - Protected block: Full link/source values until link display rules are decided.

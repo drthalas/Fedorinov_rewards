@@ -22,7 +22,7 @@
     <input name="birthday" value="{{ person.birthday or '' }}" placeholder="YYYY-MM-DD">
   </label>
   <label>
-    <span>Звание/специальность</span>
+    <span>Звание/специальность · <a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник</a></span>
     <select name="id_rank">
       <option value="">—</option>
       {% for rank in ranks %}

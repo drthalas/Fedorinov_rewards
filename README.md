@@ -105,7 +105,7 @@ Supporting/technical routes remain available:
 - `/marks` - standalone marks list
 - `/marks?page=1&page_size=25` - standalone marks list with basic pagination
 - `/marks/{id}` - mark card
-- `/guides` - read-only guide tree
+- `/guides` - guide tree and write-mode guide maintenance
 - `/search` - simple search by name/title/number
 - `/health` - environment diagnostics
 
@@ -189,6 +189,8 @@ Current development write-mode CRUD:
 - Person create/edit/delete.
 - Reward create/edit/delete for rewards attached to a person.
 - Mark create/edit/delete for standalone marks.
+- Rank/specialty guide create/edit/delete on `/guides`.
+- Award/mark tree guide create/edit/delete on `/guides` for `guide_lev_0` through `guide_lev_4`.
 - Click any displayed photo to open the large photo viewer.
 - Photo clicks open an inline modal/lightbox without leaving the current page.
 - `/persons/{id}/photos` includes a gallery and previous/next slideshow.
@@ -197,6 +199,8 @@ Current development write-mode CRUD:
 - Browser clipboard paste is prepared as a disabled control and documented for a later Clipboard API implementation.
 
 Photo upload/clear remains guarded by the same backup-first rule as CRUD. Keep owner preview read-only unless testing on a backed-up copied data folder.
+
+Guide deletes are protected: ranks used by person cards cannot be deleted, and tree nodes cannot be deleted while they have child nodes or are referenced by rewards/marks. Person, reward, and mark forms include links back to the guide page so new guide values can be managed before returning to the edit flow.
 
 Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.
 

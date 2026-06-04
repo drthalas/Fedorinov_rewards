@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}Изменить элемент справочника #{{ item.id }}{% endif %}{% endblock %}
+{% block content %}
+<h1>{% if mode == "create" %}Добавить: {{ level_label }}{% else %}Изменить: {{ level_label }} #{{ item.id }}{% endif %}</h1>
+<p><a href="{{ return_to or '/guides' }}">← Вернуться</a></p>
+{% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
+<form class="edit-form" method="post" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
+  <input type="hidden" name="return_to" value="{{ return_to or '' }}">
+  {% if level > 0 %}
+  <label>
+    <span>Родительский элемент</span>
+    <select name="parent_id" required>
+      <option value="">—</option>
+      {% for parent in parent_options %}
+      <option value="{{ parent.id }}" {% if parent.id|string == item.idl|string or parent.id|string == item.parent_id|string %}selected{% endif %}>#{{ parent.id }} · {{ parent.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <label>
+    <span>Название</span>
+    <input name="name" value="{{ item.name or '' }}" required>
+  </label>
+  <div class="actions">
+    <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
+    <a href="{{ return_to or '/guides' }}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

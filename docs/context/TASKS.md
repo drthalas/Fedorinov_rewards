@@ -248,13 +248,31 @@ Next:
 - Confirm the first real send policy before enabling daily primary sends.
 - Optional one-time test send to Alexander only after explicit confirmation.
 
+## Stage 3H
+
+Status: done/current.
+
+Scope:
+
+- Guide CRUD for ranks/specialties in `guide`.
+- Guide CRUD for the award/mark tree levels `guide_lev_0` through `guide_lev_4`.
+- Write-mode and backup-first guard before every guide write.
+- Delete protections for rank values used by person cards.
+- Delete protections for tree nodes with children or references from rewards/marks.
+- Supporting `/guides` page now provides legacy-style add/edit/delete actions in write mode.
+- Person, reward, and mark forms link back to the relevant guide page with safe return navigation.
+
+Next:
+
+- Hermes QA for guide editing and protected delete behavior.
+- Decide next parity stage: biography/form field parity, PDF export, or remaining summary table parity.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.
 - Implement Settings -> Data Source screen.
 - Implement local config storage for selected data directory.
 - Add validation report for connected database and media folders.
-- Implement Guides CRUD with backup/write-mode gates.
 - Implement full Clipboard API photo paste.
 - Implement physical photo delete only after restore workflow is mature.
 - Implement PDF export parity.

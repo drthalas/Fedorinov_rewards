@@ -10,6 +10,7 @@
 
 <form class="edit-form" method="post" action="{% if mode == 'create' %}/marks/new{% else %}/marks/{{ mark.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
+  <p class="secondary"><a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник наград</a></p>
   <label>
     <span>Государство</span>
     <select name="id_gos">

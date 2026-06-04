@@ -618,6 +618,29 @@ th {
   margin-left: 6px;
 }
 
+.guide-list {
+  padding-left: 20px;
+}
+
+.guide-list li {
+  margin: 7px 0;
+}
+
+.tree-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: 8px;
+  color: #667085;
+  font-size: 12px;
+}
+
+.tree-actions form {
+  display: inline;
+  margin: 0;
+}
+
 .legacy-body {
   min-height: 100vh;
   background: #e9edf2;
