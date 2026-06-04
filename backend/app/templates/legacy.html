@@ -464,13 +464,44 @@
     <section class="legacy-tab-panel">
       <h1>О программе</h1>
       <dl class="details">
-        <dt>Название</dt><dd>Fedorinov Rewards Web Preview</dd>
+        <dt>Название</dt><dd>{{ app_name }}</dd>
+        <dt>Текущая версия</dt><dd>{{ app_version }}</dd>
         <dt>Режим</dt><dd>{% if settings.write_mode %}Рабочий режим{% else %}Режим просмотра{% endif %}</dd>
-        <dt>Data dir</dt><dd>{{ settings.rewards_data_dir }}</dd>
+        <dt>Папка данных</dt><dd>{{ settings.rewards_data_dir }}</dd>
         <dt>Commit</dt><dd>{{ commit }}</dd>
       </dl>
-      <div class="notice">Это preview web-зеркала старого Windows-приложения. Данные остаются локально, облако не используется.</div>
-      <div class="notice">PDF export, загрузка/замена фото и CRUD справочников пока отложены.</div>
+      <div class="notice">Это preview рабочей версии старого Windows-приложения. База и фотографии остаются локально на компьютере, облако не используется.</div>
+
+      <section class="legacy-block update-block">
+        <h2>Обновления</h2>
+        {% if not settings.update_check_enabled %}
+          <div class="notice">Проверка обновлений выключена.</div>
+        {% else %}
+          <p class="secondary">Проверка использует публичный GitHub Release. GitHub token не нужен, база и фотографии никуда не отправляются.</p>
+          <p><a class="button" href="/legacy?tab=about&check_updates=1">Проверить обновления</a></p>
+          {% if update_check %}
+            {% if update_check.error %}
+              <div class="notice notice-error">{{ update_check.error }}</div>
+            {% elif update_check.update_available %}
+              <div class="notice notice-success">Доступно обновление {{ update_check.latest_version }}.</div>
+              {% if update_check.released_at %}<p class="secondary">Дата релиза: {{ update_check.released_at }}</p>{% endif %}
+              {% if update_check.notes %}
+                <ul>
+                  {% for note in update_check.notes %}
+                    <li>{{ note }}</li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              <span class="button disabled-button">Обновить</span>
+              <p class="secondary">Установка обновления будет добавлена следующим этапом.</p>
+            {% else %}
+              <div class="notice notice-success">Установлена актуальная версия.</div>
+            {% endif %}
+          {% else %}
+            <div class="notice">Нажмите “Проверить обновления”, чтобы узнать, доступна ли новая версия.</div>
+          {% endif %}
+        {% endif %}
+      </section>
     </section>
   {% endif %}
 {% endblock %}

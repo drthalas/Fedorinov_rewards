@@ -288,7 +288,7 @@ Next:
 
 ## Stage 3J
 
-Status: done/current.
+Status: done.
 
 Scope:
 
@@ -303,6 +303,24 @@ Next:
 - Hermes QA for summary filters and CSV export.
 - Next parity candidate: PDF export for summary/person booklet.
 
+## Stage 4A
+
+Status: done/current.
+
+Scope:
+
+- Added a single application version source.
+- Added `/version` for current app name/version.
+- Added `/updates/check` to check a public GitHub Release manifest.
+- Added update status UI to `/legacy?tab=about`.
+- Added example `latest.json` manifest and Stage 4B update plan.
+- Kept update checking token-free and read-only: no ZIP download, no installation, no owner data access.
+
+Next:
+
+- Publish the first GitHub Release with Windows portable ZIP and `latest.json`.
+- Stage 4B: one-click updater with download, SHA256 validation, application backup, `.env` preservation, replacement, restart, and rollback.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.
@@ -312,4 +330,5 @@ Next:
 - Implement full Clipboard API photo paste.
 - Implement physical photo delete only after restore workflow is mature.
 - Implement PDF export parity.
+- Implement Stage 4B one-click updater.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

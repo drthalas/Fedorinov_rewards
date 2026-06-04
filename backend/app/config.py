@@ -18,6 +18,9 @@ class Settings(BaseModel):
     read_only: bool = True
     write_mode: bool = False
     require_backup_before_write: bool = True
+    update_check_enabled: bool = True
+    update_manifest_url: str = "https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json"
+    update_timeout_seconds: int = 10
 
     @property
     def data_dir_exists(self) -> bool:
@@ -61,6 +64,17 @@ def _env_path(name: str, default: Optional[str] = None) -> Path:
     return Path(os.path.expandvars(value)).expanduser()
 
 
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.getenv(name, default).strip().lower() in {"true", "1", "yes", "on"}
+
+
+def _env_int(name: str, default: str) -> int:
+    try:
+        return int(os.getenv(name, default))
+    except ValueError:
+        return int(default)
+
+
 def get_settings() -> Settings:
     data_dir = _env_path("REWARDS_DATA_DIR", "/Users/hermes/Desktop/Rewards")
     db_path = _env_path(
@@ -71,8 +85,14 @@ def get_settings() -> Settings:
         rewards_data_dir=data_dir,
         rewards_db_path=db_path,
         app_host=os.getenv("APP_HOST", "127.0.0.1"),
-        app_port=int(os.getenv("APP_PORT", "8080")),
-        read_only=os.getenv("READ_ONLY", "true").lower() == "true",
-        write_mode=os.getenv("WRITE_MODE", "false").lower() == "true",
-        require_backup_before_write=os.getenv("REQUIRE_BACKUP_BEFORE_WRITE", "true").lower() == "true",
+        app_port=_env_int("APP_PORT", "8080"),
+        read_only=_env_bool("READ_ONLY", "true"),
+        write_mode=_env_bool("WRITE_MODE", "false"),
+        require_backup_before_write=_env_bool("REQUIRE_BACKUP_BEFORE_WRITE", "true"),
+        update_check_enabled=_env_bool("UPDATE_CHECK_ENABLED", "true"),
+        update_manifest_url=os.getenv(
+            "UPDATE_MANIFEST_URL",
+            "https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json",
+        ).strip(),
+        update_timeout_seconds=_env_int("UPDATE_TIMEOUT_SECONDS", "10"),
     )

@@ -108,6 +108,8 @@ Supporting/technical routes remain available:
 - `/guides` - guide tree and write-mode guide maintenance
 - `/search` - simple search by name/title/number
 - `/health` - environment diagnostics
+- `/version` - current application name and version
+- `/updates/check` - public GitHub Release update check
 
 Search supports legacy-like query parameters:
 
@@ -231,6 +233,39 @@ WRITE_MODE=true REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Reward
 ```
 
 Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.
+
+## Update Checker
+
+The application version is defined in `backend/app/version.py`.
+
+Current version:
+
+```text
+0.1.0
+```
+
+Version routes:
+
+```text
+/version
+/updates/check
+```
+
+The update checker reads a public GitHub Release manifest:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
+```
+
+No GitHub token is required because releases are public. The checker does not upload or read owner data, photos, `database/`, `Source/`, or `SourceMark/`. Stage 4A only reports whether an update is available. Downloading and installing updates is deferred to Stage 4B.
+
+Relevant environment settings:
+
+```text
+UPDATE_CHECK_ENABLED=true
+UPDATE_MANIFEST_URL=https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
+UPDATE_TIMEOUT_SECONDS=10
+```
 
 ## Windows Portable Preview
 

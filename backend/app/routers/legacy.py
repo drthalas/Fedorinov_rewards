@@ -16,6 +16,8 @@ from ..repositories.summary import (
     summary_rows,
     summary_totals,
 )
+from ..services.update_checker import check_for_updates
+from ..version import APP_NAME, APP_VERSION
 from .templates import templates
 
 
@@ -107,6 +109,7 @@ def legacy_index(
     name_id: str | None = None,
     extra: str = "",
     include_marks: str | None = None,
+    check_updates: str | None = None,
 ):
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
@@ -146,6 +149,10 @@ def legacy_index(
         "summary_totals": {"total": 0, "in_stock": 0, "not_in_stock": 0, "price_purchase_sum": 0, "price_now_sum": 0},
         "summary_csv_url": "/summary.csv",
         "commit": _current_commit(),
+        "app_name": APP_NAME,
+        "app_version": APP_VERSION,
+        "check_updates": str(check_updates or "").strip().lower() in {"1", "true", "yes", "on"},
+        "update_check": None,
     }
 
     if not settings.db_exists:
@@ -186,6 +193,9 @@ def legacy_index(
         context["summary_rows"] = rows
         context["summary_totals"] = summary_totals(rows)
         context["summary_csv_url"] = str(URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"])))
+
+    if active_tab == "about" and context["check_updates"]:
+        context["update_check"] = check_for_updates(settings)
 
     return templates.TemplateResponse(request, "legacy.html", context)
 

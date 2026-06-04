@@ -1,0 +1,11 @@
+{
+  "version": "0.1.1",
+  "released_at": "2026-06-04",
+  "download_url": "https://github.com/drthalas/Fedorinov_rewards/releases/download/v0.1.1/FedorinovRewards_WebPreview_v0.1.zip",
+  "sha256": "CHANGE_ME",
+  "notes": [
+    "Сделали основной интерфейс похожим на старую программу",
+    "Исправили просмотр фотографий",
+    "Добавили поиск и сводную таблицу"
+  ]
+}

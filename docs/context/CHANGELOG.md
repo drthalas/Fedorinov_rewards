@@ -1,5 +1,14 @@
 # Changelog
 
+## Stage 4A Public GitHub Update Checker
+
+- Added a single application version source and `/version`.
+- Added token-free `/updates/check` using the public GitHub Release `latest.json` manifest.
+- Added update status UI to `/legacy?tab=about` with a disabled Stage 4B install placeholder.
+- Added example update manifest and a Stage 4B one-click updater plan.
+- Updated Windows/help documentation to explain that update checks do not upload database, photos, or owner data.
+- Kept Stage 4A check-only: no ZIP download and no installation.
+
 ## Stage 3J Summary Table and CSV Export
 
 - Reworked `/legacy?tab=summary` from basic counts into a filterable summary matrix.

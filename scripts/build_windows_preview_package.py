@@ -53,6 +53,8 @@ FILES_TO_COPY = [
     Path("README.md"),
     Path("docs") / "WINDOWS_PREVIEW_RUNBOOK.md",
     Path("docs") / "WINDOWS_OWNER_CHECKLIST.md",
+    Path("docs") / "UPDATE_SYSTEM_PLAN.md",
+    Path("docs") / "update_manifest.example.json",
     Path("start_windows.bat"),
     Path("start_windows.ps1"),
     Path(".env.windows.example"),

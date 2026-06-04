@@ -67,3 +67,17 @@ The short biography is stored as a separate `person.biography` SQLite column ins
 The column is added by an idempotent migration script. The migration supports dry-run, requires explicit apply, and is guarded by the existing `WRITE_MODE=true` plus backup-first policy.
 
 Application reads tolerate databases that do not yet have the column, but saving biography text requires the migration to have been applied.
+
+## Public GitHub Release Update Checks
+
+Application updates are checked through a public GitHub Release manifest at:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
+```
+
+No GitHub token is needed or stored on the owner's computer. The update checker only reads public version metadata and does not download or install ZIP files in Stage 4A.
+
+The manifest must include version, public download URL, SHA256, release date, and user-facing notes. Owner data remains separate from application code and must not be touched by update checks or future update installation.
+
+One-click installation is deferred to Stage 4B and must preserve `.env`, avoid database/media folders, validate SHA256, create an application backup, and support rollback.
