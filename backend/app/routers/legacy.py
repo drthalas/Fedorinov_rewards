@@ -101,12 +101,12 @@ def legacy_index(
     mode: str = "contains",
     status: str = "",
     message: str = "",
-    country_id: int | None = None,
-    category_id: int | None = None,
-    subcategory_id: int | None = None,
-    name_id: int | None = None,
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
     extra: str = "",
-    include_marks: bool = False,
+    include_marks: str | None = None,
 ):
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
@@ -192,12 +192,12 @@ def legacy_index(
 
 @router.get("/summary.csv")
 def summary_csv(
-    country_id: int | None = None,
-    category_id: int | None = None,
-    subcategory_id: int | None = None,
-    name_id: int | None = None,
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
     extra: str = "",
-    include_marks: bool = False,
+    include_marks: str | None = None,
 ):
     settings = get_settings()
     rows = []
@@ -213,6 +213,30 @@ def summary_csv(
         rows = summary_rows(settings.rewards_db_path, filters)
     return Response(
         content=summary_csv_text(rows),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
+    )
+
+
+@router.head("/summary.csv")
+def summary_csv_head(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    return Response(
+        status_code=200,
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
     )

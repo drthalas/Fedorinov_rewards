@@ -44,27 +44,38 @@ def summary_guide_options(db_path: Path) -> dict[str, list[dict[str, object]]]:
     }
 
 
-def _int_filter(value: int | None) -> int | None:
-    if value is None or value <= 0:
+def parse_optional_int(value: object) -> int | None:
+    text = str(value or "").strip()
+    if not text:
         return None
-    return value
+    try:
+        parsed = int(text)
+    except (TypeError, ValueError):
+        return None
+    if parsed <= 0:
+        return None
+    return parsed
+
+
+def parse_bool_flag(value: object) -> bool:
+    return str(value or "").strip().lower() in {"true", "on", "1", "yes"}
 
 
 def normalized_summary_filters(
-    country_id: int | None = None,
-    category_id: int | None = None,
-    subcategory_id: int | None = None,
-    name_id: int | None = None,
+    country_id: object = None,
+    category_id: object = None,
+    subcategory_id: object = None,
+    name_id: object = None,
     extra: str = "",
-    include_marks: bool = False,
+    include_marks: object = False,
 ) -> SummaryFilters:
     return SummaryFilters(
-        country_id=_int_filter(country_id),
-        category_id=_int_filter(category_id),
-        subcategory_id=_int_filter(subcategory_id),
-        name_id=_int_filter(name_id),
+        country_id=parse_optional_int(country_id),
+        category_id=parse_optional_int(category_id),
+        subcategory_id=parse_optional_int(subcategory_id),
+        name_id=parse_optional_int(name_id),
         extra=str(extra or "").strip(),
-        include_marks=include_marks,
+        include_marks=parse_bool_flag(include_marks),
     )
 
 

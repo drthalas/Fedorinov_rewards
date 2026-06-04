@@ -5,7 +5,7 @@ import sqlite3
 import unittest
 
 from backend.app.main import app
-from backend.app.repositories.summary import normalized_summary_filters, summary_csv_text, summary_rows
+from backend.app.repositories.summary import parse_optional_int, normalized_summary_filters, summary_csv_text, summary_rows
 from backend.app.routers.legacy import summary_csv
 
 
@@ -29,7 +29,8 @@ class SummaryTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _create_db(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        connection = sqlite3.connect(self.db_path)
+        try:
             for level in range(5):
                 connection.execute(f"create table guide_lev_{level} (id integer primary key, idl integer, name text)")
             connection.execute(
@@ -87,15 +88,32 @@ class SummaryTests(unittest.TestCase):
                 values (20, 1, 1, 1, 1, 'extra-link', 1, '2024-03-01', 500, 600)
                 """
             )
+            connection.commit()
+        finally:
+            connection.close()
 
     def test_empty_filters_do_not_crash(self) -> None:
         rows = summary_rows(self.db_path, normalized_summary_filters())
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["total"], 2)
 
+    def test_parse_optional_int_handles_empty_none_and_value(self) -> None:
+        self.assertIsNone(parse_optional_int(""))
+        self.assertIsNone(parse_optional_int(None))
+        self.assertEqual(parse_optional_int("1"), 1)
+
+    def test_empty_string_filters_normalize_to_all(self) -> None:
+        filters = normalized_summary_filters(country_id="", category_id="", subcategory_id="", name_id="", extra="")
+        self.assertIsNone(filters.country_id)
+        self.assertIsNone(filters.category_id)
+        self.assertIsNone(filters.subcategory_id)
+        self.assertIsNone(filters.name_id)
+        rows = summary_rows(self.db_path, filters)
+        self.assertEqual(rows[0]["total"], 2)
+
     def test_include_marks_changes_result(self) -> None:
         rewards_only = summary_rows(self.db_path, normalized_summary_filters())
-        with_marks = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))
+        with_marks = summary_rows(self.db_path, normalized_summary_filters(include_marks="true"))
         self.assertEqual(rewards_only[0]["total"], 2)
         self.assertEqual(with_marks[0]["total"], 3)
 
@@ -114,7 +132,7 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Орден Тестовый", text)
 
     def test_summary_csv_route_returns_csv_response(self) -> None:
-        response = summary_csv(include_marks=True)
+        response = summary_csv(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/csv", response.media_type)
         self.assertIn("Орден Тестовый", response.body.decode("utf-8"))
@@ -126,8 +144,12 @@ class SummaryTests(unittest.TestCase):
         csv_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/summary.csv" and "GET" in getattr(route, "methods", set())
         ]
+        csv_head_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary.csv" and "HEAD" in getattr(route, "methods", set())
+        ]
         self.assertTrue(legacy_routes)
         self.assertTrue(csv_routes)
+        self.assertTrue(csv_head_routes)
 
     def test_summary_repository_uses_parameter_placeholders(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "backend" / "app" / "repositories" / "summary.py").read_text()
