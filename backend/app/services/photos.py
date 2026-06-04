@@ -32,8 +32,8 @@ PERSON_PHOTO_FIELDS = (
     PhotoField("rewards_foto", "Общее фото наград", "FotoAllMedal"),
     PhotoField("book1_foto", "Фото наградной книжки, сторона 1", "FotoBook1"),
     PhotoField("book2_foto", "Фото наградной книжки, сторона 2", "FotoBook2"),
-    PhotoField("card1_foto", "Фото учётной карточки, сторона 1", "FotoCard1"),
-    PhotoField("card2_foto", "Фото учётной карточки, сторона 2", "FotoCard2"),
+    PhotoField("card1_foto", "Фото учётной карточки, страница 1", "FotoCard1"),
+    PhotoField("card2_foto", "Фото учётной карточки, страница 2", "FotoCard2"),
 )
 REWARD_PHOTO_FIELDS = (
     PhotoField("front_foto", "Фото награды: аверс", "FotoFront"),

@@ -24,6 +24,10 @@
     </dl>
   </div>
   <div class="panel">
+    <h2>Краткая биография</h2>
+    <div class="text-block">{{ person.biography|dash }}</div>
+  </div>
+  <div class="panel">
     <h2>Главное фото</h2>
     {% if has_media_path(person.main_foto) %}
     <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}">
@@ -43,8 +47,8 @@
     ("Общее фото наград", person.rewards_foto),
     ("Фото наградной книжки, сторона 1", person.book1_foto),
     ("Фото наградной книжки, сторона 2", person.book2_foto),
-    ("Фото учётной карточки, сторона 1", person.card1_foto),
-    ("Фото учётной карточки, сторона 2", person.card2_foto)
+    ("Фото учётной карточки, страница 1", person.card1_foto),
+    ("Фото учётной карточки, страница 2", person.card2_foto)
   ] %}
   <div class="card {{ 'placeholder-card' if not has_media_path(path) else '' }}">
     {% if has_media_path(path) %}

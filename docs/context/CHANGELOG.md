@@ -1,5 +1,16 @@
 # Changelog
 
+## Stage 3I Form Parity and Biography
+
+- Added an idempotent migration script for a separate `person.biography` column.
+- Updated person create/edit to group main data, links, short biography, comments, and photo controls.
+- Renamed `link1` and `link2` in the UI to the owner-facing labels for `Память народа` and `Форум коллекционеров`.
+- Updated reward and mark forms to group guide fields, purchase fields, and photo controls more like the old Windows dialogs.
+- Updated person detail and the legacy rewards tab to show `Краткая биография`.
+- Updated account-card photo labels to `Фото учётной карточки, страница 1/2`.
+- Kept photo upload/clear controls behind `WRITE_MODE=true` and the existing backup-first guard.
+- Added tests for the biography migration, biography persistence, form labels, and photo controls.
+
 ## Stage 3H Guides CRUD
 
 - Added guarded add/edit/delete support for the rank/specialty guide used by person cards.

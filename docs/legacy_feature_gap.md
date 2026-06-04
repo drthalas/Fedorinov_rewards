@@ -7,9 +7,10 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Add person | Form1, Form2 | Implemented in web dev write mode | Creates `person` row and media folder expectations | Stage 3B | yes | yes |
-| Edit person | Form2 | Implemented in web dev write mode | Changes personal fields, links, comments, rank, dates | Stage 3B | yes | yes |
+| Edit person | Form2 | Implemented in web dev write mode; form labels and short biography added in Stage 3I | Changes personal fields, links, comments, biography, rank, dates | Stage 3B plus Stage 3I | yes | yes |
 | Delete person | Form1, Form2 | Implemented in web dev write mode; blocks delete while rewards exist | May orphan rewards/media if parity is expanded later | Stage 3B | yes | yes |
 | Person photos | Form2, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; viewer/slideshow implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
+| Short biography | Form2 / owner request | Implemented as `person.biography` with guarded idempotent migration and display in person/legacy cards | Adds schema column and personal text field | Stage 3I | yes for migration/write | yes for migration/write |
 
 ## Legacy Desktop Layout
 
@@ -26,8 +27,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add reward | Form2, Form3 | Implemented in web dev write mode | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C | yes | yes |
-| Edit reward | Form2, Form3 | Implemented in web dev write mode | Updates classification, price, stock, links, dates | Stage 3C | yes | yes |
+| Add reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C plus Stage 3I | yes | yes |
+| Edit reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3C plus Stage 3I | yes | yes |
 | Delete reward | Form2 | Implemented in web dev write mode | Deletes DB row only; media folders/files are preserved | Stage 3C | yes | yes |
 | Reward photos | Form3, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; large viewer implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
 
@@ -35,8 +36,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add mark | Form1, Form3 | Implemented in web dev write mode | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D | yes | yes |
-| Edit mark | Form3 | Implemented in web dev write mode | Updates classification, price, stock, links, dates | Stage 3D | yes | yes |
+| Add mark | Form1, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D plus Stage 3I | yes | yes |
+| Edit mark | Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3D plus Stage 3I | yes | yes |
 | Delete mark | Form1, Form3 | Implemented in web dev write mode | Deletes DB row only; SourceMark folders/files are preserved | Stage 3D | yes | yes |
 | Mark photos | Form3, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; large viewer implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
 

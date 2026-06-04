@@ -10,7 +10,7 @@ This inventory is based on read-only review of `Form1.cs`, `Form1.Designer.cs`, 
 - lower blocks: person reward totals `dataGridView2`, links/comment grid `dataGridView4`, selected person's main photo `pictureBox1`.
 - buttons/actions: create person via `Form2("add")`, edit person via `Form2("edit")`, delete person and related rewards/media, open guide tree via `Form6`, generate person booklet via `CreatePDF`, create ZIP of person media, open all photos via `Form4`.
 - current web equivalent: `/legacy?tab=rewards`, `/persons`, `/persons/{id}`, `/persons/{id}/photos`, `/persons/new`, `/persons/{id}/edit`, `/persons/{id}/delete`, `/persons/{id}/rewards/new`, `/rewards/{id}`, `/rewards/{id}/edit`, `/rewards/{id}/delete`, `/guides`.
-- missing: true desktop modal behavior, media folder open/zip export, person PDF booklet, inline image viewer/lightbox parity.
+- missing: true desktop modal behavior, media folder open/zip export, person PDF booklet.
 - write/unsafe actions: add/edit/delete person, add/edit/delete reward, media folder deletion/copy, PDF/ZIP file generation.
 - safe links/buttons now: guide link, existing CRUD forms when `WRITE_MODE=true`, disabled CRUD controls when read-only, booklet button as disabled/deferred link.
 
@@ -56,11 +56,11 @@ This inventory is based on read-only review of `Form1.cs`, `Form1.Designer.cs`, 
 
 ## Add/edit forms
 
-- `Form2`: person add/edit form with rank guide, birthday, links, comment, person photos, reward grid, reward add/edit/delete, all-photo view, folder open.
+- `Form2`: person add/edit form with rank guide, birthday, links, short biography, comment, person photos, reward grid, reward add/edit/delete, all-photo view, folder open.
 - `Form3`: reward/mark add/edit form with guide cascade, number, stock, purchase date, purchase/current prices, link aggregation, photo add/delete controls.
-- `Form5`: rank guide CRUD.
-- `Form6`: hierarchical guide tree CRUD and `id_link` backfill into rewards/marks.
+- `Form5`: rank guide CRUD now mirrored on `/guides` in guarded write mode.
+- `Form6`: hierarchical guide tree CRUD now mirrored on `/guides` in guarded write mode; exact `id_link` backfill parity can still be refined.
 - `Form7`: reward summary PDF options.
 - `Form8`: mark summary PDF options.
 
-The web mirror currently routes person/reward/mark CRUD to existing guarded web forms. Guides CRUD, photo upload/replace/delete, PDF/CSV exports, activation, and local folder operations remain deferred.
+The web mirror currently routes person/reward/mark CRUD and guide CRUD to guarded web forms. Photo upload/replace and clear/unlink are implemented; full clipboard paste, physical photo deletion, PDF exports, activation, and local folder operations remain deferred.

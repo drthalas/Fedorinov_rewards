@@ -11,69 +11,80 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
-<form class="edit-form" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
-  <p class="secondary"><a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник наград</a></p>
-  <label>
-    <span>Государство</span>
-    <select name="id_gos">
-      <option value="">—</option>
-      {% for item in guides.gos %}
-      <option value="{{ item.id }}" {% if item.id|string == reward.id_gos|string %}selected{% endif %}>{{ item.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    <span>Категория</span>
-    <select name="id_catigory">
-      <option value="">—</option>
-      {% for item in guides.categories %}
-      <option value="{{ item.id }}" {% if item.id|string == reward.id_catigory|string %}selected{% endif %}>{{ item.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    <span>Подкатегория</span>
-    <select name="id_sub_catigory">
-      <option value="">—</option>
-      {% for item in guides.subcategories %}
-      <option value="{{ item.id }}" {% if item.id|string == reward.id_sub_catigory|string %}selected{% endif %}>{{ item.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    <span>Наименование</span>
-    <select name="id_name">
-      <option value="">—</option>
-      {% for item in guides.names %}
-      <option value="{{ item.id }}" {% if item.id|string == reward.id_name|string %}selected{% endif %}>{{ item.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    <span>ID link / ссылки</span>
-    <input name="id_link" value="{{ reward.id_link or '' }}">
-  </label>
-  <label>
-    <span>Номер</span>
-    <input name="number" value="{{ reward.number or '' }}" inputmode="numeric">
-  </label>
-  <label class="checkbox-row">
-    <input name="instock" type="checkbox" {% if reward.instock %}checked{% endif %}>
-    <span>В наличии</span>
-  </label>
-  <label>
-    <span>Дата покупки</span>
-    <input name="date_purchase" value="{{ reward.date_purchase or '' }}" placeholder="YYYY-MM-DD">
-  </label>
-  <label>
-    <span>Цена покупки</span>
-    <input name="price_purchase" value="{{ reward.price_purchase or '' }}" inputmode="numeric">
-  </label>
-  <label>
-    <span>Текущая цена</span>
-    <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric">
-  </label>
+  <fieldset class="form-section">
+    <legend>Справочник награды</legend>
+    <p class="secondary"><a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник наград</a></p>
+    <div class="form-grid two-columns">
+      <label>
+        <span>Государство</span>
+        <select name="id_gos">
+          <option value="">—</option>
+          {% for item in guides.gos %}
+          <option value="{{ item.id }}" {% if item.id|string == reward.id_gos|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Категория</span>
+        <select name="id_catigory">
+          <option value="">—</option>
+          {% for item in guides.categories %}
+          <option value="{{ item.id }}" {% if item.id|string == reward.id_catigory|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Подкатегория</span>
+        <select name="id_sub_catigory">
+          <option value="">—</option>
+          {% for item in guides.subcategories %}
+          <option value="{{ item.id }}" {% if item.id|string == reward.id_sub_catigory|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Наименование</span>
+        <select name="id_name">
+          <option value="">—</option>
+          {% for item in guides.names %}
+          <option value="{{ item.id }}" {% if item.id|string == reward.id_name|string %}selected{% endif %}>{{ item.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <label>
+      <span>Ссылка на Монетный двор / справочник</span>
+      <input name="id_link" value="{{ reward.id_link or '' }}">
+    </label>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>Данные покупки</legend>
+    <div class="form-grid two-columns">
+      <label>
+        <span>Номер</span>
+        <input name="number" value="{{ reward.number or '' }}" inputmode="numeric">
+      </label>
+      <label>
+        <span>Дата покупки</span>
+        <input name="date_purchase" value="{{ reward.date_purchase or '' }}" placeholder="YYYY-MM-DD">
+      </label>
+      <label>
+        <span>Цена покупки</span>
+        <input name="price_purchase" value="{{ reward.price_purchase or '' }}" inputmode="numeric">
+      </label>
+      <label>
+        <span>Текущая цена</span>
+        <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric">
+      </label>
+    </div>
+    <label class="checkbox-row">
+      <input name="instock" type="checkbox" {% if reward.instock %}checked{% endif %}>
+      <span>В наличии</span>
+    </label>
+  </fieldset>
 
   {% for photo in photo_controls %}
   <input type="hidden" name="{{ photo.field }}" value="{{ reward[photo.field] or '' }}">

@@ -59,3 +59,11 @@ The report is addressed to Sergey as the primary recipient at 09:00, with the sa
 Report text uses the public project name "Награды и награждённые" and avoids internal implementation terms, local paths, database contents, photos, tokens, and personal data.
 
 The Telegram bot token, real chat ids, real launchd plist, `.env.daily-report`, and send logs remain local and are not committed. The first real send to Sergey requires separate confirmation before enabling primary delivery.
+
+## Person Biography Field
+
+The short biography is stored as a separate `person.biography` SQLite column instead of overloading the existing `person.comment` field.
+
+The column is added by an idempotent migration script. The migration supports dry-run, requires explicit apply, and is guarded by the existing `WRITE_MODE=true` plus backup-first policy.
+
+Application reads tolerate databases that do not yet have the column, but saving biography text requires the migration to have been applied.

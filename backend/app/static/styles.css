@@ -491,11 +491,40 @@ th {
 }
 
 .edit-form {
-  max-width: 720px;
+  max-width: 920px;
   background: #fff;
   border: 1px solid #d9dee5;
   border-radius: 6px;
   padding: 16px;
+}
+
+.legacy-edit-form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-section {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #fbfcfd;
+}
+
+.form-section legend {
+  padding: 0 6px;
+  color: #263238;
+  font-weight: 700;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.form-grid.two-columns {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
 .edit-form label {
@@ -533,6 +562,20 @@ th {
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font: inherit;
+}
+
+.biography-textarea {
+  min-height: 320px;
+  resize: vertical;
+}
+
+.text-block {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.legacy-biography {
+  margin: 10px 0 14px;
 }
 
 .actions {

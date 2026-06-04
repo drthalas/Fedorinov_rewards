@@ -12,12 +12,13 @@ This map is based on read-only schema inspection and legacy code review. It does
 ## `person`
 
 - Purpose: One awarded person/cavalier record.
-- Key fields: `id`, `fio`, `birthday`, `id_rank`, `link1`, `link2`, `comment`.
+- Key fields: `id`, `fio`, `birthday`, `id_rank`, `link1`, `link2`, `comment`, `biography`.
 - Media path fields: `person_foto`, `main_foto`, `rewards_foto`, `book1_foto`, `book2_foto`, `card1_foto`, `card2_foto`.
 - Relationships: `id_rank` references `guide.id`; `rewards.person_id` references `person.id`.
-- Potentially personal fields: `fio`, `birthday`, `link1`, `link2`, `comment`, person/card/book photos.
+- Stage 3I migration: `person.biography` is added by `scripts/migrate_add_person_biography.py`; the script is idempotent and guarded by write mode plus backup-first policy.
+- Potentially personal fields: `fio`, `birthday`, `link1`, `link2`, `comment`, `biography`, person/card/book photos.
 - Safe Stage 2 fields: Internal id, rank label, aggregate counts, photo presence flags, media thumbnails only when requested through safe local endpoint.
-- Protected block: Full name, birthday, links, comments, and personal document photos.
+- Protected block: Full name, birthday, links, comments, biography, and personal document photos.
 
 ## `rewards`
 

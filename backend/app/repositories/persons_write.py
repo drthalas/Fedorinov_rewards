@@ -7,7 +7,8 @@ from ..services.audit import log_action
 from ..services.write_guard import ensure_write_allowed
 
 
-PERSON_FIELDS = ("fio", "birthday", "id_rank", "link1", "link2", "comment")
+PERSON_BASE_FIELDS = ("fio", "birthday", "id_rank", "link1", "link2", "comment")
+PERSON_OPTIONAL_FIELDS = ("biography",)
 
 
 class PersonValidationError(ValueError):
@@ -26,6 +27,7 @@ class PersonWriteData:
     link1: str | None = None
     link2: str | None = None
     comment: str | None = None
+    biography: str | None = None
 
 
 def _empty_to_none(value: object) -> object:
@@ -55,44 +57,53 @@ def person_data_from_mapping(values: dict[str, object]) -> PersonWriteData:
         link1=_empty_to_none(values.get("link1")),
         link2=_empty_to_none(values.get("link2")),
         comment=_empty_to_none(values.get("comment")),
+        biography=_empty_to_none(values.get("biography")),
     )
 
 
-def _as_params(data: PersonWriteData) -> tuple[object, ...]:
-    return tuple(getattr(data, field) for field in PERSON_FIELDS)
+def _person_columns(connection) -> set[str]:
+    return {row["name"] for row in connection.execute("pragma table_info(person)").fetchall()}
+
+
+def _active_fields(connection) -> tuple[str, ...]:
+    columns = _person_columns(connection)
+    optional = tuple(field for field in PERSON_OPTIONAL_FIELDS if field in columns)
+    return (*PERSON_BASE_FIELDS, *optional)
+
+
+def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, ...]:
+    return tuple(getattr(data, field) for field in fields)
 
 
 def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        fields = _active_fields(connection)
+        columns = ", ".join(fields)
+        placeholders = ", ".join("?" for _ in fields)
         cursor = connection.execute(
-            """
-            insert into person (fio, birthday, id_rank, link1, link2, comment)
-            values (?, ?, ?, ?, ?, ?)
-            """,
-            _as_params(data),
+            f"insert into person ({columns}) values ({placeholders})",
+            _as_params(data, fields),
         )
         person_id = int(cursor.lastrowid)
         connection.commit()
-    log_action("create", "person", person_id, {"fields": list(PERSON_FIELDS)})
+    log_action("create", "person", person_id, {"fields": list(fields)})
     return person_id
 
 
 def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        fields = _active_fields(connection)
+        assignments = ", ".join(f"{field} = ?" for field in fields)
         cursor = connection.execute(
-            """
-            update person
-            set fio = ?, birthday = ?, id_rank = ?, link1 = ?, link2 = ?, comment = ?
-            where id = ?
-            """,
-            (*_as_params(data), person_id),
+            f"update person set {assignments} where id = ?",
+            (*_as_params(data, fields), person_id),
         )
         if cursor.rowcount == 0:
             raise PersonValidationError("Награжденный не найден")
         connection.commit()
-    log_action("update", "person", person_id, {"fields": list(PERSON_FIELDS)})
+    log_action("update", "person", person_id, {"fields": list(fields)})
 
 
 def delete_person(settings: Settings, person_id: int) -> None:

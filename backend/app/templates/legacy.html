@@ -124,6 +124,10 @@
                 <dt>Комментарий</dt>
                 <dd>{{ selected_person.comment|dash }}</dd>
               </dl>
+              <details class="legacy-biography">
+                <summary>Краткая биография</summary>
+                <div class="text-block">{{ selected_person.biography|dash }}</div>
+              </details>
               <a class="button disabled-button" href="/legacy?tab=about&message=pdf_not_implemented">Сформировать буклет</a>
               <p class="secondary">PDF export будет реализован позже.</p>
             </section>

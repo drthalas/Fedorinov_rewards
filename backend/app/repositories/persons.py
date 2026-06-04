@@ -1,7 +1,15 @@
+from contextlib import closing
 from pathlib import Path
 
 from .common import fetch_all, fetch_one
+from ..db import open_readonly_connection
 from ..services.photos import PERSON_PHOTO_FIELDS, REWARD_PHOTO_FIELDS
+
+
+def person_has_biography(db_path: Path) -> bool:
+    with closing(open_readonly_connection(db_path)) as connection:
+        columns = {row["name"] for row in connection.execute("pragma table_info(person)").fetchall()}
+    return "biography" in columns
 
 
 def count_persons(db_path: Path) -> int:
@@ -34,9 +42,10 @@ def list_persons(db_path: Path, limit: int = 25, offset: int = 0) -> list[dict[s
 
 
 def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
+    biography_expr = "p.biography" if person_has_biography(db_path) else "null"
     return fetch_one(
         db_path,
-        """
+        f"""
         select
             p.id,
             p.fio,
@@ -52,7 +61,8 @@ def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
             p.card2_foto,
             p.link1,
             p.link2,
-            p.comment
+            p.comment,
+            {biography_expr} as biography
         from person p
         left join guide g on g.id = p.id_rank
         where p.id = ?

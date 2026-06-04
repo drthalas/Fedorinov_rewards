@@ -191,6 +191,8 @@ Current development write-mode CRUD:
 - Mark create/edit/delete for standalone marks.
 - Rank/specialty guide create/edit/delete on `/guides`.
 - Award/mark tree guide create/edit/delete on `/guides` for `guide_lev_0` through `guide_lev_4`.
+- Person, reward, and mark forms are grouped closer to the old Windows dialogs with owner-facing labels.
+- Person edit includes a separate `Краткая биография` field after the biography migration is applied.
 - Click any displayed photo to open the large photo viewer.
 - Photo clicks open an inline modal/lightbox without leaving the current page.
 - `/persons/{id}/photos` includes a gallery and previous/next slideshow.
@@ -201,6 +203,13 @@ Current development write-mode CRUD:
 Photo upload/clear remains guarded by the same backup-first rule as CRUD. Keep owner preview read-only unless testing on a backed-up copied data folder.
 
 Guide deletes are protected: ranks used by person cards cannot be deleted, and tree nodes cannot be deleted while they have child nodes or are referenced by rewards/marks. Person, reward, and mark forms include links back to the guide page so new guide values can be managed before returning to the edit flow.
+
+To add the dedicated biography column to a backed-up development database:
+
+```sh
+REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards python3 scripts/migrate_add_person_biography.py --dry-run
+WRITE_MODE=true REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards python3 scripts/migrate_add_person_biography.py --apply
+```
 
 Never commit `.env`, backups, SQLite databases, `Source/`, `SourceMark/`, photos, PDFs, archives, EXE/DLL files, or real owner data.
 

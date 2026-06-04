@@ -55,7 +55,8 @@ class PersonWriteTests(unittest.TestCase):
                     card2_foto varchar,
                     link1 varchar,
                     link2 varchar,
-                    comment text
+                    comment text,
+                    biography text
                 )
                 """
             )
@@ -136,6 +137,15 @@ class PersonWriteTests(unittest.TestCase):
         row = self.fetch_person(person_id)
         self.assertEqual(row["fio"], fio)
         self.assertEqual(row["comment"], comment)
+
+    def test_create_update_person_saves_biography_when_column_exists(self) -> None:
+        person_id = create_person(self.settings(), PersonWriteData(fio="Biography person", biography="Short bio"))
+        row = self.fetch_person(person_id)
+        self.assertEqual(row["biography"], "Short bio")
+
+        update_person(self.settings(), person_id, PersonWriteData(fio="Biography person", biography="Updated bio"))
+        row = self.fetch_person(person_id)
+        self.assertEqual(row["biography"], "Updated bio")
 
 
 if __name__ == "__main__":

@@ -267,6 +267,25 @@ Next:
 - Hermes QA for guide editing and protected delete behavior.
 - Decide next parity stage: biography/form field parity, PDF export, or remaining summary table parity.
 
+## Stage 3I
+
+Status: done/current.
+
+Scope:
+
+- Person, reward, and mark edit forms are closer to the old Windows dialog structure.
+- Person form now has blocks for main data, links, short biography, comments, and photos.
+- Reward and mark forms now group guide fields, purchase fields, and photo controls.
+- `link1` and `link2` are shown as owner-facing labels for "Память народа" and "Форум коллекционеров".
+- Person `biography` is a separate SQLite column added through an idempotent guarded migration.
+- Person detail and legacy rewards tab display the short biography.
+- Photo controls remain the existing write-mode `+`, `×`, and disabled clipboard-paste placeholder.
+
+Next:
+
+- Hermes QA for form readability and biography workflow.
+- Decide next parity stage: PDF export, summary table parity, or remaining legacy form details.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

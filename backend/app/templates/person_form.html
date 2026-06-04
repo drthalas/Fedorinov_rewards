@@ -11,37 +11,53 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
-<form class="edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
-  <label>
-    <span>ФИО</span>
-    <input name="fio" value="{{ person.fio or '' }}" required>
-  </label>
-  <label>
-    <span>Дата рождения</span>
-    <input name="birthday" value="{{ person.birthday or '' }}" placeholder="YYYY-MM-DD">
-  </label>
-  <label>
-    <span>Звание/специальность · <a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник</a></span>
-    <select name="id_rank">
-      <option value="">—</option>
-      {% for rank in ranks %}
-      <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>
-      {% endfor %}
-    </select>
-  </label>
-  <label>
-    <span>Link 1</span>
-    <input name="link1" value="{{ person.link1 or '' }}">
-  </label>
-  <label>
-    <span>Link 2</span>
-    <input name="link2" value="{{ person.link2 or '' }}">
-  </label>
-  <label>
-    <span>Комментарий</span>
+  <fieldset class="form-section">
+    <legend>Основные данные</legend>
+    <div class="form-grid two-columns">
+      <label>
+        <span>ФИО</span>
+        <input name="fio" value="{{ person.fio or '' }}" required>
+      </label>
+      <label>
+        <span>Дата рождения / год рождения</span>
+        <input name="birthday" value="{{ person.birthday or '' }}" placeholder="YYYY-MM-DD">
+      </label>
+    </div>
+    <label>
+      <span>Звание / специальность · <a href="/guides?return_to={{ request.url.path|urlencode }}">Открыть справочник</a></span>
+      <select name="id_rank">
+        <option value="">—</option>
+        {% for rank in ranks %}
+        <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>Ссылки</legend>
+    <label>
+      <span>Ссылка на сайт “Память народа”</span>
+      <input name="link1" value="{{ person.link1 or '' }}">
+    </label>
+    <label>
+      <span>Ссылка на сайт “Форум коллекционеров”</span>
+      <input name="link2" value="{{ person.link2 or '' }}">
+    </label>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>Краткая биография</legend>
+    <textarea class="biography-textarea" name="biography" rows="14">{{ person.biography or '' }}</textarea>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>Комментарий / заметки</legend>
     <textarea name="comment" rows="5">{{ person.comment or '' }}</textarea>
-  </label>
+  </fieldset>
+
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
     <a href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
