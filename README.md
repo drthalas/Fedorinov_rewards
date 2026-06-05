@@ -4,6 +4,16 @@ Fedorinov_rewards is a new modernization project for the legacy Windows Rewards 
 
 This repository contains only the new project skeleton, documentation, diagnostics, and a read-only backend prototype. Legacy application sources and real local data are not committed here.
 
+## Проектный контекст для Codex
+
+Перед новой задачей Codex должен начинать с постоянной памяти проекта:
+
+```text
+docs/context/CODEX_START_HERE.md
+```
+
+Там зафиксированы контекст проекта, архитектура, roadmap, релизы, QA baseline, принятые решения и правила ведения Linear.
+
 ## Safety Rules
 
 - Do not commit SQLite databases, photos, PDFs, archives, EXE/DLL files, `.env`, tokens, or keys.

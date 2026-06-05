@@ -1,128 +1,91 @@
-# Decisions
+# Принятые решения
 
-## Separate Application Code and User Data
+## Источники правды
 
-The application code and the user data are separate.
+- Linear — учёт задач, статусов, QA и релизных checklist.
+- `docs/context` — постоянная память проекта для Codex и Hermes.
+- Git history — факт изменений в коде и документации.
+- Hermes QA — подтверждение качества перед релизом.
+- GitHub Releases — канал доставки owner-сборок и `latest.json`.
 
-The real owner database remains local on the owner's computer. The current `/Users/hermes/Desktop/Rewards` directory is only a safe development sample.
+Linear важен для процесса, но не является единственным источником правды. Перед работой нужно сверять Linear, `docs/context` и Git history.
 
-Future local installations must allow the user to connect their own local Rewards data folder through a data source settings screen.
+## Данные владельца отдельно от приложения
 
-The application must not upload, sync, or commit the SQLite database, photos, generated files, `.env` files, keys, tokens, or other real local data.
+- База, фото и документы владельца не входят в Git и release package.
+- Не коммитить `database`, `Source`, `SourceMark`, `default`, реальные фото, PDF, архивы, `.env`, `.env.daily-report`, токены и logs.
+- Разработка и QA используют безопасный dev data root:
 
-## Stage 2A Read-Only Mirror Structure
+```text
+/Users/hermes/LocalData/FedorinovRewards/Rewards
+```
 
-The Stage 2A backend uses FastAPI routers, Jinja2 templates, and small sqlite3 repository modules.
+- Не трогать `/Users/hermes/Desktop/Rewards` и другие реальные рабочие копии без отдельного разрешения.
 
-SQLite access stays read-only through `mode=ro`. SQL queries are parameterized where user input is involved.
+## Рабочий режим записи
 
-Media access goes through a `/media` endpoint that resolves paths under `REWARDS_DATA_DIR` only and falls back to `default/nofoto.jpg` when a referenced image is absent.
+После QA приложение должно быть обычной рабочей программой с включённым редактированием:
 
-The web mirror intentionally displays the old application structure first. Redesign, editing, exports, uploads, backups, and DataSourceManager UI are deferred.
+```text
+READ_ONLY=false
+WRITE_MODE=true
+REQUIRE_BACKUP_BEFORE_WRITE=false
+REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
+```
 
-## Stage 3A Development Write-Mode Discipline
+Обычные операции доступны без mandatory backup перед каждым сохранением:
 
-Development may enable write mode only on a safe local development data root, currently `/Users/hermes/LocalData/FedorinovRewards/Rewards`.
+- создать или изменить кавалера;
+- создать или изменить награду;
+- создать или изменить знак;
+- изменить справочник;
+- добавить, заменить или отвязать фото;
+- изменить биографию, комментарии, ссылки, номера и цены.
 
-Production and owner data remain protected until backup, restore, and validation workflows are mature.
+Опасные действия остаются с подтверждением и защитой:
 
-The full functional mirror should reproduce legacy write operations through guarded write routes. Early write stages used backup-first discipline for every write; after owner QA passed, ordinary writes may run with `REQUIRE_BACKUP_BEFORE_WRITE=false`, while dangerous actions keep separate backup-sensitive protection.
+- delete person;
+- delete reward;
+- delete mark;
+- delete guide item;
+- schema migrations;
+- restore backup;
+- mass operations.
 
-Audit logging for future write actions should avoid personal data and write to local files outside Git.
+В backlog: убрать пользовательские read-only/write-mode режимы из интерфейса и оставить нормальную рабочую программу.
 
-## Windows Portable Preview First
+## Релизы
 
-The first owner Windows launch uses a portable ZIP, not an installer.
+- Релиз публикуется только после Hermes QA PASS.
+- GitHub Release публикуется вручную, не на каждый push.
+- `latest.json` — generated release asset, не committed runtime manifest.
+- Если release уже существует, assets можно перезаписывать через `gh release upload --clobber` только после отдельного решения.
+- Public `latest.json` обязательно проверить перед Telegram notification.
+- Telegram notification отправляется только после успешного GitHub Release/latest.json.
+- GitHub token и Telegram token не выводить и не коммитить.
 
-The package contains code, startup scripts, and documentation only. Owner data, SQLite databases, photos, backups, `.env`, `.venv`, legacy sources, reports, archives, and binaries remain outside the package.
+## Обновления приложения
 
-Python 3.11+ is an acceptable prerequisite for the first preview. A dedicated installer, launcher, updater, or bundled runtime can be considered later after owner QA confirms the preview workflow.
-
-Windows preview originally started read-only. After the legacy UI became the primary workflow and owner QA passed, the preview defaults moved to visible working buttons with ordinary edit saves enabled.
-
-## Legacy UI Primary Workflow
-
-The legacy desktop mirror is now the primary user interface. Opening `/` redirects to `/legacy?tab=rewards`.
-
-The existing standalone pages such as `/persons`, `/marks`, `/search`, `/dashboard`, and detail pages remain available as supporting and technical routes, but the owner-facing workflow should start from `/legacy`.
-
-The Windows portable preview defaults to editable working mode with `READ_ONLY=false` and `WRITE_MODE=true`.
-
-After owner QA passed, ordinary write operations no longer require a fresh backup before every save: `REQUIRE_BACKUP_BEFORE_WRITE=false`.
-
-Dangerous actions remain separately protected with `REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true`, explicit confirmations, guarded write routes, and audit logging. This covers delete person/reward/mark/guide actions and future high-risk operations.
-
-Forms opened from `/legacy` must carry a sanitized internal `return_to` URL so successful create/update/delete actions return to the correct legacy tab and selected record.
-
-## Daily Telegram Reports
-
-Daily progress reports are sent through the existing colorizer/SAVBot Telegram bot instead of creating a separate bot.
-
-The report is addressed to Sergey as the primary recipient at 09:00, with the same report copied to Alexander for quality control.
-
-Report text uses the public project name "Награды и награждённые" and avoids internal implementation terms, local paths, database contents, photos, tokens, and personal data.
-
-The Telegram bot token, real chat ids, real launchd plist, `.env.daily-report`, and send logs remain local and are not committed. The first real send to Sergey requires separate confirmation before enabling primary delivery.
-
-Scheduled delivery must use `Europe/Moscow` explicitly. `launchd` uses the Mac mini local timezone, so it should only wake the script at a regular interval; `scripts/send_daily_report.py --scheduled` decides whether current Moscow time is inside the configured 09:00 send window and skips duplicates using the local send log.
-
-## Person Biography Field
-
-The short biography is stored as a separate `person.biography` SQLite column instead of overloading the existing `person.comment` field.
-
-The column is added by an idempotent migration script. The migration supports dry-run, requires explicit apply, and remains a dangerous/schema action that requires write mode plus a fresh backup when the guard is enabled.
-
-Application reads tolerate databases that do not yet have the column, but saving biography text requires the migration to have been applied.
-
-## Public GitHub Release Update Checks
-
-Application updates are checked through a public GitHub Release manifest at:
+- Проверка обновлений идёт через публичный URL:
 
 ```text
 https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
-No GitHub token is needed or stored on the owner's computer. The update checker only reads public version metadata and does not download or install ZIP files in Stage 4A.
+- На стороне владельца GitHub token не нужен.
+- Updater сохраняет `.env` и не трогает `database`, `Source`, `SourceMark`, `default`, backups, logs, data и пользовательские файлы.
+- Real updater apply не запускать на dev-проекте без отдельного разрешения.
+- Автоматический restart после обновления отложен.
 
-The manifest must include version, public download URL, SHA256, release date, and user-facing notes. Owner data remains separate from application code and must not be touched by update checks or future update installation.
+## Telegram
 
-One-click installation is deferred to Stage 4B and must preserve `.env`, avoid database/media folders, validate SHA256, create an application backup, and support rollback.
+- Ежедневные отчёты и релизные уведомления отправляются через существующий colorizer/SAVBot.
+- Сергей — основной получатель.
+- Александр получает копию.
+- Telegram token хранится локально и не должен попадать в Git, docs, logs вывода или Linear.
 
-## GitHub Release Package Publishing
+## UI и пользовательские формулировки
 
-Release packages are published through public GitHub Releases in `drthalas/Fedorinov_rewards`.
-
-Each release should include:
-
-- versioned Windows portable ZIP;
-- `latest.json` manifest.
-
-`latest.json` is a generated release asset, not a committed real manifest. It must contain the public ZIP URL, SHA256, version, release date, and owner-facing notes.
-
-GitHub tokens are never committed. Publishing can use local `gh` CLI authentication on the developer machine, while owner-side update checks remain token-free.
-
-Owner data, `.env`, database, media folders, backups, logs, and generated reports are not included in release assets.
-
-## Manual GitHub Actions Release Workflow
-
-GitHub Releases are published manually through a `workflow_dispatch` GitHub Actions workflow, not automatically on push.
-
-The workflow has a dry-run mode (`publish=false`) that builds and uploads artifacts without creating a release. Real publication requires `publish=true` and uses the standard GitHub Actions `GITHUB_TOKEN` inside GitHub Actions.
-
-The workflow validates the requested release version against `backend/app/version.py`, refuses missing release notes, and refuses to overwrite an existing GitHub Release.
-
-Owner-side update checks still do not require any token.
-
-## One-Click Updater Safety
-
-The application may install public GitHub Release ZIP updates only through an explicit POST action with user confirmation.
-
-The updater must verify SHA256 from `latest.json`, validate ZIP structure, reject forbidden paths, create an application backup, preserve `.env`, and copy only allowed application files.
-
-The updater must not touch owner data, SQLite databases, `Source`, `SourceMark`, `default`, backups, logs, `.venv`, local reports, or local update folders.
-
-Automatic restart is deferred. After a successful update, the user closes the launch window and starts the application again.
-
-The update UI should show progress while an update is running. Progress is stored locally in `updates/update_status.json` and exposed through `/updates/status`; this ignored local status file must not contain owner data.
-
-Release Telegram notifications are sent from the Mac mini through the existing colorizer/SAVBot setup after separate confirmation. GitHub Actions can show the local command to run, but it does not send Telegram messages because the Telegram token stays local.
+- Пользовательские тексты — на русском.
+- Не показывать технический мусор владельцу: endpoint, router, repository, commit, hash, internal paths.
+- Release notes и Telegram-сообщения должны описывать пользу для владельца, а не внутреннюю реализацию.
