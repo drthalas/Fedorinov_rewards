@@ -4,7 +4,7 @@
 <h1>{{ person.fio }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p>
-  <a href="{{ return_to or '/persons' }}">← к списку</a>
+  <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
   · <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Все фото</a>
   · <a href="/persons/{{ person.id }}/booklet?return_to={{ (return_to or '/persons/' ~ person.id)|urlencode }}">Сформировать буклет</a>
 </p>

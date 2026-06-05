@@ -5,13 +5,14 @@
 {% if message %}
 <div class="notice notice-success">{{ message }}</div>
 {% endif %}
-<form class="search-controls" method="get" action="/search" autocomplete="off">
+<form class="search-controls search-suggestions-form" method="get" action="/search" autocomplete="off">
+  <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
   <label>
     <span>Категория поиска</span>
     <select name="scope">
       <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
       <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
-      <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>
+      <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
       <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
     </select>
   </label>
@@ -25,7 +26,12 @@
   </label>
   <label class="search-value">
     <span>Значение</span>
-    <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер" autocomplete="off">
+    <input name="q" value="{{ q }}" placeholder="ФИО, название награды или номер" autocomplete="off" list="search-suggestions">
+    <datalist id="search-suggestions">
+      {% for item in search_suggestions.get(scope, []) %}
+      <option value="{{ item }}"></option>
+      {% endfor %}
+    </datalist>
   </label>
   <div class="search-buttons">
     <button type="submit">Искать</button>
@@ -60,22 +66,53 @@
   <div class="panel">
     <h2>Награжденные</h2>
     <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.counts.persons }}</p>
-    <ul>
-      {% for person in results.persons %}
-      <li><a href="/persons/{{ person.id }}">#{{ person.id }} · {{ person.fio|dash }}</a> · {{ person.rank_name|dash }} · {{ person.birthday|format_date }}</li>
-      {% else %}
-      <li class="muted">Не найдено.</li>
-      {% endfor %}
-    </ul>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>№</th>
+            <th>ФИО</th>
+            <th>Звание / специальность</th>
+            <th>Дата рождения</th>
+            <th>Фото кавалера</th>
+            <th>Главное фото</th>
+            <th>Общее фото наград</th>
+            <th>Фото наградной книжки, сторона 1</th>
+            <th>Фото наградной книжки, сторона 2</th>
+            <th>Фото учётной карточки, страница 1</th>
+            <th>Фото учётной карточки, страница 2</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for person in results.persons %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
+            <td>{{ person.rank_name|dash }}</td>
+            <td>{{ person.birthday|format_date }}</td>
+            <td>{{ person.person_foto_flag }}</td>
+            <td>{{ person.main_foto_flag }}</td>
+            <td>{{ person.rewards_foto_flag }}</td>
+            <td>{{ person.book1_foto_flag }}</td>
+            <td>{{ person.book2_foto_flag }}</td>
+            <td>{{ person.card1_foto_flag }}</td>
+            <td>{{ person.card2_foto_flag }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="11" class="muted">Не найдено.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
   {% endif %}
   {% if scope in ["all", "rewards"] %}
   <div class="panel">
-    <h2>Награды</h2>
+    <h2>Наименование награды</h2>
     <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.counts.rewards }}</p>
     <ul>
       {% for reward in results.rewards %}
-      <li><a href="/rewards/{{ reward.id }}">#{{ reward.id }} · {{ reward.name|dash }}</a> · № {{ reward.number|dash }} · <span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span> · {{ reward.fio|dash }}</li>
+      <li><a href="/rewards/{{ reward.id }}?return_to={{ search_return_to|urlencode }}">#{{ reward.id }} · {{ reward.name|dash }}</a> · № {{ reward.number|dash }} · <span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool("В наличии", "Нет") }}</span> · {{ reward.fio|dash }}</li>
       {% else %}
       <li class="muted">Не найдено.</li>
       {% endfor %}
@@ -88,7 +125,7 @@
     <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.counts.marks }}</p>
     <ul>
       {% for mark in results.marks %}
-      <li><a href="/marks/{{ mark.id }}">#{{ mark.id }} · {{ mark.name|dash }}</a> · № {{ mark.number|dash }} · <span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></li>
+      <li><a href="/marks/{{ mark.id }}?return_to={{ search_return_to|urlencode }}">#{{ mark.id }} · {{ mark.name|dash }}</a> · № {{ mark.number|dash }} · <span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></li>
       {% else %}
       <li class="muted">Не найдено.</li>
       {% endfor %}

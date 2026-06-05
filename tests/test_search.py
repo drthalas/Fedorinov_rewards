@@ -1,10 +1,19 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import sqlite3
 import unittest
 
 from backend.app.main import app
-from backend.app.repositories.search import search_all
+from backend.app.repositories.search import search_all, search_suggestions
+from backend.app.routers.templates import templates
+
+
+class TemplateRequest:
+    def url_for(self, name: str, **path_params) -> str:
+        if name == "static":
+            return f"/static/{path_params.get('path', '')}"
+        return f"/{name}"
 
 
 class SearchRepositoryTests(unittest.TestCase):
@@ -96,7 +105,13 @@ class SearchRepositoryTests(unittest.TestCase):
             connection.execute("insert into guide_lev_2 (id, idl, name) values (1, 1, 'Боевые')")
             connection.execute("insert into guide_lev_3 (id, idl, name) values (1, 1, 'Орден Тестовый')")
             connection.execute(
-                "insert into person (id, fio, birthday, id_rank) values (1, 'Андросов Леонид Тест', '1913-05-09', 1)"
+                """
+                insert into person (
+                    id, fio, birthday, id_rank, person_foto, main_foto, rewards_foto,
+                    book1_foto, book2_foto, card1_foto, card2_foto
+                )
+                values (1, 'Андросов Леонид Тест', '1913-05-09', 1, 'Source/1/person.jpg', '', '', 'Source/1/book1.jpg', '', '', '')
+                """
             )
             connection.execute(
                 """
@@ -164,6 +179,23 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertEqual(result["persons"], [])
         self.assertEqual(result["rewards"], [])
 
+    def test_person_results_include_photo_document_flags(self) -> None:
+        result = search_all(self.db_path, "Андрос", scope="persons")
+        person = result["persons"][0]
+        self.assertEqual(person["person_foto_flag"], 1)
+        self.assertEqual(person["main_foto_flag"], 0)
+        self.assertEqual(person["rewards_foto_flag"], 0)
+        self.assertEqual(person["book1_foto_flag"], 1)
+        self.assertEqual(person["book2_foto_flag"], 0)
+        self.assertEqual(person["card1_foto_flag"], 0)
+        self.assertEqual(person["card2_foto_flag"], 0)
+
+    def test_search_suggestions_are_loaded_from_database(self) -> None:
+        suggestions = search_suggestions(self.db_path)
+        self.assertIn("Андросов Леонид Тест", suggestions["persons"])
+        self.assertIn("Орден Тестовый", suggestions["rewards"])
+        self.assertIn("Орден Тестовый", suggestions["marks"])
+
     def test_query_with_quotes_is_safe(self) -> None:
         result = search_all(self.db_path, "Андросов ' OR 1=1 --", scope="all")
         self.assertEqual(result["total"], 0)
@@ -183,6 +215,38 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn('autocomplete="off"', search_template)
         self.assertIn('autocomplete="off"', legacy_template)
         self.assertIn('scope == "all"', legacy_template)
+
+    def test_search_category_label_uses_reward_name_text(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', search_template)
+        self.assertIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', legacy_template)
+        self.assertNotIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>', search_template)
+        self.assertNotIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>', legacy_template)
+
+    def test_person_search_results_render_user_columns_without_id_header(self) -> None:
+        results = search_all(self.db_path, "Андрос", scope="persons")
+        rendered = templates.env.get_template("search.html").render(
+            request=TemplateRequest(),
+            settings=SimpleNamespace(write_mode=False),
+            q="Андрос",
+            scope="persons",
+            mode="contains",
+            results=results,
+            message="",
+            search_suggestions=search_suggestions(self.db_path),
+            search_return_to="/search?q=%D0%90%D0%BD%D0%B4%D1%80%D0%BE%D1%81&scope=persons&mode=contains",
+        )
+        self.assertNotIn("<th>ID</th>", rendered)
+        self.assertIn("<th>№</th>", rendered)
+        self.assertIn("Фото кавалера", rendered)
+        self.assertIn("Фото наградной книжки, сторона 1", rendered)
+        self.assertIn("<td>1</td>", rendered)
+        self.assertIn("<td>0</td>", rendered)
+        self.assertIn("return_to=", rendered)
+        self.assertIn("Андросов Леонид Тест", rendered)
+        self.assertIn("<datalist id=\"search-suggestions\">", rendered)
 
 
 if __name__ == "__main__":

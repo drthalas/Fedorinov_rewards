@@ -543,6 +543,23 @@ Next:
 - Hermes QA for add/edit person, reward, and mark flows on the dev data root.
 - Owner QA for cascading guide behavior in the Windows package after the next release.
 
+## Iteration: Search Columns, Suggestions, And Return Navigation
+
+Status: done/current.
+
+Scope:
+
+- Search person results now use user-facing columns and a row number instead of exposing the database id as the first column.
+- Person search results show photo/document presence flags as `1`/`0`, matching the summary matrix convention.
+- Search category `rewards` is labeled for users as `Наименование награды`.
+- Search value inputs keep browser history autocomplete disabled while adding database-backed datalist suggestions.
+- Person suggestions come from awarded person names; reward and mark suggestions come from guide names.
+- Search result links pass `return_to` to person, reward, and mark detail pages so the user can return to the current search results.
+
+Next:
+
+- Hermes QA for search result columns, datalist suggestions, and return navigation from search detail pages.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

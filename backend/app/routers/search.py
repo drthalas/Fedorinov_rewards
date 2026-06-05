@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import RedirectResponse
 
 from ..config import get_settings
-from ..repositories.search import search_all
+from ..repositories.search import search_all, search_suggestions
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from .templates import templates
 
@@ -48,14 +48,31 @@ def _search_csv_text(q: str, scope: str, mode: str) -> str:
     return output.getvalue()
 
 
+def _search_url(path: str, q: str, scope: str, mode: str, extra: dict[str, str] | None = None) -> str:
+    params = {"q": q, "scope": scope, "mode": mode}
+    if extra:
+        params.update(extra)
+    return urlunsplit(("", "", path, urlencode(params), ""))
+
+
 @router.get("/search")
 def search_index(request: Request, q: str = "", scope: str = "all", mode: str = "contains"):
     settings = get_settings()
     results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode) if settings.db_exists else search_all(settings.rewards_db_path, "", limit=50, scope=scope, mode=mode)
+    return_to = _search_url("/search", q, results["scope"], results["mode"])
     return templates.TemplateResponse(
         request,
         "search.html",
-        {"settings": settings, "q": q, "scope": results["scope"], "mode": results["mode"], "results": results, "message": request.query_params.get("message", "")},
+        {
+            "settings": settings,
+            "q": q,
+            "scope": results["scope"],
+            "mode": results["mode"],
+            "results": results,
+            "message": request.query_params.get("message", ""),
+            "search_suggestions": search_suggestions(settings.rewards_db_path) if settings.db_exists else {},
+            "search_return_to": return_to,
+        },
     )
 
 

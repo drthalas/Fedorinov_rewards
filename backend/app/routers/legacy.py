@@ -17,7 +17,7 @@ from ..repositories.legacy_rewards import (
 )
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
 from ..repositories.persons import get_person, list_person_rewards
-from ..repositories.search import search_all
+from ..repositories.search import search_all, search_suggestions
 from ..repositories.summary import (
     normalized_summary_filters,
     summary_matrix,
@@ -118,6 +118,10 @@ def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, ob
 
 def _legacy_rewards_url(filters, person_id: int | None = None) -> str:
     return str(URL(path="/legacy").include_query_params(**_rewards_query_params(filters, person_id)))
+
+
+def _legacy_search_url(q: str, scope: str, mode: str) -> str:
+    return str(URL(path="/legacy").include_query_params(tab="search", q=q, scope=scope, mode=mode))
 
 
 def _current_commit() -> str:
@@ -237,6 +241,8 @@ def legacy_index(
         "scope": scope,
         "mode": mode,
         "search_results": None,
+        "search_suggestions": {},
+        "search_return_to": _legacy_search_url(q, scope, mode),
         "summary": None,
         "summary_filters": normalized_summary_filters(
             country_id=country_id,
@@ -300,6 +306,9 @@ def legacy_index(
         context["search_results"] = search_results
         context["scope"] = search_results["scope"]
         context["mode"] = search_results["mode"]
+        context["search_return_to"] = _legacy_search_url(q, search_results["scope"], search_results["mode"])
+    if active_tab == "search":
+        context["search_suggestions"] = search_suggestions(settings.rewards_db_path)
 
     if active_tab == "summary":
         context["summary"] = _legacy_summary(settings.rewards_db_path)

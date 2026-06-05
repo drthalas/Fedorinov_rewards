@@ -145,7 +145,7 @@ async def mark_create(request: Request):
 
 
 @router.get("/marks/{mark_id}")
-def mark_detail(request: Request, mark_id: int, status: str = ""):
+def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str = ""):
     settings = get_settings()
     mark = get_mark(settings.rewards_db_path, mark_id)
     if mark is None:
@@ -158,6 +158,7 @@ def mark_detail(request: Request, mark_id: int, status: str = ""):
             "mark": mark,
             "photos": mark_photo_items(mark),
             "status_message": STATUS_MESSAGES.get(status),
+            "return_to": safe_return_to(return_to),
         },
     )
 

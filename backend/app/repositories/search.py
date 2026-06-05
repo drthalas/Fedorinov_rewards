@@ -63,7 +63,18 @@ def _person_rows(db_path: Path) -> list[dict[str, object]]:
     return fetch_all(
         db_path,
         """
-        select p.id, p.fio, p.birthday, g.name as rank_name
+        select
+            p.id,
+            p.fio,
+            p.birthday,
+            g.name as rank_name,
+            case when nullif(trim(coalesce(p.person_foto, '')), '') is null then 0 else 1 end as person_foto_flag,
+            case when nullif(trim(coalesce(p.main_foto, '')), '') is null then 0 else 1 end as main_foto_flag,
+            case when nullif(trim(coalesce(p.rewards_foto, '')), '') is null then 0 else 1 end as rewards_foto_flag,
+            case when nullif(trim(coalesce(p.book1_foto, '')), '') is null then 0 else 1 end as book1_foto_flag,
+            case when nullif(trim(coalesce(p.book2_foto, '')), '') is null then 0 else 1 end as book2_foto_flag,
+            case when nullif(trim(coalesce(p.card1_foto, '')), '') is null then 0 else 1 end as card1_foto_flag,
+            case when nullif(trim(coalesce(p.card2_foto, '')), '') is null then 0 else 1 end as card2_foto_flag
         from person p
         left join guide g on g.id = p.id_rank
         order by p.id
@@ -118,6 +129,54 @@ def _mark_rows(db_path: Path) -> list[dict[str, object]]:
         order by m.id
         """,
     )
+
+
+def search_suggestions(db_path: Path, limit: int = 250) -> dict[str, list[str]]:
+    safe_limit = max(1, min(int(limit), 500))
+    persons = [
+        str(row["fio"])
+        for row in fetch_all(
+            db_path,
+            "select fio from person where nullif(trim(coalesce(fio, '')), '') is not null order by fio limit ?",
+            (safe_limit,),
+        )
+    ]
+    rewards = [
+        str(row["name"])
+        for row in fetch_all(
+            db_path,
+            """
+            select distinct g3.name
+            from rewards r
+            join guide_lev_3 g3 on g3.id = r.id_name
+            where nullif(trim(coalesce(g3.name, '')), '') is not null
+            order by g3.name
+            limit ?
+            """,
+            (safe_limit,),
+        )
+    ]
+    marks = [
+        str(row["name"])
+        for row in fetch_all(
+            db_path,
+            """
+            select distinct g3.name
+            from mark m
+            join guide_lev_3 g3 on g3.id = m.id_name
+            where nullif(trim(coalesce(g3.name, '')), '') is not null
+            order by g3.name
+            limit ?
+            """,
+            (safe_limit,),
+        )
+    ]
+    return {
+        "all": [],
+        "persons": persons,
+        "rewards": rewards,
+        "marks": marks,
+    }
 
 
 def search_all(

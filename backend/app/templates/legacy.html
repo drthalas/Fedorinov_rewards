@@ -242,14 +242,15 @@
   {% elif tab == "search" %}
     <section class="legacy-tab-panel">
       <h1>Поиск</h1>
-      <form class="legacy-search-form" method="get" action="/legacy" autocomplete="off">
+      <form class="legacy-search-form search-suggestions-form" method="get" action="/legacy" autocomplete="off">
+        <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
         <input type="hidden" name="tab" value="search">
         <label>
           <span>Категория поиска</span>
           <select name="scope">
             <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
             <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
-            <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>
+            <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
             <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
           </select>
         </label>
@@ -263,7 +264,12 @@
         </label>
         <label class="search-value">
           <span>Значение</span>
-          <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер" autocomplete="off">
+          <input type="search" name="q" value="{{ q }}" placeholder="ФИО, название, номер" autocomplete="off" list="legacy-search-suggestions">
+          <datalist id="legacy-search-suggestions">
+            {% for item in search_suggestions.get(scope, []) %}
+            <option value="{{ item }}"></option>
+            {% endfor %}
+          </datalist>
         </label>
         <button type="submit">Искать</button>
         <a class="button secondary-button" href="/legacy?tab=search">Сброс</a>
@@ -290,17 +296,38 @@
             <p class="secondary">Показаны первые {{ search_results.persons|length }} из {{ search_results.counts.persons }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
-                <thead><tr><th>ID</th><th>ФИО</th><th>Звание/специальность</th><th>Дата рождения</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>№</th>
+                    <th>ФИО</th>
+                    <th>Звание / специальность</th>
+                    <th>Дата рождения</th>
+                    <th>Фото кавалера</th>
+                    <th>Главное фото</th>
+                    <th>Общее фото наград</th>
+                    <th>Фото наградной книжки, сторона 1</th>
+                    <th>Фото наградной книжки, сторона 2</th>
+                    <th>Фото учётной карточки, страница 1</th>
+                    <th>Фото учётной карточки, страница 2</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {% for person in search_results.persons %}
                   <tr>
-                    <td>{{ person.id }}</td>
-                    <td><a href="/legacy?tab=rewards&person_id={{ person.id }}">{{ person.fio|dash }}</a></td>
+                    <td>{{ loop.index }}</td>
+                    <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
                     <td>{{ person.rank_name|dash }}</td>
                     <td>{{ person.birthday|format_date }}</td>
+                    <td>{{ person.person_foto_flag }}</td>
+                    <td>{{ person.main_foto_flag }}</td>
+                    <td>{{ person.rewards_foto_flag }}</td>
+                    <td>{{ person.book1_foto_flag }}</td>
+                    <td>{{ person.book2_foto_flag }}</td>
+                    <td>{{ person.card1_foto_flag }}</td>
+                    <td>{{ person.card2_foto_flag }}</td>
                   </tr>
                   {% else %}
-                  <tr><td colspan="4">Не найдено.</td></tr>
+                  <tr><td colspan="11">Не найдено.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -309,7 +336,7 @@
           {% endif %}
           {% if scope in ["all", "rewards"] %}
           <section class="legacy-block">
-            <h2>Награды ({{ search_results.counts.rewards }})</h2>
+            <h2>Наименование награды ({{ search_results.counts.rewards }})</h2>
             <p class="secondary">Показаны первые {{ search_results.rewards|length }} из {{ search_results.counts.rewards }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
@@ -318,7 +345,7 @@
                   {% for reward in search_results.rewards %}
                   <tr>
                     <td>{{ reward.id }}</td>
-                    <td><a href="/rewards/{{ reward.id }}">{{ reward.name|dash }}</a></td>
+                    <td><a href="/rewards/{{ reward.id }}?return_to={{ search_return_to|urlencode }}">{{ reward.name|dash }}</a></td>
                     <td>{{ reward.number|dash }}</td>
                     <td>{{ reward.fio|dash }}</td>
                     <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
@@ -342,7 +369,7 @@
                   {% for mark in search_results.marks %}
                   <tr>
                     <td>{{ mark.id }}</td>
-                    <td><a href="/legacy?tab=marks&mark_id={{ mark.id }}">{{ mark.name|dash }}</a></td>
+                    <td><a href="/marks/{{ mark.id }}?return_to={{ search_return_to|urlencode }}">{{ mark.name|dash }}</a></td>
                     <td>{{ mark.number|dash }}</td>
                     <td><span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool }}</span></td>
                   </tr>

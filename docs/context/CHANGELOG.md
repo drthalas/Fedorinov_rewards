@@ -1,5 +1,14 @@
 # Changelog
 
+## Search Columns, Suggestions, And Return Navigation
+
+- Reworked person search results to hide the technical database id and show a row number instead.
+- Added person photo/document presence columns to search results using `1`/`0`.
+- Renamed the user-facing rewards search category to `Наименование награды`.
+- Added database-backed datalist suggestions for person names and guide names while keeping browser history autocomplete disabled.
+- Search result links now pass a safe `return_to` to person, reward, and mark detail pages.
+- Detail pages show a direct return link back to search results when opened from search.
+
 ## Cascading Guides And Required Fields
 
 - Added cascading guide selects in reward and mark forms so names are limited to the selected country/category/subcategory branch.

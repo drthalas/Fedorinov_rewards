@@ -129,7 +129,7 @@ async def reward_create(request: Request, person_id: int):
 
 
 @router.get("/rewards/{reward_id}")
-def reward_detail(request: Request, reward_id: int, status: str = ""):
+def reward_detail(request: Request, reward_id: int, status: str = "", return_to: str = ""):
     settings = get_settings()
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
@@ -142,6 +142,7 @@ def reward_detail(request: Request, reward_id: int, status: str = ""):
             "reward": reward,
             "photos": reward_photo_items(reward),
             "status_message": STATUS_MESSAGES.get(status),
+            "return_to": safe_return_to(return_to),
         },
     )
 

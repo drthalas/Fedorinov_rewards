@@ -148,7 +148,15 @@ Examples:
 
 The search is read-only, supports lowercase Cyrillic matching, groups results by persons/rewards/marks, and limits each group to the first 50 UI results.
 
-Search fields disable browser history autocomplete. If `q` is empty and `scope=persons`, `scope=rewards`, or `scope=marks`, the UI shows the first 50 records from that selected category. If `scope=all` and `q` is empty, the UI shows guidance instead of loading everything. Database-backed live suggestions are deferred.
+Search fields disable browser history autocomplete. If `q` is empty and `scope=persons`, `scope=rewards`, or `scope=marks`, the UI shows the first 50 records from that selected category. If `scope=all` and `q` is empty, the UI shows guidance instead of loading everything.
+
+The search value field now provides database-backed suggestions while keeping browser history autocomplete disabled:
+
+- `scope=persons` suggests awarded person names;
+- `scope=rewards` is shown to the user as `Наименование награды` and suggests guide names;
+- `scope=marks` suggests guide names.
+
+Person search results use user-facing columns: row number, full name, rank/specialty, birth date, and `1`/`0` photo/document flags. Links opened from search carry a safe `return_to`, so the detail page can return to the same search result set.
 
 Guide links from person, reward, and mark forms are contextual: rank fields open the rank/specialty guide block, and reward/mark fields open the shared reward/mark guide tree. The guide page preserves `return_to`, so after adding or editing a guide value the user can return to the form.
 
