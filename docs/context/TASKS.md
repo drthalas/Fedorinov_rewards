@@ -560,6 +560,23 @@ Next:
 
 - Hermes QA for search result columns, datalist suggestions, and return navigation from search detail pages.
 
+## v0.1.2 Final QA Blockers
+
+Status: done/current.
+
+Scope:
+
+- Polished form validation messages before release QA so user-facing errors stay Russian and non-technical.
+- Added regression coverage for preserving entered form values and selected cascading guides after validation errors.
+- Fixed cascading guide dropdowns in reward forms, mark forms, and the legacy rewards filters.
+- Category changes now correctly populate subcategories; subcategory changes now correctly populate names.
+- Confirmed release notes include the full owner-facing v0.1.2 change list.
+
+Next:
+
+- Publish v0.1.2 after release package safety check and Manual Release workflow dry-run.
+- Send Telegram release notification only after public `latest.json` is verified.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

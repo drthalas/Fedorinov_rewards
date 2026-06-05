@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.1.2 Release Finalization
+
+- Expanded `release_notes/0.1.2.md` with the full owner-facing change list: save dialogs, cascading guides, required fields, search improvements, and form error polish.
+- Fixed cascading guide dropdown behavior so category changes populate subcategories and subcategory changes populate names.
+- Polished form validation messages and preserved entered values after validation errors.
+
 ## Search Columns, Suggestions, And Return Navigation
 
 - Reworked person search results to hide the technical database id and show a row number instead.
@@ -26,7 +32,7 @@
 - Added `REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true` for separately protecting dangerous actions such as deletes.
 - Changed write guard messages to Russian user-facing text.
 - Documented that ordinary edits no longer require a fresh backup before every save, while dangerous actions remain protected.
-- Added `release_notes/0.1.2.md` with owner-facing notes for summary matrix, archive/catalog actions, photo controls, PDF booklet, and working write mode.
+- Added `release_notes/0.1.2.md` with owner-facing notes for summary matrix, archive/catalog actions, save dialogs, photo controls, PDF booklet, working write mode, cascading guides, required fields, search improvements, and form error polish.
 
 ## Iteration 5 Person Booklet PDF
 
