@@ -620,6 +620,8 @@
         <dt>Название</dt><dd>{{ app_name }}</dd>
         <dt>Текущая версия</dt><dd>{{ app_version }}</dd>
         <dt>Режим</dt><dd>{% if settings.write_mode %}Рабочий режим{% else %}Режим просмотра{% endif %}</dd>
+        <dt>Редактирование</dt><dd>{% if settings.write_mode and not settings.read_only %}Обычное редактирование включено{% else %}Редактирование выключено{% endif %}</dd>
+        <dt>Резервные копии</dt><dd>Рекомендуется делать регулярно; опасные действия требуют отдельной защиты.</dd>
         <dt>Папка данных</dt><dd>{{ settings.rewards_data_dir }}</dd>
         <dt>Commit</dt><dd>{{ commit }}</dd>
       </dl>

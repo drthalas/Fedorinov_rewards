@@ -86,9 +86,9 @@ def _recent_backup_exists(data_dir: Path, max_age_hours: int = 24) -> bool:
 
 def _ensure_write_allowed(settings: MigrationSettings) -> None:
     if not settings.write_mode:
-        raise MigrationBlockedError("WRITE_MODE=true is required for migration")
+        raise MigrationBlockedError("Редактирование выключено.")
     if settings.require_backup_before_write and not _recent_backup_exists(settings.rewards_data_dir):
-        raise MigrationBlockedError("Create a fresh backup before migration")
+        raise MigrationBlockedError("Перед миграцией нужно создать резервную копию.")
 
 
 def biography_column_exists(db_path: Path) -> bool:
@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Add person.biography column safely.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--dry-run", action="store_true", help="Show migration status without changing SQLite.")
-    group.add_argument("--apply", action="store_true", help="Apply migration. Requires WRITE_MODE=true and fresh backup.")
+    group.add_argument("--apply", action="store_true", help="Apply migration. Requires write mode and backup.")
     args = parser.parse_args(argv)
 
     try:

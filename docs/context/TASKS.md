@@ -84,7 +84,7 @@ Scope:
 
 Rule:
 
-- All write stages require a fresh backup first.
+- Historical Stage 3 rule: early write stages required a fresh backup first. After owner QA, ordinary writes use working mode defaults; dangerous actions remain separately protected.
 
 ## Stage 3B
 
@@ -165,7 +165,7 @@ Scope:
 - Legacy rewards tab photo block now shows person photo, main photo, and rewards photo.
 - Human-readable photo labels replace technical photo path labels.
 - Development write-mode photo upload/replace and clear/unlink controls for person, reward, and mark edit forms.
-- Photo writes require `WRITE_MODE=true` and the existing backup-first guard.
+- Photo writes require `WRITE_MODE=true` and the guarded write pipeline; working preview defaults do not require a backup before every ordinary photo save.
 - Physical media files are not deleted when photo fields are cleared.
 
 Next:
@@ -208,7 +208,7 @@ Scope:
 - Legacy UI is the primary user workflow; standalone pages remain as supporting/technical pages.
 - Top navigation no longer presents Legacy UI as a separate mode.
 - Forms opened from `/legacy` carry safe `return_to` values and redirect back to the legacy tab/selected record after save/delete.
-- Windows preview defaults to editable working preview mode with backup-first guard enabled.
+- Windows preview defaults to editable working preview mode. Ordinary saves are enabled; dangerous actions remain separately protected.
 
 Next:
 
@@ -256,7 +256,7 @@ Scope:
 
 - Guide CRUD for ranks/specialties in `guide`.
 - Guide CRUD for the award/mark tree levels `guide_lev_0` through `guide_lev_4`.
-- Write-mode and backup-first guard before every guide write.
+- Write-mode guard before every guide write; dangerous guide deletes remain separately protected.
 - Delete protections for rank values used by person cards.
 - Delete protections for tree nodes with children or references from rewards/marks.
 - Supporting `/guides` page now provides legacy-style add/edit/delete actions in write mode.
@@ -506,6 +506,23 @@ Next:
 - Owner QA for booklet layout and PDF output on Windows.
 - Tune booklet visual layout after the owner checks printed/PDF examples.
 - Summary PDF remains a separate future export task.
+
+## v0.1.2 Working Write Mode Release
+
+Status: done/current.
+
+Scope:
+
+- Enabled permanent working write-mode defaults for owner package configuration.
+- Ordinary create/update operations, photo upload/unlink, guide edits, biography/comment/link/price/number edits no longer require a fresh backup before every save.
+- Dangerous actions remain protected by explicit confirmation and `REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true`.
+- Version bumped to `0.1.2`.
+- Added `release_notes/0.1.2.md`.
+
+Next:
+
+- Publish v0.1.2 through Manual Release workflow.
+- Confirm public `latest.json` and send release Telegram notification.
 
 ## Backlog / Future
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.1.2 Working Write Mode Release
+
+- Bumped the application version to `0.1.2`.
+- Enabled working write-mode defaults for the Windows owner package: `READ_ONLY=false`, `WRITE_MODE=true`, and `REQUIRE_BACKUP_BEFORE_WRITE=false`.
+- Added `REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true` for separately protecting dangerous actions such as deletes.
+- Changed write guard messages to Russian user-facing text.
+- Documented that ordinary edits no longer require a fresh backup before every save, while dangerous actions remain protected.
+- Added `release_notes/0.1.2.md` with owner-facing notes for summary matrix, archive/catalog actions, photo controls, PDF booklet, and working write mode.
+
 ## Iteration 5 Person Booklet PDF
 
 - Replaced the legacy `Сформировать буклет` placeholder with a working person booklet preview.

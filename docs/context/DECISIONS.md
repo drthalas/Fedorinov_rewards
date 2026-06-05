@@ -26,7 +26,7 @@ Development may enable write mode only on a safe local development data root, cu
 
 Production and owner data remain protected until backup, restore, and validation workflows are mature.
 
-The full functional mirror should reproduce legacy write operations, but every write stage must use backup-first discipline. Future write routes must require explicit `WRITE_MODE=true`, use guarded write connections, and check that a recent backup exists before changing SQLite or media files.
+The full functional mirror should reproduce legacy write operations through guarded write routes. Early write stages used backup-first discipline for every write; after owner QA passed, ordinary writes may run with `REQUIRE_BACKUP_BEFORE_WRITE=false`, while dangerous actions keep separate backup-sensitive protection.
 
 Audit logging for future write actions should avoid personal data and write to local files outside Git.
 
@@ -38,7 +38,7 @@ The package contains code, startup scripts, and documentation only. Owner data, 
 
 Python 3.11+ is an acceptable prerequisite for the first preview. A dedicated installer, launcher, updater, or bundled runtime can be considered later after owner QA confirms the preview workflow.
 
-Windows preview originally started read-only. After the legacy UI became the primary workflow, the preview defaults moved to visible working buttons with backup-first protection still enabled.
+Windows preview originally started read-only. After the legacy UI became the primary workflow and owner QA passed, the preview defaults moved to visible working buttons with ordinary edit saves enabled.
 
 ## Legacy UI Primary Workflow
 
@@ -46,7 +46,11 @@ The legacy desktop mirror is now the primary user interface. Opening `/` redirec
 
 The existing standalone pages such as `/persons`, `/marks`, `/search`, `/dashboard`, and detail pages remain available as supporting and technical routes, but the owner-facing workflow should start from `/legacy`.
 
-The Windows portable preview defaults to editable working mode with `READ_ONLY=false` and `WRITE_MODE=true`, while keeping `REQUIRE_BACKUP_BEFORE_WRITE=true`, `write_guard`, and audit logging enabled. This makes buttons visible for owner preview without removing backup-first protection.
+The Windows portable preview defaults to editable working mode with `READ_ONLY=false` and `WRITE_MODE=true`.
+
+After owner QA passed, ordinary write operations no longer require a fresh backup before every save: `REQUIRE_BACKUP_BEFORE_WRITE=false`.
+
+Dangerous actions remain separately protected with `REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true`, explicit confirmations, guarded write routes, and audit logging. This covers delete person/reward/mark/guide actions and future high-risk operations.
 
 Forms opened from `/legacy` must carry a sanitized internal `return_to` URL so successful create/update/delete actions return to the correct legacy tab and selected record.
 
@@ -66,7 +70,7 @@ Scheduled delivery must use `Europe/Moscow` explicitly. `launchd` uses the Mac m
 
 The short biography is stored as a separate `person.biography` SQLite column instead of overloading the existing `person.comment` field.
 
-The column is added by an idempotent migration script. The migration supports dry-run, requires explicit apply, and is guarded by the existing `WRITE_MODE=true` plus backup-first policy.
+The column is added by an idempotent migration script. The migration supports dry-run, requires explicit apply, and remains a dangerous/schema action that requires write mode plus a fresh backup when the guard is enabled.
 
 Application reads tolerate databases that do not yet have the column, but saving biography text requires the migration to have been applied.
 

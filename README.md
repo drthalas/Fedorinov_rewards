@@ -202,25 +202,29 @@ The legacy-style desktop mirror is available at:
 
 CRUD buttons inside `/legacy` are visible only in development write mode and reuse the existing guarded person, reward, and mark routes.
 
-## Development Write Mode
+## Working Write Mode
 
-Write mode is for the local development stand only. Keep owner preview and production-style runs in read-only mode:
+After owner QA passed, the Windows preview defaults to working edit mode:
 
 ```sh
-WRITE_MODE=false
+READ_ONLY=false
+WRITE_MODE=true
+REQUIRE_BACKUP_BEFORE_WRITE=false
+REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 ```
 
-Before enabling write mode, create and validate a fresh backup:
+Ordinary create/update operations, guide edits, photo upload/unlink, biography, links, prices, and numbers can be saved without creating a backup before every action. Dangerous actions such as deletes and migrations remain separately protected with confirmation and backup-sensitive guards. Make regular backups before serious work:
 
 ```sh
 REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards python3 scripts/backup_dev_data.py
 python3 scripts/check_backup.py ~/LocalData/FedorinovRewards/backups/Rewards_backup_YYYYMMDD_HHMMSS.zip
 ```
 
-Run development write mode explicitly when testing CRUD:
+To disable editing:
 
 ```sh
-WRITE_MODE=true REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
+READ_ONLY=true
+WRITE_MODE=false
 ```
 
 Current development write-mode CRUD:
@@ -240,7 +244,7 @@ Current development write-mode CRUD:
 - Browser clipboard paste is available in write mode through the same guarded upload pipeline. If the browser does not expose image clipboard access on localhost, use the `+` file upload button.
 - The legacy rewards screen can open the selected person's local `Source/{person_id}` folder and create a ZIP archive of that folder under the local data `archives/` folder. Source files are not deleted.
 
-Photo upload/clear remains guarded by the same backup-first rule as CRUD. Keep owner preview read-only unless testing on a backed-up copied data folder.
+Photo upload/clear remains behind `WRITE_MODE=true`. With the working preview defaults, these ordinary photo operations do not require a fresh backup before every save, but regular backups are still recommended.
 
 Guide deletes are protected: ranks used by person cards cannot be deleted, and tree nodes cannot be deleted while they have child nodes or are referenced by rewards/marks. Person, reward, and mark forms include links back to the guide page so new guide values can be managed before returning to the edit flow.
 
@@ -376,12 +380,13 @@ Windows preview defaults are now the working preview mode:
 ```text
 READ_ONLY=false
 WRITE_MODE=true
-REQUIRE_BACKUP_BEFORE_WRITE=true
+REQUIRE_BACKUP_BEFORE_WRITE=false
+REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 APP_HOST=127.0.0.1
 APP_PORT=8080
 ```
 
-Backup-first protection remains enabled. Before editing real data, create and validate a backup. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.
+Ordinary editing is enabled without requiring a fresh backup before every save. Dangerous actions such as deletes remain protected by confirmation and backup-sensitive guards. Make regular backups before serious work. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.
 
 ## Daily Telegram Reports
 

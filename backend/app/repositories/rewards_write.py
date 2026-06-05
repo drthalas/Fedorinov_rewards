@@ -4,7 +4,7 @@ from contextlib import closing
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
-from ..services.write_guard import ensure_write_allowed
+from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
 REWARD_FIELDS = (
@@ -152,7 +152,7 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
 
 
 def delete_reward(settings: Settings, reward_id: int, confirm: bool = False) -> int:
-    ensure_write_allowed(settings)
+    ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise RewardValidationError("Удаление требует confirm=true")
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:

@@ -20,7 +20,7 @@ def open_readonly_connection(db_path: Path) -> sqlite3.Connection:
 def open_write_connection(db_path: Path, write_mode: bool) -> sqlite3.Connection:
     """Open SQLite for future write routes only after explicit WRITE_MODE=true."""
     if not write_mode:
-        raise PermissionError("WRITE_MODE=true is required before opening a write connection")
+        raise PermissionError("Редактирование выключено.")
     connection = sqlite3.connect(db_path.resolve())
     return _configure_connection(connection)
 

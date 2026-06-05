@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
-from ..services.write_guard import ensure_write_allowed
+from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
 GUIDE_LEVELS = {0, 1, 2, 3, 4}
@@ -112,7 +112,7 @@ def update_rank(settings: Settings, rank_id: int, data: RankGuideData) -> None:
 
 
 def delete_rank(settings: Settings, rank_id: int) -> None:
-    ensure_write_allowed(settings)
+    ensure_dangerous_action_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _rank_exists(connection, rank_id):
             raise GuideValidationError("Звание/специальность не найдены")
@@ -177,7 +177,7 @@ def _usage_count(connection, level: int, item_id: int) -> int:
 
 def delete_guide_level_item(settings: Settings, level: int, item_id: int) -> None:
     safe_level = _validate_level(level)
-    ensure_write_allowed(settings)
+    ensure_dangerous_action_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _guide_item_exists(connection, safe_level, item_id):
             raise GuideValidationError("Элемент справочника не найден")

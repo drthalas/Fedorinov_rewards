@@ -1,6 +1,6 @@
 # Legacy Feature Gap
 
-Stage 3 changes the target from a read-only viewer toward a full functional legacy mirror on the safe development data root. Write features must remain blocked until a fresh backup exists and `WRITE_MODE=true` is explicitly enabled.
+Stage 3 changed the target from a read-only viewer toward a full functional legacy mirror on the safe development data root. After owner QA, working mode is enabled for ordinary edits; dangerous actions remain separately protected and `WRITE_MODE=true` is still required for writes.
 
 ## Persons
 

@@ -54,7 +54,7 @@ def _guide_options(settings):
 def reward_new(request: Request, person_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
@@ -128,7 +128,7 @@ def reward_detail(request: Request, reward_id: int, status: str = ""):
 def reward_edit(request: Request, reward_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
         raise HTTPException(status_code=404, detail="Reward not found")

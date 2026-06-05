@@ -103,6 +103,18 @@ class ReleaseNotificationTests(unittest.TestCase):
         )
         self.assertIn("В этой версии внесены улучшения и исправления", message)
 
+    def test_release_message_012_contains_release_instructions_and_user_items(self) -> None:
+        message = self.generator.build_message("0.1.2", release_notes=ROOT / "release_notes" / "0.1.2.md")
+        self.assertIn("Награды и награждённые", message)
+        self.assertIn("v0.1.2", message)
+        for expected in ["шахмат", "CSV", "Открыть каталог", "Архивировать", "фотограф", "PDF-буклет", "рабочий режим"]:
+            self.assertIn(expected, message)
+        self.assertIn("Откройте программу", message)
+        self.assertIn("Нажмите “Обновить”", message)
+        self.assertIn("Данные и фотографии не трогаются", message)
+        for term in ["endpoint", "router", "repository", "commit", "hash", "GitHub Release", "ZIP"]:
+            self.assertNotIn(term, message)
+
     def test_dry_run_does_not_send(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest = self._manifest(Path(tmpdir) / "latest.json")

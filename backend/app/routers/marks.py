@@ -77,7 +77,7 @@ def marks_index(request: Request, page: int = 1, page_size: int = 25, status: st
 def mark_new(request: Request, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     return templates.TemplateResponse(
         request,
         "mark_form.html",
@@ -144,7 +144,7 @@ def mark_detail(request: Request, mark_id: int, status: str = ""):
 def mark_edit(request: Request, mark_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     mark = get_mark(settings.rewards_db_path, mark_id)
     if mark is None:
         raise HTTPException(status_code=404, detail="Mark not found")

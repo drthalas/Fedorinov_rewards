@@ -76,10 +76,11 @@ http://127.0.0.1:8081
 ```text
 READ_ONLY=false
 WRITE_MODE=true
-REQUIRE_BACKUP_BEFORE_WRITE=true
+REQUIRE_BACKUP_BEFORE_WRITE=false
+REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 ```
 
-Backup-first guard остаётся включённым. Перед реальным редактированием нужно сделать backup папки Rewards. Если сохранение пишет `Create a fresh backup before making changes`, создайте свежий backup или выключите `REQUIRE_BACKUP_BEFORE_WRITE` только на тестовой копии данных.
+Обычное редактирование включено без требования backup перед каждым сохранением. Резервные копии всё равно рекомендуется делать регулярно, а опасные действия вроде удаления остаются отдельно защищены. Если программа пишет “Перед этим действием нужно создать резервную копию.”, сделайте backup папки Rewards перед продолжением.
 
 ## Режим просмотра
 

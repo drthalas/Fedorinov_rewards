@@ -14,10 +14,11 @@ def health() -> dict[str, object]:
     counts = table_counts(settings.rewards_db_path) if readable else {}
 
     return {
-        "status": "ok" if settings.data_dir_exists and settings.db_exists and readable and settings.read_only else "warning",
+        "status": "ok" if settings.data_dir_exists and settings.db_exists and readable and not settings.validation_errors() else "warning",
         "read_only": settings.read_only,
         "write_mode": settings.write_mode,
         "require_backup_before_write": settings.require_backup_before_write,
+        "require_backup_before_dangerous_actions": settings.require_backup_before_dangerous_actions,
         "data_dir": str(settings.rewards_data_dir),
         "db_exists": settings.db_exists,
         "db_readable": readable,

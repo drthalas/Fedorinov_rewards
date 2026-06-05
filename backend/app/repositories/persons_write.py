@@ -4,7 +4,7 @@ from contextlib import closing
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
-from ..services.write_guard import ensure_write_allowed
+from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
 PERSON_BASE_FIELDS = ("fio", "birthday", "id_rank", "link1", "link2", "comment")
@@ -107,7 +107,7 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
 
 
 def delete_person(settings: Settings, person_id: int) -> None:
-    ensure_write_allowed(settings)
+    ensure_dangerous_action_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         reward_count = connection.execute(
             "select count(*) as count from rewards where person_id = ?",

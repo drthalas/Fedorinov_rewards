@@ -55,6 +55,11 @@ class ReleasePackageTests(unittest.TestCase):
             self.assertNotIn("Source/", manifest_text)
             self.assertNotIn("SourceMark/", manifest_text)
 
+    def test_release_notes_012_include_owner_visible_items(self) -> None:
+        notes = (ROOT / "release_notes" / "0.1.2.md").read_text(encoding="utf-8")
+        for expected in ["шахмат", "CSV", "Открыть каталог", "Архивировать", "фотограф", "PDF-буклет", "рабочий режим"]:
+            self.assertIn(expected, notes)
+
     def test_build_release_package_rejects_version_mismatch(self) -> None:
         with self.assertRaises(ValueError):
             build_release_package.build_release_package("9.9.9")

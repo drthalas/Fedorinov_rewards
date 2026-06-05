@@ -85,7 +85,7 @@ def persons_index(request: Request, page: int = 1, page_size: int = 25, status: 
 def person_new(request: Request, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     return templates.TemplateResponse(
         request,
@@ -207,7 +207,7 @@ async def person_booklet_pdf(request: Request, person_id: int):
 def person_edit(request: Request, person_id: int, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
-        raise HTTPException(status_code=403, detail="WRITE_MODE=true is required for changes")
+        raise HTTPException(status_code=403, detail="Редактирование выключено.")
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")

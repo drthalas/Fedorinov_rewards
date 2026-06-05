@@ -21,6 +21,7 @@ def _settings(**overrides) -> Settings:
         "read_only": True,
         "write_mode": False,
         "require_backup_before_write": True,
+        "require_backup_before_dangerous_actions": True,
         "update_check_enabled": True,
         "update_manifest_url": "https://example.test/latest.json",
         "update_timeout_seconds": 10,
@@ -70,7 +71,7 @@ class UpdateCheckerTests(unittest.TestCase):
             self.assertEqual(timeout, 10)
             return _manifest_bytes(
                 {
-                    "version": "0.1.2",
+                    "version": "0.1.3",
                     "released_at": "2026-06-04",
                     "download_url": "https://example.test/app.zip",
                     "sha256": "abc",
@@ -80,7 +81,7 @@ class UpdateCheckerTests(unittest.TestCase):
 
         result = check_for_updates(_settings(), fetcher=fetcher)
         self.assertTrue(result["update_available"])
-        self.assertEqual(result["latest_version"], "0.1.2")
+        self.assertEqual(result["latest_version"], "0.1.3")
         self.assertEqual(result["notes"], ["Новая версия"])
 
     def test_update_checker_returns_no_update_for_same_version(self) -> None:
