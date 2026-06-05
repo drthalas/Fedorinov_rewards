@@ -60,26 +60,13 @@
     }
 
     function refresh(changedRole) {
-      const keepCategory = changedRole === "init" ? category.value : "";
-      const keepSubcategory = changedRole === "init" ? subcategory.value : "";
-      const keepName = changedRole === "init" ? name.value : "";
+      const selectedCategory = changedRole === "country" ? "" : category.value;
+      const selectedSubcategory = changedRole === "country" || changedRole === "category" ? "" : subcategory.value;
+      const selectedName = changedRole === "country" || changedRole === "category" || changedRole === "subcategory" ? "" : name.value;
 
-      if (changedRole === "country") {
-        category.value = "";
-        subcategory.value = "";
-        name.value = "";
-      }
-      if (changedRole === "category") {
-        subcategory.value = "";
-        name.value = "";
-      }
-      if (changedRole === "subcategory") {
-        name.value = "";
-      }
-
-      rebuildSelect(category, rowsFor(options, "category", country.value), keepCategory);
-      rebuildSelect(subcategory, rowsFor(options, "subcategory", category.value), keepSubcategory);
-      rebuildSelect(name, rowsFor(options, "name", subcategory.value), keepName);
+      rebuildSelect(category, rowsFor(options, "category", country.value), selectedCategory);
+      rebuildSelect(subcategory, rowsFor(options, "subcategory", selectedCategory), selectedSubcategory);
+      rebuildSelect(name, rowsFor(options, "name", selectedSubcategory), selectedName);
     }
 
     country.addEventListener("change", () => refresh("country"));

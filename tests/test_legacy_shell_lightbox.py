@@ -41,6 +41,33 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-detail-url", legacy_template)
         self.assertIn("dblclick", script)
 
+    def test_cascading_guides_preserve_changed_select_value(self) -> None:
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
+        legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
+        reward_form = (ROOT / "backend" / "app" / "templates" / "reward_form.html").read_text()
+        mark_form = (ROOT / "backend" / "app" / "templates" / "mark_form.html").read_text()
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        script = (ROOT / "backend" / "app" / "static" / "cascading_guides.js").read_text()
+
+        self.assertIn("cascading_guides.js", base)
+        self.assertIn("cascading_guides.js", legacy_base)
+        self.assertIn("data-guide-cascade-options", reward_form)
+        self.assertIn("data-guide-cascade-options", mark_form)
+        self.assertIn("data-guide-cascade-options", legacy_template)
+        self.assertIn('data-guide-role="category"', reward_form)
+        self.assertIn('data-guide-role="subcategory"', reward_form)
+        self.assertIn('data-guide-role="name"', reward_form)
+        self.assertIn('data-guide-role="category"', mark_form)
+        self.assertIn('data-guide-role="subcategory"', mark_form)
+        self.assertIn('data-guide-role="name"', mark_form)
+        self.assertIn('data-guide-role="category"', legacy_template)
+        self.assertIn('data-guide-role="subcategory"', legacy_template)
+        self.assertIn('data-guide-role="name"', legacy_template)
+        self.assertIn('const selectedCategory = changedRole === "country" ? "" : category.value;', script)
+        self.assertIn('const selectedSubcategory = changedRole === "country" || changedRole === "category" ? "" : subcategory.value;', script)
+        self.assertIn('rebuildSelect(subcategory, rowsFor(options, "subcategory", selectedCategory), selectedSubcategory);', script)
+        self.assertIn('rebuildSelect(name, rowsFor(options, "name", selectedSubcategory), selectedName);', script)
+
     def test_escape_back_script_is_loaded_on_forms(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
