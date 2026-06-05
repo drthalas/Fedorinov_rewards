@@ -145,7 +145,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     settings = get_settings()
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     safe_back = safe_return_to(return_to)
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
@@ -244,7 +244,7 @@ def person_edit(request: Request, person_id: int, return_to: str = ""):
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     return templates.TemplateResponse(
         request,
@@ -329,7 +329,7 @@ async def person_archive_folder(request: Request, person_id: int):
     return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}"
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     try:
         target_path = choose_save_path(
             default_filename=person_archive_filename(str(person.get("fio") or "person"), person_id),
@@ -353,7 +353,7 @@ def person_photos(request: Request, person_id: int, index: int | None = None, re
     settings = get_settings()
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     photos = person_photo_items(person, rewards)
     available_photos = [photo for photo in photos if photo.get("path")]

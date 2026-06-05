@@ -128,7 +128,7 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
             (*_as_params(data, fields), person_id),
         )
         if cursor.rowcount == 0:
-            raise PersonValidationError("Награжденный не найден")
+            raise PersonValidationError("Награжденный не найден.")
         connection.commit()
     log_action("update", "person", person_id, {"fields": list(fields)})
 
@@ -150,6 +150,6 @@ def delete_person(settings: Settings, person_id: int, confirm: bool = False) -> 
 
         cursor = connection.execute("delete from person where id = ?", (person_id,))
         if cursor.rowcount == 0:
-            raise PersonValidationError("Награжденный не найден")
+            raise PersonValidationError("Награжденный не найден.")
         connection.commit()
     log_action("delete", "person", person_id, {"blocked_if_rewards": True})

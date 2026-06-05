@@ -1,0 +1,264 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import asyncio
+import os
+import sqlite3
+import unittest
+from datetime import date
+from urllib.parse import urlencode
+from unittest.mock import patch
+
+from backend.app.routers import guides as guides_router
+from backend.app.routers import marks as marks_router
+from backend.app.routers import persons as persons_router
+from backend.app.routers import rewards as rewards_router
+from backend.app.repositories.guides_write import GuideValidationError, rank_data_from_mapping
+
+
+class FakeRequest:
+    def __init__(self, values: dict[str, object]):
+        self._body = urlencode(values).encode("utf-8")
+
+    async def body(self) -> bytes:
+        return self._body
+
+
+def _template_result(_request, name: str, context: dict[str, object], **kwargs):
+    return {
+        "template": name,
+        "context": context,
+        "status_code": kwargs.get("status_code", 200),
+    }
+
+
+class FormPolishTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.db_path = self.root / "database" / "MyDatabase.sqlite"
+        self.db_path.parent.mkdir(parents=True)
+        os.environ["REWARDS_DATA_DIR"] = str(self.root)
+        os.environ["REWARDS_DB_PATH"] = str(self.db_path)
+        os.environ["READ_ONLY"] = "false"
+        os.environ["WRITE_MODE"] = "true"
+        os.environ["REQUIRE_BACKUP_BEFORE_WRITE"] = "false"
+        os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
+        self._create_db()
+
+    def tearDown(self) -> None:
+        for key in [
+            "REWARDS_DATA_DIR",
+            "REWARDS_DB_PATH",
+            "READ_ONLY",
+            "WRITE_MODE",
+            "REQUIRE_BACKUP_BEFORE_WRITE",
+            "REWARDS_AUDIT_LOG",
+        ]:
+            os.environ.pop(key, None)
+        self.tmp.cleanup()
+
+    def _create_db(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("create table guide (id integer primary key, name text)")
+            connection.execute(
+                """
+                create table person (
+                    id integer primary key,
+                    fio text,
+                    birthday text,
+                    id_rank integer,
+                    link1 text,
+                    link2 text,
+                    comment text,
+                    biography text,
+                    person_foto text,
+                    main_foto text,
+                    rewards_foto text,
+                    book1_foto text,
+                    book2_foto text,
+                    card1_foto text,
+                    card2_foto text
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table rewards (
+                    id integer primary key,
+                    person_id integer,
+                    id_gos integer,
+                    id_catigory integer,
+                    id_sub_catigory integer,
+                    id_name integer,
+                    id_link text,
+                    number integer,
+                    instock boolean,
+                    date_purchase text,
+                    price_purchase integer,
+                    price_now integer,
+                    front_foto text,
+                    back_foto text,
+                    book1_foto text,
+                    book2_foto text,
+                    reward_list text
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table mark (
+                    id integer primary key,
+                    id_gos integer,
+                    id_catigory integer,
+                    id_sub_catigory integer,
+                    id_name integer,
+                    id_link text,
+                    number integer,
+                    instock boolean,
+                    date_purchase text,
+                    price_purchase integer,
+                    price_now integer,
+                    front_foto text,
+                    back_foto text,
+                    book1_foto text,
+                    book2_foto text
+                )
+                """
+            )
+            for level in range(5):
+                connection.execute(f"create table guide_lev_{level} (id integer primary key, idl integer, name text)")
+            connection.executemany("insert into guide (id, name) values (?, ?)", [(1, "Капитан"), (2, "Майор")])
+            connection.execute("insert into guide_lev_0 (id, idl, name) values (1, -1, 'СССР')")
+            connection.execute("insert into guide_lev_1 (id, idl, name) values (2, 1, 'Ордена')")
+            connection.execute("insert into guide_lev_2 (id, idl, name) values (3, 2, 'Боевые')")
+            connection.execute("insert into guide_lev_3 (id, idl, name) values (4, 3, 'Орден Красной Звезды')")
+            connection.execute("insert into guide_lev_1 (id, idl, name) values (90, 999, 'Лишняя категория')")
+            connection.execute("insert into guide_lev_2 (id, idl, name) values (91, 999, 'Лишняя подкатегория')")
+            connection.execute("insert into guide_lev_3 (id, idl, name) values (92, 999, 'Лишнее наименование')")
+            connection.execute(
+                """
+                insert into person (id, fio, birthday, id_rank, link1, link2, comment, biography)
+                values (1, 'Иванов Иван Иванович', '1913-05-09', 1, '', '', '', '')
+                """
+            )
+            connection.execute(
+                """
+                insert into rewards (id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number, date_purchase)
+                values (10, 1, 1, 2, 3, 4, 123, '2026-01-02')
+                """
+            )
+            connection.execute(
+                """
+                insert into mark (id, id_gos, id_catigory, id_sub_catigory, id_name, number, date_purchase)
+                values (20, 1, 2, 3, 4, 456, '2026-01-03')
+                """
+            )
+
+    def test_person_form_error_is_russian_and_preserves_values(self) -> None:
+        request = FakeRequest(
+            {
+                "fio": "Петров Пётр",
+                "birthday": "не дата",
+                "id_rank": "1",
+                "link1": "https://example.test/person",
+                "comment": "Комментарий",
+                "biography": "Биография",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = asyncio.run(persons_router.person_create(request))
+        context = response["context"]
+        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(context["error"], "Укажите дату в формате ДД.ММ.ГГГГ.")
+        self.assertEqual(context["person"]["fio"], "Петров Пётр")
+        self.assertEqual(context["person"]["link1"], "https://example.test/person")
+        self.assertEqual(context["person"]["comment"], "Комментарий")
+        self.assertEqual(context["person"]["biography"], "Биография")
+        self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
+
+    def test_reward_form_preserves_cascading_guides_after_validation_error(self) -> None:
+        request = FakeRequest(
+            {
+                "id_gos": "1",
+                "id_catigory": "2",
+                "id_sub_catigory": "3",
+                "id_name": "",
+                "number": "12345",
+                "price_now": "700",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = asyncio.run(rewards_router.reward_create(request, 1))
+        context = response["context"]
+        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(context["error"], "Выберите наименование награды.")
+        self.assertEqual(context["reward"]["number"], "12345")
+        self.assertEqual(context["reward"]["price_now"], "700")
+        self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
+        self.assertEqual([item["id"] for item in context["guides"]["categories"]], [2])
+        self.assertEqual([item["id"] for item in context["guides"]["subcategories"]], [3])
+        self.assertEqual([item["id"] for item in context["guides"]["names"]], [4])
+
+    def test_mark_form_preserves_cascading_guides_after_validation_error(self) -> None:
+        request = FakeRequest(
+            {
+                "id_gos": "1",
+                "id_catigory": "2",
+                "id_sub_catigory": "3",
+                "id_name": "",
+                "number": "54321",
+                "price_purchase": "500",
+                "return_to": "/legacy?tab=marks&mark_id=20",
+            }
+        )
+        with patch.object(marks_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = asyncio.run(marks_router.mark_create(request))
+        context = response["context"]
+        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(context["error"], "Выберите наименование знака.")
+        self.assertEqual(context["mark"]["number"], "54321")
+        self.assertEqual(context["mark"]["price_purchase"], "500")
+        self.assertEqual(context["return_to"], "/legacy?tab=marks&mark_id=20")
+        self.assertEqual([item["id"] for item in context["guides"]["categories"]], [2])
+        self.assertEqual([item["id"] for item in context["guides"]["subcategories"]], [3])
+        self.assertEqual([item["id"] for item in context["guides"]["names"]], [4])
+
+    def test_new_reward_and_mark_default_purchase_date_is_today(self) -> None:
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            reward_response = rewards_router.reward_new(object(), 1)
+        with patch.object(marks_router.templates, "TemplateResponse", side_effect=_template_result):
+            mark_response = marks_router.mark_new(object())
+        self.assertEqual(reward_response["context"]["reward"]["date_purchase"], date.today().isoformat())
+        self.assertEqual(mark_response["context"]["mark"]["date_purchase"], date.today().isoformat())
+
+    def test_empty_guide_item_is_blocked_with_russian_message(self) -> None:
+        with self.assertRaises(GuideValidationError) as exc:
+            rank_data_from_mapping({"name": ""})
+        self.assertEqual(str(exc.exception), "Заполните название.")
+
+        request = FakeRequest({"name": "", "return_to": "/guides?section=ranks"})
+        with patch.object(guides_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = asyncio.run(guides_router.rank_create(request))
+        context = response["context"]
+        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(context["error"], "Заполните название.")
+        self.assertEqual(context["rank"]["name"], "")
+        self.assertEqual(context["return_to"], "/guides?section=ranks")
+
+    def test_no_english_backup_write_error_in_templates(self) -> None:
+        templates_dir = Path(__file__).resolve().parents[1] / "backend" / "app" / "templates"
+        html = "\n".join(path.read_text(encoding="utf-8") for path in templates_dir.glob("*.html"))
+        forbidden = (
+            "Create a fresh backup before making changes",
+            "Read only",
+            "Write mode",
+            "Changes saved",
+        )
+        for phrase in forbidden:
+            self.assertNotIn(phrase, html)
+
+
+if __name__ == "__main__":
+    unittest.main()

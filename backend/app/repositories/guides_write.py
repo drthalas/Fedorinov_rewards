@@ -39,7 +39,7 @@ class GuideLevelData:
 def _name_from_mapping(values: dict[str, object]) -> str:
     name = str(values.get("name") or "").strip()
     if not name:
-        raise GuideValidationError("Название обязательно")
+        raise GuideValidationError("Заполните название.")
     return name
 
 
@@ -49,7 +49,7 @@ def rank_data_from_mapping(values: dict[str, object]) -> RankGuideData:
 
 def _validate_level(level: int) -> int:
     if level not in GUIDE_LEVELS:
-        raise GuideValidationError("Некорректный уровень справочника")
+        raise GuideValidationError("Некорректный уровень справочника.")
     return level
 
 
@@ -60,7 +60,7 @@ def _optional_int(value: object, default: int | None = None) -> int | None:
     try:
         return int(text)
     except ValueError as exc:
-        raise GuideValidationError("Некорректный родительский элемент") from exc
+        raise GuideValidationError("Некорректный родительский элемент.") from exc
 
 
 def guide_level_data_from_mapping(level: int, values: dict[str, object]) -> GuideLevelData:
@@ -71,7 +71,7 @@ def guide_level_data_from_mapping(level: int, values: dict[str, object]) -> Guid
     else:
         parent_id = _optional_int(values.get("parent_id"))
         if parent_id is None:
-            raise GuideValidationError("Выберите родительский элемент")
+            raise GuideValidationError("Выберите родительский элемент.")
     return GuideLevelData(level=safe_level, name=name, parent_id=parent_id)
 
 
@@ -88,7 +88,7 @@ def _validate_parent(connection, data: GuideLevelData) -> None:
     if data.level == 0:
         return
     if not _guide_item_exists(connection, data.level - 1, data.parent_id):
-        raise GuideValidationError("Родительский элемент не найден")
+        raise GuideValidationError("Родительский элемент не найден.")
 
 
 def create_rank(settings: Settings, data: RankGuideData) -> int:
@@ -106,7 +106,7 @@ def update_rank(settings: Settings, rank_id: int, data: RankGuideData) -> None:
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute("update guide set name = ? where id = ?", (data.name, rank_id))
         if cursor.rowcount == 0:
-            raise GuideValidationError("Звание/специальность не найдены")
+            raise GuideValidationError("Звание/специальность не найдены.")
         connection.commit()
     log_action("update", "guide_rank", rank_id, {"fields": ["name"]})
 
@@ -120,7 +120,7 @@ def delete_rank(settings: Settings, rank_id: int, confirm: bool = False) -> None
         raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _rank_exists(connection, rank_id):
-            raise GuideValidationError("Звание/специальность не найдены")
+            raise GuideValidationError("Звание/специальность не найдены.")
         used = connection.execute("select count(*) as count from person where id_rank = ?", (rank_id,)).fetchone()["count"]
         if int(used) > 0:
             raise GuideDeleteBlockedError("Нельзя удалить: значение используется в карточках награждённых.")
@@ -146,7 +146,7 @@ def create_guide_level_item(settings: Settings, data: GuideLevelData) -> int:
 def update_guide_level_item(settings: Settings, level: int, item_id: int, data: GuideLevelData) -> None:
     safe_level = _validate_level(level)
     if data.level != safe_level:
-        raise GuideValidationError("Некорректный уровень справочника")
+        raise GuideValidationError("Некорректный уровень справочника.")
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         _validate_parent(connection, data)
@@ -155,7 +155,7 @@ def update_guide_level_item(settings: Settings, level: int, item_id: int, data: 
             (data.parent_id, data.name, item_id),
         )
         if cursor.rowcount == 0:
-            raise GuideValidationError("Элемент справочника не найден")
+            raise GuideValidationError("Элемент справочника не найден.")
         connection.commit()
     log_action("update", f"guide_lev_{safe_level}", item_id, {"level": safe_level, "fields": ["idl", "name"]})
 
@@ -187,7 +187,7 @@ def delete_guide_level_item(settings: Settings, level: int, item_id: int, confir
         raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _guide_item_exists(connection, safe_level, item_id):
-            raise GuideValidationError("Элемент справочника не найден")
+            raise GuideValidationError("Элемент справочника не найден.")
         if safe_level < 4:
             child_count = connection.execute(
                 f"select count(*) as count from guide_lev_{safe_level + 1} where idl = ?",

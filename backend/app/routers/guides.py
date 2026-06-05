@@ -137,7 +137,7 @@ def rank_edit(request: Request, rank_id: int, return_to: str = ""):
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     rank = get_rank_guide_item(settings.rewards_db_path, rank_id)
     if rank is None:
-        raise HTTPException(status_code=404, detail="Rank guide item not found")
+        raise HTTPException(status_code=404, detail="Звание/специальность не найдены.")
     return templates.TemplateResponse(
         request,
         "rank_form.html",
@@ -189,7 +189,7 @@ def guide_level_new(request: Request, level: int, parent_id: int | None = None, 
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     if level not in LEVEL_LABELS:
-        raise HTTPException(status_code=404, detail="Guide level not found")
+        raise HTTPException(status_code=404, detail="Раздел справочника не найден.")
     item = {"level": level, "parent_id": parent_id if parent_id is not None else ""}
     return templates.TemplateResponse(
         request,
@@ -243,10 +243,10 @@ def guide_level_edit(request: Request, level: int, item_id: int, return_to: str 
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     if level not in LEVEL_LABELS:
-        raise HTTPException(status_code=404, detail="Guide level not found")
+        raise HTTPException(status_code=404, detail="Раздел справочника не найден.")
     item = get_guide_level_item(settings.rewards_db_path, level, item_id)
     if item is None:
-        raise HTTPException(status_code=404, detail="Guide item not found")
+        raise HTTPException(status_code=404, detail="Элемент справочника не найден.")
     return templates.TemplateResponse(
         request,
         "guide_level_form.html",

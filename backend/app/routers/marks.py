@@ -149,7 +149,7 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
     settings = get_settings()
     mark = get_mark(settings.rewards_db_path, mark_id)
     if mark is None:
-        raise HTTPException(status_code=404, detail="Mark not found")
+        raise HTTPException(status_code=404, detail="Знак не найден.")
     return templates.TemplateResponse(
         request,
         "mark_detail.html",
@@ -170,7 +170,7 @@ def mark_edit(request: Request, mark_id: int, return_to: str = ""):
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     mark = get_mark(settings.rewards_db_path, mark_id)
     if mark is None:
-        raise HTTPException(status_code=404, detail="Mark not found")
+        raise HTTPException(status_code=404, detail="Знак не найден.")
     return templates.TemplateResponse(
         request,
         "mark_form.html",

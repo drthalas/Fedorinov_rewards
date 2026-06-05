@@ -27,7 +27,7 @@ class BookletPDFResult:
 def person_booklet_context(settings: Settings, person_id: int, return_to: str = "") -> dict[str, object]:
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise BookletError("Награжденный не найден")
+        raise BookletError("Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     return {
         "person": person,
@@ -148,7 +148,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
 def person_booklet_filename(settings: Settings, person_id: int) -> str:
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise BookletError("Награжденный не найден")
+        raise BookletError("Награжденный не найден.")
     return f"{_safe_filename(str(person.get('fio') or 'person'))}_{person_id}_booklet_{_timestamp()}.pdf"
 
 

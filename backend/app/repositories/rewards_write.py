@@ -31,6 +31,17 @@ class RewardValidationError(ValueError):
     pass
 
 
+NUMERIC_FIELD_ERRORS = {
+    "id_gos": "Выберите корректное государство.",
+    "id_catigory": "Выберите корректную категорию.",
+    "id_sub_catigory": "Выберите корректную подкатегорию.",
+    "id_name": "Выберите корректное наименование награды.",
+    "number": "Укажите корректный номер награды.",
+    "price_purchase": "Укажите корректную цену покупки.",
+    "price_now": "Укажите корректную текущую цену.",
+}
+
+
 @dataclass(frozen=True)
 class RewardWriteData:
     id_gos: int | None = None
@@ -66,7 +77,7 @@ def _optional_int(values: dict[str, object], key: str) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise RewardValidationError(f"Некорректное числовое поле: {key}") from exc
+        raise RewardValidationError(NUMERIC_FIELD_ERRORS.get(key, "Укажите корректное числовое значение.")) from exc
 
 
 def _checkbox(value: object) -> bool:
@@ -133,7 +144,7 @@ def create_reward(settings: Settings, person_id: int, data: RewardWriteData) -> 
     _validate_required_name(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _person_exists(connection, person_id):
-            raise RewardValidationError("Награжденный не найден")
+            raise RewardValidationError("Награжденный не найден.")
         cursor = connection.execute(
             """
             insert into rewards (
@@ -159,7 +170,7 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
             (reward_id,),
         ).fetchone()
         if row is None:
-            raise RewardValidationError("Награда не найдена")
+            raise RewardValidationError("Награда не найдена.")
         person_id = int(row["person_id"])
         data = _preserve_existing_guide_ids(data, row)
         _validate_required_name(data)
@@ -174,7 +185,7 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
             (*_as_params(data), reward_id),
         )
         if cursor.rowcount == 0:
-            raise RewardValidationError("Награда не найдена")
+            raise RewardValidationError("Награда не найдена.")
         connection.commit()
     log_action("update", "reward", reward_id, {"fields": list(REWARD_FIELDS)})
     return person_id
@@ -187,7 +198,7 @@ def delete_reward(settings: Settings, reward_id: int, confirm: bool = False) -> 
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         row = connection.execute("select person_id from rewards where id = ?", (reward_id,)).fetchone()
         if row is None:
-            raise RewardValidationError("Награда не найдена")
+            raise RewardValidationError("Награда не найдена.")
         person_id = int(row["person_id"])
         connection.execute("delete from rewards where id = ?", (reward_id,))
         connection.commit()

@@ -30,6 +30,17 @@ class MarkValidationError(ValueError):
     pass
 
 
+NUMERIC_FIELD_ERRORS = {
+    "id_gos": "Выберите корректное государство.",
+    "id_catigory": "Выберите корректную категорию.",
+    "id_sub_catigory": "Выберите корректную подкатегорию.",
+    "id_name": "Выберите корректное наименование знака.",
+    "number": "Укажите корректный номер знака.",
+    "price_purchase": "Укажите корректную цену покупки.",
+    "price_now": "Укажите корректную текущую цену.",
+}
+
+
 @dataclass(frozen=True)
 class MarkWriteData:
     id_gos: int | None = None
@@ -64,7 +75,7 @@ def _optional_int(values: dict[str, object], key: str) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError) as exc:
-        raise MarkValidationError(f"Некорректное числовое поле: {key}") from exc
+        raise MarkValidationError(NUMERIC_FIELD_ERRORS.get(key, "Укажите корректное числовое значение.")) from exc
 
 
 def _checkbox(value: object) -> bool:
@@ -149,7 +160,7 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
             (mark_id,),
         ).fetchone()
         if existing_row is None:
-            raise MarkValidationError("Знак не найден")
+            raise MarkValidationError("Знак не найден.")
         data = _preserve_existing_guide_ids(data, existing_row)
         _validate_required_name(data)
         cursor = connection.execute(
@@ -163,7 +174,7 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
             (*_as_params(data), mark_id),
         )
         if cursor.rowcount == 0:
-            raise MarkValidationError("Знак не найден")
+            raise MarkValidationError("Знак не найден.")
         connection.commit()
     log_action("update", "mark", mark_id, {"fields": list(MARK_FIELDS)})
 
@@ -175,6 +186,6 @@ def delete_mark(settings: Settings, mark_id: int, confirm: bool = False) -> None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute("delete from mark where id = ?", (mark_id,))
         if cursor.rowcount == 0:
-            raise MarkValidationError("Знак не найден")
+            raise MarkValidationError("Знак не найден.")
         connection.commit()
     log_action("delete", "mark", mark_id, {"media_deleted": False})

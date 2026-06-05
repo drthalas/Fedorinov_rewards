@@ -77,7 +77,7 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
-        raise HTTPException(status_code=404, detail="Person not found")
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     reward = {"person_id": person_id, "instock": False, "date_purchase": date.today().isoformat()}
     return templates.TemplateResponse(
         request,
@@ -133,7 +133,7 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
     settings = get_settings()
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
-        raise HTTPException(status_code=404, detail="Reward not found")
+        raise HTTPException(status_code=404, detail="Награда не найдена.")
     return templates.TemplateResponse(
         request,
         "reward_detail.html",
@@ -154,7 +154,7 @@ def reward_edit(request: Request, reward_id: int, return_to: str = ""):
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
-        raise HTTPException(status_code=404, detail="Reward not found")
+        raise HTTPException(status_code=404, detail="Награда не найдена.")
     person = get_person(settings.rewards_db_path, int(reward["person_id"]))
     return templates.TemplateResponse(
         request,
