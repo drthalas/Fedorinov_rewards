@@ -7,6 +7,7 @@ import csv
 import io
 
 from ..db import open_readonly_connection, row_to_dict
+from ..services.display import format_date
 from .guides import list_guide_level
 
 
@@ -31,6 +32,16 @@ SUMMARY_CSV_HEADERS = [
     "Цена покупки",
     "Текущая цена",
     "Последняя дата приобретения",
+]
+
+SUMMARY_MATRIX_PHOTO_COLUMNS = [
+    ("person_foto", "Фото кавалера"),
+    ("main_foto", "Главное фото"),
+    ("rewards_foto", "Общее фото наград"),
+    ("book1_foto", "Фото наградной книжки, сторона 1"),
+    ("book2_foto", "Фото наградной книжки, сторона 2"),
+    ("card1_foto", "Фото учётной карточки, страница 1"),
+    ("card2_foto", "Фото учётной карточки, страница 2"),
 ]
 
 
@@ -112,6 +123,17 @@ def _where_clause(alias: str, filters: SummaryFilters, extra_name: str | None) -
     if not clauses:
         return "", params
     return "where " + " and ".join(clauses), params
+
+
+def _filters_active(filters: SummaryFilters) -> bool:
+    return any(
+        value is not None
+        for value in (filters.country_id, filters.category_id, filters.subcategory_id, filters.name_id)
+    ) or bool(filters.extra)
+
+
+def _has_value(value: object) -> int:
+    return 1 if str(value or "").strip() else 0
 
 
 def _source_query(table: str, alias: str, label: str, where_sql: str) -> tuple[str, list[object]]:
@@ -212,4 +234,151 @@ def summary_csv_text(rows: list[dict[str, object]]) -> str:
                 row.get("last_purchase_date") or "",
             ]
         )
+    return output.getvalue()
+
+
+def summary_matrix(db_path: Path, filters: SummaryFilters) -> dict[str, object]:
+    with closing(open_readonly_connection(db_path)) as connection:
+        extra_name = _extra_name(connection, filters.extra)
+        reward_where, reward_params = _where_clause("r", filters, extra_name)
+        active_filters = _filters_active(filters)
+        column_rows = connection.execute(
+            f"""
+            select
+                coalesce(r.id_name, 0) as id,
+                coalesce(nullif(g3.name, ''), '—') as name
+            from rewards r
+            left join guide_lev_3 g3 on g3.id = r.id_name
+            {reward_where}
+            group by coalesce(r.id_name, 0), coalesce(nullif(g3.name, ''), '—')
+            order by name
+            """,
+            tuple(reward_params),
+        ).fetchall()
+        reward_columns = [row_to_dict(row) for row in column_rows]
+        reward_column_ids = [int(row["id"]) for row in reward_columns]
+
+        person_where = ""
+        person_params: list[object] = []
+        if active_filters:
+            exists_where, exists_params = _where_clause("rx", filters, extra_name)
+            person_where = f"where exists (select 1 from rewards rx {exists_where} and rx.person_id = p.id)"
+            person_params.extend(exists_params)
+
+        person_rows_sql = connection.execute(
+            f"""
+            select
+                p.id,
+                p.fio,
+                p.birthday,
+                g.name as rank_name,
+                p.person_foto,
+                p.main_foto,
+                p.rewards_foto,
+                p.book1_foto,
+                p.book2_foto,
+                p.card1_foto,
+                p.card2_foto
+            from person p
+            left join guide g on g.id = p.id_rank
+            {person_where}
+            order by p.fio
+            """,
+            tuple(person_params),
+        ).fetchall()
+
+        count_rows = connection.execute(
+            f"""
+            select
+                r.person_id,
+                coalesce(r.id_name, 0) as name_id,
+                count(*) as count,
+                group_concat(nullif(trim(cast(r.number as text)), ''), ', ') as numbers
+            from rewards r
+            {reward_where}
+            group by r.person_id, coalesce(r.id_name, 0)
+            """,
+            tuple(reward_params),
+        ).fetchall()
+
+    counts: dict[tuple[int, int], int] = {}
+    numbers: dict[tuple[int, int], str] = {}
+    for row in count_rows:
+        key = (int(row["person_id"]), int(row["name_id"]))
+        counts[key] = int(row["count"] or 0)
+        numbers[key] = str(row["numbers"] or "").strip()
+
+    photo_totals = {field: 0 for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS}
+    reward_totals = {column_id: 0 for column_id in reward_column_ids}
+    person_rows: list[dict[str, object]] = []
+    selected_name_id = filters.name_id
+    for person_row in person_rows_sql:
+        person = row_to_dict(person_row)
+        person_id = int(person["id"])
+        photo_flags = {field: _has_value(person.get(field)) for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS}
+        for field, value in photo_flags.items():
+            photo_totals[field] += int(value)
+        reward_counts = {column_id: counts.get((person_id, column_id), 0) for column_id in reward_column_ids}
+        for column_id, value in reward_counts.items():
+            reward_totals[column_id] += int(value)
+        person_rows.append(
+            {
+                "id": person_id,
+                "fio": person.get("fio") or "—",
+                "rank_name": person.get("rank_name") or "—",
+                "birthday": person.get("birthday") or "",
+                "photo_flags": photo_flags,
+                "reward_counts": reward_counts,
+                "numbers": numbers.get((person_id, selected_name_id), "") if selected_name_id is not None else "",
+                "row_total": sum(int(value) for value in reward_counts.values()),
+            }
+        )
+
+    return {
+        "photo_columns": [{"field": field, "label": label} for field, label in SUMMARY_MATRIX_PHOTO_COLUMNS],
+        "reward_columns": reward_columns,
+        "rows": person_rows,
+        "photo_totals": photo_totals,
+        "reward_totals": reward_totals,
+        "person_total": len(person_rows),
+        "reward_total": sum(int(value) for value in reward_totals.values()),
+        "show_numbers": selected_name_id is not None,
+        "wide_warning": len(reward_columns) > 12,
+        "include_marks_note": filters.include_marks,
+    }
+
+
+def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
+    output = io.StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output)
+    photo_columns = list(matrix.get("photo_columns") or [])
+    reward_columns = list(matrix.get("reward_columns") or [])
+    show_numbers = bool(matrix.get("show_numbers"))
+    headers = ["ФИО", "Звание / специальность", "Дата рождения"]
+    headers.extend(str(column["label"]) for column in photo_columns)
+    headers.extend(str(column["name"]) for column in reward_columns)
+    if show_numbers:
+        headers.append("Номера")
+    headers.append("Итого наград")
+    writer.writerow(headers)
+    for row in matrix.get("rows") or []:
+        values = [row.get("fio") or "—", row.get("rank_name") or "—", format_date(row.get("birthday"))]
+        photo_flags = row.get("photo_flags") or {}
+        reward_counts = row.get("reward_counts") or {}
+        values.extend(int(photo_flags.get(column["field"], 0)) for column in photo_columns)
+        values.extend(int(reward_counts.get(int(column["id"]), 0)) for column in reward_columns)
+        if show_numbers:
+            values.append(row.get("numbers") or "")
+        values.append(int(row.get("row_total") or 0))
+        writer.writerow(values)
+    totals = ["Итого", f"Кавалеров: {matrix.get('person_total') or 0}", ""]
+    photo_totals = matrix.get("photo_totals") or {}
+    reward_totals = matrix.get("reward_totals") or {}
+    totals.extend(int(photo_totals.get(column["field"], 0)) for column in photo_columns)
+    totals.extend(int(reward_totals.get(int(column["id"]), 0)) for column in reward_columns)
+    if show_numbers:
+        totals.append("")
+    totals.append(int(matrix.get("reward_total") or 0))
+    writer.writerow(totals)
     return output.getvalue()

@@ -490,6 +490,12 @@ th {
   color: #1f2933;
 }
 
+.active-button {
+  color: #0f3f26;
+  border-color: #7bb784;
+  background: #d9f2dc;
+}
+
 .edit-form {
   max-width: 920px;
   background: #fff;
@@ -590,6 +596,14 @@ th {
   background: #edf7ed;
 }
 
+.summary-mode-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  grid-column: 1 / -1;
+}
+
 .summary-filter-form label span {
   display: block;
   margin-bottom: 4px;
@@ -635,6 +649,7 @@ th {
 
 .summary-matrix {
   font-size: 13px;
+  min-width: max-content;
 }
 
 .summary-matrix th {
@@ -666,6 +681,12 @@ th {
 .summary-total-row td {
   background: #cdebcf !important;
   font-weight: 700;
+}
+
+.person-reward-matrix th,
+.person-reward-matrix td {
+  max-width: 220px;
+  white-space: nowrap;
 }
 
 .number-cell {

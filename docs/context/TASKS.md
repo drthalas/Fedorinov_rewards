@@ -449,6 +449,26 @@ Next:
 - Owner QA for empty category searches and form-to-guide return flow.
 - Database-backed live search suggestions/datalist remain deferred.
 
+## Iteration 3: Summary Matrix By Persons And Rewards
+
+Status: done/current.
+
+Scope:
+
+- Added the default `Шахматка по кавалерам` mode to `/legacy?tab=summary`.
+- Rows are decorated persons; columns are reward names selected by the existing guide filters.
+- Person photo/document columns show `1` when a field has a linked photo/path and `0` when empty.
+- Reward cells show the count of matching rewards for that person, so duplicate rewards show `2+` instead of only `1`.
+- A highlighted totals row sums person photo/document columns and reward columns.
+- Added `/summary_matrix.csv` with UTF-8 BOM for Excel, Russian headers, matrix values, and totals.
+- Kept the previous aggregate table as `summary_mode=aggregate` with `/summary.csv`.
+
+Next:
+
+- Owner QA for examples such as country/category/name matrix filters.
+- Cascading guide selects and sticky first columns remain deferred UX polish.
+- Further refine reward number columns after owner QA if more detail is needed.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.

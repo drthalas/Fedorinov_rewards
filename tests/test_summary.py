@@ -5,8 +5,15 @@ import sqlite3
 import unittest
 
 from backend.app.main import app
-from backend.app.repositories.summary import parse_optional_int, normalized_summary_filters, summary_csv_text, summary_rows
-from backend.app.routers.legacy import summary_csv
+from backend.app.repositories.summary import (
+    normalized_summary_filters,
+    parse_optional_int,
+    summary_csv_text,
+    summary_matrix,
+    summary_matrix_csv_text,
+    summary_rows,
+)
+from backend.app.routers.legacy import summary_csv, summary_matrix_csv
 
 
 class SummaryTests(unittest.TestCase):
@@ -33,14 +40,34 @@ class SummaryTests(unittest.TestCase):
         try:
             for level in range(5):
                 connection.execute(f"create table guide_lev_{level} (id integer primary key, idl integer, name text)")
+            connection.execute("create table guide (id integer primary key, name text)")
+            connection.execute(
+                """
+                create table person (
+                    id integer primary key,
+                    fio text,
+                    birthday text,
+                    id_rank integer,
+                    person_foto text,
+                    main_foto text,
+                    rewards_foto text,
+                    book1_foto text,
+                    book2_foto text,
+                    card1_foto text,
+                    card2_foto text
+                )
+                """
+            )
             connection.execute(
                 """
                 create table rewards (
                     id integer primary key,
+                    person_id integer,
                     id_gos integer,
                     id_catigory integer,
                     id_sub_catigory integer,
                     id_name integer,
+                    number text,
                     id_link text,
                     instock boolean,
                     date_purchase text,
@@ -70,16 +97,29 @@ class SummaryTests(unittest.TestCase):
             connection.execute("insert into guide_lev_2 values (1, 1, 'Боевые')")
             connection.execute("insert into guide_lev_3 values (1, 1, 'Орден Тестовый')")
             connection.execute("insert into guide_lev_4 values (1, 1, 'extra-link')")
+            connection.execute("insert into guide values (1, 'Капитан')")
             connection.execute(
                 """
-                insert into rewards
-                values (10, 1, 1, 1, 1, 'extra-link', 1, '2024-01-01', 100, 200)
+                insert into person
+                values (1, 'Иванов Иван', '1901-02-03', 1, 'Source/1/person.jpg', '', 'Source/1/rewards.jpg', '', '', 'Source/1/card1.jpg', '')
+                """
+            )
+            connection.execute(
+                """
+                insert into person
+                values (2, 'Петров Петр', '1902', 1, '', '', '', '', '', '', '')
                 """
             )
             connection.execute(
                 """
                 insert into rewards
-                values (11, 1, 1, 1, 1, 'other-link', 0, '2024-02-01', 300, 400)
+                values (10, 1, 1, 1, 1, 1, 'A-1', 'extra-link', 1, '2024-01-01', 100, 200)
+                """
+            )
+            connection.execute(
+                """
+                insert into rewards
+                values (11, 2, 1, 1, 1, 1, 'B-1', 'other-link', 0, '2024-02-01', 300, 400)
                 """
             )
             connection.execute(
@@ -131,11 +171,63 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Страна", text)
         self.assertIn("Орден Тестовый", text)
 
+    def test_matrix_generates_person_rows_and_reward_columns(self) -> None:
+        matrix = summary_matrix(self.db_path, normalized_summary_filters())
+        self.assertEqual(matrix["person_total"], 2)
+        self.assertEqual(matrix["reward_columns"][0]["name"], "Орден Тестовый")
+        self.assertEqual(matrix["rows"][0]["photo_flags"]["person_foto"], 1)
+        self.assertEqual(matrix["rows"][1]["photo_flags"]["person_foto"], 0)
+        self.assertEqual(matrix["reward_total"], 2)
+
+    def test_matrix_filters_affect_reward_columns(self) -> None:
+        empty = summary_matrix(self.db_path, normalized_summary_filters(country_id=999))
+        self.assertEqual(empty["reward_columns"], [])
+        self.assertEqual(empty["rows"], [])
+        filtered = summary_matrix(self.db_path, normalized_summary_filters(country_id=1, name_id=1))
+        self.assertEqual(len(filtered["reward_columns"]), 1)
+        self.assertTrue(filtered["show_numbers"])
+
+    def test_matrix_duplicate_rewards_produce_count_above_one(self) -> None:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute(
+                """
+                insert into rewards
+                values (12, 1, 1, 1, 1, 1, 'A-2', 'extra-link', 1, '2024-03-01', 100, 200)
+                """
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+        row = next(item for item in matrix["rows"] if item["id"] == 1)
+        self.assertEqual(row["row_total"], 2)
+        self.assertIn("A-1", row["numbers"])
+        self.assertIn("A-2", row["numbers"])
+
+    def test_matrix_csv_uses_bom_and_contains_columns(self) -> None:
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+        text = summary_matrix_csv_text(matrix)
+        self.assertTrue(text.startswith("\ufeff"))
+        self.assertIn("ФИО", text)
+        self.assertIn("Орден Тестовый", text)
+        self.assertIn("Фото кавалера", text)
+        self.assertNotIn("Source/1/person.jpg", text)
+
     def test_summary_csv_route_returns_csv_response(self) -> None:
         response = summary_csv(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/csv", response.media_type)
         self.assertIn("Орден Тестовый", response.body.decode("utf-8"))
+
+    def test_summary_matrix_csv_route_returns_csv_response(self) -> None:
+        response = summary_matrix_csv(country_id="", category_id="", subcategory_id="", name_id="1", extra="", include_marks="")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/csv", response.media_type)
+        text = response.body.decode("utf-8")
+        self.assertTrue(text.startswith("\ufeff"))
+        self.assertIn("ФИО", text)
+        self.assertIn("Орден Тестовый", text)
 
     def test_summary_routes_are_registered(self) -> None:
         legacy_routes = [
@@ -147,9 +239,13 @@ class SummaryTests(unittest.TestCase):
         csv_head_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/summary.csv" and "HEAD" in getattr(route, "methods", set())
         ]
+        matrix_csv_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.csv" and "GET" in getattr(route, "methods", set())
+        ]
         self.assertTrue(legacy_routes)
         self.assertTrue(csv_routes)
         self.assertTrue(csv_head_routes)
+        self.assertTrue(matrix_csv_routes)
 
     def test_summary_repository_uses_parameter_placeholders(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "backend" / "app" / "repositories" / "summary.py").read_text()

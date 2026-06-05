@@ -1,5 +1,13 @@
 # Changelog
 
+## Iteration 3 Summary Matrix By Persons And Rewards
+
+- Added a default `Шахматка по кавалерам` mode to `/legacy?tab=summary`.
+- Matrix rows are decorated persons, reward names become columns, and values show `0`, `1`, or duplicate counts.
+- Added person photo/document presence columns and a highlighted totals row.
+- Added `/summary_matrix.csv` export with UTF-8 BOM for Excel while keeping the existing aggregate `/summary.csv`.
+- Kept PDF export disabled and cascading select narrowing deferred.
+
 ## v0.1.1 Release Notes Correction
 
 - Expanded `release_notes/0.1.1.md` to include all owner-facing improvements from the release: rewards filters, totals, search, contextual guides, return navigation, and update progress.

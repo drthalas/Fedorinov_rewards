@@ -40,10 +40,10 @@ This inventory is based on read-only review of `Form1.cs`, `Form1.Designer.cs`, 
 - controls: reward/mark mode selector, stock filter, guide-level filters, CSV export button, PDF export button.
 - main panel: generated `dataGridView6` with dynamic columns for reward/mark summary.
 - buttons/actions: build summary, remove zero rows/columns, total rows, export CSV, configure PDF through `Form7` or `Form8`.
-- current web equivalent: `/legacy?tab=summary` with country/category/subcategory/name/extra filters, optional marks checkbox, green summary matrix, totals, and `/summary.csv` export.
-- missing: exact dynamic matrix parity, stock-only filter, and PDF export options/output.
+- current web equivalent: `/legacy?tab=summary` defaults to `Шахматка по кавалерам`, with persons as rows, reward names as columns, photo/document flags, duplicate counts, totals, and `/summary_matrix.csv`; aggregate mode remains as `summary_mode=aggregate` with `/summary.csv`.
+- missing: PDF export options/output, sticky first columns, dependent guide selects, and exact zero row/column cleanup parity.
 - write/unsafe actions: CSV/PDF writes generated files outside DB; clicking rows opens edit forms in legacy.
-- safe links/buttons now: read-only filtered summary matrix and CSV export; PDF button remains disabled.
+- safe links/buttons now: read-only filtered person/reward matrix, aggregate summary mode, and CSV exports; PDF button remains disabled.
 
 ## Tab: О программе
 

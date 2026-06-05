@@ -154,12 +154,14 @@ Summary supports read-only filter parameters:
 Examples:
 
 ```text
-/legacy?tab=summary&include_marks=true
-/legacy?tab=summary&country_id=1
+/legacy?tab=summary
+/legacy?tab=summary&summary_mode=matrix&country_id=1
+/legacy?tab=summary&summary_mode=aggregate&include_marks=true
+/summary_matrix.csv?country_id=1
 /summary.csv?include_marks=true
 ```
 
-The summary CSV export uses UTF-8 with BOM for Excel compatibility and does not include photos or personal comments.
+The default summary mode is the person/reward matrix: rows are decorated persons, reward names become columns, photo/document presence is shown as `1`/`0`, duplicate rewards are counted as `2+`, and totals are shown at the bottom. `/summary_matrix.csv` exports the same matrix with UTF-8 BOM for Excel compatibility. The older aggregate summary remains available as `summary_mode=aggregate` with `/summary.csv`.
 
 Start the backend on the Mac mini:
 
@@ -195,7 +197,7 @@ The legacy-style desktop mirror is available at:
 - `/legacy?tab=rewards` - old main rewards tab structure with person list, selected rewards, links, booklet placeholder, and photos.
 - `/legacy?tab=search` - grouped search in the legacy tab shell.
 - `/legacy?tab=marks` - standalone marks tab with selected mark detail.
-- `/legacy?tab=summary` - filtered green summary matrix with optional marks and CSV export.
+- `/legacy?tab=summary` - default person × rewards matrix with photo/document flags, totals, filters, and CSV export; aggregate summary remains available from the mode switch.
 - `/legacy?tab=about` - preview status, mode, data directory, and commit.
 
 CRUD buttons inside `/legacy` are visible only in development write mode and reuse the existing guarded person, reward, and mark routes.

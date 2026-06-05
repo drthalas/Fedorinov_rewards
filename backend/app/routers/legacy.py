@@ -17,6 +17,8 @@ from ..repositories.persons import get_person, list_person_rewards
 from ..repositories.search import search_all
 from ..repositories.summary import (
     normalized_summary_filters,
+    summary_matrix,
+    summary_matrix_csv_text,
     summary_csv_text,
     summary_guide_options,
     summary_rows,
@@ -57,6 +59,12 @@ def _summary_query_params(filters) -> dict[str, object]:
     if filters.include_marks:
         params["include_marks"] = "true"
     return params
+
+
+def _summary_url(filters, summary_mode: str) -> str:
+    params = {"tab": "summary", "summary_mode": summary_mode}
+    params.update(_summary_query_params(filters))
+    return str(URL(path="/legacy").include_query_params(**params))
 
 
 def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, object]:
@@ -137,10 +145,12 @@ def legacy_index(
     name_id: str | None = None,
     extra: str = "",
     include_marks: str | None = None,
+    summary_mode: str = "matrix",
     check_updates: str | None = None,
 ):
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
+    active_summary_mode = "aggregate" if summary_mode == "aggregate" else "matrix"
     rewards_filters = normalized_legacy_rewards_filters(
         rank_id=rank_id,
         country_id=country_id,
@@ -206,7 +216,12 @@ def legacy_index(
         "summary_options": {"countries": [], "categories": [], "subcategories": [], "names": [], "extras": []},
         "summary_rows": [],
         "summary_totals": {"total": 0, "in_stock": 0, "not_in_stock": 0, "price_purchase_sum": 0, "price_now_sum": 0},
+        "summary_mode": active_summary_mode,
         "summary_csv_url": "/summary.csv",
+        "summary_matrix": None,
+        "summary_matrix_csv_url": "/summary_matrix.csv",
+        "summary_matrix_mode_url": "/legacy?tab=summary&summary_mode=matrix",
+        "summary_aggregate_mode_url": "/legacy?tab=summary&summary_mode=aggregate",
         "commit": _current_commit(),
         "app_name": APP_NAME,
         "app_version": APP_VERSION,
@@ -259,6 +274,12 @@ def legacy_index(
         context["summary_rows"] = rows
         context["summary_totals"] = summary_totals(rows)
         context["summary_csv_url"] = str(URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"])))
+        context["summary_matrix"] = summary_matrix(settings.rewards_db_path, context["summary_filters"])
+        context["summary_matrix_csv_url"] = str(
+            URL(path="/summary_matrix.csv").include_query_params(**_summary_query_params(context["summary_filters"]))
+        )
+        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix")
+        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate")
 
     if active_tab == "about" and context["check_updates"]:
         context["update_check"] = check_for_updates(settings)
@@ -315,6 +336,58 @@ def summary_csv_head(
         status_code=200,
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
+    )
+
+
+@router.get("/summary_matrix.csv")
+def summary_matrix_csv(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    settings = get_settings()
+    matrix = {"photo_columns": [], "reward_columns": [], "rows": [], "photo_totals": {}, "reward_totals": {}, "person_total": 0, "reward_total": 0}
+    if settings.db_exists:
+        filters = normalized_summary_filters(
+            country_id=country_id,
+            category_id=category_id,
+            subcategory_id=subcategory_id,
+            name_id=name_id,
+            extra=extra,
+            include_marks=include_marks,
+        )
+        matrix = summary_matrix(settings.rewards_db_path, filters)
+    return Response(
+        content=summary_matrix_csv_text(matrix),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
+    )
+
+
+@router.head("/summary_matrix.csv")
+def summary_matrix_csv_head(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    return Response(
+        status_code=200,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
     )
 
 

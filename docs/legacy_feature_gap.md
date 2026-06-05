@@ -20,7 +20,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Rewards tab layout | Form1 | Implemented as `/legacy?tab=rewards` using existing guarded CRUD links; main list filters, totals, safe links, and double-click card open added in Iteration 1 | Delete controls must remain POST-only and write-mode gated; dependent guide selects still need UX polish | Stage 3E plus Iteration 1 | only for writes | only for writes |
 | Search tab layout | Form1 | Reworked in Stage 3G with category, condition, value, grouped result tables, counts, and reset; Iteration 2 adds empty-category search and disables browser history suggestions | Database-backed live suggestions and auto-submit JS still deferred | Stage 3G plus Iteration 2 | no | no |
 | Marks tab layout | Form1 | Implemented as `/legacy?tab=marks` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
-| Summary tab matrix | Form1 | Implemented as `/legacy?tab=summary` with guide filters, optional marks, green matrix rows, totals, and CSV export | Exact dynamic matrix and PDF parity still deferred | Stage 3J plus later PDF stage | no | no |
+| Summary tab matrix | Form1 | Implemented as `/legacy?tab=summary` default `Шахматка по кавалерам`: persons as rows, reward names as columns, photo/document flags, duplicate counts, totals, and `/summary_matrix.csv`; aggregate summary remains as `summary_mode=aggregate` | Sticky columns, dependent selects, and PDF parity still deferred | Stage 3J plus Iteration 3 and later PDF stage | no | no |
 | About tab | Form1, StringCipher | Implemented as `/legacy?tab=about` preview/status page | Activation/licensing workflow deferred | Stage 3E | no | no |
 
 ## Rewards
@@ -70,8 +70,8 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | --- | --- | --- | --- | --- | --- | --- |
 | Legacy filters | Form1 | Search filters implemented for all/persons/rewards/marks; empty specific-category searches show all category records; main rewards screen filters implemented for rank and reward guide levels | Dependent select narrowing and database-backed suggestions are still deferred | Stage 3G plus Iterations 1-2 | no | no |
 | Search CSV export | Form1 | Implemented as read-only `/search.csv` | Output parity with legacy export can still be refined | Stage 3G | no | no |
-| Summary CSV export | Form1 | Implemented as read-only `/summary.csv` using current summary filters | PDF and exact Excel-style layout parity still deferred | Stage 3J | no | no |
-| Summary tables | Form1 | Implemented with guide-level filters, optional marks, stock counts, prices, and last purchase date | Exact legacy matrix shape and stock-only filters can still be refined | Stage 3J | no | no |
+| Summary CSV export | Form1 | Implemented as read-only `/summary_matrix.csv` for the кавалеры × награды matrix and `/summary.csv` for aggregate summary | PDF export still deferred | Stage 3J plus Iteration 3 | no | no |
+| Summary tables | Form1 | Implemented with guide-level filters, default person/reward matrix, aggregate fallback mode, optional mark aggregate mode, totals, and CSV exports | Sticky first columns, cascading selects, and further reward-number layout can still be refined | Stage 3J plus Iteration 3 | no | no |
 
 ## Activation / Licensing
 

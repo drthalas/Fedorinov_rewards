@@ -423,6 +423,11 @@
       {% if summary %}
         <form class="summary-filter-form" method="get" action="/legacy">
           <input type="hidden" name="tab" value="summary">
+          <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
+          <div class="summary-mode-switch" aria-label="Режим сводной таблицы">
+            <a class="button {{ 'active-button' if summary_mode == 'matrix' else 'secondary-button' }}" href="{{ summary_matrix_mode_url }}">Шахматка по кавалерам</a>
+            <a class="button {{ 'active-button' if summary_mode == 'aggregate' else 'secondary-button' }}" href="{{ summary_aggregate_mode_url }}">Свод по наградам</a>
+          </div>
           <label>
             <span>Страна</span>
             <select name="country_id">
@@ -475,7 +480,8 @@
           <div class="summary-filter-actions">
             <button type="submit">Показать</button>
             <a class="button secondary-button" href="/legacy?tab=summary">Сброс</a>
-            <a class="button secondary-button" href="{{ summary_csv_url }}">CSV</a>
+            <a class="button secondary-button" href="{{ summary_matrix_csv_url }}">CSV шахматка</a>
+            <a class="button secondary-button" href="{{ summary_csv_url }}">CSV свод</a>
             <span class="button secondary-button disabled-button">PDF</span>
           </div>
         </form>
@@ -485,6 +491,67 @@
           <div class="card"><strong>Наград</strong><br>{{ summary.counts.rewards }}</div>
           <div class="card"><strong>Знаков</strong><br>{{ summary.counts.mark }}</div>
         </div>
+        {% if summary_mode == "matrix" %}
+        {% if summary_matrix.wide_warning %}
+        <section class="notice">Выбрано много наград, таблица может быть широкой. Используйте фильтры или CSV.</section>
+        {% endif %}
+        {% if summary_matrix.include_marks_note %}
+        <p class="secondary">Знаки не привязаны к кавалерам, поэтому в шахматке учитываются только награды. Для знаков используйте режим “Свод по наградам”.</p>
+        {% endif %}
+        <div class="legacy-table-wrap summary-matrix-wrap">
+          <table class="legacy-table summary-matrix person-reward-matrix">
+            <thead>
+              <tr>
+                <th>ФИО кавалера</th>
+                <th>Звание / специальность</th>
+                <th>Дата рождения</th>
+                {% for column in summary_matrix.photo_columns %}
+                <th>{{ column.label }}</th>
+                {% endfor %}
+                {% for column in summary_matrix.reward_columns %}
+                <th>{{ column.name|dash }}</th>
+                {% endfor %}
+                {% if summary_matrix.show_numbers %}<th>Номера</th>{% endif %}
+                <th>Итого наград</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in summary_matrix.rows %}
+              <tr>
+                <td><a href="/persons/{{ row.id }}?return_to=/legacy%3Ftab%3Dsummary%26summary_mode%3Dmatrix">{{ row.fio|dash }}</a></td>
+                <td>{{ row.rank_name|dash }}</td>
+                <td>{{ row.birthday|format_date }}</td>
+                {% for column in summary_matrix.photo_columns %}
+                <td class="number-cell {{ 'stock-yes' if row.photo_flags.get(column.field) else 'stock-no' }}">{{ row.photo_flags.get(column.field, 0) }}</td>
+                {% endfor %}
+                {% for column in summary_matrix.reward_columns %}
+                {% set count = row.reward_counts.get(column.id, 0) %}
+                <td class="number-cell {{ 'stock-yes' if count else 'stock-no' }}">{{ count }}</td>
+                {% endfor %}
+                {% if summary_matrix.show_numbers %}<td>{{ row.numbers|dash }}</td>{% endif %}
+                <td class="number-cell">{{ row.row_total }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="12">По выбранным фильтрам записей нет.</td></tr>
+              {% endfor %}
+              <tr class="summary-total-row">
+                <td>Итого</td>
+                <td>Кавалеров: {{ summary_matrix.person_total }}</td>
+                <td>—</td>
+                {% for column in summary_matrix.photo_columns %}
+                <td class="number-cell">{{ summary_matrix.photo_totals.get(column.field, 0) }}</td>
+                {% endfor %}
+                {% for column in summary_matrix.reward_columns %}
+                <td class="number-cell">{{ summary_matrix.reward_totals.get(column.id, 0) }}</td>
+                {% endfor %}
+                {% if summary_matrix.show_numbers %}<td>—</td>{% endif %}
+                <td class="number-cell">{{ summary_matrix.reward_total }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="secondary">В ячейках показано количество наград выбранного наименования у кавалера: 0, 1 или больше.</p>
+        {% else %}
         <div class="legacy-table-wrap summary-matrix-wrap">
           <table class="legacy-table summary-matrix">
             <thead>
@@ -531,6 +598,7 @@
           </table>
         </div>
         <p class="secondary">По умолчанию таблица показывает награды. Чтобы включить знаки, отметьте “Знаки” и нажмите “Показать”.</p>
+        {% endif %}
       {% endif %}
     </section>
   {% elif tab == "about" %}
