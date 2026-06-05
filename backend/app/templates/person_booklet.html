@@ -12,12 +12,15 @@
     <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
     <form method="post" action="/persons/{{ person.id }}/booklet.pdf">
       <input type="hidden" name="return_to" value="{{ return_to }}">
-      <button type="submit">Скачать PDF</button>
+      <button type="submit">Сохранить PDF</button>
     </form>
   </header>
 
   {% if error %}
   <section class="notice notice-error no-print">{{ error }}</section>
+  {% endif %}
+  {% if message %}
+  <section class="notice notice-success no-print">{{ message }}</section>
   {% endif %}
 
   <main class="booklet-document">

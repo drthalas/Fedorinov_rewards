@@ -153,7 +153,7 @@ class PersonBookletTests(unittest.TestCase):
         self.assertIn("Иванов Иван", rendered)
         self.assertIn("Биография", rendered)
         self.assertIn("Guide 3", rendered)
-        self.assertIn("Скачать PDF", rendered)
+        self.assertIn("Сохранить PDF", rendered)
 
     def test_missing_and_unsafe_photos_do_not_crash_or_get_included(self) -> None:
         context = person_booklet_context(persons_router.get_settings(), 1)
@@ -170,17 +170,30 @@ class PersonBookletTests(unittest.TestCase):
         after = self._counts()
         self.assertEqual(after, before)
 
-    def test_pdf_route_returns_file_response_when_generator_succeeds(self) -> None:
-        pdf_path = self.root / "generated" / "booklets" / "test.pdf"
-        pdf_path.parent.mkdir(parents=True)
-        pdf_path.write_bytes(b"%PDF-1.4\n%fake\n")
+    def test_pdf_route_saves_to_selected_path_when_generator_succeeds(self) -> None:
+        selected_path = self.root / "selected" / "test.pdf"
         with patch.object(
             persons_router,
+            "choose_save_path",
+            return_value=selected_path,
+        ), patch.object(
+            persons_router,
             "generate_person_booklet_pdf",
-            return_value=BookletPDFResult(path=pdf_path, filename="test.pdf"),
+            return_value=BookletPDFResult(path=selected_path, filename="test.pdf"),
         ):
             response = asyncio.run(persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1"}), 1))
-        self.assertEqual(response.media_type, "application/pdf")
+        self.assertEqual(response.status_code, 303)
+        self.assertIn("message=", response.headers["location"])
+
+    def test_pdf_route_cancel_does_not_generate_file(self) -> None:
+        with patch.object(
+            persons_router,
+            "choose_save_path",
+            side_effect=persons_router.SaveDialogCancelled("cancel"),
+        ), patch.object(persons_router, "generate_person_booklet_pdf") as generator:
+            response = asyncio.run(persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1"}), 1))
+        self.assertEqual(response.status_code, 303)
+        generator.assert_not_called()
 
     def test_generate_person_booklet_pdf_creates_pdf_when_reportlab_available(self) -> None:
         try:
@@ -192,6 +205,16 @@ class PersonBookletTests(unittest.TestCase):
         self.assertEqual(result.path.suffix, ".pdf")
         self.assertIn("generated", result.path.parts)
         self.assertTrue(result.path.read_bytes().startswith(b"%PDF"))
+
+    def test_generate_person_booklet_pdf_can_write_selected_path(self) -> None:
+        try:
+            import reportlab  # noqa: F401
+        except ImportError:
+            self.skipTest("reportlab is not installed")
+        selected_path = self.root / "chosen" / "custom.pdf"
+        result = generate_person_booklet_pdf(persons_router.get_settings(), 1, output_path=selected_path)
+        self.assertEqual(result.path, selected_path.resolve())
+        self.assertTrue(result.path.exists())
 
     def test_generated_pdf_paths_are_ignored(self) -> None:
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")

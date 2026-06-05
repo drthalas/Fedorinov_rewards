@@ -1,8 +1,11 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import urlencode
+import asyncio
 import os
 import sqlite3
 import unittest
+from unittest.mock import patch
 
 from backend.app.main import app
 from backend.app.repositories.summary import (
@@ -13,7 +16,16 @@ from backend.app.repositories.summary import (
     summary_matrix_csv_text,
     summary_rows,
 )
-from backend.app.routers.legacy import summary_csv, summary_matrix_csv
+from backend.app.routers.legacy import summary_csv, summary_csv_save, summary_matrix_csv, summary_matrix_csv_save
+from backend.app.services.save_dialog import SaveDialogCancelled
+
+
+class FakeRequest:
+    def __init__(self, values: dict[str, object] | None = None):
+        self._body = urlencode(values or {}).encode("utf-8")
+
+    async def body(self) -> bytes:
+        return self._body
 
 
 class SummaryTests(unittest.TestCase):
@@ -228,6 +240,23 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(text.startswith("\ufeff"))
         self.assertIn("ФИО", text)
         self.assertIn("Орден Тестовый", text)
+
+    def test_summary_matrix_csv_save_writes_selected_path(self) -> None:
+        selected_path = self.root / "exports" / "matrix.csv"
+        request = FakeRequest({"name_id": "1", "return_to": "/legacy?tab=summary"})
+        with patch("backend.app.routers.legacy.choose_save_path", return_value=selected_path):
+            response = asyncio.run(summary_matrix_csv_save(request))
+        self.assertEqual(response.status_code, 303)
+        self.assertTrue(selected_path.exists())
+        self.assertIn("ФИО", selected_path.read_text(encoding="utf-8"))
+
+    def test_summary_csv_save_cancel_does_not_write(self) -> None:
+        selected_path = self.root / "exports" / "summary.csv"
+        request = FakeRequest({"return_to": "/legacy?tab=summary"})
+        with patch("backend.app.routers.legacy.choose_save_path", side_effect=SaveDialogCancelled("cancel")):
+            response = asyncio.run(summary_csv_save(request))
+        self.assertEqual(response.status_code, 303)
+        self.assertFalse(selected_path.exists())
 
     def test_summary_routes_are_registered(self) -> None:
         legacy_routes = [

@@ -45,7 +45,7 @@ def person_booklet_context(settings: Settings, person_id: int, return_to: str = 
     }
 
 
-def generate_person_booklet_pdf(settings: Settings, person_id: int) -> BookletPDFResult:
+def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path: Path | None = None) -> BookletPDFResult:
     context = person_booklet_context(settings, person_id)
     person = context["person"]
     rewards = context["rewards"]
@@ -63,10 +63,15 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int) -> BookletPD
     except ImportError as exc:
         raise BookletError("PDF-библиотека reportlab не установлена. Используйте печать страницы буклета в PDF.") from exc
 
-    output_dir = _booklet_output_dir(settings)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"{_safe_filename(str(person.get('fio') or 'person'))}_{person_id}_booklet_{_timestamp()}.pdf"
-    output_path = output_dir / filename
+    if output_path is None:
+        output_dir = _booklet_output_dir(settings)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = person_booklet_filename(settings, person_id)
+        output_path = output_dir / filename
+    else:
+        output_path = output_path.resolve()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        filename = output_path.name
 
     font_name = _register_pdf_font(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
@@ -138,6 +143,13 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int) -> BookletPD
 
     doc.build(story)
     return BookletPDFResult(path=output_path, filename=filename)
+
+
+def person_booklet_filename(settings: Settings, person_id: int) -> str:
+    person = get_person(settings.rewards_db_path, person_id)
+    if person is None:
+        raise BookletError("Награжденный не найден")
+    return f"{_safe_filename(str(person.get('fio') or 'person'))}_{person_id}_booklet_{_timestamp()}.pdf"
 
 
 def _booklet_output_dir(settings: Settings) -> Path:

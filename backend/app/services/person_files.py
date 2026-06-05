@@ -55,7 +55,7 @@ def open_person_folder(settings: Settings, person_id: int, opener=None) -> Path:
     return folder
 
 
-def archive_person_folder(settings: Settings, person_id: int, fio: str) -> ArchiveResult:
+def archive_person_folder(settings: Settings, person_id: int, fio: str, target_path: Path | None = None) -> ArchiveResult:
     folder, exists = person_folder_status(settings, person_id)
     if not exists:
         raise PersonFilesError("Каталог кавалера не найден.")
@@ -63,16 +63,20 @@ def archive_person_folder(settings: Settings, person_id: int, fio: str) -> Archi
     if not files:
         raise PersonFilesError("В каталоге кавалера нет файлов для архивации.")
 
-    archive_dir = (settings.rewards_data_dir / "archives").resolve()
-    root = settings.rewards_data_dir.resolve()
-    try:
-        archive_dir.relative_to(root)
-    except ValueError as exc:
-        raise PersonFilesError("Папка архивов находится вне папки данных") from exc
-    archive_dir.mkdir(parents=True, exist_ok=True)
-
-    filename = f"{_safe_filename(fio)}_{person_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-    archive_path = archive_dir / filename
+    if target_path is None:
+        archive_dir = (settings.rewards_data_dir / "archives").resolve()
+        root = settings.rewards_data_dir.resolve()
+        try:
+            archive_dir.relative_to(root)
+        except ValueError as exc:
+            raise PersonFilesError("Папка архивов находится вне папки данных") from exc
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        filename = person_archive_filename(fio, person_id)
+        archive_path = archive_dir / filename
+    else:
+        archive_path = target_path.resolve()
+        archive_path.parent.mkdir(parents=True, exist_ok=True)
+        filename = archive_path.name
     with ZipFile(archive_path, "w", compression=ZIP_DEFLATED) as archive:
         for path in files:
             archive.write(path, path.relative_to(folder).as_posix())
@@ -85,6 +89,10 @@ def archive_person_folder(settings: Settings, person_id: int, fio: str) -> Archi
     )
     log_action("person_folder_archived", "person", person_id, {"archive_filename": filename, "files": len(files)})
     return result
+
+
+def person_archive_filename(fio: str, person_id: int) -> str:
+    return f"{_safe_filename(fio)}_{person_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
 
 
 def _default_opener(path: Path) -> None:

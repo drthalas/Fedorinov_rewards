@@ -1424,6 +1424,25 @@ th {
   color: #475467;
 }
 
+.inline-export-row,
+.inline-save-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.link-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: #175cd3;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 @media print {
   body.booklet-page {
     background: #fff;

@@ -1,7 +1,9 @@
 from pathlib import Path
 import subprocess
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Request, Response
+from fastapi.responses import RedirectResponse
 from starlette.datastructures import URL
 
 from ..config import PROJECT_ROOT, get_settings
@@ -25,6 +27,7 @@ from ..repositories.summary import (
     summary_totals,
 )
 from ..services.update_checker import check_for_updates
+from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..version import APP_NAME, APP_VERSION
 from .templates import templates
 
@@ -65,6 +68,34 @@ def _summary_url(filters, summary_mode: str) -> str:
     params = {"tab": "summary", "summary_mode": summary_mode}
     params.update(_summary_query_params(filters))
     return str(URL(path="/legacy").include_query_params(**params))
+
+
+async def _read_form(request: Request) -> dict[str, object]:
+    body = (await request.body()).decode("utf-8")
+    parsed = parse_qs(body, keep_blank_values=True)
+    return {key: values[-1] if values else "" for key, values in parsed.items()}
+
+
+def _with_message(url: str, message: str) -> str:
+    if not url:
+        url = "/legacy?tab=summary"
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query = [(key, value) for key, value in query if key != "message"]
+    if message:
+        query.append(("message", message))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _write_csv_to_chosen_path(default_filename: str, title: str, content: str) -> Path:
+    target_path = choose_save_path(
+        default_filename=default_filename,
+        title=title,
+        filetypes=(("CSV", "*.csv"), ("Все файлы", "*.*")),
+    )
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(content, encoding="utf-8")
+    return target_path
 
 
 def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, object]:
@@ -315,6 +346,29 @@ def summary_csv(
     )
 
 
+@router.post("/summary.csv/save")
+async def summary_csv_save(request: Request):
+    form_values = await _read_form(request)
+    return_to = str(form_values.get("return_to") or "/legacy?tab=summary&summary_mode=aggregate")
+    filters = normalized_summary_filters(
+        country_id=str(form_values.get("country_id") or ""),
+        category_id=str(form_values.get("category_id") or ""),
+        subcategory_id=str(form_values.get("subcategory_id") or ""),
+        name_id=str(form_values.get("name_id") or ""),
+        extra=str(form_values.get("extra") or ""),
+        include_marks=str(form_values.get("include_marks") or ""),
+    )
+    settings = get_settings()
+    rows = summary_rows(settings.rewards_db_path, filters) if settings.db_exists else []
+    try:
+        path = _write_csv_to_chosen_path("summary.csv", "Сохранить CSV сводной таблицы", summary_csv_text(rows))
+    except SaveDialogCancelled:
+        return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
+    except SaveDialogError as exc:
+        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
+    return RedirectResponse(_with_message(return_to, f"CSV сохранён: {path}"), status_code=303)
+
+
 @router.head("/summary.csv")
 def summary_csv_head(
     country_id: str | None = None,
@@ -365,6 +419,33 @@ def summary_matrix_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
     )
+
+
+@router.post("/summary_matrix.csv/save")
+async def summary_matrix_csv_save(request: Request):
+    form_values = await _read_form(request)
+    return_to = str(form_values.get("return_to") or "/legacy?tab=summary&summary_mode=matrix")
+    filters = normalized_summary_filters(
+        country_id=str(form_values.get("country_id") or ""),
+        category_id=str(form_values.get("category_id") or ""),
+        subcategory_id=str(form_values.get("subcategory_id") or ""),
+        name_id=str(form_values.get("name_id") or ""),
+        extra=str(form_values.get("extra") or ""),
+        include_marks=str(form_values.get("include_marks") or ""),
+    )
+    settings = get_settings()
+    matrix = (
+        summary_matrix(settings.rewards_db_path, filters)
+        if settings.db_exists
+        else {"photo_columns": [], "reward_columns": [], "rows": [], "photo_totals": {}, "reward_totals": {}, "person_total": 0, "reward_total": 0}
+    )
+    try:
+        path = _write_csv_to_chosen_path("summary_matrix.csv", "Сохранить CSV шахматки", summary_matrix_csv_text(matrix))
+    except SaveDialogCancelled:
+        return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
+    except SaveDialogError as exc:
+        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
+    return RedirectResponse(_with_message(return_to, f"CSV сохранён: {path}"), status_code=303)
 
 
 @router.head("/summary_matrix.csv")

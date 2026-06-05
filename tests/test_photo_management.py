@@ -161,6 +161,17 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertNotIn(".env", names)
         self.assertNotIn("nested.zip", names)
 
+    def test_archive_person_folder_can_write_selected_path(self) -> None:
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        (folder / "photo.jpg").write_bytes(b"image")
+        selected_path = self.root / "chosen" / "archive.zip"
+        result = archive_person_folder(self.settings(), 1, "Test Person", target_path=selected_path)
+        self.assertEqual(result.path, selected_path.resolve())
+        self.assertTrue(result.path.exists())
+        with ZipFile(result.path) as archive:
+            self.assertIn("photo.jpg", archive.namelist())
+
 
 if __name__ == "__main__":
     unittest.main()

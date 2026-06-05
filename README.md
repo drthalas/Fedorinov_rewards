@@ -161,7 +161,7 @@ Examples:
 /summary.csv?include_marks=true
 ```
 
-The default summary mode is the person/reward matrix: rows are decorated persons, reward names become columns, photo/document presence is shown as `1`/`0`, duplicate rewards are counted as `2+`, and totals are shown at the bottom. `/summary_matrix.csv` exports the same matrix with UTF-8 BOM for Excel compatibility. The older aggregate summary remains available as `summary_mode=aggregate` with `/summary.csv`.
+The default summary mode is the person/reward matrix: rows are decorated persons, reward names become columns, photo/document presence is shown as `1`/`0`, duplicate rewards are counted as `2+`, and totals are shown at the bottom. The main CSV buttons open a system save dialog and write the current CSV to the selected path. The older GET routes `/summary_matrix.csv` and `/summary.csv` remain as technical fallback exports with the same CSV structure.
 
 Start the backend on the Mac mini:
 
@@ -242,7 +242,7 @@ Current development write-mode CRUD:
 - Person, reward, and mark edit forms include photo upload/replace controls in `WRITE_MODE=true`.
 - Photo clear/unlink removes only the SQLite field value. It does not delete the physical file.
 - Browser clipboard paste is available in write mode through the same guarded upload pipeline. If the browser does not expose image clipboard access on localhost, use the `+` file upload button.
-- The legacy rewards screen can open the selected person's local `Source/{person_id}` folder and create a ZIP archive of that folder under the local data `archives/` folder. Source files are not deleted.
+- The legacy rewards screen can open the selected person's local `Source/{person_id}` folder and create a ZIP archive of that folder after the user selects a save path. Source files are not deleted.
 
 Photo upload/clear remains behind `WRITE_MODE=true`. With the working preview defaults, these ordinary photo operations do not require a fresh backup before every save, but regular backups are still recommended.
 
@@ -421,10 +421,6 @@ The selected person can be exported as a booklet from the main rewards screen or
 /persons/{id}/booklet
 ```
 
-The booklet preview is printable and has a `Скачать PDF` button. Generated PDFs are saved under the local data root:
-
-```text
-generated/booklets/
-```
+The booklet preview is printable and has a `Сохранить PDF` button. The button opens a system save dialog and writes the PDF to the selected path. The app reports the saved path after success. In browser/headless environments where a native save dialog is unavailable, use browser print-to-PDF as a fallback.
 
 The booklet includes person details, biography, links, person photos/documents, and all rewards with their key fields and photos. Missing photos do not stop generation.

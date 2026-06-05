@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
@@ -14,10 +14,11 @@ from ..repositories.persons_write import (
     update_person,
 )
 from ..services.display import pagination
-from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context
+from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import safe_return_to, with_status
-from ..services.person_files import PersonFilesError, archive_person_folder, open_person_folder, person_folder_status
+from ..services.person_files import PersonFilesError, archive_person_folder, open_person_folder, person_archive_filename, person_folder_status
 from ..services.photos import photo_items
+from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -35,6 +36,8 @@ STATUS_MESSAGES = {
     "folder_opened": "Каталог кавалера открыт.",
     "folder_missing": "Каталог кавалера не найден.",
     "archive_empty": "В каталоге кавалера нет файлов для архивации.",
+    "archive_cancelled": "Сохранение архива отменено.",
+    "save_dialog_unavailable": "Системный диалог сохранения недоступен.",
 }
 
 
@@ -157,7 +160,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
 
 
 @router.get("/persons/{person_id}/booklet")
-def person_booklet(request: Request, person_id: int, return_to: str = "", error: str = ""):
+def person_booklet(request: Request, person_id: int, return_to: str = "", error: str = "", message: str = ""):
     settings = get_settings()
     safe_back = safe_return_to(return_to) or f"/persons/{person_id}"
     try:
@@ -172,6 +175,7 @@ def person_booklet(request: Request, person_id: int, return_to: str = "", error:
             **context,
             "return_to": safe_back,
             "error": error,
+            "message": message,
         },
     )
 
@@ -182,7 +186,17 @@ async def person_booklet_pdf(request: Request, person_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}/booklet"
     try:
-        result = generate_person_booklet_pdf(settings, person_id)
+        target_path = choose_save_path(
+            default_filename=person_booklet_filename(settings, person_id),
+            title="Сохранить PDF-буклет",
+            filetypes=(("PDF", "*.pdf"), ("Все файлы", "*.*")),
+        )
+    except SaveDialogCancelled:
+        return RedirectResponse(_with_message(return_to, "Сохранение буклета отменено."), status_code=303)
+    except SaveDialogError as exc:
+        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
+    try:
+        result = generate_person_booklet_pdf(settings, person_id, output_path=target_path)
     except BookletError as exc:
         context = person_booklet_context(settings, person_id, return_to)
         return templates.TemplateResponse(
@@ -193,14 +207,11 @@ async def person_booklet_pdf(request: Request, person_id: int):
                 **context,
                 "return_to": return_to,
                 "error": str(exc),
+                "message": "",
             },
             status_code=400,
         )
-    return FileResponse(
-        result.path,
-        media_type="application/pdf",
-        filename=result.filename,
-    )
+    return RedirectResponse(_with_message(return_to, f"Буклет сохранён: {result.path}"), status_code=303)
 
 
 @router.get("/persons/{person_id}/edit")
@@ -297,11 +308,21 @@ async def person_archive_folder(request: Request, person_id: int):
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
     try:
-        result = archive_person_folder(settings, person_id, str(person.get("fio") or "person"))
+        target_path = choose_save_path(
+            default_filename=person_archive_filename(str(person.get("fio") or "person"), person_id),
+            title="Сохранить архив документов кавалера",
+            filetypes=(("ZIP-архив", "*.zip"), ("Все файлы", "*.*")),
+        )
+    except SaveDialogCancelled:
+        return RedirectResponse(with_status(return_to, "archive_cancelled"), status_code=303)
+    except SaveDialogError:
+        return RedirectResponse(with_status(return_to, "save_dialog_unavailable"), status_code=303)
+    try:
+        result = archive_person_folder(settings, person_id, str(person.get("fio") or "person"), target_path=target_path)
     except PersonFilesError as exc:
         status = "archive_empty" if "нет файлов" in str(exc) else "folder_missing"
         return RedirectResponse(with_status(return_to, status), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"Архив создан: {result.filename}"), status_code=303)
+    return RedirectResponse(_with_message(return_to, f"Архив создан: {result.path}"), status_code=303)
 
 
 @router.get("/persons/{person_id}/photos")
