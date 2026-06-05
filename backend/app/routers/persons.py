@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
@@ -14,6 +14,7 @@ from ..repositories.persons_write import (
     update_person,
 )
 from ..services.display import pagination
+from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context
 from ..services.navigation import safe_return_to, with_status
 from ..services.person_files import PersonFilesError, archive_person_folder, open_person_folder, person_folder_status
 from ..services.photos import photo_items
@@ -152,6 +153,53 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
         },
+    )
+
+
+@router.get("/persons/{person_id}/booklet")
+def person_booklet(request: Request, person_id: int, return_to: str = "", error: str = ""):
+    settings = get_settings()
+    safe_back = safe_return_to(return_to) or f"/persons/{person_id}"
+    try:
+        context = person_booklet_context(settings, person_id, safe_back)
+    except BookletError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return templates.TemplateResponse(
+        request,
+        "person_booklet.html",
+        {
+            "settings": settings,
+            **context,
+            "return_to": safe_back,
+            "error": error,
+        },
+    )
+
+
+@router.post("/persons/{person_id}/booklet.pdf")
+async def person_booklet_pdf(request: Request, person_id: int):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}/booklet"
+    try:
+        result = generate_person_booklet_pdf(settings, person_id)
+    except BookletError as exc:
+        context = person_booklet_context(settings, person_id, return_to)
+        return templates.TemplateResponse(
+            request,
+            "person_booklet.html",
+            {
+                "settings": settings,
+                **context,
+                "return_to": return_to,
+                "error": str(exc),
+            },
+            status_code=400,
+        )
+    return FileResponse(
+        result.path,
+        media_type="application/pdf",
+        filename=result.filename,
     )
 
 

@@ -406,3 +406,20 @@ deploy/launchd/com.fedorinov.daily-report.plist.example
 ```
 
 See `docs/DAILY_TELEGRAM_REPORTS.md` for setup, safety rules, and launchd enable/disable commands.
+
+## Person Booklets
+
+The selected person can be exported as a booklet from the main rewards screen or the person card:
+
+```text
+/legacy?tab=rewards&person_id=...
+/persons/{id}/booklet
+```
+
+The booklet preview is printable and has a `Скачать PDF` button. Generated PDFs are saved under the local data root:
+
+```text
+generated/booklets/
+```
+
+The booklet includes person details, biography, links, person photos/documents, and all rewards with their key fields and photos. Missing photos do not stop generation.

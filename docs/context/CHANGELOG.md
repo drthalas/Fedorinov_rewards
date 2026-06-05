@@ -1,5 +1,13 @@
 # Changelog
 
+## Iteration 5 Person Booklet PDF
+
+- Replaced the legacy `Сформировать буклет` placeholder with a working person booklet preview.
+- Added `/persons/{person_id}/booklet` printable layout with person details, biography, links, person photos/documents, and rewards.
+- Added POST `/persons/{person_id}/booklet.pdf` to generate and download a PDF when `reportlab` is installed.
+- Generated PDFs are written under the local data root `generated/booklets/` and remain outside Git.
+- Missing or unsafe image paths do not crash booklet rendering; unavailable images are skipped or shown as not found.
+
 ## Iteration 4 Person Folder And Photo Controls
 
 - Added legacy rewards actions to open the selected person's local `Source/{person_id}` folder.

@@ -488,6 +488,25 @@ Next:
 - PDF/booklet generation remains the next dedicated iteration.
 - Physical photo deletion remains deferred.
 
+## Iteration 5: Person Booklet PDF
+
+Status: done/current.
+
+Scope:
+
+- Added `Сформировать буклет` for the selected person on `/legacy?tab=rewards&person_id=...`.
+- Added `/persons/{person_id}/booklet` as a printable booklet preview without the normal web navigation shell.
+- Added PDF download through POST `/persons/{person_id}/booklet.pdf` using `reportlab`.
+- Booklets include person details, rank, birth date, biography, comments, safe links, person photos/documents, and all rewards with key fields and reward photos.
+- Generated PDF files are saved under `REWARDS_DATA_DIR/generated/booklets/` and ignored by Git.
+- Missing or unsafe image paths are handled without crashing.
+
+Next:
+
+- Owner QA for booklet layout and PDF output on Windows.
+- Tune booklet visual layout after the owner checks printed/PDF examples.
+- Summary PDF remains a separate future export task.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.
@@ -496,5 +515,5 @@ Next:
 - Add validation report for connected database and media folders.
 - Validate Clipboard API photo paste on owner Windows browsers and keep file-upload fallback.
 - Implement physical photo delete only after restore workflow is mature.
-- Implement PDF export parity.
+- Implement summary PDF export parity.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

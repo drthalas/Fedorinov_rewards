@@ -61,7 +61,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Person PDF | Form1, Form7, CreatePDF | Not implemented | Reads personal/media data, writes generated PDF outside DB | Stage 3G | no for read-only export | no |
+| Person PDF | Form1, Form7, CreatePDF | Implemented as person booklet preview plus PDF download; generated PDFs go to local `generated/booklets/` outside Git | Reads personal/media data, writes generated PDF outside DB | Iteration 5 | no for read-only export | no |
 | Summary PDF | Form1, Form8, CreatePDF | Not implemented | Output validation against legacy layout needed | Stage 3G | no for read-only export | no |
 
 ## Search / Filter / Svod

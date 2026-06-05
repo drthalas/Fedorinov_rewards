@@ -20,6 +20,7 @@ legacy/_external/
 docs/reports/
 backups/
 archives/
+generated/
 logs/
 updates/
 Rewards_backup_*.zip

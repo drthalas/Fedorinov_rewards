@@ -194,9 +194,9 @@
                   <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                   <button class="button secondary-button" type="submit">Архивировать</button>
                 </form>
-                <a class="button disabled-button" href="/legacy?tab=about&message=pdf_not_implemented">Сформировать буклет</a>
+                <a class="button" href="/persons/{{ selected_person.id }}/booklet?return_to={{ selected_person_return|urlencode }}">Сформировать буклет</a>
               </div>
-              <p class="secondary">PDF export будет реализован позже.</p>
+              <p class="secondary">Откроется предпросмотр буклета с печатью и скачиванием PDF.</p>
             </section>
 
             <section class="legacy-block">

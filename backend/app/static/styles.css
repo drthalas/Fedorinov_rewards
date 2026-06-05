@@ -1291,6 +1291,162 @@ th {
   font-weight: 700;
 }
 
+.booklet-page {
+  background: #e9edf2;
+  color: #1f2933;
+}
+
+.booklet-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 1px solid #cfd6df;
+  background: #fff;
+}
+
+.booklet-toolbar form {
+  display: inline;
+}
+
+.booklet-document {
+  width: min(920px, calc(100vw - 32px));
+  margin: 18px auto 36px;
+  padding: 36px;
+  background: #fff;
+  border: 1px solid #d9dee5;
+  box-shadow: 0 10px 26px rgb(15 23 42 / 12%);
+}
+
+.booklet-title-block {
+  padding-bottom: 18px;
+  border-bottom: 2px solid #1f2933;
+}
+
+.booklet-kicker {
+  margin: 0 0 6px;
+  color: #667085;
+  font-size: 13px;
+  text-transform: uppercase;
+}
+
+.booklet-document h1 {
+  margin: 0 0 16px;
+  font-size: 30px;
+}
+
+.booklet-section {
+  margin-top: 22px;
+}
+
+.booklet-section h2 {
+  margin: 0 0 10px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #d9dee5;
+  font-size: 18px;
+}
+
+.booklet-reward {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e6e9ee;
+}
+
+.booklet-reward h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.booklet-details {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  margin: 0;
+  border-top: 1px solid #e6e9ee;
+  border-left: 1px solid #e6e9ee;
+}
+
+.booklet-details dt,
+.booklet-details dd {
+  margin: 0;
+  padding: 7px 9px;
+  border-right: 1px solid #e6e9ee;
+  border-bottom: 1px solid #e6e9ee;
+  overflow-wrap: anywhere;
+}
+
+.booklet-details dt {
+  background: #f5f7fa;
+  font-weight: 700;
+}
+
+.booklet-text {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.booklet-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.booklet-photo-grid figure {
+  margin: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.booklet-photo-grid img,
+.booklet-missing-photo div {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  border: 1px solid #d9dee5;
+  background: #fff;
+}
+
+.booklet-missing-photo div {
+  display: grid;
+  place-items: center;
+  color: #667085;
+  background: #f5f7fa;
+}
+
+.booklet-photo-grid figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475467;
+}
+
+@media print {
+  body.booklet-page {
+    background: #fff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .booklet-document {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .booklet-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+}
+
 @media (max-width: 900px) {
   .legacy-layout,
   .legacy-layout-marks,
