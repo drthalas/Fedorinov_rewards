@@ -4,6 +4,7 @@ from contextlib import closing
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
+from ..services.dates import normalize_date_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -42,9 +43,20 @@ def _empty_to_none(value: object) -> object:
 def person_data_from_mapping(values: dict[str, object]) -> PersonWriteData:
     fio = str(values.get("fio") or "").strip()
     if not fio:
-        raise PersonValidationError("ФИО обязательно")
+        raise PersonValidationError("Заполните ФИО.")
+
+    try:
+        birthday = normalize_date_input(
+            values.get("birthday"),
+            required=True,
+            required_message="Укажите дату рождения.",
+        )
+    except ValueError as exc:
+        raise PersonValidationError(str(exc)) from exc
 
     rank_value = _empty_to_none(values.get("id_rank"))
+    if rank_value is None:
+        raise PersonValidationError("Выберите звание / специальность.")
     try:
         id_rank = int(rank_value) if rank_value is not None else None
     except (TypeError, ValueError) as exc:
@@ -52,7 +64,7 @@ def person_data_from_mapping(values: dict[str, object]) -> PersonWriteData:
 
     return PersonWriteData(
         fio=fio,
-        birthday=_empty_to_none(values.get("birthday")),
+        birthday=birthday,
         id_rank=id_rank,
         link1=_empty_to_none(values.get("link1")),
         link2=_empty_to_none(values.get("link2")),
@@ -75,8 +87,22 @@ def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, 
     return tuple(getattr(data, field) for field in fields)
 
 
+def _validate_person_data(data: PersonWriteData) -> None:
+    if not data.fio.strip():
+        raise PersonValidationError("Заполните ФИО.")
+    if not data.birthday:
+        raise PersonValidationError("Укажите дату рождения.")
+    try:
+        normalize_date_input(data.birthday, required=True, required_message="Укажите дату рождения.")
+    except ValueError as exc:
+        raise PersonValidationError(str(exc)) from exc
+    if data.id_rank is None:
+        raise PersonValidationError("Выберите звание / специальность.")
+
+
 def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
+    _validate_person_data(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         fields = _active_fields(connection)
         columns = ", ".join(fields)
@@ -93,6 +119,7 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
 
 def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:
     ensure_write_allowed(settings)
+    _validate_person_data(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         fields = _active_fields(connection)
         assignments = ", ".join(f"{field} = ?" for field in fields)

@@ -11,6 +11,7 @@ from backend.app.repositories.persons_write import (
     PersonWriteData,
     create_person,
     delete_person,
+    person_data_from_mapping,
     update_person,
 )
 from backend.app.services.write_guard import WriteBlockedError
@@ -38,6 +39,11 @@ class PersonWriteTests(unittest.TestCase):
             require_backup_before_write=False,
             require_backup_before_dangerous_actions=False,
         )
+
+    def person_data(self, fio: str = "Test Person", **overrides) -> PersonWriteData:
+        values = {"fio": fio, "birthday": "1913-05-09", "id_rank": 1}
+        values.update(overrides)
+        return PersonWriteData(**values)
 
     def _create_db(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
@@ -78,7 +84,7 @@ class PersonWriteTests(unittest.TestCase):
 
     def test_write_mode_disabled_blocks_create_update_delete(self) -> None:
         settings = self.settings(write_mode=False)
-        data = PersonWriteData(fio="Blocked")
+        data = self.person_data("Blocked")
         with self.assertRaises(WriteBlockedError):
             create_person(settings, data)
         with self.assertRaises(WriteBlockedError):
@@ -96,7 +102,7 @@ class PersonWriteTests(unittest.TestCase):
             require_backup_before_dangerous_actions=False,
         )
         with self.assertRaises(WriteBlockedError):
-            create_person(settings, PersonWriteData(fio="Needs backup"))
+            create_person(settings, self.person_data("Needs backup"))
 
     def test_read_only_blocks_create_even_when_write_mode_true(self) -> None:
         settings = Settings(
@@ -107,11 +113,11 @@ class PersonWriteTests(unittest.TestCase):
             require_backup_before_write=False,
         )
         with self.assertRaises(WriteBlockedError):
-            create_person(settings, PersonWriteData(fio="Read only"))
+            create_person(settings, self.person_data("Read only"))
 
     def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
         settings = self.settings()
-        person_id = create_person(settings, PersonWriteData(fio="Dangerous delete"))
+        person_id = create_person(settings, self.person_data("Dangerous delete"))
         dangerous_settings = Settings(
             rewards_data_dir=self.root,
             rewards_db_path=self.db_path,
@@ -125,12 +131,12 @@ class PersonWriteTests(unittest.TestCase):
         self.assertIsNotNone(self.fetch_person(person_id))
 
     def test_delete_person_with_confirm_works_without_mandatory_backup(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Delete without backup"))
+        person_id = create_person(self.settings(), self.person_data("Delete without backup"))
         delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNone(self.fetch_person(person_id))
 
     def test_delete_person_without_confirm_is_blocked(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Needs confirm"))
+        person_id = create_person(self.settings(), self.person_data("Needs confirm"))
         with self.assertRaises(PersonValidationError) as blocked:
             delete_person(self.settings(), person_id)
         self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
@@ -148,7 +154,7 @@ class PersonWriteTests(unittest.TestCase):
         self.assertEqual(row["id_rank"], 2)
 
     def test_update_person_works(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Before"))
+        person_id = create_person(self.settings(), self.person_data("Before"))
         update_person(
             self.settings(),
             person_id,
@@ -159,12 +165,12 @@ class PersonWriteTests(unittest.TestCase):
         self.assertEqual(row["comment"], "Updated")
 
     def test_delete_person_without_rewards_works(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Delete me"))
+        person_id = create_person(self.settings(), self.person_data("Delete me"))
         delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNone(self.fetch_person(person_id))
 
     def test_delete_person_with_rewards_is_blocked(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Has rewards"))
+        person_id = create_person(self.settings(), self.person_data("Has rewards"))
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into rewards (person_id) values (?)", (person_id,))
         with self.assertRaises(PersonDeleteBlockedError):
@@ -174,19 +180,38 @@ class PersonWriteTests(unittest.TestCase):
     def test_sql_handles_quotes_in_fio_and_comment(self) -> None:
         fio = "O'Connor \"TEST\""
         comment = "Quote: 'single' and \"double\""
-        person_id = create_person(self.settings(), PersonWriteData(fio=fio, comment=comment))
+        person_id = create_person(self.settings(), self.person_data(fio, comment=comment))
         row = self.fetch_person(person_id)
         self.assertEqual(row["fio"], fio)
         self.assertEqual(row["comment"], comment)
 
     def test_create_update_person_saves_biography_when_column_exists(self) -> None:
-        person_id = create_person(self.settings(), PersonWriteData(fio="Biography person", biography="Short bio"))
+        person_id = create_person(self.settings(), self.person_data("Biography person", biography="Short bio"))
         row = self.fetch_person(person_id)
         self.assertEqual(row["biography"], "Short bio")
 
-        update_person(self.settings(), person_id, PersonWriteData(fio="Biography person", biography="Updated bio"))
+        update_person(self.settings(), person_id, self.person_data("Biography person", biography="Updated bio"))
         row = self.fetch_person(person_id)
         self.assertEqual(row["biography"], "Updated bio")
+
+    def test_empty_person_is_not_created(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "", "birthday": "01.01.1913", "id_rank": "1"})
+        self.assertEqual(str(exc.exception), "Заполните ФИО.")
+
+    def test_person_without_birthday_is_not_created(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "No birthday", "birthday": "", "id_rank": "1"})
+        self.assertEqual(str(exc.exception), "Укажите дату рождения.")
+
+    def test_person_without_rank_is_not_created(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "No rank", "birthday": "01.01.1913", "id_rank": ""})
+        self.assertEqual(str(exc.exception), "Выберите звание / специальность.")
+
+    def test_birthday_is_normalized_from_user_format(self) -> None:
+        data = person_data_from_mapping({"fio": "Date user", "birthday": "09.05.1913", "id_rank": "2"})
+        self.assertEqual(data.birthday, "1913-05-09")
 
 
 if __name__ == "__main__":

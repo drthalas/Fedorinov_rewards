@@ -1,9 +1,11 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs
 
 from ..config import get_settings
-from ..repositories.guides import list_guide_level
+from ..repositories.guides import guide_cascade_data, guide_cascade_options
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
 from ..repositories.marks_write import (
     MarkValidationError,
@@ -40,15 +42,33 @@ def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
 
 
-def _guide_options(settings):
+def _safe_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _selected_guides(row: dict[str, object] | None) -> dict[str, int | None]:
+    if not row:
+        return {"country_id": None, "category_id": None, "subcategory_id": None}
+    return {
+        "country_id": _safe_int(row.get("id_gos")),
+        "category_id": _safe_int(row.get("id_catigory")),
+        "subcategory_id": _safe_int(row.get("id_sub_catigory")),
+    }
+
+
+def _guide_options(settings, selected: dict[str, object] | None = None):
     if not settings.db_exists:
         return {"gos": [], "categories": [], "subcategories": [], "names": []}
-    return {
-        "gos": list_guide_level(settings.rewards_db_path, 0),
-        "categories": list_guide_level(settings.rewards_db_path, 1),
-        "subcategories": list_guide_level(settings.rewards_db_path, 2),
-        "names": list_guide_level(settings.rewards_db_path, 3),
-    }
+    return guide_cascade_options(settings.rewards_db_path, **_selected_guides(selected))
+
+
+def _guide_cascade(settings) -> dict[str, list[dict[str, object]]]:
+    return guide_cascade_data(settings.rewards_db_path) if settings.db_exists else {}
 
 
 @router.get("/marks")
@@ -84,8 +104,9 @@ def mark_new(request: Request, return_to: str = ""):
         {
             "settings": settings,
             "mode": "create",
-            "mark": {"instock": False},
+            "mark": {"instock": False, "date_purchase": date.today().isoformat()},
             "guides": _guide_options(settings),
+            "guide_cascade": _guide_cascade(settings),
             "photo_controls": [],
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -111,7 +132,8 @@ async def mark_create(request: Request):
                 "settings": settings,
                 "mode": "create",
                 "mark": form_values,
-                "guides": _guide_options(settings),
+                "guides": _guide_options(settings, form_values),
+                "guide_cascade": _guide_cascade(settings),
                 "photo_controls": [],
                 "return_to": return_to,
                 "error": str(exc),
@@ -155,7 +177,8 @@ def mark_edit(request: Request, mark_id: int, return_to: str = ""):
             "settings": settings,
             "mode": "edit",
             "mark": mark,
-            "guides": _guide_options(settings),
+            "guides": _guide_options(settings, mark),
+            "guide_cascade": _guide_cascade(settings),
             "photo_controls": photo_items("mark", mark),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -182,7 +205,8 @@ async def mark_update(request: Request, mark_id: int):
                 "settings": settings,
                 "mode": "edit",
                 "mark": {**mark, **form_values},
-                "guides": _guide_options(settings),
+                "guides": _guide_options(settings, {**mark, **form_values}),
+                "guide_cascade": _guide_cascade(settings),
                 "photo_controls": photo_items("mark", mark),
                 "return_to": return_to,
                 "error": str(exc),

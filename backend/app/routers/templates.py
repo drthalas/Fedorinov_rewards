@@ -11,6 +11,7 @@ from ..services.display import (
     has_media_path,
     safe_external_url,
 )
+from ..services.dates import format_date_input
 
 
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
@@ -39,4 +40,5 @@ templates.env.filters["bool_class"] = bool_class
 templates.env.filters["dash"] = dash_if_empty
 templates.env.filters["format_bool"] = format_bool
 templates.env.filters["format_date"] = format_date
+templates.env.filters["format_date_input"] = format_date_input
 templates.env.filters["format_money"] = format_money

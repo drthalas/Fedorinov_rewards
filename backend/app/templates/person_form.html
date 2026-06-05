@@ -23,13 +23,13 @@
       </label>
       <label>
         <span>Дата рождения / год рождения</span>
-        <input name="birthday" value="{{ person.birthday or '' }}" placeholder="ДД.ММ.ГГГГ или YYYY-MM-DD">
+        <input name="birthday" value="{{ person.birthday|format_date_input }}" placeholder="ДД.ММ.ГГГГ" required>
         {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_date }}</small>{% endif %}
       </label>
     </div>
     <label>
       <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a></span>
-      <select name="id_rank">
+      <select name="id_rank" required>
         <option value="">—</option>
         {% for rank in ranks %}
         <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>

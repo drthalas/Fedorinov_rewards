@@ -1,9 +1,11 @@
+from datetime import date
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs
 
 from ..config import get_settings
-from ..repositories.guides import list_guide_level
+from ..repositories.guides import guide_cascade_data, guide_cascade_options
 from ..repositories.persons import get_person
 from ..repositories.rewards import get_reward, reward_photo_items
 from ..repositories.rewards_write import (
@@ -39,15 +41,33 @@ def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
 
 
-def _guide_options(settings):
+def _safe_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _selected_guides(row: dict[str, object] | None) -> dict[str, int | None]:
+    if not row:
+        return {"country_id": None, "category_id": None, "subcategory_id": None}
+    return {
+        "country_id": _safe_int(row.get("id_gos")),
+        "category_id": _safe_int(row.get("id_catigory")),
+        "subcategory_id": _safe_int(row.get("id_sub_catigory")),
+    }
+
+
+def _guide_options(settings, selected: dict[str, object] | None = None):
     if not settings.db_exists:
         return {"gos": [], "categories": [], "subcategories": [], "names": []}
-    return {
-        "gos": list_guide_level(settings.rewards_db_path, 0),
-        "categories": list_guide_level(settings.rewards_db_path, 1),
-        "subcategories": list_guide_level(settings.rewards_db_path, 2),
-        "names": list_guide_level(settings.rewards_db_path, 3),
-    }
+    return guide_cascade_options(settings.rewards_db_path, **_selected_guides(selected))
+
+
+def _guide_cascade(settings) -> dict[str, list[dict[str, object]]]:
+    return guide_cascade_data(settings.rewards_db_path) if settings.db_exists else {}
 
 
 @router.get("/persons/{person_id}/rewards/new")
@@ -58,7 +78,7 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Person not found")
-    reward = {"person_id": person_id, "instock": False}
+    reward = {"person_id": person_id, "instock": False, "date_purchase": date.today().isoformat()}
     return templates.TemplateResponse(
         request,
         "reward_form.html",
@@ -68,6 +88,7 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
             "person": person,
             "reward": reward,
             "guides": _guide_options(settings),
+            "guide_cascade": _guide_cascade(settings),
             "photo_controls": [],
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -95,7 +116,8 @@ async def reward_create(request: Request, person_id: int):
                 "mode": "create",
                 "person": person,
                 "reward": {"person_id": person_id, **form_values},
-                "guides": _guide_options(settings),
+                "guides": _guide_options(settings, form_values),
+                "guide_cascade": _guide_cascade(settings),
                 "photo_controls": [],
                 "return_to": return_to,
                 "error": str(exc),
@@ -141,7 +163,8 @@ def reward_edit(request: Request, reward_id: int, return_to: str = ""):
             "mode": "edit",
             "person": person,
             "reward": reward,
-            "guides": _guide_options(settings),
+            "guides": _guide_options(settings, reward),
+            "guide_cascade": _guide_cascade(settings),
             "photo_controls": photo_items("reward", reward),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -171,7 +194,8 @@ async def reward_update(request: Request, reward_id: int):
                 "mode": "edit",
                 "person": person,
                 "reward": {**reward, **form_values},
-                "guides": _guide_options(settings),
+                "guides": _guide_options(settings, {**reward, **form_values}),
+                "guide_cascade": _guide_cascade(settings),
                 "photo_controls": photo_items("reward", reward),
                 "return_to": return_to,
                 "error": str(exc),

@@ -10,6 +10,7 @@ from backend.app.repositories.rewards_write import (
     RewardWriteData,
     create_reward,
     delete_reward,
+    reward_data_from_mapping,
     update_reward,
 )
 from backend.app.services.write_guard import WriteBlockedError
@@ -37,6 +38,11 @@ class RewardWriteTests(unittest.TestCase):
             require_backup_before_write=False,
             require_backup_before_dangerous_actions=False,
         )
+
+    def reward_data(self, **overrides) -> RewardWriteData:
+        values = {"id_gos": 1, "id_catigory": 2, "id_sub_catigory": 3, "id_name": 4}
+        values.update(overrides)
+        return RewardWriteData(**values)
 
     def _create_db(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
@@ -73,7 +79,7 @@ class RewardWriteTests(unittest.TestCase):
 
     def test_write_mode_disabled_blocks_create_update_delete(self) -> None:
         settings = self.settings(write_mode=False)
-        data = RewardWriteData(number=1)
+        data = self.reward_data(number=1)
         with self.assertRaises(WriteBlockedError):
             create_reward(settings, 1, data)
         with self.assertRaises(WriteBlockedError):
@@ -94,7 +100,7 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["instock"], 1)
 
     def test_update_reward_works(self) -> None:
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(number=1, price_now=100))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=1, price_now=100))
         update_reward(
             self.settings(),
             reward_id,
@@ -110,26 +116,26 @@ class RewardWriteTests(unittest.TestCase):
         media_dir = self.root / "Source" / "1" / "1"
         media_dir.mkdir(parents=True)
         (media_dir / "FotoFront.jpg").write_bytes(b"fake")
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(front_foto="Source/1/1/FotoFront.jpg"))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(front_foto="Source/1/1/FotoFront.jpg"))
         delete_reward(self.settings(), reward_id, confirm=True)
         self.assertIsNone(self.fetch_reward(reward_id))
         self.assertTrue(media_dir.exists())
         self.assertTrue((media_dir / "FotoFront.jpg").exists())
 
     def test_delete_reward_with_confirm_works_without_mandatory_backup(self) -> None:
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(number=101))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=101))
         delete_reward(self.settings(), reward_id, confirm=True)
         self.assertIsNone(self.fetch_reward(reward_id))
 
     def test_delete_reward_without_confirm_is_blocked(self) -> None:
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(number=102))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=102))
         with self.assertRaises(RewardValidationError) as blocked:
             delete_reward(self.settings(), reward_id)
         self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
         self.assertIsNotNone(self.fetch_reward(reward_id))
 
     def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(number=103))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=103))
         settings = Settings(
             rewards_data_dir=self.root,
             rewards_db_path=self.db_path,
@@ -144,14 +150,33 @@ class RewardWriteTests(unittest.TestCase):
 
     def test_sql_handles_quotes_and_text(self) -> None:
         text = "Link 'single' and \"double\""
-        reward_id = create_reward(self.settings(), 1, RewardWriteData(id_link=text, reward_list="Source/quoted path.jpg"))
+        reward_id = create_reward(self.settings(), 1, self.reward_data(id_link=text, reward_list="Source/quoted path.jpg"))
         row = self.fetch_reward(reward_id)
         self.assertEqual(row["id_link"], text)
         self.assertEqual(row["reward_list"], "Source/quoted path.jpg")
 
     def test_create_reward_fails_for_nonexistent_person(self) -> None:
         with self.assertRaises(RewardValidationError):
-            create_reward(self.settings(), 999, RewardWriteData(number=1))
+            create_reward(self.settings(), 999, self.reward_data(number=1))
+
+    def test_empty_reward_is_not_created(self) -> None:
+        with self.assertRaises(RewardValidationError) as exc:
+            create_reward(self.settings(), 1, RewardWriteData(number=1))
+        self.assertEqual(str(exc.exception), "Выберите наименование награды.")
+
+    def test_reward_date_purchase_normalizes_user_format(self) -> None:
+        data = reward_data_from_mapping({"id_name": "4", "date_purchase": "05.06.2026"})
+        self.assertEqual(data.date_purchase, "2026-06-05")
+
+    def test_update_reward_preserves_existing_guide_ids_when_form_omits_them(self) -> None:
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=77))
+        update_reward(self.settings(), reward_id, RewardWriteData(number=88, price_now=700))
+        row = self.fetch_reward(reward_id)
+        self.assertEqual(row["number"], 88)
+        self.assertEqual(row["id_gos"], 1)
+        self.assertEqual(row["id_catigory"], 2)
+        self.assertEqual(row["id_sub_catigory"], 3)
+        self.assertEqual(row["id_name"], 4)
 
 
 if __name__ == "__main__":

@@ -17,7 +17,7 @@ Stage 3 changed the target from a read-only viewer toward a full functional lega
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Main desktop shell | Form1 | Implemented as `/legacy` separate route | Layout parity only; no direct writes | Stage 3E | no | no |
-| Rewards tab layout | Form1 | Implemented as `/legacy?tab=rewards` using existing guarded CRUD links; main list filters, totals, safe links, and double-click card open added in Iteration 1 | Delete controls must remain POST-only and write-mode gated; dependent guide selects still need UX polish | Stage 3E plus Iteration 1 | only for writes | only for writes |
+| Rewards tab layout | Form1 | Implemented as `/legacy?tab=rewards` using existing guarded CRUD links; main list filters, cascading guide filters, totals, safe links, and double-click card open added | Delete controls must remain POST-only and write-mode gated | Stage 3E plus Iteration 1 and cascading-guide iteration | only for writes | only for writes |
 | Search tab layout | Form1 | Reworked in Stage 3G with category, condition, value, grouped result tables, counts, and reset; Iteration 2 adds empty-category search and disables browser history suggestions | Database-backed live suggestions and auto-submit JS still deferred | Stage 3G plus Iteration 2 | no | no |
 | Marks tab layout | Form1 | Implemented as `/legacy?tab=marks` using existing guarded CRUD links | Delete controls must remain POST-only and write-mode gated | Stage 3E | only for writes | only for writes |
 | Summary tab matrix | Form1 | Implemented as `/legacy?tab=summary` default `Шахматка по кавалерам`: persons as rows, reward names as columns, photo/document flags, duplicate counts, totals, and `/summary_matrix.csv`; aggregate summary remains as `summary_mode=aggregate` | Sticky columns, dependent selects, and PDF parity still deferred | Stage 3J plus Iteration 3 and later PDF stage | no | no |
@@ -27,8 +27,8 @@ Stage 3 changed the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C plus Stage 3I | yes | yes |
-| Edit reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3C plus Stage 3I | yes | yes |
+| Add reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog and guide selects now cascade by selected branch | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C plus Stage 3I and cascading-guide iteration | yes | yes |
+| Edit reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog and preserves current guide ids | Updates classification, price, stock, links, dates | Stage 3C plus Stage 3I and cascading-guide iteration | yes | yes |
 | Delete reward | Form2 | Implemented in web dev write mode | Deletes DB row only; media folders/files are preserved | Stage 3C | yes | yes |
 | Reward photos | Form3, Form4 | Upload/replace, clipboard paste, clear/unlink, and zoom/pan large viewer implemented in web dev write mode | Physical file deletion still deferred; Clipboard API needs Windows browser QA | Stage 3F plus Iteration 4 and later photo deletion stage | yes | yes |
 
@@ -36,8 +36,8 @@ Stage 3 changed the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Add mark | Form1, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D plus Stage 3I | yes | yes |
-| Edit mark | Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3D plus Stage 3I | yes | yes |
+| Add mark | Form1, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog and guide selects now cascade by selected branch | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D plus Stage 3I and cascading-guide iteration | yes | yes |
+| Edit mark | Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog and preserves current guide ids | Updates classification, price, stock, links, dates | Stage 3D plus Stage 3I and cascading-guide iteration | yes | yes |
 | Delete mark | Form1, Form3 | Implemented in web dev write mode | Deletes DB row only; SourceMark folders/files are preserved | Stage 3D | yes | yes |
 | Mark photos | Form3, Form4 | Upload/replace, clipboard paste, clear/unlink, and zoom/pan large viewer implemented in web dev write mode | Physical file deletion still deferred; Clipboard API needs Windows browser QA | Stage 3F plus Iteration 4 and later photo deletion stage | yes | yes |
 
@@ -68,7 +68,7 @@ Stage 3 changed the target from a read-only viewer toward a full functional lega
 
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
-| Legacy filters | Form1 | Search filters implemented for all/persons/rewards/marks; empty specific-category searches show all category records; main rewards screen filters implemented for rank and reward guide levels | Dependent select narrowing and database-backed suggestions are still deferred | Stage 3G plus Iterations 1-2 | no | no |
+| Legacy filters | Form1 | Search filters implemented for all/persons/rewards/marks; empty specific-category searches show all category records; main rewards screen filters implemented for rank and cascading reward guide levels | Database-backed suggestions are still deferred | Stage 3G plus Iterations 1-2 and cascading-guide iteration | no | no |
 | Search CSV export | Form1 | Implemented as read-only `/search.csv` | Output parity with legacy export can still be refined | Stage 3G | no | no |
 | Summary CSV export | Form1 | Implemented as read-only `/summary_matrix.csv` for the кавалеры × награды matrix and `/summary.csv` for aggregate summary | PDF export still deferred | Stage 3J plus Iteration 3 | no | no |
 | Summary tables | Form1 | Implemented with guide-level filters, default person/reward matrix, aggregate fallback mode, optional mark aggregate mode, totals, and CSV exports | Sticky first columns, cascading selects, and further reward-number layout can still be refined | Stage 3J plus Iteration 3 | no | no |

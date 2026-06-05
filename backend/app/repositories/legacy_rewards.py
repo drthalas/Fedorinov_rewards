@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .common import fetch_all, fetch_one
-from .guides import list_guide_level, list_rank_guide
+from .guides import guide_cascade_data, guide_cascade_options, list_rank_guide
 from .summary import parse_optional_int
 
 
@@ -31,14 +31,28 @@ def normalized_legacy_rewards_filters(
     )
 
 
-def legacy_rewards_filter_options(db_path: Path) -> dict[str, list[dict[str, object]]]:
+def legacy_rewards_filter_options(
+    db_path: Path,
+    filters: LegacyRewardsFilters | None = None,
+) -> dict[str, list[dict[str, object]]]:
+    filters = filters or LegacyRewardsFilters()
+    cascade = guide_cascade_options(
+        db_path,
+        country_id=filters.country_id,
+        category_id=filters.category_id,
+        subcategory_id=filters.subcategory_id,
+    )
     return {
         "ranks": list_rank_guide(db_path),
-        "countries": list_guide_level(db_path, 0),
-        "categories": list_guide_level(db_path, 1),
-        "subcategories": list_guide_level(db_path, 2),
-        "names": list_guide_level(db_path, 3),
+        "countries": cascade["gos"],
+        "categories": cascade["categories"],
+        "subcategories": cascade["subcategories"],
+        "names": cascade["names"],
     }
+
+
+def legacy_rewards_filter_cascade(db_path: Path) -> dict[str, list[dict[str, object]]]:
+    return guide_cascade_data(db_path)
 
 
 def _reward_filter_clauses(filters: LegacyRewardsFilters, alias: str = "r") -> tuple[list[str], list[object]]:

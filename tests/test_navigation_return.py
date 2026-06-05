@@ -115,8 +115,13 @@ class ReturnNavigationTests(unittest.TestCase):
                 )
                 """
             )
-            connection.execute("insert into person (id, fio) values (1, 'Test Person')")
-            connection.execute("insert into rewards (id, person_id, number) values (10, 1, 100)")
+            connection.execute("insert into person (id, fio, birthday, id_rank) values (1, 'Test Person', '1913-05-09', 1)")
+            connection.execute(
+                """
+                insert into rewards (id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number)
+                values (10, 1, 1, 1, 1, 2, 100)
+                """
+            )
             connection.execute(
                 """
                 insert into mark (id, id_gos, id_catigory, id_sub_catigory, id_name, number)
@@ -155,7 +160,14 @@ class ReturnNavigationTests(unittest.TestCase):
         self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards%26person_id%3D1", url)
 
     def test_person_edit_post_respects_safe_return_to(self) -> None:
-        request = FakeRequest({"fio": "Updated Person", "return_to": "/legacy?tab=rewards&person_id=1"})
+        request = FakeRequest(
+            {
+                "fio": "Updated Person",
+                "birthday": "09.05.1913",
+                "id_rank": "1",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
         response = asyncio.run(person_update(request, 1))
         self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=updated")
 

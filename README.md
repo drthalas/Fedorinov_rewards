@@ -119,7 +119,17 @@ The main rewards workspace supports filters above the person list:
 - `subcategory_id` - reward subcategory.
 - `name_id` - reward name.
 
-Filters can be combined, for example rank plus a specific reward name. The totals panel at the bottom of the rewards workspace reflects the current filtered selection. Person rows use single click to select and double click to open the person card. Dependent/cascading select narrowing is planned as a later UX polish; backend filtering already accepts the combined parameters.
+Filters can be combined, for example rank plus a specific reward name. The totals panel at the bottom of the rewards workspace reflects the current filtered selection. Person rows use single click to select and double click to open the person card.
+
+The reward guide filters now cascade in the UI: selecting a country limits categories, selecting a category limits subcategories, and selecting a subcategory limits reward names. Empty filter parameters still mean `Все` and do not produce validation errors.
+
+Person, reward, and mark write forms validate required fields before writing to SQLite:
+
+- person: full name, birth date, and rank/specialty;
+- reward: selected reward name;
+- mark: selected mark name.
+
+Birth date and purchase date inputs use `ДД.ММ.ГГГГ` in the UI. New rewards and marks default `Дата покупки` to today's date.
 
 Search supports legacy-like query parameters:
 

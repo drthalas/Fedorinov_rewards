@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
+from ..services.dates import normalize_date_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -75,6 +76,10 @@ def _checkbox(value: object) -> bool:
 
 
 def mark_data_from_mapping(values: dict[str, object]) -> MarkWriteData:
+    try:
+        date_purchase = normalize_date_input(values.get("date_purchase"))
+    except ValueError as exc:
+        raise MarkValidationError(str(exc)) from exc
     return MarkWriteData(
         id_gos=_optional_int(values, "id_gos"),
         id_catigory=_optional_int(values, "id_catigory"),
@@ -83,7 +88,7 @@ def mark_data_from_mapping(values: dict[str, object]) -> MarkWriteData:
         id_link=_empty_to_none(values.get("id_link")),
         number=_optional_int(values, "number"),
         instock=_checkbox(values.get("instock")),
-        date_purchase=_empty_to_none(values.get("date_purchase")),
+        date_purchase=date_purchase,
         price_purchase=_optional_int(values, "price_purchase"),
         price_now=_optional_int(values, "price_now"),
         front_foto=_empty_to_none(values.get("front_foto")),
@@ -97,6 +102,16 @@ def _as_params(data: MarkWriteData) -> tuple[object, ...]:
     return tuple(getattr(data, field) for field in MARK_FIELDS)
 
 
+def _validate_required_name(data: MarkWriteData) -> None:
+    if data.id_name is None:
+        raise MarkValidationError("Выберите наименование знака.")
+    if data.date_purchase:
+        try:
+            normalize_date_input(data.date_purchase)
+        except ValueError as exc:
+            raise MarkValidationError(str(exc)) from exc
+
+
 def _preserve_existing_guide_ids(data: MarkWriteData, existing_row) -> MarkWriteData:
     values = {field: getattr(data, field) for field in MARK_FIELDS}
     for field in ("id_gos", "id_catigory", "id_sub_catigory", "id_name"):
@@ -107,6 +122,7 @@ def _preserve_existing_guide_ids(data: MarkWriteData, existing_row) -> MarkWrite
 
 def create_mark(settings: Settings, data: MarkWriteData) -> int:
     ensure_write_allowed(settings)
+    _validate_required_name(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute(
             """
@@ -135,6 +151,7 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
         if existing_row is None:
             raise MarkValidationError("Знак не найден")
         data = _preserve_existing_guide_ids(data, existing_row)
+        _validate_required_name(data)
         cursor = connection.execute(
             """
             update mark

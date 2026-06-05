@@ -466,7 +466,7 @@ Scope:
 Next:
 
 - Owner QA for examples such as country/category/name matrix filters.
-- Cascading guide selects and sticky first columns remain deferred UX polish.
+- Sticky first columns remain deferred UX polish; cascading guide selects are implemented in the later required-fields iteration.
 - Further refine reward number columns after owner QA if more detail is needed.
 
 ## Iteration 4: Person Folder Archive And Photo Controls
@@ -523,6 +523,25 @@ Next:
 
 - Publish v0.1.2 through Manual Release workflow.
 - Confirm public `latest.json` and send release Telegram notification.
+
+## Iteration: Cascading Guides And Required Fields
+
+Status: done/current.
+
+Scope:
+
+- Added cascading guide selects for reward and mark forms: country narrows categories, category narrows subcategories, and subcategory narrows names.
+- Added the same cascade to the main `/legacy?tab=rewards` filter block.
+- Required person fields are now checked before writing: full name, birth date, and rank/specialty.
+- Required reward/mark guide name is now checked before writing so empty rewards or marks cannot be created.
+- Person birth date and purchase dates accept/display the owner-facing `ДД.ММ.ГГГГ` format and are normalized before storage.
+- New reward and mark forms default `Дата покупки` to the current date.
+- Reward and mark edit preserve existing guide ids if a form omits guide fields, preventing accidental guide clearing.
+
+Next:
+
+- Hermes QA for add/edit person, reward, and mark flows on the dev data root.
+- Owner QA for cascading guide behavior in the Windows package after the next release.
 
 ## Backlog / Future
 

@@ -9,6 +9,7 @@ from starlette.datastructures import URL
 from ..config import PROJECT_ROOT, get_settings
 from ..repositories.common import fetch_one, table_counts
 from ..repositories.legacy_rewards import (
+    legacy_rewards_filter_cascade,
     legacy_rewards_filter_options,
     legacy_rewards_totals,
     list_legacy_reward_persons,
@@ -207,6 +208,7 @@ def legacy_index(
         "persons_total": 0,
         "rewards_filters": rewards_filters,
         "rewards_filter_options": {"ranks": [], "countries": [], "categories": [], "subcategories": [], "names": []},
+        "rewards_filter_cascade": {},
         "rewards_filter_active": any(
             value is not None
             for value in (
@@ -263,7 +265,8 @@ def legacy_index(
     if not settings.db_exists:
         return templates.TemplateResponse(request, "legacy.html", context)
 
-    context["rewards_filter_options"] = legacy_rewards_filter_options(settings.rewards_db_path)
+    context["rewards_filter_options"] = legacy_rewards_filter_options(settings.rewards_db_path, rewards_filters)
+    context["rewards_filter_cascade"] = legacy_rewards_filter_cascade(settings.rewards_db_path)
     persons = list_legacy_reward_persons(settings.rewards_db_path, rewards_filters)
     for person in persons:
         row_id = int(person["id"])

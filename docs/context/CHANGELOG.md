@@ -1,5 +1,15 @@
 # Changelog
 
+## Cascading Guides And Required Fields
+
+- Added cascading guide selects in reward and mark forms so names are limited to the selected country/category/subcategory branch.
+- Added cascading guide filters to the main `Награды` tab.
+- Blocked empty person creation/update by requiring full name, birth date, and rank/specialty before any database write.
+- Blocked empty reward and mark creation/update by requiring a selected name.
+- Switched owner-facing birth and purchase date inputs to `ДД.ММ.ГГГГ` while preserving normalized storage.
+- Defaulted purchase date to today's date for new rewards and new marks.
+- Preserved existing reward and mark guide ids during edit if guide fields are omitted by the form.
+
 ## v0.1.2 Working Write Mode Release
 
 - Bumped the application version to `0.1.2`.

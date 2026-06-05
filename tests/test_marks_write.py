@@ -13,6 +13,7 @@ from backend.app.repositories.marks_write import (
     MarkWriteData,
     create_mark,
     delete_mark,
+    mark_data_from_mapping,
     update_mark,
 )
 from backend.app.repositories.marks import get_mark
@@ -65,6 +66,11 @@ class MarkWriteTests(unittest.TestCase):
             require_backup_before_dangerous_actions=False,
         )
 
+    def mark_data(self, **overrides) -> MarkWriteData:
+        values = {"id_gos": 1, "id_catigory": 2, "id_sub_catigory": 3, "id_name": 4}
+        values.update(overrides)
+        return MarkWriteData(**values)
+
     def _create_db(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
             connection.execute(
@@ -102,6 +108,9 @@ class MarkWriteTests(unittest.TestCase):
                     f"insert into guide_lev_{level} (id, idl, name) values (?, ?, ?)",
                     (level + 1, level, f"Guide {level}"),
                 )
+            connection.execute("insert into guide_lev_1 (id, idl, name) values (90, 999, 'Wrong category')")
+            connection.execute("insert into guide_lev_2 (id, idl, name) values (91, 999, 'Wrong subcategory')")
+            connection.execute("insert into guide_lev_3 (id, idl, name) values (92, 999, 'Wrong name')")
 
     def fetch_mark(self, mark_id: int) -> sqlite3.Row | None:
         with sqlite3.connect(self.db_path) as connection:
@@ -110,7 +119,7 @@ class MarkWriteTests(unittest.TestCase):
 
     def test_write_mode_disabled_blocks_create_update_delete(self) -> None:
         settings = self.settings(write_mode=False)
-        data = MarkWriteData(number=1)
+        data = self.mark_data(number=1)
         with self.assertRaises(WriteBlockedError):
             create_mark(settings, data)
         with self.assertRaises(WriteBlockedError):
@@ -129,7 +138,7 @@ class MarkWriteTests(unittest.TestCase):
         self.assertEqual(row["instock"], 1)
 
     def test_update_mark_works(self) -> None:
-        mark_id = create_mark(self.settings(), MarkWriteData(number=1, price_now=100))
+        mark_id = create_mark(self.settings(), self.mark_data(number=1, price_now=100))
         update_mark(
             self.settings(),
             mark_id,
@@ -172,6 +181,9 @@ class MarkWriteTests(unittest.TestCase):
         self.assertIn('<option value="2" selected>Guide 1</option>', rendered)
         self.assertIn('<option value="3" selected>Guide 2</option>', rendered)
         self.assertIn('<option value="4" selected>Guide 3</option>', rendered)
+        self.assertNotIn('<option value="90">Wrong category</option>', rendered)
+        self.assertNotIn('<option value="91">Wrong subcategory</option>', rendered)
+        self.assertNotIn('<option value="92">Wrong name</option>', rendered)
 
     def test_update_mark_preserves_existing_guide_ids_when_form_omits_them(self) -> None:
         mark_id = create_mark(
@@ -197,26 +209,26 @@ class MarkWriteTests(unittest.TestCase):
         media_dir = self.root / "SourceMark" / "1"
         media_dir.mkdir(parents=True)
         (media_dir / "FotoFront.jpg").write_bytes(b"fake")
-        mark_id = create_mark(self.settings(), MarkWriteData(front_foto="SourceMark/1/FotoFront.jpg"))
+        mark_id = create_mark(self.settings(), self.mark_data(front_foto="SourceMark/1/FotoFront.jpg"))
         delete_mark(self.settings(), mark_id, confirm=True)
         self.assertIsNone(self.fetch_mark(mark_id))
         self.assertTrue(media_dir.exists())
         self.assertTrue((media_dir / "FotoFront.jpg").exists())
 
     def test_delete_mark_with_confirm_works_without_mandatory_backup(self) -> None:
-        mark_id = create_mark(self.settings(), MarkWriteData(number=101))
+        mark_id = create_mark(self.settings(), self.mark_data(number=101))
         delete_mark(self.settings(), mark_id, confirm=True)
         self.assertIsNone(self.fetch_mark(mark_id))
 
     def test_delete_mark_without_confirm_is_blocked(self) -> None:
-        mark_id = create_mark(self.settings(), MarkWriteData(number=102))
+        mark_id = create_mark(self.settings(), self.mark_data(number=102))
         with self.assertRaises(MarkValidationError) as blocked:
             delete_mark(self.settings(), mark_id)
         self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
         self.assertIsNotNone(self.fetch_mark(mark_id))
 
     def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
-        mark_id = create_mark(self.settings(), MarkWriteData(number=103))
+        mark_id = create_mark(self.settings(), self.mark_data(number=103))
         settings = Settings(
             rewards_data_dir=self.root,
             rewards_db_path=self.db_path,
@@ -231,10 +243,19 @@ class MarkWriteTests(unittest.TestCase):
 
     def test_sql_handles_quotes_and_text(self) -> None:
         text = "Link 'single' and \"double\""
-        mark_id = create_mark(self.settings(), MarkWriteData(id_link=text, front_foto="SourceMark/quoted path.jpg"))
+        mark_id = create_mark(self.settings(), self.mark_data(id_link=text, front_foto="SourceMark/quoted path.jpg"))
         row = self.fetch_mark(mark_id)
         self.assertEqual(row["id_link"], text)
         self.assertEqual(row["front_foto"], "SourceMark/quoted path.jpg")
+
+    def test_empty_mark_is_not_created(self) -> None:
+        with self.assertRaises(MarkValidationError) as exc:
+            create_mark(self.settings(), MarkWriteData(number=1))
+        self.assertEqual(str(exc.exception), "Выберите наименование знака.")
+
+    def test_mark_date_purchase_normalizes_user_format(self) -> None:
+        data = mark_data_from_mapping({"id_name": "4", "date_purchase": "05.06.2026"})
+        self.assertEqual(data.date_purchase, "2026-06-05")
 
 
 if __name__ == "__main__":

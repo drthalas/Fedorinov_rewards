@@ -4,6 +4,7 @@ import sqlite3
 import unittest
 
 from backend.app.repositories.legacy_rewards import (
+    legacy_rewards_filter_options,
     legacy_rewards_totals,
     list_legacy_reward_persons,
     normalized_legacy_rewards_filters,
@@ -57,9 +58,12 @@ class LegacyRewardsFilterTests(unittest.TestCase):
             connection.execute("insert into guide values (2, 'майор')")
             connection.execute("insert into guide_lev_0 values (1, -1, 'СССР')")
             connection.execute("insert into guide_lev_1 values (1, 1, 'Ордена')")
+            connection.execute("insert into guide_lev_1 values (9, 9, 'Чужая категория')")
             connection.execute("insert into guide_lev_2 values (1, 1, 'Боевые')")
+            connection.execute("insert into guide_lev_2 values (9, 9, 'Чужая подкатегория')")
             connection.execute("insert into guide_lev_3 values (1, 1, 'Орден Красной Звезды')")
             connection.execute("insert into guide_lev_3 values (2, 1, 'Медаль За отвагу')")
+            connection.execute("insert into guide_lev_3 values (9, 9, 'Чужое наименование')")
             connection.execute("insert into person values (1, 'Капитан Тест', '1913-05-09', 1, '', '')")
             connection.execute("insert into person values (2, 'Майор Тест', '1914-01-01', 2, '', '')")
             connection.execute("insert into person values (3, 'Капитан без ордена', '1915', 1, '', '')")
@@ -106,6 +110,26 @@ class LegacyRewardsFilterTests(unittest.TestCase):
         self.assertIsNone(filters.rank_id)
         self.assertIsNone(filters.country_id)
         self.assertEqual(len(list_legacy_reward_persons(self.db_path, filters)), 3)
+
+    def test_filter_options_are_cascaded_by_selected_parent(self) -> None:
+        empty_options = legacy_rewards_filter_options(self.db_path, normalized_legacy_rewards_filters())
+        self.assertEqual(empty_options["categories"], [])
+        self.assertEqual(empty_options["subcategories"], [])
+        self.assertEqual(empty_options["names"], [])
+
+        country_options = legacy_rewards_filter_options(
+            self.db_path,
+            normalized_legacy_rewards_filters(country_id="1"),
+        )
+        self.assertEqual([row["id"] for row in country_options["categories"]], [1])
+        self.assertEqual(country_options["subcategories"], [])
+
+        category_options = legacy_rewards_filter_options(
+            self.db_path,
+            normalized_legacy_rewards_filters(country_id="1", category_id="1", subcategory_id="1"),
+        )
+        self.assertEqual([row["id"] for row in category_options["subcategories"]], [1])
+        self.assertEqual([row["id"] for row in category_options["names"]], [1, 2])
 
 
 if __name__ == "__main__":
