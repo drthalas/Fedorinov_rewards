@@ -181,7 +181,9 @@ class PersonBookletTests(unittest.TestCase):
             "generate_person_booklet_pdf",
             return_value=BookletPDFResult(path=selected_path, filename="test.pdf"),
         ):
-            response = asyncio.run(persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1"}), 1))
+            response = asyncio.run(
+                persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1", "save_dialog": "1"}), 1)
+            )
         self.assertEqual(response.status_code, 303)
         self.assertIn("message=", response.headers["location"])
 
@@ -191,9 +193,23 @@ class PersonBookletTests(unittest.TestCase):
             "choose_save_path",
             side_effect=persons_router.SaveDialogCancelled("cancel"),
         ), patch.object(persons_router, "generate_person_booklet_pdf") as generator:
-            response = asyncio.run(persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1"}), 1))
+            response = asyncio.run(
+                persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1", "save_dialog": "1"}), 1)
+            )
         self.assertEqual(response.status_code, 303)
         generator.assert_not_called()
+
+    def test_pdf_route_returns_application_pdf(self) -> None:
+        try:
+            import reportlab  # noqa: F401
+        except ImportError:
+            self.skipTest("reportlab is not installed")
+        before = self._counts()
+        response = asyncio.run(persons_router.person_booklet_pdf(FakeRequest({"return_to": "/persons/1"}), 1))
+        after = self._counts()
+        self.assertEqual(response.media_type, "application/pdf")
+        self.assertTrue(Path(response.path).read_bytes().startswith(b"%PDF"))
+        self.assertEqual(after, before)
 
     def test_generate_person_booklet_pdf_creates_pdf_when_reportlab_available(self) -> None:
         try:

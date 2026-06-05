@@ -12,6 +12,7 @@
     <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
     <form method="post" action="/persons/{{ person.id }}/booklet.pdf">
       <input type="hidden" name="return_to" value="{{ return_to }}">
+      <input type="hidden" name="save_dialog" value="1">
       <button type="submit">Сохранить PDF</button>
     </form>
   </header>

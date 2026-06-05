@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
@@ -185,6 +185,24 @@ async def person_booklet_pdf(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}/booklet"
+    if form_values.get("save_dialog") != "1":
+        try:
+            result = generate_person_booklet_pdf(settings, person_id)
+        except BookletError as exc:
+            context = person_booklet_context(settings, person_id, return_to)
+            return templates.TemplateResponse(
+                request,
+                "person_booklet.html",
+                {
+                    "settings": settings,
+                    **context,
+                    "return_to": return_to,
+                    "error": str(exc),
+                    "message": "",
+                },
+                status_code=400,
+            )
+        return FileResponse(result.path, media_type="application/pdf", filename=result.filename)
     try:
         target_path = choose_save_path(
             default_filename=person_booklet_filename(settings, person_id),
