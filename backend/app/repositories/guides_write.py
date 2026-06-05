@@ -111,8 +111,13 @@ def update_rank(settings: Settings, rank_id: int, data: RankGuideData) -> None:
     log_action("update", "guide_rank", rank_id, {"fields": ["name"]})
 
 
-def delete_rank(settings: Settings, rank_id: int) -> None:
+CONFIRM_REQUIRED_MESSAGE = "Действие требует подтверждения."
+
+
+def delete_rank(settings: Settings, rank_id: int, confirm: bool = False) -> None:
     ensure_dangerous_action_allowed(settings)
+    if not confirm:
+        raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _rank_exists(connection, rank_id):
             raise GuideValidationError("Звание/специальность не найдены")
@@ -175,9 +180,11 @@ def _usage_count(connection, level: int, item_id: int) -> int:
     return 0
 
 
-def delete_guide_level_item(settings: Settings, level: int, item_id: int) -> None:
+def delete_guide_level_item(settings: Settings, level: int, item_id: int, confirm: bool = False) -> None:
     safe_level = _validate_level(level)
     ensure_dangerous_action_allowed(settings)
+    if not confirm:
+        raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _guide_item_exists(connection, safe_level, item_id):
             raise GuideValidationError("Элемент справочника не найден")

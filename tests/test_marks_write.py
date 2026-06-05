@@ -9,6 +9,7 @@ from backend.app.config import Settings
 from backend.app.routers import marks as marks_router
 from backend.app.routers.templates import templates
 from backend.app.repositories.marks_write import (
+    MarkValidationError,
     MarkWriteData,
     create_mark,
     delete_mark,
@@ -201,6 +202,32 @@ class MarkWriteTests(unittest.TestCase):
         self.assertIsNone(self.fetch_mark(mark_id))
         self.assertTrue(media_dir.exists())
         self.assertTrue((media_dir / "FotoFront.jpg").exists())
+
+    def test_delete_mark_with_confirm_works_without_mandatory_backup(self) -> None:
+        mark_id = create_mark(self.settings(), MarkWriteData(number=101))
+        delete_mark(self.settings(), mark_id, confirm=True)
+        self.assertIsNone(self.fetch_mark(mark_id))
+
+    def test_delete_mark_without_confirm_is_blocked(self) -> None:
+        mark_id = create_mark(self.settings(), MarkWriteData(number=102))
+        with self.assertRaises(MarkValidationError) as blocked:
+            delete_mark(self.settings(), mark_id)
+        self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
+        self.assertIsNotNone(self.fetch_mark(mark_id))
+
+    def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
+        mark_id = create_mark(self.settings(), MarkWriteData(number=103))
+        settings = Settings(
+            rewards_data_dir=self.root,
+            rewards_db_path=self.db_path,
+            read_only=False,
+            write_mode=True,
+            require_backup_before_write=True,
+            require_backup_before_dangerous_actions=True,
+        )
+        with self.assertRaises(WriteBlockedError):
+            delete_mark(settings, mark_id, confirm=True)
+        self.assertIsNotNone(self.fetch_mark(mark_id))
 
     def test_sql_handles_quotes_and_text(self) -> None:
         text = "Link 'single' and \"double\""

@@ -51,6 +51,11 @@ def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
 
 
+def _delete_validation_error(exc: PersonValidationError) -> HTTPException:
+    status_code = 400 if str(exc) == "Действие требует подтверждения." else 404
+    return HTTPException(status_code=status_code, detail=str(exc))
+
+
 def _with_message(url: str, message: str) -> str:
     safe_url = safe_return_to(url)
     if not safe_url or not message:
@@ -293,14 +298,14 @@ async def person_delete(request: Request, person_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        delete_person(settings, person_id)
+        delete_person(settings, person_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonDeleteBlockedError:
         target = with_status(return_to, "delete_blocked") if return_to else f"/persons/{person_id}?status=delete_blocked"
         return RedirectResponse(target, status_code=303)
     except PersonValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _delete_validation_error(exc) from exc
     target = with_status(return_to, "deleted") if return_to else "/persons?status=deleted"
     return RedirectResponse(target, status_code=303)
 

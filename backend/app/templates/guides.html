@@ -12,6 +12,7 @@
         {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
+          <input type="hidden" name="confirm" value="true">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
@@ -27,6 +28,7 @@
         {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
+          <input type="hidden" name="confirm" value="true">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
@@ -61,6 +63,7 @@
         <span class="tree-actions">
           <a href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
           <form method="post" action="/guides/ranks/{{ rank.id }}/delete" onsubmit="return confirm('Удалить звание/специальность?');">
+            <input type="hidden" name="confirm" value="true">
             <input type="hidden" name="return_to" value="{{ guides_self }}">
             <button class="link-button" type="submit">Удалить</button>
           </form>

@@ -75,6 +75,7 @@
             {% if selected_person %}
               <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
               <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Подтвердите удаление награжденного')">
+                <input type="hidden" name="confirm" value="true">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
                 <button class="tool-button danger" type="submit">❌ Удалить</button>
               </form>

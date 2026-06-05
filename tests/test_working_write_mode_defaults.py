@@ -2,7 +2,7 @@ from pathlib import Path
 import unittest
 
 from backend.app.config import Settings
-from backend.app.services.write_guard import WriteBlockedError, ensure_write_allowed
+from backend.app.services.write_guard import WriteBlockedError, ensure_dangerous_action_allowed, ensure_write_allowed
 from backend.app.version import APP_VERSION
 
 
@@ -49,6 +49,50 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             require_backup_before_write=False,
         )
         ensure_write_allowed(settings)
+
+    def test_dangerous_action_allowed_without_mandatory_backup_when_dangerous_backup_disabled(self) -> None:
+        settings = Settings(
+            rewards_data_dir=Path("/tmp/rewards"),
+            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
+            read_only=False,
+            write_mode=True,
+            require_backup_before_write=False,
+            require_backup_before_dangerous_actions=False,
+        )
+        ensure_dangerous_action_allowed(settings)
+
+    def test_dangerous_action_allowed_when_mandatory_write_backup_disabled(self) -> None:
+        settings = Settings(
+            rewards_data_dir=Path("/tmp/rewards"),
+            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
+            read_only=False,
+            write_mode=True,
+            require_backup_before_write=False,
+            require_backup_before_dangerous_actions=True,
+        )
+        ensure_dangerous_action_allowed(settings)
+
+    def test_dangerous_action_still_respects_read_only_and_write_mode(self) -> None:
+        read_only = Settings(
+            rewards_data_dir=Path("/tmp/rewards"),
+            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
+            read_only=True,
+            write_mode=True,
+            require_backup_before_write=False,
+            require_backup_before_dangerous_actions=False,
+        )
+        write_off = Settings(
+            rewards_data_dir=Path("/tmp/rewards"),
+            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
+            read_only=False,
+            write_mode=False,
+            require_backup_before_write=False,
+            require_backup_before_dangerous_actions=False,
+        )
+        with self.assertRaises(WriteBlockedError):
+            ensure_dangerous_action_allowed(read_only)
+        with self.assertRaises(WriteBlockedError):
+            ensure_dangerous_action_allowed(write_off)
 
     def test_no_old_english_backup_message_in_user_templates(self) -> None:
         for relative in ["backend/app/templates/base.html", "backend/app/templates/legacy.html", "HELP_RU.md"]:

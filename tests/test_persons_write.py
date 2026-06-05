@@ -7,6 +7,7 @@ import unittest
 from backend.app.config import Settings
 from backend.app.repositories.persons_write import (
     PersonDeleteBlockedError,
+    PersonValidationError,
     PersonWriteData,
     create_person,
     delete_person,
@@ -83,7 +84,7 @@ class PersonWriteTests(unittest.TestCase):
         with self.assertRaises(WriteBlockedError):
             update_person(settings, 1, data)
         with self.assertRaises(WriteBlockedError):
-            delete_person(settings, 1)
+            delete_person(settings, 1, confirm=True)
 
     def test_missing_backup_blocks_create_when_required(self) -> None:
         settings = Settings(
@@ -116,11 +117,23 @@ class PersonWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=False,
+            require_backup_before_write=True,
             require_backup_before_dangerous_actions=True,
         )
         with self.assertRaises(WriteBlockedError):
-            delete_person(dangerous_settings, person_id)
+            delete_person(dangerous_settings, person_id, confirm=True)
+        self.assertIsNotNone(self.fetch_person(person_id))
+
+    def test_delete_person_with_confirm_works_without_mandatory_backup(self) -> None:
+        person_id = create_person(self.settings(), PersonWriteData(fio="Delete without backup"))
+        delete_person(self.settings(), person_id, confirm=True)
+        self.assertIsNone(self.fetch_person(person_id))
+
+    def test_delete_person_without_confirm_is_blocked(self) -> None:
+        person_id = create_person(self.settings(), PersonWriteData(fio="Needs confirm"))
+        with self.assertRaises(PersonValidationError) as blocked:
+            delete_person(self.settings(), person_id)
+        self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
         self.assertIsNotNone(self.fetch_person(person_id))
 
     def test_create_person_works(self) -> None:
@@ -147,7 +160,7 @@ class PersonWriteTests(unittest.TestCase):
 
     def test_delete_person_without_rewards_works(self) -> None:
         person_id = create_person(self.settings(), PersonWriteData(fio="Delete me"))
-        delete_person(self.settings(), person_id)
+        delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNone(self.fetch_person(person_id))
 
     def test_delete_person_with_rewards_is_blocked(self) -> None:
@@ -155,7 +168,7 @@ class PersonWriteTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into rewards (person_id) values (?)", (person_id,))
         with self.assertRaises(PersonDeleteBlockedError):
-            delete_person(self.settings(), person_id)
+            delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNotNone(self.fetch_person(person_id))
 
     def test_sql_handles_quotes_in_fio_and_comment(self) -> None:

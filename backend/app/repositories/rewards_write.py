@@ -154,7 +154,7 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
 def delete_reward(settings: Settings, reward_id: int, confirm: bool = False) -> int:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
-        raise RewardValidationError("Удаление требует confirm=true")
+        raise RewardValidationError("Действие требует подтверждения.")
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         row = connection.execute("select person_id from rewards where id = ?", (reward_id,)).fetchone()
         if row is None:

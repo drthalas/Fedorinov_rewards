@@ -106,8 +106,13 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
     log_action("update", "person", person_id, {"fields": list(fields)})
 
 
-def delete_person(settings: Settings, person_id: int) -> None:
+CONFIRM_REQUIRED_MESSAGE = "Действие требует подтверждения."
+
+
+def delete_person(settings: Settings, person_id: int, confirm: bool = False) -> None:
     ensure_dangerous_action_allowed(settings)
+    if not confirm:
+        raise PersonValidationError(CONFIRM_REQUIRED_MESSAGE)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         reward_count = connection.execute(
             "select count(*) as count from rewards where person_id = ?",

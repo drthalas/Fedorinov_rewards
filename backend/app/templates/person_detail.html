@@ -12,6 +12,7 @@
 <div class="actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
   <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Удалить награжденного?');">
+    <input type="hidden" name="confirm" value="true">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>

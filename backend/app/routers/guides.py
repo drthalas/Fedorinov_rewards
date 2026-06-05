@@ -56,6 +56,11 @@ def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
 
 
+def _delete_validation_error(exc: GuideValidationError) -> HTTPException:
+    status_code = 400 if str(exc) == "Действие требует подтверждения." else 404
+    return HTTPException(status_code=status_code, detail=str(exc))
+
+
 def _context(settings, request: Request, return_to: str = "", status: str = "", error: str | None = None, section: str = ""):
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     tree = guide_tree(settings.rewards_db_path) if settings.db_exists else []
@@ -166,14 +171,14 @@ async def rank_delete(request: Request, rank_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        delete_rank(settings, rank_id)
+        delete_rank(settings, rank_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except GuideDeleteBlockedError:
         target = with_status(return_to, "rank_delete_used") if return_to else "/guides?status=rank_delete_used"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _delete_validation_error(exc) from exc
     target = with_status(return_to, "rank_deleted") if return_to else "/guides?status=rank_deleted"
     return RedirectResponse(target, status_code=303)
 
@@ -294,7 +299,7 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        delete_guide_level_item(settings, level, item_id)
+        delete_guide_level_item(settings, level, item_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except GuideDeleteBlockedError as exc:
@@ -302,6 +307,6 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
         target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise _delete_validation_error(exc) from exc
     target = with_status(return_to, "guide_deleted") if return_to else "/guides?status=guide_deleted"
     return RedirectResponse(target, status_code=303)

@@ -154,7 +154,7 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
 def delete_mark(settings: Settings, mark_id: int, confirm: bool = False) -> None:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
-        raise MarkValidationError("Удаление требует confirm=true")
+        raise MarkValidationError("Действие требует подтверждения.")
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         cursor = connection.execute("delete from mark where id = ?", (mark_id,))
         if cursor.rowcount == 0:
