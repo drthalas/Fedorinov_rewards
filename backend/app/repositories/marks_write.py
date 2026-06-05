@@ -97,6 +97,14 @@ def _as_params(data: MarkWriteData) -> tuple[object, ...]:
     return tuple(getattr(data, field) for field in MARK_FIELDS)
 
 
+def _preserve_existing_guide_ids(data: MarkWriteData, existing_row) -> MarkWriteData:
+    values = {field: getattr(data, field) for field in MARK_FIELDS}
+    for field in ("id_gos", "id_catigory", "id_sub_catigory", "id_name"):
+        if values[field] is None and existing_row[field] is not None:
+            values[field] = existing_row[field]
+    return MarkWriteData(**values)
+
+
 def create_mark(settings: Settings, data: MarkWriteData) -> int:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
@@ -120,6 +128,13 @@ def create_mark(settings: Settings, data: MarkWriteData) -> int:
 def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        existing_row = connection.execute(
+            "select id_gos, id_catigory, id_sub_catigory, id_name from mark where id = ?",
+            (mark_id,),
+        ).fetchone()
+        if existing_row is None:
+            raise MarkValidationError("Знак не найден")
+        data = _preserve_existing_guide_ids(data, existing_row)
         cursor = connection.execute(
             """
             update mark

@@ -47,9 +47,13 @@ def get_mark(db_path: Path, mark_id: int) -> dict[str, object] | None:
         """
         select
             m.id,
+            m.id_gos,
             g0.name as gos,
+            m.id_catigory,
             g1.name as category,
+            m.id_sub_catigory,
             g2.name as subcategory,
+            m.id_name,
             g3.name as name,
             m.id_link,
             m.number,

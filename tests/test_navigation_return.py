@@ -117,7 +117,12 @@ class ReturnNavigationTests(unittest.TestCase):
             )
             connection.execute("insert into person (id, fio) values (1, 'Test Person')")
             connection.execute("insert into rewards (id, person_id, number) values (10, 1, 100)")
-            connection.execute("insert into mark (id, number) values (20, 200)")
+            connection.execute(
+                """
+                insert into mark (id, id_gos, id_catigory, id_sub_catigory, id_name, number)
+                values (20, 1, 1, 1, 2, 200)
+                """
+            )
             connection.commit()
         finally:
             connection.close()
@@ -163,6 +168,19 @@ class ReturnNavigationTests(unittest.TestCase):
         request = FakeRequest({"number": "201", "return_to": "/legacy?tab=marks&mark_id=20"})
         response = asyncio.run(mark_update(request, 20))
         self.assertEqual(response.headers["location"], "/legacy?tab=marks&mark_id=20&status=updated")
+
+    def test_mark_edit_post_preserves_guide_ids_when_payload_omits_them(self) -> None:
+        request = FakeRequest({"number": "202", "price_now": "700", "return_to": "/legacy?tab=marks&mark_id=20"})
+        asyncio.run(mark_update(request, 20))
+        with sqlite3.connect(self.db_path) as connection:
+            connection.row_factory = sqlite3.Row
+            row = connection.execute("select * from mark where id = 20").fetchone()
+        self.assertEqual(row["number"], 202)
+        self.assertEqual(row["price_now"], 700)
+        self.assertEqual(row["id_gos"], 1)
+        self.assertEqual(row["id_catigory"], 1)
+        self.assertEqual(row["id_sub_catigory"], 1)
+        self.assertEqual(row["id_name"], 2)
 
 
 if __name__ == "__main__":

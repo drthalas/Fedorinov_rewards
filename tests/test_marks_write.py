@@ -3,15 +3,29 @@ from tempfile import TemporaryDirectory
 import os
 import sqlite3
 import unittest
+from unittest.mock import patch
 
 from backend.app.config import Settings
+from backend.app.routers import marks as marks_router
+from backend.app.routers.templates import templates
 from backend.app.repositories.marks_write import (
     MarkWriteData,
     create_mark,
     delete_mark,
     update_mark,
 )
+from backend.app.repositories.marks import get_mark
 from backend.app.services.write_guard import WriteBlockedError
+
+
+class TemplateRequest:
+    def __init__(self, path: str):
+        self.url = type("URL", (), {"path": path})()
+
+    def url_for(self, name: str, **path_params) -> str:
+        if name == "static":
+            return f"/static/{path_params.get('path', '')}"
+        return f"/{name}"
 
 
 class MarkWriteTests(unittest.TestCase):
@@ -20,11 +34,24 @@ class MarkWriteTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.db_path = self.root / "database" / "MyDatabase.sqlite"
         self.db_path.parent.mkdir(parents=True)
+        os.environ["REWARDS_DATA_DIR"] = str(self.root)
+        os.environ["REWARDS_DB_PATH"] = str(self.db_path)
+        os.environ["READ_ONLY"] = "false"
+        os.environ["WRITE_MODE"] = "true"
+        os.environ["REQUIRE_BACKUP_BEFORE_WRITE"] = "false"
         os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
         self._create_db()
 
     def tearDown(self) -> None:
-        os.environ.pop("REWARDS_AUDIT_LOG", None)
+        for key in [
+            "REWARDS_DATA_DIR",
+            "REWARDS_DB_PATH",
+            "READ_ONLY",
+            "WRITE_MODE",
+            "REQUIRE_BACKUP_BEFORE_WRITE",
+            "REWARDS_AUDIT_LOG",
+        ]:
+            os.environ.pop(key, None)
         self.tmp.cleanup()
 
     def settings(self, write_mode: bool = True) -> Settings:
@@ -59,6 +86,20 @@ class MarkWriteTests(unittest.TestCase):
                 )
                 """
             )
+            for level in range(4):
+                connection.execute(
+                    f"""
+                    create table guide_lev_{level} (
+                        id integer primary key,
+                        idl integer,
+                        name text
+                    )
+                    """
+                )
+                connection.execute(
+                    f"insert into guide_lev_{level} (id, idl, name) values (?, ?, ?)",
+                    (level + 1, level, f"Guide {level}"),
+                )
 
     def fetch_mark(self, mark_id: int) -> sqlite3.Row | None:
         with sqlite3.connect(self.db_path) as connection:
@@ -97,6 +138,58 @@ class MarkWriteTests(unittest.TestCase):
         self.assertEqual(row["price_purchase"], 500)
         self.assertEqual(row["price_now"], 700)
         self.assertEqual(row["instock"], 0)
+
+    def test_get_mark_returns_guide_ids(self) -> None:
+        mark_id = create_mark(
+            self.settings(),
+            MarkWriteData(id_gos=1, id_catigory=2, id_sub_catigory=3, id_name=4, number=77),
+        )
+        mark = get_mark(self.db_path, mark_id)
+        self.assertIsNotNone(mark)
+        self.assertEqual(mark["id_gos"], 1)
+        self.assertEqual(mark["id_catigory"], 2)
+        self.assertEqual(mark["id_sub_catigory"], 3)
+        self.assertEqual(mark["id_name"], 4)
+
+    def test_mark_edit_context_and_template_preselect_guide_ids(self) -> None:
+        mark_id = create_mark(
+            self.settings(),
+            MarkWriteData(id_gos=1, id_catigory=2, id_sub_catigory=3, id_name=4, number=77),
+        )
+        with patch.object(marks_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = marks_router.mark_edit(object(), mark_id)
+        self.assertEqual(context["mark"]["id_gos"], 1)
+        self.assertEqual(context["mark"]["id_catigory"], 2)
+        self.assertEqual(context["mark"]["id_sub_catigory"], 3)
+        self.assertEqual(context["mark"]["id_name"], 4)
+        rendered = templates.env.get_template("mark_form.html").render(
+            request=TemplateRequest(f"/marks/{mark_id}/edit"),
+            **context,
+        )
+        self.assertIn('<option value="1" selected>Guide 0</option>', rendered)
+        self.assertIn('<option value="2" selected>Guide 1</option>', rendered)
+        self.assertIn('<option value="3" selected>Guide 2</option>', rendered)
+        self.assertIn('<option value="4" selected>Guide 3</option>', rendered)
+
+    def test_update_mark_preserves_existing_guide_ids_when_form_omits_them(self) -> None:
+        mark_id = create_mark(
+            self.settings(),
+            MarkWriteData(id_gos=1, id_catigory=2, id_sub_catigory=3, id_name=4, number=77),
+        )
+        update_mark(
+            self.settings(),
+            mark_id,
+            MarkWriteData(number=88, price_purchase=500, price_now=700, instock=True),
+        )
+        row = self.fetch_mark(mark_id)
+        self.assertEqual(row["number"], 88)
+        self.assertEqual(row["price_purchase"], 500)
+        self.assertEqual(row["price_now"], 700)
+        self.assertEqual(row["instock"], 1)
+        self.assertEqual(row["id_gos"], 1)
+        self.assertEqual(row["id_catigory"], 2)
+        self.assertEqual(row["id_sub_catigory"], 3)
+        self.assertEqual(row["id_name"], 4)
 
     def test_delete_mark_removes_row_but_not_media_folder(self) -> None:
         media_dir = self.root / "SourceMark" / "1"
