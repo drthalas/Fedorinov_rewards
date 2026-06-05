@@ -469,13 +469,32 @@ Next:
 - Cascading guide selects and sticky first columns remain deferred UX polish.
 - Further refine reward number columns after owner QA if more detail is needed.
 
+## Iteration 4: Person Folder Archive And Photo Controls
+
+Status: done/current.
+
+Scope:
+
+- Added `Открыть каталог` on the legacy rewards screen for the selected person. It opens only `Source/{person_id}` inside `REWARDS_DATA_DIR`.
+- Added `Архивировать` on the legacy rewards screen. It creates a ZIP of the selected person's folder under `REWARDS_DATA_DIR/archives/` and never deletes source files.
+- Archive creation excludes `.env`, logs, backups, nested ZIP, EXE, DLL, database, `Source` root, and `SourceMark` paths.
+- Added audit logging for `person_folder_archived` with person id and archive filename only.
+- Enhanced the inline photo lightbox with zoom in/out, reset, wheel zoom, and mouse drag panning.
+- Enabled `Вставить из буфера` in write-mode photo controls using the existing guarded `/photos/upload` endpoint.
+
+Next:
+
+- Owner QA on Windows for OS folder opening and browser clipboard support.
+- PDF/booklet generation remains the next dedicated iteration.
+- Physical photo deletion remains deferred.
+
 ## Backlog / Future
 
 - Implement DataSourceManager.
 - Implement Settings -> Data Source screen.
 - Implement local config storage for selected data directory.
 - Add validation report for connected database and media folders.
-- Implement full Clipboard API photo paste.
+- Validate Clipboard API photo paste on owner Windows browsers and keep file-upload fallback.
 - Implement physical photo delete only after restore workflow is mature.
 - Implement PDF export parity.
 - Improve pagination, protected-field display controls, media diagnostics UI, and test coverage.

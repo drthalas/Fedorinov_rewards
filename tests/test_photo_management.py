@@ -3,8 +3,10 @@ from tempfile import TemporaryDirectory
 import os
 import sqlite3
 import unittest
+from zipfile import ZipFile
 
 from backend.app.config import Settings
+from backend.app.services.person_files import PersonFilesError, archive_person_folder, open_person_folder, safe_person_folder
 from backend.app.services.photos import PhotoValidationError, clear_photo, save_photo
 from backend.app.services.write_guard import WriteBlockedError
 
@@ -113,6 +115,50 @@ class PhotoManagementTests(unittest.TestCase):
             save_photo(self.settings(write_mode=False), "person", 1, "person_foto", "portrait.jpg", b"jpeg")
         with self.assertRaises(WriteBlockedError):
             clear_photo(self.settings(write_mode=False), "person", 1, "person_foto")
+
+    def test_person_folder_resolves_inside_data_root(self) -> None:
+        folder = safe_person_folder(self.settings(), 1)
+        self.assertEqual(folder, (self.root / "Source" / "1").resolve())
+        self.assertTrue(str(folder).startswith(str(self.root.resolve())))
+
+    def test_person_folder_rejects_invalid_id(self) -> None:
+        with self.assertRaises(PersonFilesError):
+            safe_person_folder(self.settings(), -1)
+
+    def test_person_folder_missing_is_handled(self) -> None:
+        with self.assertRaises(PersonFilesError):
+            open_person_folder(self.settings(), 1, opener=lambda path: None)
+
+    def test_person_folder_open_uses_injected_opener(self) -> None:
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        opened: list[Path] = []
+        open_person_folder(self.settings(), 1, opener=opened.append)
+        self.assertEqual(opened, [folder.resolve()])
+
+    def test_archive_person_folder_creates_zip_without_deleting_files(self) -> None:
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        source_file = folder / "photo.jpg"
+        source_file.write_bytes(b"image")
+        result = archive_person_folder(self.settings(), 1, "Test Person")
+        self.assertTrue(result.path.exists())
+        self.assertTrue(source_file.exists())
+        with ZipFile(result.path) as archive:
+            self.assertIn("photo.jpg", archive.namelist())
+
+    def test_archive_person_folder_skips_forbidden_members(self) -> None:
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        (folder / "photo.jpg").write_bytes(b"image")
+        (folder / ".env").write_text("SECRET=1", encoding="utf-8")
+        (folder / "nested.zip").write_bytes(b"zip")
+        result = archive_person_folder(self.settings(), 1, "Test Person")
+        with ZipFile(result.path) as archive:
+            names = set(archive.namelist())
+        self.assertIn("photo.jpg", names)
+        self.assertNotIn(".env", names)
+        self.assertNotIn("nested.zip", names)
 
 
 if __name__ == "__main__":

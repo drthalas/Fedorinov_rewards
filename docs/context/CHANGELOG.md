@@ -1,5 +1,14 @@
 # Changelog
 
+## Iteration 4 Person Folder And Photo Controls
+
+- Added legacy rewards actions to open the selected person's local `Source/{person_id}` folder.
+- Added safe person-folder ZIP archive creation under the local data `archives/` folder.
+- Added audit logging for person-folder archives without personal text values.
+- Enhanced the inline photo lightbox with zoom in, zoom out, reset, mouse drag panning, and wheel zoom.
+- Enabled `Вставить из буфера` in write-mode photo controls using the browser Clipboard API and the existing guarded upload endpoint.
+- Kept physical media deletion, PDF/booklet generation, and automatic OS-level archive cleanup deferred.
+
 ## Iteration 3 Summary Matrix By Persons And Rewards
 
 - Added a default `Шахматка по кавалерам` mode to `/legacy?tab=summary`.

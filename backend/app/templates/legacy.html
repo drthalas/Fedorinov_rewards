@@ -3,6 +3,8 @@
 {% block content %}
   {% if message == "pdf_not_implemented" %}
     <div class="notice">PDF export будет реализован позже. Сейчас кнопка оставлена как заглушка legacy-интерфейса.</div>
+  {% elif message %}
+    <div class="notice notice-success">{{ message }}</div>
   {% endif %}
   {% if status_message %}
     <div class="notice notice-success">{{ status_message }}</div>
@@ -183,7 +185,17 @@
                 <summary>Краткая биография</summary>
                 <div class="text-block">{{ selected_person.biography|dash }}</div>
               </details>
-              <a class="button disabled-button" href="/legacy?tab=about&message=pdf_not_implemented">Сформировать буклет</a>
+              <div class="person-file-actions">
+                <form method="post" action="/persons/{{ selected_person.id }}/open-folder">
+                  <input type="hidden" name="return_to" value="{{ selected_person_return }}">
+                  <button class="button secondary-button" type="submit">Открыть каталог</button>
+                </form>
+                <form method="post" action="/persons/{{ selected_person.id }}/archive-folder">
+                  <input type="hidden" name="return_to" value="{{ selected_person_return }}">
+                  <button class="button secondary-button" type="submit">Архивировать</button>
+                </form>
+                <a class="button disabled-button" href="/legacy?tab=about&message=pdf_not_implemented">Сформировать буклет</a>
+              </div>
               <p class="secondary">PDF export будет реализован позже.</p>
             </section>
 

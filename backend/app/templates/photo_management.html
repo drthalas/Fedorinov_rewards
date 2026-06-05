@@ -33,7 +33,17 @@
           <input type="hidden" name="return_url" value="{{ current_form_url }}">
           <button class="mini-button danger" type="submit" title="Убрать привязку">×</button>
         </form>
-        <button class="mini-button disabled" type="button" title="Clipboard paste будет реализован позже" disabled>Вставить из буфера</button>
+        <button
+          class="mini-button clipboard-paste-button"
+          type="button"
+          data-clipboard-paste
+          data-entity-type="{{ photo_entity_type }}"
+          data-entity-id="{{ photo_entity_id }}"
+          data-photo-field="{{ photo.field }}"
+          data-return-url="{{ current_form_url }}"
+          title="Вставить изображение из буфера обмена"
+        >Вставить из буфера</button>
+        <span class="clipboard-paste-status" aria-live="polite"></span>
       </div>
     </div>
     {% endfor %}

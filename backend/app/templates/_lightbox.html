@@ -3,8 +3,15 @@
   <div class="photo-lightbox-panel" role="dialog" aria-modal="true" aria-label="Просмотр фото">
     <button class="photo-lightbox-close" type="button" data-lightbox-close aria-label="Закрыть">×</button>
     <button class="photo-lightbox-nav photo-lightbox-prev" type="button" data-lightbox-prev aria-label="Предыдущее фото">‹</button>
-    <img class="photo-lightbox-image" src="" alt="">
+    <div class="photo-lightbox-viewport">
+      <img class="photo-lightbox-image" src="" alt="">
+    </div>
     <button class="photo-lightbox-nav photo-lightbox-next" type="button" data-lightbox-next aria-label="Следующее фото">›</button>
+    <div class="photo-lightbox-tools" aria-label="Масштаб фото">
+      <button type="button" data-lightbox-zoom-out title="Отдалить">−</button>
+      <button type="button" data-lightbox-zoom-in title="Приблизить">+</button>
+      <button type="button" data-lightbox-reset>Сброс</button>
+    </div>
     <div class="photo-lightbox-caption" id="photo-lightbox-caption"></div>
   </div>
 </div>

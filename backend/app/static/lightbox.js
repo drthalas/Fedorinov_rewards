@@ -45,11 +45,23 @@
     }
 
     var image = lightbox.querySelector(".photo-lightbox-image");
+    var viewport = lightbox.querySelector(".photo-lightbox-viewport");
     var caption = lightbox.querySelector(".photo-lightbox-caption");
     var previousButton = lightbox.querySelector("[data-lightbox-prev]");
     var nextButton = lightbox.querySelector("[data-lightbox-next]");
+    var zoomInButton = lightbox.querySelector("[data-lightbox-zoom-in]");
+    var zoomOutButton = lightbox.querySelector("[data-lightbox-zoom-out]");
+    var resetButton = lightbox.querySelector("[data-lightbox-reset]");
     var links = collectLinks();
     var currentIndex = -1;
+    var scale = 1;
+    var offsetX = 0;
+    var offsetY = 0;
+    var dragging = false;
+    var dragStartX = 0;
+    var dragStartY = 0;
+    var dragOriginX = 0;
+    var dragOriginY = 0;
 
     links.forEach(function (link, index) {
       link.classList.add("photo-clickable");
@@ -85,6 +97,7 @@
       if (!src) {
         return;
       }
+      resetTransform();
       image.setAttribute("src", src);
       image.setAttribute("alt", closestCaption(link));
       caption.textContent = closestCaption(link);
@@ -104,6 +117,7 @@
       document.body.classList.remove("photo-lightbox-open");
       image.setAttribute("src", "");
       currentIndex = -1;
+      resetTransform();
     }
 
     function step(delta) {
@@ -112,6 +126,34 @@
       }
       var nextIndex = (currentIndex + delta + links.length) % links.length;
       open(nextIndex);
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function applyTransform() {
+      scale = clamp(scale, 1, 5);
+      if (scale === 1) {
+        offsetX = 0;
+        offsetY = 0;
+      }
+      image.style.transform = "translate(" + offsetX + "px, " + offsetY + "px) scale(" + scale + ")";
+      image.classList.toggle("is-zoomed", scale > 1);
+    }
+
+    function resetTransform() {
+      scale = 1;
+      offsetX = 0;
+      offsetY = 0;
+      if (image) {
+        applyTransform();
+      }
+    }
+
+    function zoom(delta) {
+      scale = clamp(scale + delta, 1, 5);
+      applyTransform();
     }
 
     lightbox.addEventListener("click", function (event) {
@@ -128,6 +170,56 @@
     if (nextButton) {
       nextButton.addEventListener("click", function () {
         step(1);
+      });
+    }
+    if (zoomInButton) {
+      zoomInButton.addEventListener("click", function () {
+        zoom(0.25);
+      });
+    }
+    if (zoomOutButton) {
+      zoomOutButton.addEventListener("click", function () {
+        zoom(-0.25);
+      });
+    }
+    if (resetButton) {
+      resetButton.addEventListener("click", resetTransform);
+    }
+    if (viewport) {
+      viewport.addEventListener("wheel", function (event) {
+        if (!lightbox.classList.contains("is-open")) {
+          return;
+        }
+        event.preventDefault();
+        zoom(event.deltaY < 0 ? 0.25 : -0.25);
+      }, { passive: false });
+      viewport.addEventListener("pointerdown", function (event) {
+        if (scale <= 1) {
+          return;
+        }
+        dragging = true;
+        dragStartX = event.clientX;
+        dragStartY = event.clientY;
+        dragOriginX = offsetX;
+        dragOriginY = offsetY;
+        viewport.setPointerCapture(event.pointerId);
+      });
+      viewport.addEventListener("pointermove", function (event) {
+        if (!dragging) {
+          return;
+        }
+        offsetX = dragOriginX + event.clientX - dragStartX;
+        offsetY = dragOriginY + event.clientY - dragStartY;
+        applyTransform();
+      });
+      viewport.addEventListener("pointerup", function (event) {
+        dragging = false;
+        if (viewport.hasPointerCapture(event.pointerId)) {
+          viewport.releasePointerCapture(event.pointerId);
+        }
+      });
+      viewport.addEventListener("pointercancel", function () {
+        dragging = false;
       });
     }
 

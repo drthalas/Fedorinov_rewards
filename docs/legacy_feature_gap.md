@@ -9,7 +9,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Add person | Form1, Form2 | Implemented in web dev write mode | Creates `person` row and media folder expectations | Stage 3B | yes | yes |
 | Edit person | Form2 | Implemented in web dev write mode; form labels and short biography added in Stage 3I | Changes personal fields, links, comments, biography, rank, dates | Stage 3B plus Stage 3I | yes | yes |
 | Delete person | Form1, Form2 | Implemented in web dev write mode; blocks delete while rewards exist | May orphan rewards/media if parity is expanded later | Stage 3B | yes | yes |
-| Person photos | Form2, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; viewer/slideshow implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
+| Person photos | Form2, Form4 | Upload/replace, clipboard paste, clear/unlink, viewer/slideshow, and zoom/pan lightbox implemented in web dev write mode | Physical file deletion still deferred; Clipboard API needs Windows browser QA | Stage 3F plus Iteration 4 and later photo deletion stage | yes | yes |
 | Short biography | Form2 / owner request | Implemented as `person.biography` with guarded idempotent migration and display in person/legacy cards | Adds schema column and personal text field | Stage 3I | yes for migration/write | yes for migration/write |
 
 ## Legacy Desktop Layout
@@ -30,7 +30,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Add reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `rewards`, duplicate-number parity still needs refinement | Stage 3C plus Stage 3I | yes | yes |
 | Edit reward | Form2, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3C plus Stage 3I | yes | yes |
 | Delete reward | Form2 | Implemented in web dev write mode | Deletes DB row only; media folders/files are preserved | Stage 3C | yes | yes |
-| Reward photos | Form3, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; large viewer implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
+| Reward photos | Form3, Form4 | Upload/replace, clipboard paste, clear/unlink, and zoom/pan large viewer implemented in web dev write mode | Physical file deletion still deferred; Clipboard API needs Windows browser QA | Stage 3F plus Iteration 4 and later photo deletion stage | yes | yes |
 
 ## Marks
 
@@ -39,7 +39,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Add mark | Form1, Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Inserts `mark`, duplicate-number parity still needs refinement | Stage 3D plus Stage 3I | yes | yes |
 | Edit mark | Form3 | Implemented in web dev write mode; form grouped closer to legacy dialog in Stage 3I | Updates classification, price, stock, links, dates | Stage 3D plus Stage 3I | yes | yes |
 | Delete mark | Form1, Form3 | Implemented in web dev write mode | Deletes DB row only; SourceMark folders/files are preserved | Stage 3D | yes | yes |
-| Mark photos | Form3, Form4 | Upload/replace and clear/unlink implemented in web dev write mode; large viewer implemented | Physical file deletion and clipboard paste still deferred | Stage 3F plus later photo deletion/paste stage | yes | yes |
+| Mark photos | Form3, Form4 | Upload/replace, clipboard paste, clear/unlink, and zoom/pan large viewer implemented in web dev write mode | Physical file deletion still deferred; Clipboard API needs Windows browser QA | Stage 3F plus Iteration 4 and later photo deletion stage | yes | yes |
 
 ## Guides
 
@@ -53,7 +53,7 @@ Stage 3 changes the target from a read-only viewer toward a full functional lega
 | Feature | Legacy source/form | Current web status | Risk | Recommended stage | Requires backup? | Requires write mode? |
 | --- | --- | --- | --- | --- | --- | --- |
 | Upload from file | Form2, Form3 | Implemented in web dev write mode for person/reward/mark photo fields | Copies real media into Source/SourceMark; backup required | Stage 3F | yes | yes |
-| Paste from clipboard equivalent | Form2, Form3 | UI placeholder and implementation plan documented | Needs browser Clipboard API and owner QA of upload flow first | Later Stage 3F follow-up | yes | yes |
+| Paste from clipboard equivalent | Form2, Form3 | Implemented in write mode through browser Clipboard API and the existing guarded upload endpoint | Browser support must be verified on owner Windows; file upload remains fallback | Iteration 4 | yes | yes |
 | Replace | Form2, Form3 | Implemented as upload with generated safe filename and DB field update | Old physical file remains on disk | Stage 3F | yes | yes |
 | Delete | Form2, Form3 | Implemented as clear/unlink of DB field only | Physical delete can break historical records and remains deferred | Later restore-safe photo delete stage | yes | yes |
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -15,6 +15,7 @@ from ..repositories.persons_write import (
 )
 from ..services.display import pagination
 from ..services.navigation import safe_return_to, with_status
+from ..services.person_files import PersonFilesError, archive_person_folder, open_person_folder, person_folder_status
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -30,6 +31,9 @@ STATUS_MESSAGES = {
     "delete_blocked": "Нельзя удалить: у награжденного есть награды. Сначала удалите или перенесите награды.",
     "reward_created": "Награда добавлена.",
     "reward_deleted": "Награда удалена.",
+    "folder_opened": "Каталог кавалера открыт.",
+    "folder_missing": "Каталог кавалера не найден.",
+    "archive_empty": "В каталоге кавалера нет файлов для архивации.",
 }
 
 
@@ -41,6 +45,17 @@ async def _read_form(request: Request) -> dict[str, object]:
 
 def _write_error(exc: WriteBlockedError) -> HTTPException:
     return HTTPException(status_code=403, detail=str(exc))
+
+
+def _with_message(url: str, message: str) -> str:
+    safe_url = safe_return_to(url)
+    if not safe_url or not message:
+        return safe_url
+    parts = urlsplit(safe_url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query = [(key, value) for key, value in query if key != "message"]
+    query.append(("message", message))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 @router.get("/persons")
@@ -124,6 +139,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
         raise HTTPException(status_code=404, detail="Person not found")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     safe_back = safe_return_to(return_to)
+    person_folder, person_folder_exists = person_folder_status(settings, person_id)
     return templates.TemplateResponse(
         request,
         "person_detail.html",
@@ -133,6 +149,8 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "rewards": rewards,
             "status_message": STATUS_MESSAGES.get(status),
             "return_to": safe_back,
+            "person_folder_exists": person_folder_exists,
+            "person_folder_name": person_folder.name,
         },
     )
 
@@ -208,6 +226,34 @@ async def person_delete(request: Request, person_id: int):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     target = with_status(return_to, "deleted") if return_to else "/persons?status=deleted"
     return RedirectResponse(target, status_code=303)
+
+
+@router.post("/persons/{person_id}/open-folder")
+async def person_open_folder(request: Request, person_id: int):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}"
+    try:
+        open_person_folder(settings, person_id)
+    except PersonFilesError:
+        return RedirectResponse(with_status(return_to, "folder_missing"), status_code=303)
+    return RedirectResponse(with_status(return_to, "folder_opened"), status_code=303)
+
+
+@router.post("/persons/{person_id}/archive-folder")
+async def person_archive_folder(request: Request, person_id: int):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}"
+    person = get_person(settings.rewards_db_path, person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="Person not found")
+    try:
+        result = archive_person_folder(settings, person_id, str(person.get("fio") or "person"))
+    except PersonFilesError as exc:
+        status = "archive_empty" if "нет файлов" in str(exc) else "folder_missing"
+        return RedirectResponse(with_status(return_to, status), status_code=303)
+    return RedirectResponse(_with_message(return_to, f"Архив создан: {result.filename}"), status_code=303)
 
 
 @router.get("/persons/{person_id}/photos")

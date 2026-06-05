@@ -233,11 +233,12 @@ Current development write-mode CRUD:
 - Person, reward, and mark forms are grouped closer to the old Windows dialogs with owner-facing labels.
 - Person edit includes a separate `Краткая биография` field after the biography migration is applied.
 - Click any displayed photo to open the large photo viewer.
-- Photo clicks open an inline modal/lightbox without leaving the current page.
+- Photo clicks open an inline modal/lightbox without leaving the current page; the viewer supports zoom in, zoom out, reset, mouse drag panning, wheel zoom, Escape close, and previous/next navigation.
 - `/persons/{id}/photos` includes a gallery and previous/next slideshow.
 - Person, reward, and mark edit forms include photo upload/replace controls in `WRITE_MODE=true`.
 - Photo clear/unlink removes only the SQLite field value. It does not delete the physical file.
-- Browser clipboard paste is prepared as a disabled control and documented for a later Clipboard API implementation.
+- Browser clipboard paste is available in write mode through the same guarded upload pipeline. If the browser does not expose image clipboard access on localhost, use the `+` file upload button.
+- The legacy rewards screen can open the selected person's local `Source/{person_id}` folder and create a ZIP archive of that folder under the local data `archives/` folder. Source files are not deleted.
 
 Photo upload/clear remains guarded by the same backup-first rule as CRUD. Keep owner preview read-only unless testing on a backed-up copied data folder.
 

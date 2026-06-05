@@ -25,6 +25,10 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('{% include "_lightbox.html" %}', legacy_base)
         self.assertIn("event.preventDefault()", script)
         self.assertIn("Escape", script)
+        self.assertIn("data-lightbox-zoom-in", (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text())
+        self.assertIn("data-lightbox-reset", (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text())
+        self.assertIn("pointerdown", script)
+        self.assertIn("wheel", script)
 
     def test_legacy_rewards_has_filters_totals_and_double_click(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -51,6 +55,16 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-escape-back", reward_form)
         self.assertIn("data-escape-back", mark_form)
         self.assertIn(".photo-lightbox.is-open", script)
+
+    def test_clipboard_paste_button_is_active_in_photo_controls(self) -> None:
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
+        photo_management = (ROOT / "backend" / "app" / "templates" / "photo_management.html").read_text()
+        script = (ROOT / "backend" / "app" / "static" / "clipboard_paste.js").read_text()
+
+        self.assertIn("clipboard_paste.js", base)
+        self.assertIn("data-clipboard-paste", photo_management)
+        self.assertIn("navigator.clipboard.read", script)
+        self.assertIn("/photos/upload", script)
 
 
 if __name__ == "__main__":

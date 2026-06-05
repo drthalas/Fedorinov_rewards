@@ -63,14 +63,24 @@ Clear only removes the database field value. It does not delete the physical fil
 
 ## Clipboard Paste
 
-The current UI includes a disabled “Вставить из буфера” control as a Stage 3F placeholder. Full clipboard support should use the browser Clipboard API:
+The “Вставить из буфера” control is active in write mode and uses the browser Clipboard API:
 
 1. Read image blobs with `navigator.clipboard.read()`.
 2. Convert the image blob to multipart upload data.
 3. Send it to the same guarded `/photos/upload` endpoint.
 4. Keep the same size/type validation and backup-first rule.
 
-Clipboard paste should be implemented after owner QA confirms the file upload workflow.
+If the browser does not support image clipboard reads, or blocks clipboard access for the current local page, the UI shows a clear fallback message and the user can use the `+` file upload button. Localhost is generally treated as a secure context by modern browsers, but this must be confirmed during Windows owner QA.
+
+## Person Folder Archive
+
+The legacy rewards screen can open and archive the selected person's local folder:
+
+- Folder: `Source/{person_id}` under `REWARDS_DATA_DIR`.
+- Open folder uses the local OS file manager and never accepts arbitrary paths from the browser.
+- Archive creates `REWARDS_DATA_DIR/archives/<fio>_<id>_YYYYMMDD_HHMMSS.zip`.
+- Only the selected person's folder is archived. The database, `Source` root, `SourceMark`, backups, logs, `.env`, nested ZIP files, EXE, and DLL files are excluded.
+- Source files are not deleted.
 
 ## Backup Rule
 

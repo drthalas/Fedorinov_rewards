@@ -63,4 +63,4 @@ This inventory is based on read-only review of `Form1.cs`, `Form1.Designer.cs`, 
 - `Form7`: reward summary PDF options.
 - `Form8`: mark summary PDF options.
 
-The web mirror currently routes person/reward/mark CRUD and guide CRUD to guarded web forms. Photo upload/replace and clear/unlink are implemented; full clipboard paste, physical photo deletion, PDF exports, activation, and local folder operations remain deferred.
+The web mirror currently routes person/reward/mark CRUD and guide CRUD to guarded web forms. Photo upload/replace, clipboard paste, clear/unlink, zoom/pan viewer controls, and selected-person folder archive/open actions are implemented; physical photo deletion, PDF exports, and activation remain deferred.
