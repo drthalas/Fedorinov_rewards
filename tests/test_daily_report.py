@@ -48,6 +48,62 @@ class DailyReportTests(unittest.TestCase):
         self.assertNotIn(".env", text)
         self.assertNotIn("SQLite", text)
 
+    def test_known_english_commit_messages_are_translated(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=[
+                "Add person booklet PDF",
+                "Fix cascading guide dropdowns",
+                "Improve search results and suggestions",
+                "Implement browser Save As for exports",
+                "Polish forms validation and errors",
+                "Fix delete backup guard in working write mode",
+            ],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 5))
+
+        self.assertIn("добавили PDF-буклет по кавалеру", text)
+        self.assertIn("исправили выпадающие справочники", text)
+        self.assertIn("улучшили поиск", text)
+        self.assertIn("сохранение файлов через системное окно браузера", text)
+        self.assertIn("улучшили проверки форм", text)
+        self.assertIn("исправили удаление записей", text)
+
+        for forbidden in ["Add", "Fix", "Improve", "Update", "Release", "backend", "endpoint", "route", "commit"]:
+            self.assertNotIn(forbidden, text)
+
+    def test_unknown_english_commit_message_uses_russian_fallback(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=["Refactor backend routes for internal workflow"],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 5))
+
+        self.assertIn("Награды и награждённые", text)
+        self.assertIn("доработали рабочий интерфейс и проверки", text)
+        self.assertNotIn("Refactor backend routes", text)
+        self.assertNotIn("backend", text)
+        self.assertNotIn("workflow", text)
+
+    def test_report_rejects_commit_style_words(self) -> None:
+        generator = load_generator()
+        subjects = [
+            "Add person booklet PDF",
+            "Fix cascading guide dropdowns",
+            "Improve search results and suggestions",
+            "Update internal backend endpoint",
+            "Release workflow cleanup",
+        ]
+        with patch.object(generator, "git_subjects_for_date", return_value=subjects):
+            text = generator.build_report(dt.date(2026, 6, 5))
+
+        for forbidden in ["Add", "Fix", "Improve", "Update", "Release", "backend", "endpoint", "route", "commit"]:
+            self.assertNotIn(forbidden, text)
+
 
 if __name__ == "__main__":
     unittest.main()

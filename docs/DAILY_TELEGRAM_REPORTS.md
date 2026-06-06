@@ -15,6 +15,16 @@ The report is intended to arrive every day at 09:00 Europe/Moscow:
 - Do not commit Telegram tokens or real chat ids.
 - Do not send a real message to Sergey until that first send is separately confirmed.
 
+## Язык ежедневного отчёта
+
+Ежедневный отчёт Сергею и копия Александру всегда должны быть на русском языке.
+
+- Английские commit messages нельзя отправлять пользователю напрямую.
+- Технические слова вроде `backend`, `endpoint`, `route`, `workflow`, `commit` не должны попадать в текст отчёта.
+- Известные технические формулировки переводятся в понятные русские пункты.
+- Если источник не распознан, используется нейтральная русская формулировка, а не исходный английский текст.
+- Dry-run можно использовать для проверки текста, но он не отправляет Telegram-сообщения.
+
 ## Local Configuration
 
 Copy the example file and edit only the local ignored file:

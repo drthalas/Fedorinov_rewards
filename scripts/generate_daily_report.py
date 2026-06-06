@@ -17,7 +17,15 @@ BANNED_TERMS = [
     "Fedorinov_rewards",
     "legacy UI",
     "CRUD",
+    "Add",
+    "Fix",
+    "Improve",
+    "Update",
+    "Release",
+    "workflow",
+    "backend",
     "endpoint",
+    "route",
     "router",
     "repository",
     "commit",
@@ -31,6 +39,60 @@ CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
     (
         "Add daily Telegram progress reports",
         ["настроили ежедневный утренний отчёт в Telegram;"],
+    ),
+    (
+        "Add person booklet PDF",
+        ["добавили PDF-буклет по кавалеру;"],
+    ),
+    (
+        "Fix cascading guide dropdowns",
+        [
+            "исправили выпадающие справочники: теперь страна, категория, подкатегория и наименование корректно сужают друг друга;",
+        ],
+    ),
+    (
+        "Improve search results and suggestions",
+        [
+            "улучшили поиск: добавили нужные колонки, подсказки из базы и возврат к результатам;",
+        ],
+    ),
+    (
+        "Implement browser Save As for exports",
+        ["добавили сохранение файлов через системное окно браузера;"],
+    ),
+    (
+        "Polish forms validation and errors",
+        ["улучшили проверки форм и русские сообщения об ошибках;"],
+    ),
+    (
+        "Fix delete backup guard in working write mode",
+        [
+            "исправили удаление записей в рабочем режиме: подтверждение осталось, но лишнее требование резервной копии убрано;",
+        ],
+    ),
+    (
+        "Add cascading guides and required fields",
+        ["добавили каскадные справочники и обязательные поля в формах;"],
+    ),
+    (
+        "Document project context for Codex",
+        ["привели проектную память и правила разработки в порядок;"],
+    ),
+    (
+        "Prepare v0.1.2 release",
+        ["подготовили версию 0.1.2 к выпуску;"],
+    ),
+    (
+        "Add save dialogs for archive PDF and CSV",
+        ["добавили выбор места сохранения для архива, PDF-буклета и CSV-файлов;"],
+    ),
+    (
+        "Add person folder archive and photo viewer controls",
+        ["добавили каталог кавалера, архивирование материалов и удобное управление просмотром фото;"],
+    ),
+    (
+        "Fix mark edit guide preservation",
+        ["исправили сохранение справочника знака при редактировании;"],
     ),
     (
         "Make legacy UI single shell and add photo lightbox",
@@ -112,8 +174,13 @@ TECH_REPLACEMENTS = [
     (re.compile(r"return navigation", re.IGNORECASE), "исправили возврат назад после редактирования"),
     (re.compile(r"lightbox|modal", re.IGNORECASE), "фото открываются крупно прямо на странице"),
     (re.compile(r"Stage\s+\w+", re.IGNORECASE), ""),
-    (re.compile(r"endpoint|router|repository|commit|hash|pull|push|SQLite", re.IGNORECASE), ""),
+    (re.compile(r"workflow|backend|endpoint|route|router|repository|commit|hash|pull|push|SQLite", re.IGNORECASE), ""),
     (re.compile(r"Fedorinov_rewards", re.IGNORECASE), PROJECT_TITLE),
+]
+
+RUSSIAN_FALLBACK_ITEMS = [
+    "доработали рабочий интерфейс и проверки;",
+    "внесли технические улучшения в проект;",
 ]
 
 
@@ -160,6 +227,21 @@ def _clean_sentence(value: str) -> str:
     return text
 
 
+def _contains_latin_letters(value: str) -> bool:
+    return bool(re.search(r"[A-Za-z]", value))
+
+
+def _fallback_item(index: int) -> str:
+    return RUSSIAN_FALLBACK_ITEMS[index % len(RUSSIAN_FALLBACK_ITEMS)]
+
+
+def _normalize_unknown_subject(subject: str, index: int) -> str:
+    cleaned = _clean_sentence(subject)
+    if _contains_latin_letters(cleaned):
+        return _fallback_item(index)
+    return cleaned
+
+
 def human_items(subjects: list[str]) -> list[str]:
     items: list[str] = []
     for subject in subjects:
@@ -170,7 +252,7 @@ def human_items(subjects: list[str]) -> list[str]:
                 matched = True
                 break
         if not matched:
-            items.append(_clean_sentence(subject))
+            items.append(_normalize_unknown_subject(subject, len(items)))
 
     deduped: list[str] = []
     seen: set[str] = set()

@@ -114,6 +114,26 @@ class DailyReportScheduleTests(unittest.TestCase):
         self.assertEqual(result, 0)
         send_message.assert_not_called()
 
+    def test_dry_run_never_sends(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / ".env.daily-report"
+            config_path.write_text(
+                "\n".join([
+                    "REPORT_PRIMARY_CHAT_ID=1",
+                    "REPORT_COPY_CHAT_IDS=2",
+                    "REPORT_PRIMARY_SEND_CONFIRMED=true",
+                ]),
+                encoding="utf-8",
+            )
+            with patch.object(self.module, "LOCAL_CONFIG", config_path), \
+                patch.object(self.module, "LOG_PATH", Path(tmp) / "daily_reports.jsonl"), \
+                patch.object(self.module, "_load_generate_module", return_value=DummyGenerator), \
+                patch.object(self.module, "send_message") as send_message, \
+                patch("sys.argv", ["send_daily_report.py", "--dry-run"]):
+                result = self.module.main()
+        self.assertEqual(result, 0)
+        send_message.assert_not_called()
+
     def test_launchd_example_uses_scheduled_mode(self) -> None:
         text = (ROOT / "deploy" / "launchd" / "com.fedorinov.daily-report.plist.example").read_text()
         self.assertIn("<string>--scheduled</string>", text)
