@@ -276,6 +276,13 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(csv_head_routes)
         self.assertTrue(matrix_csv_routes)
 
+    def test_summary_csv_buttons_use_browser_save_as_forms(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form', template)
+        self.assertIn('id="summary-save-form" method="get" action="/summary.csv" data-save-as-form', template)
+        self.assertNotIn('action="/summary_matrix.csv/save"', template)
+        self.assertNotIn('action="/summary.csv/save"', template)
+
     def test_summary_repository_uses_parameter_placeholders(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "backend" / "app" / "repositories" / "summary.py").read_text()
         self.assertIn(" = ?", source)

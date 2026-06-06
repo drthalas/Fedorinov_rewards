@@ -53,11 +53,10 @@
 {% else %}
 <div class="muted inline-export-row">
   <span>Найдено строк: {{ total_found }} · время: {{ results.elapsed_ms }} ms</span>
-  <form class="inline-save-form" method="post" action="/search.csv/save">
+  <form class="inline-save-form" method="get" action="/search.csv" data-save-as-form>
     <input type="hidden" name="q" value="{{ q }}">
     <input type="hidden" name="scope" value="{{ scope }}">
     <input type="hidden" name="mode" value="{{ mode }}">
-    <input type="hidden" name="return_to" value="/search?q={{ q|urlencode }}&scope={{ scope }}&mode={{ mode }}">
     <button class="link-button" type="submit">Сохранить CSV</button>
   </form>
 </div>

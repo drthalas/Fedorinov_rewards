@@ -2,10 +2,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlencode
 import asyncio
+from io import BytesIO
 import os
 import sqlite3
 import unittest
 from unittest.mock import patch
+from zipfile import ZipFile
 
 from backend.app.routers import persons as persons_router
 from backend.app.routers.templates import templates
@@ -154,6 +156,8 @@ class PersonBookletTests(unittest.TestCase):
         self.assertIn("Биография", rendered)
         self.assertIn("Guide 3", rendered)
         self.assertIn("Сохранить PDF", rendered)
+        self.assertIn("data-save-as-form", rendered)
+        self.assertNotIn('name="save_dialog"', rendered)
 
     def test_missing_and_unsafe_photos_do_not_crash_or_get_included(self) -> None:
         context = person_booklet_context(persons_router.get_settings(), 1)
@@ -210,6 +214,28 @@ class PersonBookletTests(unittest.TestCase):
         self.assertEqual(response.media_type, "application/pdf")
         self.assertTrue(Path(response.path).read_bytes().startswith(b"%PDF"))
         self.assertEqual(after, before)
+
+    def test_archive_blob_route_returns_zip(self) -> None:
+        (self.root / "Source" / "1" / "document.txt").write_text("content", encoding="utf-8")
+        response = asyncio.run(persons_router.person_archive_folder_zip(1))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, "application/zip")
+        self.assertIn("Content-Disposition", response.headers)
+        with ZipFile(BytesIO(response.body)) as archive:
+            names = set(archive.namelist())
+        self.assertIn("FotoPerson.jpg", names)
+        self.assertIn("document.txt", names)
+
+    def test_archive_blob_route_skips_forbidden_members(self) -> None:
+        (self.root / "Source" / "1" / "photo.jpg").write_bytes(b"image")
+        (self.root / "Source" / "1" / ".env").write_text("SECRET=1", encoding="utf-8")
+        (self.root / "Source" / "1" / "nested.zip").write_bytes(b"zip")
+        response = asyncio.run(persons_router.person_archive_folder_zip(1))
+        with ZipFile(BytesIO(response.body)) as archive:
+            names = set(archive.namelist())
+        self.assertIn("photo.jpg", names)
+        self.assertNotIn(".env", names)
+        self.assertNotIn("nested.zip", names)
 
     def test_generate_person_booklet_pdf_creates_pdf_when_reportlab_available(self) -> None:
         try:

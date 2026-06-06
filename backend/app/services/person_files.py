@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from io import BytesIO
 import os
 from pathlib import Path
 import platform
@@ -20,6 +21,14 @@ class PersonFilesError(ValueError):
 @dataclass(frozen=True)
 class ArchiveResult:
     path: Path
+    filename: str
+    files_count: int
+    size_bytes: int
+
+
+@dataclass(frozen=True)
+class ArchiveBytesResult:
+    content: bytes
     filename: str
     files_count: int
     size_bytes: int
@@ -89,6 +98,29 @@ def archive_person_folder(settings: Settings, person_id: int, fio: str, target_p
     )
     log_action("person_folder_archived", "person", person_id, {"archive_filename": filename, "files": len(files)})
     return result
+
+
+def archive_person_folder_bytes(settings: Settings, person_id: int, fio: str) -> ArchiveBytesResult:
+    folder, exists = person_folder_status(settings, person_id)
+    if not exists:
+        raise PersonFilesError("Каталог кавалера не найден.")
+    files = [path for path in folder.rglob("*") if path.is_file() and _allowed_archive_member(path, folder)]
+    if not files:
+        raise PersonFilesError("В каталоге кавалера нет файлов для архивации.")
+
+    filename = person_archive_filename(fio, person_id)
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        for path in files:
+            archive.write(path, path.relative_to(folder).as_posix())
+    content = buffer.getvalue()
+    log_action("person_folder_archived", "person", person_id, {"archive_filename": filename, "files": len(files)})
+    return ArchiveBytesResult(
+        content=content,
+        filename=filename,
+        files_count=len(files),
+        size_bytes=len(content),
+    )
 
 
 def person_archive_filename(fio: str, person_id: int) -> str:

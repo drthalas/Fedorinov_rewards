@@ -10,9 +10,8 @@
   <header class="booklet-toolbar no-print">
     <a class="button secondary-button" href="{{ return_to }}">← Вернуться</a>
     <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
-    <form method="post" action="/persons/{{ person.id }}/booklet.pdf">
+    <form method="post" action="/persons/{{ person.id }}/booklet.pdf" data-save-as-form>
       <input type="hidden" name="return_to" value="{{ return_to }}">
-      <input type="hidden" name="save_dialog" value="1">
       <button type="submit">Сохранить PDF</button>
     </form>
   </header>
@@ -125,5 +124,6 @@
       {% endfor %}
     </section>
   </main>
+  <script src="{{ url_for('static', path='save_as.js') }}" defer></script>
 </body>
 </html>

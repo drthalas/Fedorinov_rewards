@@ -248,6 +248,15 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("Андросов Леонид Тест", rendered)
         self.assertIn("<datalist id=\"search-suggestions\">", rendered)
 
+    def test_search_csv_uses_browser_save_as_form(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn('method="get" action="/search.csv" data-save-as-form', search_template)
+        self.assertIn('method="get" action="/search.csv" data-save-as-form', legacy_template)
+        self.assertNotIn('action="/search.csv/save"', search_template)
+        self.assertNotIn('action="/search.csv/save"', legacy_template)
+
 
 if __name__ == "__main__":
     unittest.main()

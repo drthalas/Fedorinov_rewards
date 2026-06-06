@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
-from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
+from fastapi.responses import FileResponse, RedirectResponse, Response
+from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -16,7 +16,7 @@ from ..repositories.persons_write import (
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import safe_return_to, with_status
-from ..services.person_files import PersonFilesError, archive_person_folder, open_person_folder, person_archive_filename, person_folder_status
+from ..services.person_files import PersonFilesError, archive_person_folder, archive_person_folder_bytes, open_person_folder, person_archive_filename, person_folder_status
 from ..services.photos import photo_items
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
@@ -65,6 +65,11 @@ def _with_message(url: str, message: str) -> str:
     query = [(key, value) for key, value in query if key != "message"]
     query.append(("message", message))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _attachment_header(filename: str) -> str:
+    safe_fallback = "".join(ch if ch.isascii() and ch not in {'"', "\\", ";"} else "_" for ch in filename) or "download"
+    return f"attachment; filename=\"{safe_fallback}\"; filename*=UTF-8''{quote(filename)}"
 
 
 @router.get("/persons")
@@ -346,6 +351,23 @@ async def person_archive_folder(request: Request, person_id: int):
         status = "archive_empty" if "нет файлов" in str(exc) else "folder_missing"
         return RedirectResponse(with_status(return_to, status), status_code=303)
     return RedirectResponse(_with_message(return_to, f"Архив создан: {result.path}"), status_code=303)
+
+
+@router.post("/persons/{person_id}/archive-folder.zip")
+async def person_archive_folder_zip(person_id: int):
+    settings = get_settings()
+    person = get_person(settings.rewards_db_path, person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
+    try:
+        result = archive_person_folder_bytes(settings, person_id, str(person.get("fio") or "person"))
+    except PersonFilesError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return Response(
+        content=result.content,
+        media_type="application/zip",
+        headers={"Content-Disposition": _attachment_header(result.filename)},
+    )
 
 
 @router.get("/persons/{person_id}/photos")
