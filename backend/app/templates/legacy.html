@@ -213,7 +213,7 @@
                   ("Главное фото", selected_person.main_foto),
                   ("Общее фото наград", selected_person.rewards_foto)
                 ] %}
-                  <figure class="{{ 'placeholder-card' if not has_media_path(path) else '' }}">
+                  <figure class="legacy-photo-card">
                     <div class="legacy-photo-frame">
                     {% if has_media_path(path) %}
                     <a class="photo-link" href="{{ photo_view_url(path, label, '/legacy?tab=rewards&person_id=' ~ selected_person.id) }}">
@@ -451,7 +451,7 @@
               <h2>Фото</h2>
               <div class="legacy-photo-strip">
                 {% for photo in selected_mark_photos %}
-                  <figure class="{{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+                  <figure class="legacy-photo-card">
                     <div class="legacy-photo-frame">
                     {% if has_media_path(photo.path) %}
                     <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/legacy?tab=marks&mark_id=' ~ selected_mark.id) }}">

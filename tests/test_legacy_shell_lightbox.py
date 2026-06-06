@@ -111,6 +111,30 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("legacy-photo-placeholder", legacy_template)
         self.assertNotIn("legacy-photo placeholder-image", legacy_template)
 
+    def test_legacy_photo_strip_uses_same_external_frame_for_real_and_missing_photos(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn('figure class="legacy-photo-card"', legacy_template)
+        self.assertNotIn("placeholder-card' if not has_media_path(path)", legacy_template)
+        self.assertIn('<div class="legacy-photo-frame">', legacy_template)
+        self.assertRegex(
+            legacy_template,
+            re.compile(r'<div class="legacy-photo-frame">\s*{% if has_media_path\(path\) %}\s*<a class="photo-link"[^>]*>\s*<img class="legacy-photo"', re.S),
+        )
+        self.assertRegex(
+            legacy_template,
+            re.compile(r"{% else %}\s*<div class=\"legacy-photo legacy-photo-placeholder\">Нет фото</div>\s*{% endif %}\s*</div>", re.S),
+        )
+        self.assertRegex(
+            styles,
+            re.compile(r"\.legacy-photo-frame\s*\{[^}]*height:\s*170px;[^}]*background:\s*#eef2f6;[^}]*overflow:\s*hidden;", re.S),
+        )
+        self.assertRegex(
+            styles,
+            re.compile(r"\.legacy-photo\s*\{[^}]*max-width:\s*100%;[^}]*max-height:\s*100%;[^}]*width:\s*auto;[^}]*height:\s*auto;[^}]*object-fit:\s*contain;", re.S),
+        )
+
     def test_person_cards_have_wrapping_layout_classes(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
