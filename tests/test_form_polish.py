@@ -253,6 +253,64 @@ class FormPolishTests(unittest.TestCase):
         self.assertEqual([item["id"] for item in context["guides"]["subcategories"]], [3])
         self.assertEqual([item["id"] for item in context["guides"]["names"]], [4])
 
+    def test_new_reward_page_shows_person_context(self) -> None:
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_new(object(), 1, return_to="/persons/1/edit")
+        context = response["context"]
+        self.assertEqual(context["person"]["fio"], "Иванов Иван Иванович")
+        self.assertEqual(context["reward"]["date_purchase"], date.today().isoformat())
+        self.assertEqual(context["return_to"], "/persons/1/edit")
+
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_form.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Добавление награды для кавалера", template)
+
+    def test_successful_reward_create_redirects_to_edit_with_created_message(self) -> None:
+        request = FakeRequest(
+            {
+                "id_gos": "1",
+                "id_catigory": "2",
+                "id_sub_catigory": "3",
+                "id_name": "4",
+                "number": "98765",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        response = asyncio.run(rewards_router.reward_create(request, 1))
+        location = response.headers["location"]
+        self.assertTrue(location.startswith("/rewards/11/edit?"))
+        self.assertIn("created=1", location)
+        self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards%26person_id%3D1", location)
+
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            edit_response = rewards_router.reward_edit(
+                object(),
+                11,
+                return_to="/legacy?tab=rewards&person_id=1",
+                created="1",
+            )
+        context = edit_response["context"]
+        self.assertEqual(context["created_message"], "Награда добавлена. Теперь можно добавить фотографии и документы.")
+        labels = [item["label"] for item in context["photo_controls"]]
+        self.assertIn("Фото награды: аверс", labels)
+        self.assertIn("Фото награды: реверс", labels)
+        self.assertIn("Фото книжки, сторона 1", labels)
+        self.assertIn("Фото книжки, сторона 2", labels)
+        self.assertIn("Наградной лист", labels)
+
+    def test_reward_edit_contains_next_actions(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_form.html").read_text(
+            encoding="utf-8"
+        )
+        photo_template = (
+            Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "photo_management.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Редактировать фото и документы", template)
+        self.assertIn("Добавить ещё награду", template)
+        self.assertIn("Вернуться к кавалеру", template)
+        self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
+
     def test_mark_form_preserves_cascading_guides_after_validation_error(self) -> None:
         request = FakeRequest(
             {

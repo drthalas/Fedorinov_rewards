@@ -2,7 +2,7 @@ from datetime import date
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 from ..config import get_settings
 from ..repositories.guides import guide_cascade_data, guide_cascade_options
@@ -26,6 +26,7 @@ router = APIRouter()
 
 STATUS_MESSAGES = {
     "created": "Награда добавлена.",
+    "created_next": "Награда добавлена. Теперь можно добавить фотографии и документы.",
     "updated": "Изменения сохранены.",
     "deleted": "Награда удалена.",
 }
@@ -70,6 +71,13 @@ def _guide_cascade(settings) -> dict[str, list[dict[str, object]]]:
     return guide_cascade_data(settings.rewards_db_path) if settings.db_exists else {}
 
 
+def _reward_created_edit_url(reward_id: int, return_to: str = "") -> str:
+    query = [("created", "1")]
+    if return_to:
+        query.append(("return_to", return_to))
+    return f"/rewards/{reward_id}/edit?{urlencode(query)}"
+
+
 @router.get("/persons/{person_id}/rewards/new")
 def reward_new(request: Request, person_id: int, return_to: str = ""):
     settings = get_settings()
@@ -92,6 +100,7 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
             "photo_controls": [],
             "return_to": safe_return_to(return_to),
             "error": None,
+            "created_message": "",
         },
     )
 
@@ -103,7 +112,7 @@ async def reward_create(request: Request, person_id: int):
     return_to = safe_return_to(form_values.get("return_to"))
     try:
         data = reward_data_from_mapping(form_values)
-        create_reward(settings, person_id, data)
+        reward_id = create_reward(settings, person_id, data)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
@@ -121,10 +130,11 @@ async def reward_create(request: Request, person_id: int):
                 "photo_controls": [],
                 "return_to": return_to,
                 "error": str(exc),
+                "created_message": "",
             },
             status_code=400,
         )
-    target = with_status(return_to, "reward_created") if return_to else f"/persons/{person_id}?status=reward_created"
+    target = _reward_created_edit_url(reward_id, return_to or f"/persons/{person_id}")
     return RedirectResponse(target, status_code=303)
 
 
@@ -148,7 +158,7 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
 
 
 @router.get("/rewards/{reward_id}/edit")
-def reward_edit(request: Request, reward_id: int, return_to: str = ""):
+def reward_edit(request: Request, reward_id: int, return_to: str = "", created: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
@@ -169,6 +179,7 @@ def reward_edit(request: Request, reward_id: int, return_to: str = ""):
             "photo_controls": photo_items("reward", reward),
             "return_to": safe_return_to(return_to),
             "error": None,
+            "created_message": STATUS_MESSAGES["created_next"] if created == "1" else "",
         },
     )
 
@@ -200,6 +211,7 @@ async def reward_update(request: Request, reward_id: int):
                 "photo_controls": photo_items("reward", reward),
                 "return_to": return_to,
                 "error": str(exc),
+                "created_message": "",
             },
             status_code=400,
         )

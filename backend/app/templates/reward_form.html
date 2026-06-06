@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить награду{% else %}Изменить награду #{{ reward.id }}{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if mode == "create" %}Добавить награду{% else %}Изменить награду #{{ reward.id }}{% endif %}</h1>
+<h1>{% if mode == "create" and person %}Добавление награды для кавалера: {{ person.fio|dash }}{% elif mode == "create" %}Добавить награду{% else %}Изменить награду #{{ reward.id }}{% endif %}</h1>
 <p>
   {% if person %}<a data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">← Вернуться</a>{% endif %}
   {% if mode == "edit" %} · <a href="/rewards/{{ reward.id }}">к карточке награды</a>{% endif %}
@@ -11,9 +11,21 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
+{% if created_message %}
+<section class="notice notice-success">{{ created_message }}</section>
+{% endif %}
+
+{% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
+{% if return_to and return_to.startswith('/legacy') %}
+  {% set person_back_url = return_to %}
+{% elif person %}
+  {% set person_back_url = '/persons/' ~ person.id %}
+{% else %}
+  {% set person_back_url = '/persons' %}
+{% endif %}
+
 <form class="edit-form legacy-edit-form guide-cascade" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
   <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
-  {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Справочник награды</legend>
@@ -97,6 +109,16 @@
     <a data-escape-back href="{{ return_to or ('/persons/' ~ person.id if mode == 'create' else '/rewards/' ~ reward.id) }}">Отмена</a>
   </div>
 </form>
+{% if mode == "edit" and settings.write_mode and person %}
+<section class="form-section next-action-panel" aria-label="Следующие действия">
+  <h2>Следующие действия</h2>
+  <div class="actions">
+    <a class="button secondary-button" href="#reward-photo-management">Редактировать фото и документы</a>
+    <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ person_back_url|urlencode }}">Добавить ещё награду</a>
+    <a class="button secondary-button" href="{{ person_back_url }}">Вернуться к кавалеру</a>
+  </div>
+</section>
+{% endif %}
 {% with photo_entity_type="reward", photo_entity_id=reward.id %}
   {% include "photo_management.html" %}
 {% endwith %}
