@@ -50,14 +50,15 @@
   </div>
   <div class="panel">
     <h2>Главное фото</h2>
+    <div class="photo-frame">
     {% if has_media_path(person.main_foto) %}
     <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}">
       <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Главное фото">
     </a>
     {% else %}
-    <img class="photo {{ 'placeholder-image' if not has_media_path(person.main_foto) else '' }}" src="{{ media_url(person.main_foto) }}" alt="">
-    <p class="photo-caption muted">Нет фото</p>
+    <div class="photo photo-placeholder">Нет фото</div>
     {% endif %}
+    </div>
   </div>
 </section>
 
@@ -72,15 +73,16 @@
     ("Фото учётной карточки, страница 2", person.card2_foto)
   ] %}
   <div class="card {{ 'placeholder-card' if not has_media_path(path) else '' }}">
+    <div class="photo-frame">
     {% if has_media_path(path) %}
     <a class="photo-link" href="{{ photo_view_url(path, label, '/persons/' ~ person.id) }}">
       <img class="photo" src="{{ media_url(path) }}" alt="{{ label }}">
     </a>
     {% else %}
-    <img class="photo {{ 'placeholder-image' if not has_media_path(path) else '' }}" src="{{ media_url(path) }}" alt="">
+    <div class="photo photo-placeholder">Нет фото</div>
     {% endif %}
+    </div>
     <p>{{ label }}</p>
-    {% if not has_media_path(path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
   {% endfor %}
 </div>

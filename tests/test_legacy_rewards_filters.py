@@ -82,7 +82,8 @@ class LegacyRewardsFilterTests(unittest.TestCase):
 
     def test_empty_filters_show_all_persons(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters())
-        self.assertEqual([row["id"] for row in rows], [1, 2, 3])
+        self.assertEqual([row["id"] for row in rows], [1, 3, 2])
+        self.assertEqual([row["fio"] for row in rows], ["Капитан Тест", "Капитан без ордена", "Майор Тест"])
 
     def test_rank_filter(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters(rank_id="1"))

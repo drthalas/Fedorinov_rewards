@@ -41,6 +41,42 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-detail-url", legacy_template)
         self.assertIn("dblclick", script)
 
+    def test_legacy_rewards_has_quick_person_search(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
+
+        self.assertIn("legacy-person-search-input", legacy_template)
+        self.assertIn('autocomplete="off" data-person-quick-search', legacy_template)
+        self.assertIn("data-person-name", legacy_template)
+        self.assertIn("data-person-empty", legacy_template)
+        self.assertIn("Ничего не найдено.", legacy_template)
+        self.assertIn("toLocaleLowerCase(\"ru-RU\")", script)
+        self.assertIn("name.includes(query)", script)
+
+    def test_legacy_person_rows_do_not_have_hover_title_links(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+
+        self.assertIn("<button class=\"legacy-list-row", legacy_template)
+        self.assertIn('type="button" data-person-name', legacy_template)
+        self.assertNotIn("legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}\" href=", legacy_template)
+
+    def test_legacy_rewards_scroll_and_photo_frames_are_present(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn("legacy-rewards-table-scroll", legacy_template)
+        self.assertIn(".legacy-rewards-table-scroll", styles)
+        self.assertIn("max-height: clamp", styles)
+        self.assertIn("legacy-photo-frame", legacy_template)
+        self.assertIn("legacy-photo-placeholder", legacy_template)
+        self.assertIn(".legacy-photo-frame", styles)
+        self.assertIn(".legacy-photo-placeholder", styles)
+        self.assertIn("photo-frame", person_detail)
+        self.assertIn("photo-placeholder", person_detail)
+        self.assertIn(".photo-frame", styles)
+        self.assertIn(".photo-placeholder", styles)
+
     def test_cascading_guides_preserve_changed_select_value(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()

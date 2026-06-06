@@ -114,7 +114,7 @@ def list_legacy_reward_persons(db_path: Path, filters: LegacyRewardsFilters) -> 
         left join rewards r on r.person_id = p.id
         {_where_sql(clauses)}
         group by p.id
-        order by p.id
+        order by lower(coalesce(p.fio, '')), p.id
         """,
         params,
     )

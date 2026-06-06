@@ -87,15 +87,20 @@
             <span class="tool-button disabled">❌ Удалить</span>
           {% endif %}
         </div>
-        <div class="legacy-list">
+        <div class="legacy-person-search">
+          <label for="legacy-person-search-input">Быстрый поиск</label>
+          <input id="legacy-person-search-input" type="search" placeholder="ФИО кавалера" autocomplete="off" data-person-quick-search>
+        </div>
+        <div class="legacy-list" data-person-list>
           {% for person in persons %}
-            <a class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" href="{{ person.legacy_url }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}">
+            <button class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" type="button" data-person-name="{{ person.fio|dash }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}">
               <span>{{ person.fio|dash }}</span>
               <small>{{ person.rewards_count }} нагр.</small>
-            </a>
+            </button>
           {% else %}
             <div class="legacy-empty">Нет записей.</div>
           {% endfor %}
+          <div class="legacy-empty" data-person-empty hidden>Ничего не найдено.</div>
         </div>
       </aside>
 
@@ -125,7 +130,7 @@
                 {% endif %}
               </div>
             </div>
-            <div class="legacy-table-wrap">
+            <div class="legacy-table-wrap legacy-rewards-table-scroll">
               <table class="legacy-table">
                 <thead>
                   <tr>
@@ -209,14 +214,15 @@
                   ("Общее фото наград", selected_person.rewards_foto)
                 ] %}
                   <figure class="{{ 'placeholder-card' if not has_media_path(path) else '' }}">
+                    <div class="legacy-photo-frame">
                     {% if has_media_path(path) %}
                     <a class="photo-link" href="{{ photo_view_url(path, label, '/legacy?tab=rewards&person_id=' ~ selected_person.id) }}">
                       <img class="legacy-photo" src="{{ media_url(path) }}" alt="{{ label }}">
                     </a>
                     {% else %}
-                    <img class="legacy-photo placeholder-image" src="{{ media_url(path) }}" alt="">
-                    <figcaption class="muted">Нет фото</figcaption>
+                    <div class="legacy-photo legacy-photo-placeholder">Нет фото</div>
                     {% endif %}
+                    </div>
                     <figcaption>{{ label }}</figcaption>
                   </figure>
                 {% endfor %}
