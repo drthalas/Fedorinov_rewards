@@ -602,6 +602,20 @@ th {
   font-weight: 700;
 }
 
+.next-action-panel {
+  max-width: 920px;
+  margin-top: 14px;
+}
+
+.next-action-panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.next-action-panel .actions {
+  flex-wrap: wrap;
+}
+
 .form-grid {
   display: grid;
   gap: 12px;

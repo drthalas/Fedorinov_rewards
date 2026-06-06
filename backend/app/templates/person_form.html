@@ -11,8 +11,13 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
+{% if created_message %}
+<section class="notice notice-success">{{ created_message }}</section>
+{% endif %}
+
+{% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
+
 <form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
-  {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
@@ -28,7 +33,7 @@
       </label>
     </div>
     <label>
-      <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a></span>
+      <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a> · <a href="/guides/ranks/new?return_to={{ form_return_path|urlencode }}">Добавить звание</a></span>
       <select name="id_rank" required>
         <option value="">—</option>
         {% for rank in ranks %}
@@ -65,6 +70,16 @@
     <a data-escape-back href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
   </div>
 </form>
+{% if mode == "edit" and settings.write_mode %}
+<section class="form-section next-action-panel" aria-label="Следующие действия">
+  <h2>Следующие действия</h2>
+  <div class="actions">
+    <a class="button secondary-button" href="#person-photo-management">Добавить фото и документы</a>
+    <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ form_return_path|urlencode }}">Добавить награду</a>
+    <a class="button secondary-button" href="/persons/{{ person.id }}">Вернуться к карточке</a>
+  </div>
+</section>
+{% endif %}
 {% with photo_entity_type="person", photo_entity_id=person.id %}
   {% include "photo_management.html" %}
 {% endwith %}

@@ -28,6 +28,7 @@ router = APIRouter()
 
 STATUS_MESSAGES = {
     "created": "Награжденный добавлен.",
+    "created_next": "Кавалер создан. Теперь можно добавить фотографии и документы.",
     "updated": "Изменения сохранены.",
     "deleted": "Награжденный удален.",
     "delete_blocked": "Нельзя удалить: у награжденного есть награды. Сначала удалите или перенесите награды.",
@@ -65,6 +66,13 @@ def _with_message(url: str, message: str) -> str:
     query = [(key, value) for key, value in query if key != "message"]
     query.append(("message", message))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _person_created_edit_url(person_id: int, return_to: str = "") -> str:
+    query = [("created", "1")]
+    if return_to:
+        query.append(("return_to", return_to))
+    return f"/persons/{person_id}/edit?{urlencode(query)}"
 
 
 def _attachment_header(filename: str) -> str:
@@ -111,6 +119,7 @@ def person_new(request: Request, return_to: str = ""):
             "photo_controls": [],
             "return_to": safe_return_to(return_to),
             "error": None,
+            "created_message": "",
         },
     )
 
@@ -138,10 +147,11 @@ async def person_create(request: Request):
                 "photo_controls": [],
                 "return_to": return_to,
                 "error": str(exc),
+                "created_message": "",
             },
             status_code=400,
         )
-    target = with_status(return_to, "created") if return_to else f"/persons/{person_id}?status=created"
+    target = _person_created_edit_url(person_id, return_to)
     return RedirectResponse(target, status_code=303)
 
 
@@ -243,7 +253,7 @@ async def person_booklet_pdf(request: Request, person_id: int):
 
 
 @router.get("/persons/{person_id}/edit")
-def person_edit(request: Request, person_id: int, return_to: str = ""):
+def person_edit(request: Request, person_id: int, return_to: str = "", created: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
@@ -262,6 +272,7 @@ def person_edit(request: Request, person_id: int, return_to: str = ""):
             "photo_controls": photo_items("person", person),
             "return_to": safe_return_to(return_to),
             "error": None,
+            "created_message": STATUS_MESSAGES["created_next"] if created == "1" else "",
         },
     )
 
@@ -290,6 +301,7 @@ async def person_update(request: Request, person_id: int):
                 "photo_controls": photo_items("person", person),
                 "return_to": return_to,
                 "error": str(exc),
+                "created_message": "",
             },
             status_code=400,
         )

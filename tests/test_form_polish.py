@@ -177,6 +177,58 @@ class FormPolishTests(unittest.TestCase):
         self.assertEqual(context["person"]["biography"], "Биография")
         self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
 
+    def test_successful_person_create_redirects_to_edit_with_created_message(self) -> None:
+        request = FakeRequest(
+            {
+                "fio": "Петров Пётр Петрович",
+                "birthday": "10.05.1914",
+                "id_rank": "1",
+                "return_to": "/legacy?tab=rewards",
+            }
+        )
+        response = asyncio.run(persons_router.person_create(request))
+        location = response.headers["location"]
+        self.assertTrue(location.startswith("/persons/2/edit?"))
+        self.assertIn("created=1", location)
+        self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards", location)
+
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
+            edit_response = persons_router.person_edit(object(), 2, return_to="/legacy?tab=rewards", created="1")
+        context = edit_response["context"]
+        self.assertEqual(context["created_message"], "Кавалер создан. Теперь можно добавить фотографии и документы.")
+        self.assertEqual(context["return_to"], "/legacy?tab=rewards")
+
+    def test_person_edit_contains_photo_controls_and_next_actions(self) -> None:
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = persons_router.person_edit(object(), 1, return_to="/persons")
+        context = response["context"]
+        labels = [item["label"] for item in context["photo_controls"]]
+        self.assertIn("Фото кавалера", labels)
+        self.assertIn("Главное фото", labels)
+        self.assertIn("Общее фото наград", labels)
+        self.assertIn("Фото учётной карточки, страница 1", labels)
+        self.assertIn("Фото учётной карточки, страница 2", labels)
+
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_form.html").read_text(
+            encoding="utf-8"
+        )
+        photo_template = (
+            Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "photo_management.html"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Добавить фото и документы", template)
+        self.assertIn("Добавить награду", template)
+        self.assertIn("Вернуться к карточке", template)
+        self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
+        self.assertIn("Вставить из буфера", photo_template)
+        self.assertIn("photo-upload-form", photo_template)
+
+    def test_person_form_guide_links_preserve_return_to(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_form.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks", template)
+        self.assertIn("/guides/ranks/new?return_to={{ form_return_path|urlencode }}", template)
+
     def test_reward_form_preserves_cascading_guides_after_validation_error(self) -> None:
         request = FakeRequest(
             {
