@@ -6,14 +6,15 @@
   <div class="photo-manage-grid">
     {% for photo in photo_controls %}
     <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+      <div class="photo-frame">
       {% if has_media_path(photo.path) %}
       <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, current_form_url) }}">
         <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
       {% else %}
-      <img class="photo placeholder-image" src="{{ media_url(photo.path) }}" alt="">
-      <p class="photo-caption muted">Нет фото</p>
+      <div class="photo photo-placeholder">Нет фото</div>
       {% endif %}
+      </div>
       <p class="photo-manage-label">{{ photo.label }}</p>
       <div class="photo-manage-actions">
         <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data">

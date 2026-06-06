@@ -452,14 +452,15 @@
               <div class="legacy-photo-strip">
                 {% for photo in selected_mark_photos %}
                   <figure class="{{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+                    <div class="legacy-photo-frame">
                     {% if has_media_path(photo.path) %}
                     <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/legacy?tab=marks&mark_id=' ~ selected_mark.id) }}">
                       <img class="legacy-photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
                     </a>
                     {% else %}
-                    <img class="legacy-photo placeholder-image" src="{{ media_url(photo.path) }}" alt="">
-                    <figcaption class="muted">Нет фото</figcaption>
+                    <div class="legacy-photo legacy-photo-placeholder">Нет фото</div>
                     {% endif %}
+                    </div>
                     <figcaption>{{ photo.label }}</figcaption>
                   </figure>
                 {% endfor %}

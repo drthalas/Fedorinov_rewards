@@ -19,15 +19,16 @@
 <div class="photo-grid">
   {% for photo in photos %}
   <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    <div class="photo-frame">
     {% if has_media_path(photo.path) %}
     <a class="photo-link" href="/persons/{{ person.id }}/photos?index={{ available_photos.index(photo) }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">
       <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
     </a>
     {% else %}
-    <img class="photo {{ 'placeholder-image' if not has_media_path(photo.path) else '' }}" src="{{ media_url(photo.path) }}" alt="">
+    <div class="photo photo-placeholder">Нет фото</div>
     {% endif %}
+    </div>
     <p>{{ photo.label }}</p>
-    {% if not has_media_path(photo.path) %}<p class="photo-caption muted">Нет фото</p>{% endif %}
   </div>
   {% endfor %}
 </div>

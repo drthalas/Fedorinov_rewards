@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import unittest
 
 
@@ -76,6 +77,39 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("photo-placeholder", person_detail)
         self.assertIn(".photo-frame", styles)
         self.assertIn(".photo-placeholder", styles)
+
+    def test_photo_frames_do_not_stretch_real_images(self) -> None:
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn("align-items: center", styles)
+        self.assertIn("justify-content: center", styles)
+        self.assertIn("max-width: 100%", styles)
+        self.assertIn("max-height: 100%", styles)
+        self.assertIn("object-fit: contain", styles)
+        self.assertIn(".photo-placeholder", styles)
+        self.assertIn(".legacy-photo-placeholder", styles)
+        self.assertNotRegex(styles, re.compile(r"\.photo-frame\s+\.photo\s*\{[^}]*(?<!-)width:\s*100%;[^}]*(?<!-)height:\s*100%", re.S))
+        self.assertNotRegex(styles, re.compile(r"\.legacy-photo\s*\{[^}]*(?<!-)width:\s*100%;[^}]*(?<!-)height:\s*100%", re.S))
+
+    def test_photo_galleries_wrap_images_and_placeholders_in_same_frame(self) -> None:
+        template_names = [
+            "person_detail.html",
+            "person_photos.html",
+            "reward_detail.html",
+            "mark_detail.html",
+            "photo_management.html",
+        ]
+
+        for template_name in template_names:
+            with self.subTest(template=template_name):
+                template = (ROOT / "backend" / "app" / "templates" / template_name).read_text()
+                self.assertIn("photo-frame", template)
+                self.assertIn("photo-placeholder", template)
+
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        self.assertIn("legacy-photo-frame", legacy_template)
+        self.assertIn("legacy-photo-placeholder", legacy_template)
+        self.assertNotIn("legacy-photo placeholder-image", legacy_template)
 
     def test_person_cards_have_wrapping_layout_classes(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
