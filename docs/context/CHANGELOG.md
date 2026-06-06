@@ -26,6 +26,11 @@ https://github.com/drthalas/Fedorinov_rewards/releases/tag/v0.1.2
 - Обязательные поля для кавалера, награды и знака.
 - Поиск с пользовательскими колонками, подсказками из базы и возвратом к результатам.
 - Финальная полировка форм: русские ошибки, сохранение введённых значений после validation error.
+- Браузерный Save As для архива кавалера, PDF-буклета и CSV; Windows Chrome/Edge native dialog оставлен отдельным пунктом owner QA.
+- Главный экран "Награды": сортировка кавалеров, быстрый поиск, внутренний скролл перечня наград, одинаковые фото-карточки.
+- Улучшенный поток добавления кавалера: после создания открывается дозаполнение фото и документов.
+- Улучшенный поток добавления награды: после создания открывается редактирование фото и документов награды.
+- Карточка кавалера и legacy-панель лучше переносят длинные ФИО, ссылки, биографию и комментарии.
 
 Ключевые commits:
 
@@ -39,6 +44,11 @@ https://github.com/drthalas/Fedorinov_rewards/releases/tag/v0.1.2
 - `790744e` Polish forms validation and errors.
 - `b1b9fbc` Fix cascading guide dropdowns.
 - `6920b81` Prepare v0.1.2 release.
+- `b1e69e3` Implement browser Save As for exports.
+- `2d48ae0` Polish rewards screen layout.
+- `aaed551` Improve person creation flow.
+- `c0f9e04` Improve reward creation flow.
+- `b4b4d2f` Polish person card layout.
 
 ## v0.1.1
 
