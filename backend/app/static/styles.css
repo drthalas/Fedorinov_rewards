@@ -110,6 +110,27 @@ button {
   overflow-wrap: anywhere;
 }
 
+.wrap-text,
+.link-wrap,
+.bio-text,
+.comment-text,
+.person-title,
+.legacy-person-title {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.link-wrap a,
+a.link-wrap {
+  display: inline-block;
+}
+
+.person-title {
+  line-height: 1.2;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -483,15 +504,20 @@ th {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 8px 14px;
+  min-width: 0;
 }
 
 .details dt {
+  min-width: 0;
   font-weight: 700;
   color: #475467;
+  overflow-wrap: anywhere;
 }
 
 .details dd {
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .form-row {
@@ -1162,23 +1188,33 @@ th {
 
 .legacy-split-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
 }
 
+.legacy-person-heading {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
 .legacy-split-header h1 {
   margin: 0 0 4px;
   font-size: 20px;
+  line-height: 1.2;
 }
 
 .legacy-actions {
   display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .legacy-block {
+  min-width: 0;
   margin-bottom: 10px;
   background: #fff;
   border: 1px solid #cfd6dd;
@@ -1265,6 +1301,7 @@ th {
 }
 
 .legacy-links dd {
+  min-width: 0;
   margin: 0;
   overflow-wrap: anywhere;
 }

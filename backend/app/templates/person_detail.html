@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
-<h1>{{ person.fio }}</h1>
+<h1 class="person-title wrap-text">{{ person.fio }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p>
   <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
@@ -19,32 +19,32 @@
 </div>
 {% endif %}
 
-<section class="grid">
+<section class="grid person-detail-grid">
   <div class="panel">
     <h2>Карточка</h2>
-    <dl class="details">
+    <dl class="details person-detail-list">
       <dt>ID</dt><dd>{{ person.id }}</dd>
-      <dt>ФИО</dt><dd>{{ person.fio|dash }}</dd>
+      <dt>ФИО</dt><dd class="wrap-text">{{ person.fio|dash }}</dd>
       <dt>Дата рождения</dt><dd>{{ person.birthday|format_date }}</dd>
-      <dt>Звание/специальность</dt><dd>{{ person.rank_name|dash }}</dd>
+      <dt>Звание/специальность</dt><dd class="wrap-text">{{ person.rank_name|dash }}</dd>
     </dl>
   </div>
   <div class="panel">
     <h2>Краткая биография</h2>
-    <div class="text-block">{{ person.biography|dash }}</div>
+    <div class="text-block bio-text wrap-text">{{ person.biography|dash }}</div>
   </div>
   <div class="panel">
     <h2>Ссылки</h2>
-    <dl class="details">
+    <dl class="details person-detail-list">
       <dt>Ссылка на сайт "Память народа"</dt>
-      <dd>
+      <dd class="link-wrap">
         {% set link_url = safe_external_url(person.link1) %}
-        {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link1 }}</a>{% else %}{{ person.link1|dash }}{% endif %}
+        {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link1 }}</a>{% else %}{{ person.link1|dash }}{% endif %}
       </dd>
       <dt>Ссылка на сайт "Форум коллекционеров"</dt>
-      <dd>
+      <dd class="link-wrap">
         {% set link_url = safe_external_url(person.link2) %}
-        {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link2 }}</a>{% else %}{{ person.link2|dash }}{% endif %}
+        {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link2 }}</a>{% else %}{{ person.link2|dash }}{% endif %}
       </dd>
     </dl>
   </div>

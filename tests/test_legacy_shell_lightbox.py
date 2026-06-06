@@ -77,6 +77,27 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".photo-frame", styles)
         self.assertIn(".photo-placeholder", styles)
 
+    def test_person_cards_have_wrapping_layout_classes(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn('class="person-title wrap-text"', person_detail)
+        self.assertIn("person-detail-list", person_detail)
+        self.assertIn("bio-text wrap-text", person_detail)
+        self.assertIn("link-wrap", person_detail)
+        self.assertIn("legacy-person-heading", legacy_template)
+        self.assertIn("legacy-person-title wrap-text", legacy_template)
+        self.assertIn("legacy-person-meta wrap-text", legacy_template)
+        self.assertIn("comment-text wrap-text", legacy_template)
+        self.assertIn(".wrap-text", styles)
+        self.assertIn("overflow-wrap: anywhere", styles)
+        self.assertIn("word-break: normal", styles)
+        self.assertIn(".legacy-person-heading", styles)
+        self.assertIn("booklet-title", booklet)
+        self.assertIn("booklet-section", booklet)
+
     def test_cascading_guides_preserve_changed_select_value(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()

@@ -107,9 +107,9 @@
       <section class="legacy-main">
         {% if selected_person %}
           <div class="legacy-split-header">
-            <div>
-              <h1>{{ selected_person.fio|dash }}</h1>
-              <p class="secondary">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_date }}</p>
+            <div class="legacy-person-heading">
+              <h1 class="legacy-person-title wrap-text">{{ selected_person.fio|dash }}</h1>
+              <p class="secondary legacy-person-meta wrap-text">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_date }}</p>
             </div>
             <div class="legacy-actions">
               <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
@@ -176,21 +176,21 @@
               <h2>Ссылки</h2>
               <dl class="legacy-links">
                 <dt>Ссылка на сайт "Память народа"</dt>
-                <dd>
+                <dd class="link-wrap">
                   {% set link_url = safe_external_url(selected_person.link1) %}
-                  {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link1 }}</a>{% else %}{{ selected_person.link1|dash }}{% endif %}
+                  {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link1 }}</a>{% else %}{{ selected_person.link1|dash }}{% endif %}
                 </dd>
                 <dt>Ссылка на сайт "Форум коллекционеров"</dt>
-                <dd>
+                <dd class="link-wrap">
                   {% set link_url = safe_external_url(selected_person.link2) %}
-                  {% if link_url %}<a href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link2 }}</a>{% else %}{{ selected_person.link2|dash }}{% endif %}
+                  {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ selected_person.link2 }}</a>{% else %}{{ selected_person.link2|dash }}{% endif %}
                 </dd>
                 <dt>Комментарий</dt>
-                <dd>{{ selected_person.comment|dash }}</dd>
+                <dd class="text-block comment-text wrap-text">{{ selected_person.comment|dash }}</dd>
               </dl>
               <details class="legacy-biography">
                 <summary>Краткая биография</summary>
-                <div class="text-block">{{ selected_person.biography|dash }}</div>
+                <div class="text-block bio-text wrap-text">{{ selected_person.biography|dash }}</div>
               </details>
               <div class="person-file-actions">
                 <form method="post" action="/persons/{{ selected_person.id }}/open-folder">
