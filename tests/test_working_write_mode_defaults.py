@@ -101,8 +101,8 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
 
-    def test_app_version_is_012(self) -> None:
-        self.assertEqual(APP_VERSION, "0.1.2")
+    def test_app_version_is_013(self) -> None:
+        self.assertEqual(APP_VERSION, "0.1.3")
 
 
 if __name__ == "__main__":
