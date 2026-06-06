@@ -537,7 +537,7 @@
             <a class="button secondary-button" href="/legacy?tab=summary">Сброс</a>
             <button class="button secondary-button" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
             <button class="button secondary-button" type="submit" form="summary-save-form">CSV свод</button>
-            <span class="button secondary-button disabled-button">PDF</span>
+            <button class="button secondary-button" type="submit" form="summary-pdf-save-form">PDF</button>
           </div>
         </form>
         <form id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form>
@@ -556,7 +556,14 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <p class="secondary">PDF-экспорт будет добавлен следующим этапом.</p>
+        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form>
+          <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
+          <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
+          <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
+          <input type="hidden" name="name_id" value="{{ summary_filters.name_id or '' }}">
+          <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
+          <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
+        </form>
         <div class="grid">
           <div class="card"><strong>Награждённых</strong><br>{{ summary.counts.person }}</div>
           <div class="card"><strong>Наград</strong><br>{{ summary.counts.rewards }}</div>

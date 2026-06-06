@@ -16,7 +16,14 @@ from backend.app.repositories.summary import (
     summary_matrix_csv_text,
     summary_rows,
 )
-from backend.app.routers.legacy import summary_csv, summary_csv_save, summary_matrix_csv, summary_matrix_csv_save
+from backend.app.routers.legacy import (
+    summary_csv,
+    summary_csv_save,
+    summary_matrix_csv,
+    summary_matrix_csv_save,
+    summary_matrix_pdf,
+    summary_pdf,
+)
 from backend.app.services.save_dialog import SaveDialogCancelled
 
 
@@ -241,6 +248,33 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("ФИО", text)
         self.assertIn("Орден Тестовый", text)
 
+    def test_summary_pdf_route_returns_pdf_response(self) -> None:
+        response = summary_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, "application/pdf")
+        self.assertTrue(response.body.startswith(b"%PDF"))
+        self.assertIn('filename="summary.pdf"', response.headers["content-disposition"])
+
+    def test_summary_matrix_pdf_route_returns_pdf_response(self) -> None:
+        response = summary_matrix_pdf(country_id="", category_id="", subcategory_id="", name_id="1", extra="", include_marks="")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.media_type, "application/pdf")
+        self.assertTrue(response.body.startswith(b"%PDF"))
+        self.assertIn('filename="summary_matrix.pdf"', response.headers["content-disposition"])
+        self.assertFalse((self.root / "generated").exists())
+
+    def test_summary_pdf_filters_are_accepted_without_422(self) -> None:
+        response = summary_matrix_pdf(country_id="1", category_id="1", subcategory_id="1", name_id="1", extra="1", include_marks="true")
+        self.assertIn(response.status_code, {200, 400})
+        if response.status_code == 200:
+            self.assertTrue(response.body.startswith(b"%PDF"))
+
+    def test_too_wide_summary_matrix_pdf_is_handled_gracefully(self) -> None:
+        with patch("backend.app.services.summary_pdf.SUMMARY_MATRIX_MAX_COLUMNS", 5):
+            response = summary_matrix_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Таблица слишком широкая для PDF", response.body.decode("utf-8"))
+
     def test_summary_matrix_csv_save_writes_selected_path(self) -> None:
         selected_path = self.root / "exports" / "matrix.csv"
         request = FakeRequest({"name_id": "1", "return_to": "/legacy?tab=summary"})
@@ -271,17 +305,29 @@ class SummaryTests(unittest.TestCase):
         matrix_csv_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.csv" and "GET" in getattr(route, "methods", set())
         ]
+        summary_pdf_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary.pdf" and "GET" in getattr(route, "methods", set())
+        ]
+        matrix_pdf_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.pdf" and "GET" in getattr(route, "methods", set())
+        ]
         self.assertTrue(legacy_routes)
         self.assertTrue(csv_routes)
         self.assertTrue(csv_head_routes)
         self.assertTrue(matrix_csv_routes)
+        self.assertTrue(summary_pdf_routes)
+        self.assertTrue(matrix_pdf_routes)
 
     def test_summary_csv_buttons_use_browser_save_as_forms(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
         self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form', template)
         self.assertIn('id="summary-save-form" method="get" action="/summary.csv" data-save-as-form', template)
+        self.assertIn('id="summary-pdf-save-form" method="get" action="{{ \'/summary_matrix.pdf\' if summary_mode == \'matrix\' else \'/summary.pdf\' }}" data-save-as-form', template)
+        self.assertIn('form="summary-pdf-save-form">PDF</button>', template)
         self.assertNotIn('action="/summary_matrix.csv/save"', template)
         self.assertNotIn('action="/summary.csv/save"', template)
+        self.assertNotIn("PDF-экспорт будет добавлен следующим этапом", template)
+        self.assertNotIn("disabled-button\">PDF", template)
 
     def test_summary_repository_uses_parameter_placeholders(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "backend" / "app" / "repositories" / "summary.py").read_text()

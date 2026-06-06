@@ -29,6 +29,7 @@ from ..repositories.summary import (
 )
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
+from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..version import APP_NAME, APP_VERSION
 from .templates import templates
 
@@ -405,6 +406,57 @@ def summary_csv_head(
     )
 
 
+@router.get("/summary.pdf")
+def summary_pdf(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    settings = get_settings()
+    filters = normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    if not settings.db_exists:
+        return Response(content=b"", media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="summary.pdf"'})
+    try:
+        result = generate_summary_pdf(settings.rewards_db_path, filters)
+    except SummaryPDFError as exc:
+        return Response(content=str(exc), status_code=500, media_type="text/plain; charset=utf-8")
+    return Response(
+        content=result.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
+    )
+
+
+@router.head("/summary.pdf")
+def summary_pdf_head(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    return Response(status_code=200, media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="summary.pdf"'})
+
+
 @router.get("/summary_matrix.csv")
 def summary_matrix_csv(
     country_id: str | None = None,
@@ -430,6 +482,63 @@ def summary_matrix_csv(
         content=summary_matrix_csv_text(matrix),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
+    )
+
+
+@router.get("/summary_matrix.pdf")
+def summary_matrix_pdf(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    settings = get_settings()
+    filters = normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    if not settings.db_exists:
+        return Response(content=b"", media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="summary_matrix.pdf"'})
+    try:
+        result = generate_summary_matrix_pdf(settings.rewards_db_path, filters)
+    except SummaryPDFTooWide as exc:
+        return Response(content=str(exc), status_code=400, media_type="text/plain; charset=utf-8")
+    except SummaryPDFError as exc:
+        return Response(content=str(exc), status_code=500, media_type="text/plain; charset=utf-8")
+    return Response(
+        content=result.content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
+    )
+
+
+@router.head("/summary_matrix.pdf")
+def summary_matrix_pdf_head(
+    country_id: str | None = None,
+    category_id: str | None = None,
+    subcategory_id: str | None = None,
+    name_id: str | None = None,
+    extra: str = "",
+    include_marks: str | None = None,
+):
+    normalized_summary_filters(
+        country_id=country_id,
+        category_id=category_id,
+        subcategory_id=subcategory_id,
+        name_id=name_id,
+        extra=extra,
+        include_marks=include_marks,
+    )
+    return Response(
+        status_code=200,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="summary_matrix.pdf"'},
     )
 
 
