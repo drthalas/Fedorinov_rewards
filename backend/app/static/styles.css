@@ -128,7 +128,37 @@ a.link-wrap {
 }
 
 .person-title {
+  margin: 0;
   line-height: 1.2;
+}
+
+.person-detail-hero {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.person-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px 14px;
+  margin: 0;
+}
+
+.person-summary-strip div {
+  min-width: 0;
+}
+
+.person-summary-strip dt {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.person-summary-strip dd {
+  min-width: 0;
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .grid {
@@ -432,10 +462,20 @@ th {
   margin-top: 18px;
 }
 
+.photo-manage-section-compact {
+  max-width: 100%;
+  margin-top: 12px;
+}
+
 .photo-manage-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
+}
+
+.photo-manage-section-compact .photo-manage-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
 }
 
 .photo-manage-card {
@@ -445,9 +485,22 @@ th {
   background: #fff;
 }
 
+.photo-manage-section-compact .photo-manage-card {
+  padding: 8px;
+}
+
+.photo-manage-section-compact .photo-frame {
+  max-height: 118px;
+}
+
 .photo-manage-label {
   margin: 8px 0;
   font-weight: 700;
+}
+
+.photo-manage-section-compact .photo-manage-label {
+  margin: 5px 0;
+  font-size: 12px;
 }
 
 .photo-manage-actions {
@@ -455,6 +508,10 @@ th {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.photo-manage-section-compact .photo-manage-actions {
+  gap: 4px;
 }
 
 .photo-upload-form {
@@ -704,8 +761,36 @@ th {
 }
 
 .biography-textarea {
-  min-height: 320px;
+  min-height: 220px;
   resize: vertical;
+}
+
+.compact-person-form {
+  display: grid;
+  gap: 10px;
+}
+
+.compact-person-form .form-section {
+  margin: 0;
+  padding: 10px;
+}
+
+.compact-person-form label {
+  margin-bottom: 8px;
+}
+
+.compact-person-form input,
+.compact-person-form select,
+.compact-person-form textarea {
+  padding: 7px 8px;
+}
+
+.compact-person-form .biography-textarea {
+  min-height: 150px;
+}
+
+.compact-person-form .compact-text-section textarea {
+  min-height: 86px;
 }
 
 .text-block {
@@ -1201,7 +1286,16 @@ th {
   padding: 10px;
 }
 
+.legacy-person-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .legacy-split-header {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -1235,6 +1329,11 @@ th {
   border: 1px solid #cfd6dd;
   border-radius: 3px;
   overflow: hidden;
+}
+
+.legacy-rewards-block {
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .legacy-block h2 {
@@ -1295,6 +1394,13 @@ th {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.legacy-person-workspace > .legacy-bottom-grid {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 2px;
 }
 
 .legacy-results-grid {
@@ -1388,6 +1494,7 @@ th {
 }
 
 .legacy-totals-panel {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(7, minmax(110px, 1fr));
   gap: 1px;
@@ -1395,6 +1502,10 @@ th {
   border: 1px solid #9dc6a3;
   background: #9dc6a3;
   font-size: 12px;
+}
+
+.legacy-totals-footer {
+  margin-top: auto;
 }
 
 .legacy-totals-panel div {

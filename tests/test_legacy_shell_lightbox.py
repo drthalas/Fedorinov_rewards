@@ -54,6 +54,15 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("toLocaleLowerCase(\"ru-RU\")", script)
         self.assertIn("name.includes(query)", script)
 
+    def test_legacy_selected_person_scrolls_into_view(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
+
+        self.assertIn("data-selected-person-row", legacy_template)
+        self.assertIn('document.querySelector("[data-selected-person-row]")', script)
+        self.assertIn("selectedPersonRow.scrollIntoView", script)
+        self.assertIn('block: "nearest"', script)
+
     def test_legacy_person_rows_do_not_have_hover_title_links(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
 
@@ -73,10 +82,29 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("legacy-photo-placeholder", legacy_template)
         self.assertIn(".legacy-photo-frame", styles)
         self.assertIn(".legacy-photo-placeholder", styles)
+        self.assertIn("legacy-person-workspace", legacy_template)
+        self.assertIn("legacy-totals-footer", legacy_template)
+        self.assertIn(".legacy-person-workspace", styles)
+        self.assertIn(".legacy-totals-footer", styles)
+        self.assertIn("flex: 0 0 auto", styles)
         self.assertIn("photo-frame", person_detail)
         self.assertIn("photo-placeholder", person_detail)
         self.assertIn(".photo-frame", styles)
         self.assertIn(".photo-placeholder", styles)
+
+    def test_person_delete_requires_explicit_confirmation_in_ui_and_route(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        persons_router = (ROOT / "backend" / "app" / "routers" / "persons.py").read_text()
+
+        expected_text = "Вы точно хотите удалить кавалера? Это действие нельзя отменить."
+        self.assertIn(expected_text, legacy_template)
+        self.assertIn(expected_text, person_detail)
+        self.assertIn('name="confirm" value="true"', legacy_template)
+        self.assertIn('name="delete_person_confirm" value="true"', legacy_template)
+        self.assertIn('name="delete_person_confirm" value="true"', person_detail)
+        self.assertIn('form_values.get("delete_person_confirm") != "true"', persons_router)
+        self.assertIn("Действие требует подтверждения.", persons_router)
 
     def test_photo_frames_do_not_stretch_real_images(self) -> None:
         styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
@@ -141,6 +169,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
         styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
 
+        self.assertIn("person-detail-hero", person_detail)
+        self.assertIn("person-summary-strip", person_detail)
         self.assertIn('class="person-title wrap-text"', person_detail)
         self.assertIn("person-detail-list", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
@@ -153,8 +183,23 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("overflow-wrap: anywhere", styles)
         self.assertIn("word-break: normal", styles)
         self.assertIn(".legacy-person-heading", styles)
+        self.assertIn(".person-summary-strip", styles)
         self.assertIn("booklet-title", booklet)
         self.assertIn("booklet-section", booklet)
+
+    def test_person_edit_form_uses_compact_photo_controls(self) -> None:
+        person_form = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text()
+        photo_management = (ROOT / "backend" / "app" / "templates" / "photo_management.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn("compact-person-form", person_form)
+        self.assertIn('rows="7"', person_form)
+        self.assertIn('rows="3"', person_form)
+        self.assertIn("photo_manage_compact = true", person_form)
+        self.assertIn("photo-manage-section-compact", photo_management)
+        self.assertIn(".compact-person-form", styles)
+        self.assertIn(".photo-manage-section-compact", styles)
+        self.assertIn("max-height: 118px", styles)
 
     def test_cascading_guides_preserve_changed_select_value(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()

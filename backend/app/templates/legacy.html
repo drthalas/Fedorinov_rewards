@@ -75,8 +75,9 @@
             <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
             {% if selected_person %}
               <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
-              <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Подтвердите удаление награжденного')">
+              <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Вы точно хотите удалить кавалера? Это действие нельзя отменить.')">
                 <input type="hidden" name="confirm" value="true">
+                <input type="hidden" name="delete_person_confirm" value="true">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
                 <button class="tool-button danger" type="submit">❌ Удалить</button>
               </form>
@@ -93,7 +94,7 @@
         </div>
         <div class="legacy-list" data-person-list>
           {% for person in persons %}
-            <button class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" type="button" data-person-name="{{ person.fio|dash }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}">
+            <button class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" type="button" data-person-name="{{ person.fio|dash }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}"{% if selected_person and person.id == selected_person.id %} data-selected-person-row{% endif %}>
               <span>{{ person.fio|dash }}</span>
               <small>{{ person.rewards_count }} нагр.</small>
             </button>
@@ -105,6 +106,7 @@
       </aside>
 
       <section class="legacy-main">
+        <div class="legacy-person-workspace">
         {% if selected_person %}
           <div class="legacy-split-header">
             <div class="legacy-person-heading">
@@ -117,7 +119,7 @@
             </div>
           </div>
 
-          <section class="legacy-block">
+          <section class="legacy-block legacy-rewards-block">
             <div class="legacy-block-head">
               <h2>Перечень наград</h2>
               <div class="legacy-toolbar">
@@ -233,7 +235,8 @@
         {% else %}
           <div class="notice">Выберите награжденного.</div>
         {% endif %}
-        <section class="legacy-totals-panel" aria-label="Итоги">
+        </div>
+        <section class="legacy-totals-panel legacy-totals-footer" aria-label="Итоги">
           <div><span>Награждённых</span><strong>{{ rewards_totals.persons_total }}</strong></div>
           <div><span>Наград</span><strong>{{ rewards_totals.rewards_total }}</strong></div>
           <div><span>В наличии</span><strong>{{ rewards_totals.in_stock }}</strong></div>

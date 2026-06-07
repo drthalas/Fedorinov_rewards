@@ -314,6 +314,8 @@ async def person_delete(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("delete_person_confirm") != "true":
+        raise _delete_validation_error(PersonValidationError("Действие требует подтверждения."))
     try:
         delete_person(settings, person_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:

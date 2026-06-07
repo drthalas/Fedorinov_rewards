@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const quickSearch = document.querySelector("[data-person-quick-search]");
   const personRows = Array.from(document.querySelectorAll("[data-person-name]"));
   const emptySearch = document.querySelector("[data-person-empty]");
+  const selectedPersonRow = document.querySelector("[data-selected-person-row]");
 
   const applyPersonSearch = () => {
     const query = normalize(quickSearch ? quickSearch.value : "");
@@ -24,6 +25,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (quickSearch) {
     quickSearch.addEventListener("input", applyPersonSearch);
+  }
+
+  if (selectedPersonRow) {
+    selectedPersonRow.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   document.querySelectorAll("[data-select-url][data-detail-url]").forEach((row) => {

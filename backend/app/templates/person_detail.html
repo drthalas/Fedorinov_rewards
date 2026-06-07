@@ -1,7 +1,19 @@
 {% extends "base.html" %}
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
-<h1 class="person-title wrap-text">{{ person.fio }}</h1>
+<section class="person-detail-hero panel">
+  <h1 class="person-title wrap-text">{{ person.fio }}</h1>
+  <dl class="person-summary-strip">
+    <div>
+      <dt>Звание / специальность</dt>
+      <dd class="wrap-text">{{ person.rank_name|dash }}</dd>
+    </div>
+    <div>
+      <dt>Дата рождения</dt>
+      <dd>{{ person.birthday|format_date }}</dd>
+    </div>
+  </dl>
+</section>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p>
   <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
@@ -11,8 +23,9 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Удалить награжденного?');">
+  <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Вы точно хотите удалить кавалера? Это действие нельзя отменить.');">
     <input type="hidden" name="confirm" value="true">
+    <input type="hidden" name="delete_person_confirm" value="true">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>

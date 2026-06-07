@@ -17,7 +17,7 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
-<form class="edit-form legacy-edit-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
@@ -45,24 +45,26 @@
 
   <fieldset class="form-section">
     <legend>Ссылки</legend>
-    <label>
-      <span>Ссылка на сайт “Память народа”</span>
-      <input name="link1" value="{{ person.link1 or '' }}">
-    </label>
-    <label>
-      <span>Ссылка на сайт “Форум коллекционеров”</span>
-      <input name="link2" value="{{ person.link2 or '' }}">
-    </label>
+    <div class="form-grid two-columns">
+      <label>
+        <span>Ссылка на сайт “Память народа”</span>
+        <input name="link1" value="{{ person.link1 or '' }}">
+      </label>
+      <label>
+        <span>Ссылка на сайт “Форум коллекционеров”</span>
+        <input name="link2" value="{{ person.link2 or '' }}">
+      </label>
+    </div>
   </fieldset>
 
-  <fieldset class="form-section">
+  <fieldset class="form-section compact-text-section">
     <legend>Краткая биография</legend>
-    <textarea class="biography-textarea" name="biography" rows="14">{{ person.biography or '' }}</textarea>
+    <textarea class="biography-textarea" name="biography" rows="7">{{ person.biography or '' }}</textarea>
   </fieldset>
 
-  <fieldset class="form-section">
+  <fieldset class="form-section compact-text-section">
     <legend>Комментарий / заметки</legend>
-    <textarea name="comment" rows="5">{{ person.comment or '' }}</textarea>
+    <textarea name="comment" rows="3">{{ person.comment or '' }}</textarea>
   </fieldset>
 
   <div class="actions">
@@ -80,6 +82,7 @@
   </div>
 </section>
 {% endif %}
+{% set photo_manage_compact = true %}
 {% with photo_entity_type="person", photo_entity_id=person.id %}
   {% include "photo_management.html" %}
 {% endwith %}
