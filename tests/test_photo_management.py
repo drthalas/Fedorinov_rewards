@@ -87,6 +87,7 @@ class PhotoManagementTests(unittest.TestCase):
     def test_person_photo_upload_and_clear(self) -> None:
         path = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", b"jpeg-bytes")
         self.assertTrue(path.startswith("Source/1/FotoPerson_"))
+        self.assertTrue(path.endswith(".jpg"))
         self.assertEqual(self.fetch_value("person", 1, "person_foto"), path)
         target = self.root / path
         self.assertTrue(target.exists())
@@ -95,9 +96,18 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertIsNone(self.fetch_value("person", 1, "person_foto"))
         self.assertTrue(target.exists())
 
+    def test_clipboard_jpeg_upload_saves_jpg_path(self) -> None:
+        path = save_photo(self.settings(), "person", 1, "person_foto", "clipboard.jpg", b"jpeg-bytes")
+        self.assertTrue(path.startswith("Source/1/FotoPerson_"))
+        self.assertTrue(path.endswith(".jpg"))
+        target = self.root / path
+        self.assertTrue(target.exists())
+        self.assertEqual(target.read_bytes(), b"jpeg-bytes")
+
     def test_reward_photo_upload_uses_person_reward_folder(self) -> None:
         path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", b"png-bytes")
         self.assertTrue(path.startswith("Source/1/10/FotoFront_"))
+        self.assertTrue(path.endswith(".png"))
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), path)
         self.assertTrue((self.root / path).exists())
 

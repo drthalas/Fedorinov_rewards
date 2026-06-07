@@ -252,6 +252,12 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-clipboard-paste", photo_management)
         self.assertIn("navigator.clipboard.read", script)
         self.assertIn("/photos/upload", script)
+        self.assertIn("canvas.toBlob", script)
+        self.assertIn('"image/jpeg"', script)
+        self.assertIn("0.85", script)
+        self.assertIn('"clipboard.jpg"', script)
+        self.assertIn("Не удалось подготовить JPEG из буфера. Используйте кнопку +.", script)
+        self.assertNotIn("clipboard\" + extension", script)
 
 
 if __name__ == "__main__":
