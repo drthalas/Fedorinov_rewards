@@ -249,6 +249,9 @@
     </div>
   {% elif tab == "search" %}
     <section class="legacy-tab-panel">
+      {% macro search_sort_th(key, label) -%}
+      <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+      {%- endmacro %}
       <h1>Поиск</h1>
       <form class="legacy-search-form search-suggestions-form" method="get" action="/legacy" autocomplete="off">
         <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
@@ -259,6 +262,7 @@
             <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
             <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
             <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
+            <option value="reward_numbers" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды</option>
             <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
           </select>
         </label>
@@ -291,6 +295,8 @@
             <input type="hidden" name="q" value="{{ q }}">
             <input type="hidden" name="scope" value="{{ scope }}">
             <input type="hidden" name="mode" value="{{ mode }}">
+            <input type="hidden" name="sort" value="{{ sort }}">
+            <input type="hidden" name="dir" value="{{ dir }}">
             <button class="link-button" type="submit">Сохранить CSV</button>
           </form>
         </div>
@@ -306,16 +312,16 @@
                 <thead>
                   <tr>
                     <th>№</th>
-                    <th>ФИО</th>
-                    <th>Звание / специальность</th>
-                    <th>Дата рождения</th>
-                    <th>Фото кавалера</th>
-                    <th>Главное фото</th>
-                    <th>Общее фото наград</th>
-                    <th>Фото наградной книжки, сторона 1</th>
-                    <th>Фото наградной книжки, сторона 2</th>
-                    <th>Фото учётной карточки, страница 1</th>
-                    <th>Фото учётной карточки, страница 2</th>
+                    {{ search_sort_th("fio", "ФИО") }}
+                    {{ search_sort_th("rank_name", "Звание / специальность") }}
+                    {{ search_sort_th("birthday", "Дата рождения") }}
+                    {{ search_sort_th("person_foto_flag", "Фото кавалера") }}
+                    {{ search_sort_th("main_foto_flag", "Главное фото") }}
+                    {{ search_sort_th("rewards_foto_flag", "Общее фото наград") }}
+                    {{ search_sort_th("book1_foto_flag", "Фото наградной книжки, сторона 1") }}
+                    {{ search_sort_th("book2_foto_flag", "Фото наградной книжки, сторона 2") }}
+                    {{ search_sort_th("card1_foto_flag", "Фото учётной карточки, страница 1") }}
+                    {{ search_sort_th("card2_foto_flag", "Фото учётной карточки, страница 2") }}
                   </tr>
                 </thead>
                 <tbody>
@@ -341,24 +347,52 @@
             </div>
           </section>
           {% endif %}
-          {% if scope in ["all", "rewards"] %}
+          {% if scope in ["all", "rewards", "reward_numbers"] %}
           <section class="legacy-block">
-            <h2>Наименование награды ({{ search_results.counts.rewards }})</h2>
+            <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }} ({{ search_results.counts.rewards }})</h2>
             <p class="secondary">Показаны первые {{ search_results.rewards|length }} из {{ search_results.counts.rewards }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
-                <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Владелец</th><th>Наличие</th></tr></thead>
+                <thead>
+                  <tr>
+                    {{ search_sort_th("fio", "ФИО") }}
+                    {{ search_sort_th("rank_name", "Звание / специальность") }}
+                    {{ search_sort_th("birthday", "Дата рождения") }}
+                    {{ search_sort_th("person_book1_foto_flag", "Фото наградной книжки, сторона 1") }}
+                    {{ search_sort_th("person_book2_foto_flag", "Фото наградной книжки, сторона 2") }}
+                    {{ search_sort_th("person_card1_foto_flag", "Фото учётной карточки, страница 1") }}
+                    {{ search_sort_th("person_card2_foto_flag", "Фото учётной карточки, страница 2") }}
+                    {{ search_sort_th("name", "Наименование награды") }}
+                    {{ search_sort_th("number", "Номер") }}
+                    {{ search_sort_th("date_purchase", "Дата покупки") }}
+                    {{ search_sort_th("price_purchase", "Цена покупки") }}
+                    {{ search_sort_th("price_now", "Текущая цена") }}
+                    {{ search_sort_th("front_foto_flag", "Фото награды: аверс") }}
+                    {{ search_sort_th("back_foto_flag", "Фото награды: реверс") }}
+                    {{ search_sort_th("reward_list_flag", "Наградной лист") }}
+                  </tr>
+                </thead>
                 <tbody>
                   {% for reward in search_results.rewards %}
                   <tr>
-                    <td>{{ reward.id }}</td>
+                    <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
+                    <td>{{ reward.rank_name|dash }}</td>
+                    <td>{{ reward.birthday|format_date }}</td>
+                    <td>{{ reward.person_book1_foto_flag }}</td>
+                    <td>{{ reward.person_book2_foto_flag }}</td>
+                    <td>{{ reward.person_card1_foto_flag }}</td>
+                    <td>{{ reward.person_card2_foto_flag }}</td>
                     <td><a href="/rewards/{{ reward.id }}?return_to={{ search_return_to|urlencode }}">{{ reward.name|dash }}</a></td>
                     <td>{{ reward.number|dash }}</td>
-                    <td>{{ reward.fio|dash }}</td>
-                    <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
+                    <td>{{ reward.date_purchase|format_date }}</td>
+                    <td>{{ reward.price_purchase|format_money }}</td>
+                    <td>{{ reward.price_now|format_money }}</td>
+                    <td>{{ reward.front_foto_flag }}</td>
+                    <td>{{ reward.back_foto_flag }}</td>
+                    <td>{{ reward.reward_list_flag }}</td>
                   </tr>
                   {% else %}
-                  <tr><td colspan="5">Не найдено.</td></tr>
+                  <tr><td colspan="15">Не найдено.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>

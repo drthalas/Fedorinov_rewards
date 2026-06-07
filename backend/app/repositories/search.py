@@ -6,7 +6,7 @@ from time import perf_counter
 from .common import fetch_all
 
 
-VALID_SCOPES = {"all", "persons", "rewards", "marks"}
+VALID_SCOPES = {"all", "persons", "rewards", "reward_numbers", "marks"}
 VALID_MODES = {"contains", "starts", "exact"}
 DEFAULT_LIMIT = 50
 
@@ -43,12 +43,54 @@ def _limited(rows: list[dict[str, object]], limit: int) -> list[dict[str, object
     return rows[: max(0, limit)]
 
 
-def _empty_result(query: str, scope: str, mode: str, limit: int, elapsed_ms: float = 0.0) -> dict[str, object]:
+def _sort_rows(rows: list[dict[str, object]], sort_by: str, sort_dir: str) -> list[dict[str, object]]:
+    clean_sort = str(sort_by or "").strip()
+    clean_dir = "desc" if str(sort_dir or "").strip().lower() == "desc" else "asc"
+    if not clean_sort:
+        return rows
+
+    numeric_fields = {
+        "id",
+        "number",
+        "price_purchase",
+        "price_now",
+        "instock",
+        "person_foto_flag",
+        "main_foto_flag",
+        "rewards_foto_flag",
+        "book1_foto_flag",
+        "book2_foto_flag",
+        "card1_foto_flag",
+        "card2_foto_flag",
+        "person_book1_foto_flag",
+        "person_book2_foto_flag",
+        "person_card1_foto_flag",
+        "person_card2_foto_flag",
+        "front_foto_flag",
+        "back_foto_flag",
+        "reward_list_flag",
+    }
+
+    def sortable(row: dict[str, object]) -> object:
+        value = row.get(clean_sort)
+        if clean_sort in numeric_fields:
+            try:
+                return int(value or 0)
+            except (TypeError, ValueError):
+                return 0
+        return str(value or "").casefold()
+
+    return sorted(rows, key=lambda row: (sortable(row), str(row.get("fio") or "").casefold(), int(row.get("id") or 0)), reverse=clean_dir == "desc")
+
+
+def _empty_result(query: str, scope: str, mode: str, limit: int, elapsed_ms: float = 0.0, sort_by: str = "", sort_dir: str = "asc") -> dict[str, object]:
     counts = {"persons": 0, "rewards": 0, "marks": 0}
     return {
         "query": query,
         "scope": scope,
         "mode": mode,
+        "sort_by": str(sort_by or "").strip(),
+        "sort_dir": "desc" if str(sort_dir or "").strip().lower() == "desc" else "asc",
         "limit": limit,
         "elapsed_ms": elapsed_ms,
         "counts": counts,
@@ -90,15 +132,28 @@ def _reward_rows(db_path: Path) -> list[dict[str, object]]:
             r.id,
             r.person_id,
             p.fio,
+            p.birthday,
+            guide.name as rank_name,
             g0.name as gos,
             g1.name as category,
             g2.name as subcategory,
             g3.name as name,
             r.id_link,
             r.number,
-            r.instock
+            r.instock,
+            r.date_purchase,
+            r.price_purchase,
+            r.price_now,
+            case when nullif(trim(coalesce(p.book1_foto, '')), '') is null then 0 else 1 end as person_book1_foto_flag,
+            case when nullif(trim(coalesce(p.book2_foto, '')), '') is null then 0 else 1 end as person_book2_foto_flag,
+            case when nullif(trim(coalesce(p.card1_foto, '')), '') is null then 0 else 1 end as person_card1_foto_flag,
+            case when nullif(trim(coalesce(p.card2_foto, '')), '') is null then 0 else 1 end as person_card2_foto_flag,
+            case when nullif(trim(coalesce(r.front_foto, '')), '') is null then 0 else 1 end as front_foto_flag,
+            case when nullif(trim(coalesce(r.back_foto, '')), '') is null then 0 else 1 end as back_foto_flag,
+            case when nullif(trim(coalesce(r.reward_list, '')), '') is null then 0 else 1 end as reward_list_flag
         from rewards r
         left join person p on p.id = r.person_id
+        left join guide on guide.id = p.id_rank
         left join guide_lev_0 g0 on g0.id = r.id_gos
         left join guide_lev_1 g1 on g1.id = r.id_catigory
         left join guide_lev_2 g2 on g2.id = r.id_sub_catigory
@@ -175,6 +230,7 @@ def search_suggestions(db_path: Path, limit: int = 250) -> dict[str, list[str]]:
         "all": [],
         "persons": persons,
         "rewards": rewards,
+        "reward_numbers": [],
         "marks": marks,
     }
 
@@ -185,6 +241,8 @@ def search_all(
     limit: int = DEFAULT_LIMIT,
     scope: str = "all",
     mode: str = "contains",
+    sort_by: str = "",
+    sort_dir: str = "asc",
 ) -> dict[str, object]:
     started = perf_counter()
     cleaned_query = query.strip()
@@ -197,7 +255,7 @@ def search_all(
     marks: list[dict[str, object]] = []
 
     if not needle and cleaned_scope == "all":
-        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit)
+        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit, sort_by=sort_by, sort_dir=sort_dir)
 
     if cleaned_scope in {"all", "persons"}:
         person_rows = _person_rows(db_path)
@@ -206,19 +264,28 @@ def search_all(
             for row in person_rows
             if _row_matches(row, ("fio", "birthday", "rank_name"), needle, cleaned_mode)
         ]
+        persons = _sort_rows(persons, sort_by, sort_dir)
 
-    if cleaned_scope in {"all", "rewards"}:
+    if cleaned_scope in {"all", "rewards", "reward_numbers"}:
         reward_rows = _reward_rows(db_path)
-        rewards = reward_rows if not needle else [
-            row
-            for row in reward_rows
-            if _row_matches(
-                row,
-                ("number", "name", "gos", "category", "subcategory", "fio", "id_link"),
-                needle,
-                cleaned_mode,
-            )
-        ]
+        if cleaned_scope == "reward_numbers":
+            rewards = [] if not needle else [
+                row
+                for row in reward_rows
+                if _row_matches(row, ("number",), needle, cleaned_mode)
+            ]
+        else:
+            rewards = reward_rows if not needle else [
+                row
+                for row in reward_rows
+                if _row_matches(
+                    row,
+                    ("number", "name", "gos", "category", "subcategory", "fio", "id_link"),
+                    needle,
+                    cleaned_mode,
+                )
+            ]
+        rewards = _sort_rows(rewards, sort_by, sort_dir)
 
     if cleaned_scope in {"all", "marks"}:
         mark_rows = _mark_rows(db_path)
@@ -227,6 +294,7 @@ def search_all(
             for row in mark_rows
             if _row_matches(row, ("number", "name", "gos", "category", "subcategory", "id_link"), needle, cleaned_mode)
         ]
+        marks = _sort_rows(marks, sort_by, sort_dir)
 
     counts = {"persons": len(persons), "rewards": len(rewards), "marks": len(marks)}
     elapsed_ms = round((perf_counter() - started) * 1000, 2)
@@ -234,6 +302,8 @@ def search_all(
         "query": cleaned_query,
         "scope": cleaned_scope,
         "mode": cleaned_mode,
+        "sort_by": str(sort_by or "").strip(),
+        "sort_dir": "desc" if str(sort_dir or "").strip().lower() == "desc" else "asc",
         "limit": safe_limit,
         "elapsed_ms": elapsed_ms,
         "counts": counts,

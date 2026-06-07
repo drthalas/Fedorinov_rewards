@@ -167,8 +167,54 @@ def _legacy_rewards_url(filters, person_id: int | None = None) -> str:
     return str(URL(path="/legacy").include_query_params(**_rewards_query_params(filters, person_id)))
 
 
-def _legacy_search_url(q: str, scope: str, mode: str) -> str:
-    return str(URL(path="/legacy").include_query_params(tab="search", q=q, scope=scope, mode=mode))
+def _legacy_search_url(q: str, scope: str, mode: str, sort: str = "", direction: str = "asc") -> str:
+    params = {"tab": "search", "q": q, "scope": scope, "mode": mode}
+    if sort:
+        params["sort"] = sort
+        params["dir"] = "desc" if direction == "desc" else "asc"
+    return str(URL(path="/legacy").include_query_params(**params))
+
+
+def _search_sort_context(path: str, q: str, scope: str, mode: str, current_sort: str, current_dir: str, extra: dict[str, str] | None = None) -> dict[str, object]:
+    def url_for(sort_key: str) -> str:
+        next_dir = "desc" if current_sort == sort_key and current_dir == "asc" else "asc"
+        if path == "/legacy":
+            return _legacy_search_url(q, scope, mode, sort_key, next_dir)
+        params = {"q": q, "scope": scope, "mode": mode, "sort": sort_key, "dir": next_dir}
+        if extra:
+            params.update(extra)
+        return str(URL(path=path).include_query_params(**params))
+
+    keys = [
+        "fio",
+        "rank_name",
+        "birthday",
+        "name",
+        "number",
+        "date_purchase",
+        "price_purchase",
+        "price_now",
+        "instock",
+        "person_foto_flag",
+        "main_foto_flag",
+        "rewards_foto_flag",
+        "book1_foto_flag",
+        "book2_foto_flag",
+        "card1_foto_flag",
+        "card2_foto_flag",
+        "person_book1_foto_flag",
+        "person_book2_foto_flag",
+        "person_card1_foto_flag",
+        "person_card2_foto_flag",
+        "front_foto_flag",
+        "back_foto_flag",
+        "reward_list_flag",
+    ]
+    return {
+        "sort": current_sort,
+        "dir": current_dir,
+        "urls": {key: url_for(key) for key in keys},
+    }
 
 
 def _current_commit() -> str:
@@ -219,6 +265,8 @@ def legacy_index(
     q: str = "",
     scope: str = "all",
     mode: str = "contains",
+    sort: str = "",
+    dir: str = "asc",
     status: str = "",
     message: str = "",
     rank_id: str | None = None,
@@ -290,9 +338,12 @@ def legacy_index(
         "q": q,
         "scope": scope,
         "mode": mode,
+        "sort": sort,
+        "dir": "desc" if str(dir or "").strip().lower() == "desc" else "asc",
         "search_results": None,
         "search_suggestions": {},
-        "search_return_to": _legacy_search_url(q, scope, mode),
+        "search_return_to": _legacy_search_url(q, scope, mode, sort, dir),
+        "search_sort": _search_sort_context("/legacy", q, scope, mode, sort, "desc" if str(dir or "").strip().lower() == "desc" else "asc"),
         "summary": None,
         "summary_filters": normalized_summary_filters(
             country_id=country_id,
@@ -356,11 +407,21 @@ def legacy_index(
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
 
     if active_tab == "search" and (q.strip() or scope != "all"):
-        search_results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode)
+        search_results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
         context["search_results"] = search_results
         context["scope"] = search_results["scope"]
         context["mode"] = search_results["mode"]
-        context["search_return_to"] = _legacy_search_url(q, search_results["scope"], search_results["mode"])
+        context["sort"] = search_results["sort_by"]
+        context["dir"] = search_results["sort_dir"]
+        context["search_return_to"] = _legacy_search_url(q, search_results["scope"], search_results["mode"], search_results["sort_by"], search_results["sort_dir"])
+        context["search_sort"] = _search_sort_context(
+            "/legacy",
+            q,
+            search_results["scope"],
+            search_results["mode"],
+            search_results["sort_by"],
+            search_results["sort_dir"],
+        )
     if active_tab == "search":
         context["search_suggestions"] = search_suggestions(settings.rewards_db_path)
 
