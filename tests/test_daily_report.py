@@ -84,10 +84,69 @@ class DailyReportTests(unittest.TestCase):
             text = generator.build_report(dt.date(2026, 6, 5))
 
         self.assertIn("Награды и награждённые", text)
-        self.assertIn("доработали рабочий интерфейс и проверки", text)
+        self.assertIn("есть изменения без пользовательского описания", text)
         self.assertNotIn("Refactor backend routes", text)
         self.assertNotIn("backend", text)
         self.assertNotIn("workflow", text)
+
+    def test_recent_release_commits_have_factual_russian_summary(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=[
+                "Fix legacy photo frame layout",
+                "Add summary PDF export",
+                "Prepare v0.1.3 release",
+            ],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 6))
+
+        self.assertIn("реальные фотографии и блоки “Нет фото” теперь находятся в одинаковых рамках", text)
+        self.assertIn("PDF-экспорт для сводной таблицы и шахматки", text)
+        self.assertIn("подготовили и выпустили релиз v0.1.3", text)
+        self.assertIn("проверить, что фото и “Нет фото” отображаются в одинаковых рамках", text)
+        self.assertIn("проверить PDF на вкладке “Свод.таблица”", text)
+        self.assertIn("проверить обновление через кнопку", text)
+        self.assertIn("проверка владельцем после v0.1.3", text)
+        self.assertIn("собрать замечания владельца", text)
+
+    def test_known_recent_commits_do_not_use_generic_fallback(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=[
+                "Fix legacy photo frame layout",
+                "Add summary PDF export",
+                "Unknown backend cleanup",
+            ],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 6))
+
+        self.assertNotIn("доработали рабочий интерфейс и проверки", text)
+        self.assertNotIn("внесли технические улучшения в проект", text)
+        self.assertNotIn("есть изменения без пользовательского описания", text)
+        self.assertNotIn("Unknown backend cleanup", text)
+        self.assertNotIn("backend", text)
+
+    def test_check_section_matches_recent_commits(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=[
+                "Fix legacy photo frame layout",
+                "Add summary PDF export",
+            ],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 6))
+
+        check_section = text.split("Что теперь можно проверить:", 1)[1].split("Что дальше:", 1)[0]
+        self.assertIn("фото и “Нет фото”", check_section)
+        self.assertIn("PDF на вкладке “Свод.таблица”", check_section)
+        self.assertNotIn("открыть основной экран", check_section)
+        self.assertNotIn("кликнуть по фотографии", check_section)
 
     def test_report_rejects_commit_style_words(self) -> None:
         generator = load_generator()

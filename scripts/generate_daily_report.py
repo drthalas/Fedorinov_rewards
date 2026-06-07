@@ -37,6 +37,66 @@ BANNED_TERMS = [
 
 CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
     (
+        "Fix daily report Russian wording",
+        ["исправили ежедневный Telegram-отчёт: текст теперь формируется на русском языке;"],
+    ),
+    (
+        "Polish rewards screen layout",
+        [
+            "улучшили главный экран “Награды”: список кавалеров отсортирован по алфавиту, появился быстрый поиск, а перечень наград прокручивается внутри своего блока;",
+        ],
+    ),
+    (
+        "Improve person creation flow",
+        [
+            "улучшили добавление кавалера: после создания сразу открывается экран, где можно добавить фотографии и документы;",
+        ],
+    ),
+    (
+        "Improve reward creation flow",
+        [
+            "улучшили добавление награды: после сохранения сразу можно добавить фотографии и документы награды;",
+        ],
+    ),
+    (
+        "Polish person card layout",
+        [
+            "улучшили карточку кавалера: длинные ФИО, ссылки, биография и комментарии аккуратно переносятся;",
+        ],
+    ),
+    (
+        "Prepare final v0.1.2 release",
+        ["подготовили финальный релиз v0.1.2;"],
+    ),
+    (
+        "Clarify v0.1.2 Windows Save As testing",
+        ["уточнили проверку сохранения файлов на Windows Chrome/Edge для владельца;"],
+    ),
+    (
+        "Fix photo frame sizing",
+        [
+            "исправили отображение фото: реальные фотографии и блоки “Нет фото” теперь находятся в одинаковых рамках;",
+        ],
+    ),
+    (
+        "Fix legacy photo frame layout",
+        [
+            "исправили отображение фото: реальные фотографии и блоки “Нет фото” теперь находятся в одинаковых рамках;",
+        ],
+    ),
+    (
+        "Add summary PDF export",
+        ["добавили PDF-экспорт для сводной таблицы и шахматки;"],
+    ),
+    (
+        "Prepare v0.1.3 release",
+        [
+            "подготовили и выпустили релиз v0.1.3;",
+            "проверили пакет обновления и основные сценарии перед уведомлением владельцу;",
+            "обновили задачи в Linear после релиза;",
+        ],
+    ),
+    (
         "Add daily Telegram progress reports",
         ["настроили ежедневный утренний отчёт в Telegram;"],
     ),
@@ -179,8 +239,85 @@ TECH_REPLACEMENTS = [
 ]
 
 RUSSIAN_FALLBACK_ITEMS = [
-    "доработали рабочий интерфейс и проверки;",
-    "внесли технические улучшения в проект;",
+    "есть изменения без пользовательского описания; перед проверкой нужно уточнить их смысл;",
+]
+
+CHECK_PATTERNS: list[tuple[str, list[str]]] = [
+    (
+        "Fix daily report Russian wording",
+        ["проверить dry-run ежедневного отчёта: текст должен быть на русском и без английских технических строк;"],
+    ),
+    (
+        "Polish rewards screen layout",
+        [
+            "проверить главный экран “Награды”: сортировку кавалеров, быстрый поиск слева и внутренний скролл перечня наград;",
+        ],
+    ),
+    (
+        "Improve person creation flow",
+        ["проверить добавление кавалера: после создания должны быть доступны фото, документы и переход к наградам;"],
+    ),
+    (
+        "Improve reward creation flow",
+        ["проверить добавление награды: после сохранения должны быть доступны фото, документы и добавление следующей награды;"],
+    ),
+    (
+        "Polish person card layout",
+        ["проверить карточку кавалера: длинные ФИО, ссылки, биография и комментарии должны переноситься корректно;"],
+    ),
+    (
+        "Clarify v0.1.2 Windows Save As testing",
+        ["проверить выбор места сохранения на Windows Chrome/Edge;"],
+    ),
+    (
+        "Fix photo frame sizing",
+        ["проверить, что фото и “Нет фото” отображаются в одинаковых рамках;"],
+    ),
+    (
+        "Fix legacy photo frame layout",
+        ["проверить, что фото и “Нет фото” отображаются в одинаковых рамках;"],
+    ),
+    (
+        "Add summary PDF export",
+        ["проверить PDF на вкладке “Свод.таблица”: свод по наградам и шахматку по кавалерам;"],
+    ),
+    (
+        "Prepare v0.1.3 release",
+        ["проверить обновление через кнопку и убедиться, что приложение видит версию v0.1.3;"],
+    ),
+    (
+        "Prepare final v0.1.2 release",
+        ["проверить обновление через кнопку и убедиться, что приложение видит версию v0.1.2;"],
+    ),
+    (
+        "Implement browser Save As for exports",
+        ["проверить сохранение архива, PDF и CSV через окно выбора места сохранения;"],
+    ),
+]
+
+NEXT_STEP_PATTERNS: list[tuple[str, list[str]]] = [
+    (
+        "Prepare v0.1.3 release",
+        [
+            "проверка владельцем после v0.1.3;",
+            "собрать замечания владельца и перевести их в Linear-задачи;",
+        ],
+    ),
+    (
+        "Prepare final v0.1.2 release",
+        [
+            "проверка владельцем после v0.1.2;",
+            "собрать замечания владельца и перевести их в Linear-задачи;",
+        ],
+    ),
+    (
+        "Add summary PDF export",
+        ["передать PDF-экспорт сводной таблицы на QA;"],
+    ),
+    (
+        "Fix legacy photo frame layout",
+        ["передать исправление фото-фреймов на QA;"],
+    ),
 ]
 
 
@@ -243,16 +380,24 @@ def _normalize_unknown_subject(subject: str, index: int) -> str:
 
 
 def human_items(subjects: list[str]) -> list[str]:
-    items: list[str] = []
+    matched_items: list[str] = []
+    unknown_items: list[str] = []
     for subject in subjects:
         matched = False
         for pattern, replacements in CHANGE_PATTERNS:
             if pattern.lower() in subject.lower():
-                items.extend(replacements)
+                matched_items.extend(replacements)
                 matched = True
                 break
         if not matched:
-            items.append(_normalize_unknown_subject(subject, len(items)))
+            normalized = _normalize_unknown_subject(subject, len(unknown_items))
+            unknown_items.append(normalized)
+
+    items = matched_items[:]
+    if not matched_items and unknown_items:
+        items.append(unknown_items[0])
+    elif matched_items:
+        items.extend(item for item in unknown_items if item not in RUSSIAN_FALLBACK_ITEMS)
 
     deduped: list[str] = []
     seen: set[str] = set()
@@ -263,6 +408,55 @@ def human_items(subjects: list[str]) -> list[str]:
             seen.add(key)
             deduped.append(cleaned)
     return deduped[:8]
+
+
+def _dedupe_sentences(items: list[str], limit: int) -> list[str]:
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        cleaned = _clean_sentence(item)
+        key = cleaned.casefold()
+        if key not in seen:
+            seen.add(key)
+            result.append(cleaned)
+        if len(result) >= limit:
+            break
+    return result
+
+
+def _items_from_patterns(subjects: list[str], patterns: list[tuple[str, list[str]]], limit: int) -> list[str]:
+    items: list[str] = []
+    for subject in subjects:
+        for pattern, replacements in patterns:
+            if pattern.lower() in subject.lower():
+                items.extend(replacements)
+                break
+    return _dedupe_sentences(items, limit)
+
+
+def check_items(subjects: list[str], report_items: list[str]) -> list[str]:
+    checks = _items_from_patterns(subjects, CHECK_PATTERNS, 4)
+    if checks:
+        return checks
+    return _dedupe_sentences(
+        [f"проверить: {_strip_trailing_semicolon(item)}" for item in report_items[:3]],
+        3,
+    )
+
+
+def next_step_items(subjects: list[str]) -> list[str]:
+    release_subjects = [subject for subject in subjects if "release" in subject.lower()]
+    if release_subjects:
+        release_steps = _items_from_patterns(release_subjects, NEXT_STEP_PATTERNS, 3)
+        if release_steps:
+            return release_steps
+    next_steps = _items_from_patterns(subjects, NEXT_STEP_PATTERNS, 3)
+    if next_steps:
+        return next_steps
+    return [
+        "провести пользовательскую проверку и зафиксировать замечания;",
+        "следующие замечания оформить отдельными задачами в Linear;",
+    ]
 
 
 def _strip_trailing_semicolon(value: str) -> str:
@@ -294,15 +488,8 @@ def build_report(report_date: dt.date) -> str:
         return text
 
     numbered = "\n".join(f"{index}. {_strip_trailing_semicolon(item)}" for index, item in enumerate(items, start=1))
-    checks = [
-        "открыть основной экран и убедиться, что он выглядит как единая рабочая программа;",
-        "кликнуть по фотографии и проверить, что она открывается крупно прямо на странице;",
-        "проверить поиск по фамилии, названию или номеру.",
-    ]
-    next_steps = [
-        "провести пользовательскую проверку и зафиксировать замечания;",
-        "после подтверждения собрать следующий пакет для владельца.",
-    ]
+    checks = check_items(subjects, items)
+    next_steps = next_step_items(subjects)
     text = (
         f"Доброе утро!\n\n"
         f"За вчера по проекту “{PROJECT_TITLE}” сделали:\n\n"
