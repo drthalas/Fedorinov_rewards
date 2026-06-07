@@ -1370,6 +1370,15 @@ th {
   z-index: 1;
 }
 
+.matrix-sort-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.matrix-sort-link:hover {
+  text-decoration: underline;
+}
+
 .compact-actions {
   white-space: nowrap;
 }

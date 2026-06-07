@@ -8,7 +8,7 @@ import io
 
 from ..db import open_readonly_connection, row_to_dict
 from ..services.display import format_date
-from .guides import list_guide_level
+from .guides import guide_cascade_data, guide_cascade_options, list_guide_level
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,27 @@ def summary_guide_options(db_path: Path) -> dict[str, list[dict[str, object]]]:
         "names": list_guide_level(db_path, 3),
         "extras": list_guide_level(db_path, 4),
     }
+
+
+def summary_filter_options(db_path: Path, filters: SummaryFilters | None = None) -> dict[str, list[dict[str, object]]]:
+    filters = filters or SummaryFilters()
+    cascade = guide_cascade_options(
+        db_path,
+        country_id=filters.country_id,
+        category_id=filters.category_id,
+        subcategory_id=filters.subcategory_id,
+    )
+    return {
+        "countries": cascade["gos"],
+        "categories": cascade["categories"],
+        "subcategories": cascade["subcategories"],
+        "names": cascade["names"],
+        "extras": list_guide_level(db_path, 4),
+    }
+
+
+def summary_filter_cascade(db_path: Path) -> dict[str, list[dict[str, object]]]:
+    return guide_cascade_data(db_path)
 
 
 def parse_optional_int(value: object) -> int | None:
@@ -237,7 +258,39 @@ def summary_csv_text(rows: list[dict[str, object]]) -> str:
     return output.getvalue()
 
 
-def summary_matrix(db_path: Path, filters: SummaryFilters) -> dict[str, object]:
+def _sort_matrix_rows(rows: list[dict[str, object]], sort_by: str, sort_dir: str) -> list[dict[str, object]]:
+    direction = "desc" if sort_dir == "desc" else "asc"
+    sort_key = str(sort_by or "fio")
+
+    def text_key(value: object) -> str:
+        return str(value or "").casefold()
+
+    def row_value(row: dict[str, object]) -> object:
+        if sort_key == "fio":
+            return text_key(row.get("fio"))
+        if sort_key == "rank_name":
+            return text_key(row.get("rank_name"))
+        if sort_key == "birthday":
+            return str(row.get("birthday") or "")
+        if sort_key == "row_total":
+            return int(row.get("row_total") or 0)
+        if sort_key == "numbers":
+            return text_key(row.get("numbers"))
+        if sort_key.startswith("photo:"):
+            field = sort_key.split(":", 1)[1]
+            return int((row.get("photo_flags") or {}).get(field, 0))
+        if sort_key.startswith("reward:"):
+            try:
+                reward_id = int(sort_key.split(":", 1)[1])
+            except ValueError:
+                return 0
+            return int((row.get("reward_counts") or {}).get(reward_id, 0))
+        return text_key(row.get("fio"))
+
+    return sorted(rows, key=lambda row: (row_value(row), text_key(row.get("fio")), int(row.get("id") or 0)), reverse=direction == "desc")
+
+
+def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio", sort_dir: str = "asc") -> dict[str, object]:
     with closing(open_readonly_connection(db_path)) as connection:
         extra_name = _extra_name(connection, filters.extra)
         reward_where, reward_params = _where_clause("r", filters, extra_name)
@@ -334,10 +387,12 @@ def summary_matrix(db_path: Path, filters: SummaryFilters) -> dict[str, object]:
             }
         )
 
+    sorted_person_rows = _sort_matrix_rows(person_rows, sort_by, sort_dir)
+
     return {
         "photo_columns": [{"field": field, "label": label} for field, label in SUMMARY_MATRIX_PHOTO_COLUMNS],
         "reward_columns": reward_columns,
-        "rows": person_rows,
+        "rows": sorted_person_rows,
         "photo_totals": photo_totals,
         "reward_totals": reward_totals,
         "person_total": len(person_rows),

@@ -11,6 +11,8 @@ from backend.app.main import app
 from backend.app.repositories.summary import (
     normalized_summary_filters,
     parse_optional_int,
+    summary_filter_cascade,
+    summary_filter_options,
     summary_csv_text,
     summary_matrix,
     summary_matrix_csv_text,
@@ -112,9 +114,13 @@ class SummaryTests(unittest.TestCase):
                 """
             )
             connection.execute("insert into guide_lev_0 values (1, -1, 'СССР')")
+            connection.execute("insert into guide_lev_0 values (2, -1, 'Россия')")
             connection.execute("insert into guide_lev_1 values (1, 1, 'Ордена')")
+            connection.execute("insert into guide_lev_1 values (2, 2, 'Юбилейные')")
             connection.execute("insert into guide_lev_2 values (1, 1, 'Боевые')")
+            connection.execute("insert into guide_lev_2 values (2, 2, 'Гражданские')")
             connection.execute("insert into guide_lev_3 values (1, 1, 'Орден Тестовый')")
+            connection.execute("insert into guide_lev_3 values (2, 2, 'Медаль Другая')")
             connection.execute("insert into guide_lev_4 values (1, 1, 'extra-link')")
             connection.execute("insert into guide values (1, 'Капитан')")
             connection.execute(
@@ -183,6 +189,33 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(rows[0]["total"], 2)
         self.assertEqual(rows[0]["last_purchase_date"], "2024-03-01")
 
+    def test_summary_filter_options_are_cascaded(self) -> None:
+        root_options = summary_filter_options(self.db_path, normalized_summary_filters())
+        self.assertEqual([row["id"] for row in root_options["countries"]], [1, 2])
+        self.assertEqual(root_options["categories"], [])
+        self.assertEqual(root_options["subcategories"], [])
+        self.assertEqual(root_options["names"], [])
+
+        country_options = summary_filter_options(self.db_path, normalized_summary_filters(country_id=1))
+        self.assertEqual([row["id"] for row in country_options["categories"]], [1])
+
+        category_options = summary_filter_options(self.db_path, normalized_summary_filters(country_id=1, category_id=1))
+        self.assertEqual([row["id"] for row in category_options["subcategories"]], [1])
+
+        subcategory_options = summary_filter_options(
+            self.db_path,
+            normalized_summary_filters(country_id=1, category_id=1, subcategory_id=1),
+        )
+        self.assertEqual([row["id"] for row in subcategory_options["names"]], [1])
+        self.assertNotIn(2, [row["id"] for row in subcategory_options["names"]])
+
+    def test_summary_filter_cascade_contains_all_branches_for_js(self) -> None:
+        cascade = summary_filter_cascade(self.db_path)
+        self.assertEqual({row["id"] for row in cascade["countries"]}, {1, 2})
+        self.assertEqual({row["id"] for row in cascade["categories"]}, {1, 2})
+        self.assertEqual({row["id"] for row in cascade["subcategories"]}, {1, 2})
+        self.assertEqual({row["id"] for row in cascade["names"]}, {1, 2})
+
     def test_csv_export_text_uses_utf8_bom(self) -> None:
         rows = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))
         text = summary_csv_text(rows)
@@ -197,6 +230,19 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(matrix["rows"][0]["photo_flags"]["person_foto"], 1)
         self.assertEqual(matrix["rows"][1]["photo_flags"]["person_foto"], 0)
         self.assertEqual(matrix["reward_total"], 2)
+
+    def test_matrix_sorting_by_visible_columns(self) -> None:
+        by_fio_desc = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="fio", sort_dir="desc")
+        self.assertEqual([row["fio"] for row in by_fio_desc["rows"]], ["Петров Петр", "Иванов Иван"])
+
+        by_birthday_desc = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="birthday", sort_dir="desc")
+        self.assertEqual(by_birthday_desc["rows"][0]["fio"], "Петров Петр")
+
+        by_reward_desc = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="reward:1", sort_dir="desc")
+        self.assertEqual(by_reward_desc["rows"][0]["reward_counts"][1], 1)
+
+        by_total_asc = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="row_total", sort_dir="asc")
+        self.assertEqual([row["row_total"] for row in by_total_asc["rows"]], [1, 1])
 
     def test_matrix_filters_affect_reward_columns(self) -> None:
         empty = summary_matrix(self.db_path, normalized_summary_filters(country_id=999))
@@ -247,6 +293,12 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(text.startswith("\ufeff"))
         self.assertIn("ФИО", text)
         self.assertIn("Орден Тестовый", text)
+
+    def test_matrix_total_row_stays_last_in_csv_after_sort(self) -> None:
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="fio", sort_dir="desc")
+        text = summary_matrix_csv_text(matrix)
+        data_lines = [line for line in text.splitlines() if line.strip()]
+        self.assertTrue(data_lines[-1].startswith("Итого,"))
 
     def test_summary_pdf_route_returns_pdf_response(self) -> None:
         response = summary_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
@@ -320,14 +372,31 @@ class SummaryTests(unittest.TestCase):
 
     def test_summary_csv_buttons_use_browser_save_as_forms(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        save_as = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
         self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form', template)
         self.assertIn('id="summary-save-form" method="get" action="/summary.csv" data-save-as-form', template)
         self.assertIn('id="summary-pdf-save-form" method="get" action="{{ \'/summary_matrix.pdf\' if summary_mode == \'matrix\' else \'/summary.pdf\' }}" data-save-as-form', template)
         self.assertIn('form="summary-pdf-save-form">PDF</button>', template)
+        self.assertIn("Файл сохранён. Откройте его из выбранной папки.", save_as)
         self.assertNotIn('action="/summary_matrix.csv/save"', template)
         self.assertNotIn('action="/summary.csv/save"', template)
         self.assertNotIn("PDF-экспорт будет добавлен следующим этапом", template)
         self.assertNotIn("disabled-button\">PDF", template)
+
+    def test_summary_template_uses_cascading_filters_and_sort_links(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn('class="summary-filter-form guide-cascade"', template)
+        self.assertIn("data-guide-cascade-options", template)
+        self.assertIn('name="country_id" data-guide-role="country"', template)
+        self.assertIn('name="category_id" data-guide-role="category"', template)
+        self.assertIn('name="subcategory_id" data-guide-role="subcategory"', template)
+        self.assertIn('name="name_id" data-guide-role="name"', template)
+        self.assertIn('name="matrix_sort"', template)
+        self.assertIn('name="matrix_dir"', template)
+        self.assertIn("matrix-sort-link", template)
+        self.assertIn("summary_matrix_sort.urls.fio", template)
+        self.assertIn("summary_matrix_sort.urls.birthday", template)
+        self.assertIn("summary_matrix_sort.reward_urls", template)
 
     def test_summary_repository_uses_parameter_placeholders(self) -> None:
         source = (Path(__file__).resolve().parents[1] / "backend" / "app" / "repositories" / "summary.py").read_text()

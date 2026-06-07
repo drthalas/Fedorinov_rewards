@@ -479,16 +479,19 @@
     <section class="legacy-tab-panel">
       <h1>Свод.таблица</h1>
       {% if summary %}
-        <form class="summary-filter-form" method="get" action="/legacy">
+        <form class="summary-filter-form guide-cascade" method="get" action="/legacy">
+          <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="summary">
           <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
+          <input type="hidden" name="matrix_sort" value="{{ matrix_sort }}">
+          <input type="hidden" name="matrix_dir" value="{{ matrix_dir }}">
           <div class="summary-mode-switch" aria-label="Режим сводной таблицы">
             <a class="button {{ 'active-button' if summary_mode == 'matrix' else 'secondary-button' }}" href="{{ summary_matrix_mode_url }}">Шахматка по кавалерам</a>
             <a class="button {{ 'active-button' if summary_mode == 'aggregate' else 'secondary-button' }}" href="{{ summary_aggregate_mode_url }}">Свод по наградам</a>
           </div>
           <label>
             <span>Страна</span>
-            <select name="country_id">
+            <select name="country_id" data-guide-role="country">
               <option value="">Все</option>
               {% for item in summary_options.countries %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.country_id %}selected{% endif %}>{{ item.name }}</option>
@@ -497,7 +500,7 @@
           </label>
           <label>
             <span>Категория</span>
-            <select name="category_id">
+            <select name="category_id" data-guide-role="category">
               <option value="">Все</option>
               {% for item in summary_options.categories %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.category_id %}selected{% endif %}>{{ item.name }}</option>
@@ -506,7 +509,7 @@
           </label>
           <label>
             <span>Подкатегория</span>
-            <select name="subcategory_id">
+            <select name="subcategory_id" data-guide-role="subcategory">
               <option value="">Все</option>
               {% for item in summary_options.subcategories %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.subcategory_id %}selected{% endif %}>{{ item.name }}</option>
@@ -515,7 +518,7 @@
           </label>
           <label>
             <span>Наименование</span>
-            <select name="name_id">
+            <select name="name_id" data-guide-role="name">
               <option value="">Все</option>
               {% for item in summary_options.names %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.name_id %}selected{% endif %}>{{ item.name }}</option>
@@ -583,17 +586,19 @@
           <table class="legacy-table summary-matrix person-reward-matrix">
             <thead>
               <tr>
-                <th>ФИО кавалера</th>
-                <th>Звание / специальность</th>
-                <th>Дата рождения</th>
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.fio }}">ФИО кавалера{% if summary_matrix_sort.sort == 'fio' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.rank_name }}">Звание / специальность{% if summary_matrix_sort.sort == 'rank_name' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.birthday }}">Дата рождения{% if summary_matrix_sort.sort == 'birthday' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 {% for column in summary_matrix.photo_columns %}
-                <th>{{ column.label }}</th>
+                {% set sort_key = 'photo:' ~ column.field %}
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.photo_urls.get(column.field) }}">{{ column.label }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 {% endfor %}
                 {% for column in summary_matrix.reward_columns %}
-                <th>{{ column.name|dash }}</th>
+                {% set sort_key = 'reward:' ~ column.id %}
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.reward_urls.get(column.id|string) }}">{{ column.name|dash }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 {% endfor %}
-                {% if summary_matrix.show_numbers %}<th>Номера</th>{% endif %}
-                <th>Итого наград</th>
+                {% if summary_matrix.show_numbers %}<th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.numbers }}">Номера{% if summary_matrix_sort.sort == 'numbers' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>{% endif %}
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.row_total }}">Итого наград{% if summary_matrix_sort.sort == 'row_total' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
               </tr>
             </thead>
             <tbody>

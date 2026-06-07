@@ -143,7 +143,7 @@
     setMessage(form, "Подготовка файла...", "");
     try {
       await saveResponse(form);
-      setMessage(form, "Файл сохранён.", "success");
+      setMessage(form, "Файл сохранён. Откройте его из выбранной папки.", "success");
     } catch (error) {
       if (error && error.name === "AbortError") {
         setMessage(form, "Сохранение отменено.", "");
