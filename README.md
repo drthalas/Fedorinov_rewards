@@ -131,7 +131,7 @@ The main rewards workspace supports filters above the person list:
 
 Filters can be combined, for example rank plus a specific reward name. The totals panel at the bottom of the rewards workspace reflects the current filtered selection. Person rows use single click to select and double click to open the person card.
 
-The v0.1.3 release also includes the latest owner-feedback polish: real photos and "Нет фото" placeholders use the same outer photo frame, and the summary table plus the person/reward matrix can be exported to PDF.
+The v0.1.4 release also includes the latest owner-feedback polish: the selected cavalier stays visible in the left list, person editing is more compact, summary/search tables have improved sorting and filters, and pasted clipboard photos are saved as JPEG.
 
 The reward guide filters now cascade in the UI: selecting a country limits categories, selecting a category limits subcategories, and selecting a subcategory limits reward names. Empty filter parameters still mean `Все` and do not produce validation errors.
 
