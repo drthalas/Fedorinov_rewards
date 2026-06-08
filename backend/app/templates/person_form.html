@@ -17,6 +17,11 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
+{% if mode == "edit" and settings.write_mode %}
+<div class="person-edit-workspace">
+  <div class="person-edit-main">
+{% endif %}
+
 <form class="edit-form legacy-edit-form person-edit-form compact-person-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
@@ -82,8 +87,19 @@
   </div>
 </section>
 {% endif %}
+
+{% if mode == "edit" and settings.write_mode %}
+  </div>
+  <div class="person-edit-photos">
+{% endif %}
+
 {% set photo_manage_compact = true %}
 {% with photo_entity_type="person", photo_entity_id=person.id %}
   {% include "photo_management.html" %}
 {% endwith %}
+
+{% if mode == "edit" and settings.write_mode %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}

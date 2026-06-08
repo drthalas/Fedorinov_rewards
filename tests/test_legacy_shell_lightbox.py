@@ -59,9 +59,14 @@ class LegacyShellLightboxTests(unittest.TestCase):
         script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
 
         self.assertIn("data-selected-person-row", legacy_template)
+        self.assertIn("data-person-list", legacy_template)
         self.assertIn('document.querySelector("[data-selected-person-row]")', script)
-        self.assertIn("selectedPersonRow.scrollIntoView", script)
-        self.assertIn('block: "nearest"', script)
+        self.assertIn('document.querySelector("[data-person-list]")', script)
+        self.assertIn("scrollSelectedPersonIntoList", script)
+        self.assertIn("personList.scrollTop", script)
+        self.assertIn("personList.getBoundingClientRect()", script)
+        self.assertIn("selectedPersonRow.getBoundingClientRect()", script)
+        self.assertNotIn("selectedPersonRow.scrollIntoView", script)
 
     def test_legacy_person_rows_do_not_have_hover_title_links(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -193,13 +198,22 @@ class LegacyShellLightboxTests(unittest.TestCase):
         styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
 
         self.assertIn("compact-person-form", person_form)
+        self.assertIn("person-edit-workspace", person_form)
+        self.assertIn("person-edit-main", person_form)
+        self.assertIn("person-edit-photos", person_form)
         self.assertIn('rows="7"', person_form)
         self.assertIn('rows="3"', person_form)
         self.assertIn("photo_manage_compact = true", person_form)
         self.assertIn("photo-manage-section-compact", photo_management)
         self.assertIn(".compact-person-form", styles)
+        self.assertIn(".person-edit-workspace", styles)
+        self.assertIn("grid-template-columns: minmax(0, 1fr) minmax(320px, 430px)", styles)
+        self.assertIn(".person-edit-photos .photo-manage-section", styles)
         self.assertIn(".photo-manage-section-compact", styles)
-        self.assertIn("max-height: 118px", styles)
+        self.assertIn("height: 96px", styles)
+        self.assertIn("max-height: 96px", styles)
+        self.assertIn("min-height: 104px", styles)
+        self.assertIn("min-height: 72px", styles)
 
     def test_cascading_guides_preserve_changed_select_value(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()

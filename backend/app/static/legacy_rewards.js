@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const personRows = Array.from(document.querySelectorAll("[data-person-name]"));
   const emptySearch = document.querySelector("[data-person-empty]");
   const selectedPersonRow = document.querySelector("[data-selected-person-row]");
+  const personList = document.querySelector("[data-person-list]");
 
   const applyPersonSearch = () => {
     const query = normalize(quickSearch ? quickSearch.value : "");
@@ -27,8 +28,42 @@ document.addEventListener("DOMContentLoaded", () => {
     quickSearch.addEventListener("input", applyPersonSearch);
   }
 
+  const scrollSelectedPersonIntoList = () => {
+    if (!selectedPersonRow || !personList) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const containerRect = personList.getBoundingClientRect();
+        const rowRect = selectedPersonRow.getBoundingClientRect();
+        const margin = 8;
+        const fullyVisible = rowRect.top >= containerRect.top + margin
+          && rowRect.bottom <= containerRect.bottom - margin;
+
+        if (!fullyVisible) {
+          const targetTop = personList.scrollTop
+            + rowRect.top
+            - containerRect.top
+            - ((personList.clientHeight - selectedPersonRow.offsetHeight) / 2);
+          personList.scrollTop = Math.max(0, targetTop);
+        }
+
+        window.requestAnimationFrame(() => {
+          const adjustedContainerRect = personList.getBoundingClientRect();
+          const adjustedRowRect = selectedPersonRow.getBoundingClientRect();
+          if (adjustedRowRect.top < adjustedContainerRect.top + margin) {
+            personList.scrollTop -= (adjustedContainerRect.top + margin) - adjustedRowRect.top;
+          } else if (adjustedRowRect.bottom > adjustedContainerRect.bottom - margin) {
+            personList.scrollTop += adjustedRowRect.bottom - (adjustedContainerRect.bottom - margin);
+          }
+        });
+      });
+    });
+  };
+
   if (selectedPersonRow) {
-    selectedPersonRow.scrollIntoView({ block: "nearest", inline: "nearest" });
+    scrollSelectedPersonIntoList();
   }
 
   document.querySelectorAll("[data-select-url][data-detail-url]").forEach((row) => {
