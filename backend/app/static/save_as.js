@@ -140,9 +140,8 @@
     return "download";
   }
 
-  async function saveResponse(form, fileHandle, request, pickerFilename) {
+  async function fetchFileResponse(request) {
     const { url, options } = request;
-
     const response = await fetch(url, options);
     if (!response.ok) {
       let message = "Не удалось подготовить файл.";
@@ -157,10 +156,28 @@
       }
       throw new Error(message);
     }
+    return response;
+  }
+
+  async function responseBlobAndFilename(response, fallbackFilename) {
     const blob = await response.blob();
     const headerFilename = filenameFromContentDisposition(response.headers.get("Content-Disposition"));
-    const filename = pickerFilename || headerFilename || form.getAttribute("data-save-as-filename") || "download";
+    const filename = fallbackFilename || headerFilename || "download";
+    return { blob, filename };
+  }
+
+  async function saveResponse(fileHandle, request, pickerFilename) {
+    const response = await fetchFileResponse(request);
+    const { blob, filename } = await responseBlobAndFilename(response, pickerFilename);
     await writeFileHandle(fileHandle, blob);
+    return filename;
+  }
+
+  async function downloadWithFallback(form, request, fallbackFilename) {
+    setMessage(form, "Подготовка обычной загрузки файла...", "");
+    const response = await fetchFileResponse(request);
+    const { blob, filename } = await responseBlobAndFilename(response, fallbackFilename);
+    fallbackDownload(blob, filename);
     return filename;
   }
 
@@ -186,35 +203,63 @@
     if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-save-as-form")) {
       return;
     }
-    if (!("showSaveFilePicker" in window)) {
-      window.alert("Ваш браузер не поддерживает выбор места сохранения. Файл будет скачан обычным способом.");
-      return;
-    }
-
     event.preventDefault();
     const request = requestFromForm(form);
     const pickerFilename = filenameFromRequest(form, request.url);
+    const submitter = event.submitter;
+    if (submitter) {
+      submitter.disabled = true;
+    }
+
+    if (!("showSaveFilePicker" in window)) {
+      setMessage(form, "Ваш браузер не поддерживает выбор места сохранения. Файл будет скачан обычным способом.", "");
+      try {
+        await downloadWithFallback(form, request, pickerFilename);
+        setMessage(form, "Файл скачан обычным способом. Проверьте папку загрузок браузера.", "success");
+      } catch (error) {
+        setMessage(form, error && error.message ? error.message : "Не удалось скачать файл.", "error");
+      } finally {
+        if (submitter) {
+          submitter.disabled = false;
+        }
+      }
+      return;
+    }
+
     const pickerMimeType = form.getAttribute("data-save-as-mime") || mimeTypeForFilename(pickerFilename);
     let fileHandle;
     try {
       fileHandle = await openSaveFilePicker(pickerFilename, pickerMimeType);
     } catch (error) {
       const message = saveDialogErrorMessage(error) || "Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.";
-      setMessage(form, message, error && error.name === "AbortError" ? "" : "error");
+      if (error && error.name === "AbortError") {
+        setMessage(form, message, "");
+      } else {
+        setMessage(form, message, "error");
+        try {
+          await downloadWithFallback(form, request, pickerFilename);
+          setMessage(form, "Файл скачан обычным способом. Проверьте папку загрузок браузера.", "success");
+        } catch (fallbackError) {
+          setMessage(form, fallbackError && fallbackError.message ? fallbackError.message : "Не удалось скачать файл.", "error");
+        }
+      }
+      if (submitter) {
+        submitter.disabled = false;
+      }
       return;
     }
 
-    const submitter = event.submitter;
-    if (submitter) {
-      submitter.disabled = true;
-    }
     setMessage(form, "Подготовка файла...", "");
     try {
-      await saveResponse(form, fileHandle, request, pickerFilename);
+      await saveResponse(fileHandle, request, pickerFilename);
       setMessage(form, "Файл сохранён. Откройте его из выбранной папки.", "success");
     } catch (error) {
       const message = saveDialogErrorMessage(error);
-      setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), message === "Сохранение отменено." ? "" : "error");
+      if (message === "Сохранение отменено.") {
+        setMessage(form, message, "");
+      } else {
+        setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), "error");
+      }
     } finally {
       if (submitter) {
         submitter.disabled = false;
@@ -226,6 +271,7 @@
     fallbackDownload,
     filenameFromContentDisposition,
     filenameFromRequest,
+    downloadWithFallback,
     mimeTypeForFilename,
   };
 })();

@@ -451,6 +451,6 @@ The selected person can be exported as a booklet from the main rewards screen or
 /persons/{id}/booklet
 ```
 
-The booklet preview is printable and has a `Сохранить PDF` button. The button opens a system save dialog and writes the PDF to the selected path. The app reports the saved path after success. In browser/headless environments where a native save dialog is unavailable, use browser print-to-PDF as a fallback.
+The booklet preview is printable and has a `Сохранить PDF` button. In Chrome/Edge the button uses browser Save As through the File System Access API. If the browser does not support that API, the app falls back to a normal browser download. Windows Chrome/Edge behavior must be confirmed during owner QA when a Windows VM or owner machine is available.
 
 The booklet includes person details, biography, links, person photos/documents, and all rewards with their key fields and photos. Missing photos do not stop generation.

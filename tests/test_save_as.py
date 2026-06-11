@@ -15,6 +15,7 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("Файл сохранён.", source)
         self.assertIn("fetch(url, options)", source)
         self.assertIn("Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.", source)
+        self.assertIn("Файл скачан обычным способом. Проверьте папку загрузок браузера.", source)
 
     def test_file_picker_is_opened_before_fetch_to_keep_user_gesture(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
@@ -32,6 +33,34 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("console.warn", source)
         self.assertIn("Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.", source)
         self.assertNotIn("setMessage(form, error && error.message ? error.message : \"Не удалось открыть окно сохранения", source)
+
+    def test_fallback_download_creates_link_and_clicks_it(self) -> None:
+        source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
+        fallback = source.split("function fallbackDownload", 1)[1].split("function requestFromForm", 1)[0]
+        self.assertIn('document.createElement("a")', fallback)
+        self.assertIn("link.download = filename || \"download\"", fallback)
+        self.assertIn("document.body.appendChild(link)", fallback)
+        self.assertIn("link.click()", fallback)
+        self.assertIn("URL.revokeObjectURL(url)", fallback)
+
+    def test_missing_file_system_access_api_starts_blob_download(self) -> None:
+        source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
+        submit_handler = source.split('document.addEventListener("submit"', 1)[1]
+        unsupported_branch = submit_handler.split('if (!("showSaveFilePicker" in window))', 1)[1].split("const pickerMimeType", 1)[0]
+        self.assertIn("event.preventDefault()", submit_handler)
+        self.assertIn("await downloadWithFallback(form, request, pickerFilename)", unsupported_branch)
+        self.assertIn("fallbackDownload(blob, filename)", source)
+        self.assertNotIn("window.alert", unsupported_branch)
+
+    def test_picker_error_falls_back_but_cancel_does_not(self) -> None:
+        source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
+        submit_handler = source.split('document.addEventListener("submit"', 1)[1]
+        picker_error_branch = submit_handler.split("fileHandle = await openSaveFilePicker", 1)[1].split("setMessage(form, \"Подготовка файла", 1)[0]
+        cancel_branch = picker_error_branch.split("} else {", 1)[0]
+        error_branch = picker_error_branch.split("} else {", 1)[1]
+        self.assertIn('error.name === "AbortError"', cancel_branch)
+        self.assertNotIn("downloadWithFallback", cancel_branch)
+        self.assertIn("await downloadWithFallback(form, request, pickerFilename)", error_branch)
 
     def test_save_as_js_is_loaded_in_base_and_legacy_layouts(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text(encoding="utf-8")
