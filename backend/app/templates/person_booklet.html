@@ -10,7 +10,7 @@
   <header class="booklet-toolbar no-print">
     <a class="button secondary-button" href="{{ return_to }}">← Вернуться</a>
     <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
-    <form method="post" action="/persons/{{ person.id }}/booklet.pdf" data-save-as-form>
+    <form method="post" action="/persons/{{ person.id }}/booklet.pdf" data-save-as-form data-save-as-filename="{{ pdf_filename }}" data-save-as-mime="application/pdf">
       <input type="hidden" name="return_to" value="{{ return_to }}">
       <button type="submit">Сохранить PDF</button>
     </form>

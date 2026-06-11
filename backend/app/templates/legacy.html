@@ -199,7 +199,7 @@
                   <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                   <button class="button secondary-button" type="submit">Открыть каталог</button>
                 </form>
-                <form method="post" action="/persons/{{ selected_person.id }}/archive-folder.zip" data-save-as-form>
+                <form method="post" action="/persons/{{ selected_person.id }}/archive-folder.zip" data-save-as-form data-save-as-filename="{{ selected_person_archive_filename }}" data-save-as-mime="application/zip">
                   <button class="button secondary-button" type="submit">Архивировать</button>
                 </form>
                 <a class="button" href="/persons/{{ selected_person.id }}/booklet?return_to={{ selected_person_return|urlencode }}">Сформировать буклет</a>
@@ -291,7 +291,7 @@
       {% elif search_results %}
         <div class="secondary inline-export-row">
           <span>Найдено строк: {{ search_results.total }} · время: {{ search_results.elapsed_ms }} ms</span>
-          <form class="inline-save-form" method="get" action="/search.csv" data-save-as-form>
+          <form class="inline-save-form" method="get" action="/search.csv" data-save-as-form data-save-as-filename="search_results.csv" data-save-as-mime="text/csv">
             <input type="hidden" name="q" value="{{ q }}">
             <input type="hidden" name="scope" value="{{ scope }}">
             <input type="hidden" name="mode" value="{{ mode }}">
@@ -580,7 +580,7 @@
             <button class="button secondary-button" type="submit" form="summary-pdf-save-form">PDF</button>
           </div>
         </form>
-        <form id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form>
+        <form id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form data-save-as-filename="summary_matrix.csv" data-save-as-mime="text/csv">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
@@ -588,7 +588,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <form id="summary-save-form" method="get" action="/summary.csv" data-save-as-form>
+        <form id="summary-save-form" method="get" action="/summary.csv" data-save-as-form data-save-as-filename="summary.csv" data-save-as-mime="text/csv">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
@@ -596,7 +596,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form>
+        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form data-save-as-filename="{{ 'summary_matrix.pdf' if summary_mode == 'matrix' else 'summary.pdf' }}" data-save-as-mime="application/pdf">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">

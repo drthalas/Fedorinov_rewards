@@ -57,7 +57,7 @@
 {% else %}
 <div class="muted inline-export-row">
   <span>Найдено строк: {{ total_found }} · время: {{ results.elapsed_ms }} ms</span>
-  <form class="inline-save-form" method="get" action="/search.csv" data-save-as-form>
+  <form class="inline-save-form" method="get" action="/search.csv" data-save-as-form data-save-as-filename="search_results.csv" data-save-as-mime="text/csv">
     <input type="hidden" name="q" value="{{ q }}">
     <input type="hidden" name="scope" value="{{ scope }}">
     <input type="hidden" name="mode" value="{{ mode }}">

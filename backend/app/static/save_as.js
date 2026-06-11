@@ -41,6 +41,20 @@
     ];
   }
 
+  function mimeTypeForFilename(filename) {
+    const extension = extensionFromFilename(filename);
+    if (extension === ".pdf") {
+      return "application/pdf";
+    }
+    if (extension === ".zip") {
+      return "application/zip";
+    }
+    if (extension === ".csv") {
+      return "text/csv";
+    }
+    return "application/octet-stream";
+  }
+
   function setMessage(form, message, kind) {
     const targetSelector = form.getAttribute("data-save-as-status");
     let target = targetSelector ? document.querySelector(targetSelector) : null;
@@ -62,11 +76,14 @@
     }
   }
 
-  async function writeWithFilePicker(blob, filename) {
-    const handle = await window.showSaveFilePicker({
+  async function openSaveFilePicker(filename, mimeType) {
+    return await window.showSaveFilePicker({
       suggestedName: filename || "download",
-      types: pickerTypes(filename, blob.type),
+      types: pickerTypes(filename, mimeType),
     });
+  }
+
+  async function writeFileHandle(handle, blob) {
     const writable = await handle.createWritable();
     await writable.write(blob);
     await writable.close();
@@ -85,7 +102,7 @@
     }, 1000);
   }
 
-  async function saveResponse(form) {
+  function requestFromForm(form) {
     const method = (form.getAttribute("method") || "get").toUpperCase();
     let url = form.getAttribute("action") || window.location.href;
     const options = {
@@ -103,6 +120,28 @@
     } else {
       options.body = formData;
     }
+    return { url, options };
+  }
+
+  function filenameFromRequest(form, url) {
+    const explicit = form.getAttribute("data-save-as-filename");
+    if (explicit) {
+      return explicit;
+    }
+    try {
+      const path = new URL(url, window.location.href).pathname;
+      const lastSegment = path.split("/").filter(Boolean).pop() || "";
+      if (lastSegment.indexOf(".") >= 0) {
+        return lastSegment;
+      }
+    } catch (error) {
+      // Keep the generic fallback below.
+    }
+    return "download";
+  }
+
+  async function saveResponse(form, fileHandle, request, pickerFilename) {
+    const { url, options } = request;
 
     const response = await fetch(url, options);
     if (!response.ok) {
@@ -120,9 +159,26 @@
     }
     const blob = await response.blob();
     const headerFilename = filenameFromContentDisposition(response.headers.get("Content-Disposition"));
-    const filename = headerFilename || form.getAttribute("data-save-as-filename") || "download";
-    await writeWithFilePicker(blob, filename);
+    const filename = pickerFilename || headerFilename || form.getAttribute("data-save-as-filename") || "download";
+    await writeFileHandle(fileHandle, blob);
     return filename;
+  }
+
+  function saveDialogErrorMessage(error) {
+    if (error && error.name === "AbortError") {
+      return "Сохранение отменено.";
+    }
+    if (
+      error &&
+      (
+        error.name === "SecurityError" ||
+        String(error.message || "").indexOf("Must be handling a user gesture") >= 0
+      )
+    ) {
+      console.warn("Save As file picker failed", error);
+      return "Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.";
+    }
+    return "";
   }
 
   document.addEventListener("submit", async function (event) {
@@ -136,20 +192,29 @@
     }
 
     event.preventDefault();
+    const request = requestFromForm(form);
+    const pickerFilename = filenameFromRequest(form, request.url);
+    const pickerMimeType = form.getAttribute("data-save-as-mime") || mimeTypeForFilename(pickerFilename);
+    let fileHandle;
+    try {
+      fileHandle = await openSaveFilePicker(pickerFilename, pickerMimeType);
+    } catch (error) {
+      const message = saveDialogErrorMessage(error) || "Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.";
+      setMessage(form, message, error && error.name === "AbortError" ? "" : "error");
+      return;
+    }
+
     const submitter = event.submitter;
     if (submitter) {
       submitter.disabled = true;
     }
     setMessage(form, "Подготовка файла...", "");
     try {
-      await saveResponse(form);
+      await saveResponse(form, fileHandle, request, pickerFilename);
       setMessage(form, "Файл сохранён. Откройте его из выбранной папки.", "success");
     } catch (error) {
-      if (error && error.name === "AbortError") {
-        setMessage(form, "Сохранение отменено.", "");
-      } else {
-        setMessage(form, error && error.message ? error.message : "Не удалось сохранить файл.", "error");
-      }
+      const message = saveDialogErrorMessage(error);
+      setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), message === "Сохранение отменено." ? "" : "error");
     } finally {
       if (submitter) {
         submitter.disabled = false;
@@ -160,5 +225,7 @@
   window.FedorinovSaveAs = {
     fallbackDownload,
     filenameFromContentDisposition,
+    filenameFromRequest,
+    mimeTypeForFilename,
   };
 })();

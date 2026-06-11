@@ -30,6 +30,7 @@ from ..repositories.summary import (
 )
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
+from ..services.person_files import person_archive_filename
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..version import APP_NAME, APP_VERSION
 from .templates import templates
@@ -306,6 +307,7 @@ def legacy_index(
         "status_message": STATUS_MESSAGES.get(status),
         "persons": [],
         "selected_person": None,
+        "selected_person_archive_filename": "",
         "person_rewards": [],
         "persons_total": 0,
         "rewards_filters": rewards_filters,
@@ -399,6 +401,8 @@ def legacy_index(
         context["selected_person"] = selected_person
         context["person_rewards"] = list_person_rewards(settings.rewards_db_path, selected_person_id)
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
+        if selected_person is not None:
+            context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
 
     selected_mark_id = mark_id or (int(marks[0]["id"]) if marks else None)
     if selected_mark_id is not None:

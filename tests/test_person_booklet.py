@@ -157,6 +157,9 @@ class PersonBookletTests(unittest.TestCase):
         self.assertIn("Guide 3", rendered)
         self.assertIn("Сохранить PDF", rendered)
         self.assertIn("data-save-as-form", rendered)
+        self.assertIn("data-save-as-filename=", rendered)
+        self.assertIn("data-save-as-mime=\"application/pdf\"", rendered)
+        self.assertIn("Иванов_Иван_1_booklet_", rendered)
         self.assertNotIn('name="save_dialog"', rendered)
 
     def test_missing_and_unsafe_photos_do_not_crash_or_get_included(self) -> None:

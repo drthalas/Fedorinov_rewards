@@ -194,6 +194,7 @@ def person_booklet(request: Request, person_id: int, return_to: str = "", error:
             "settings": settings,
             **context,
             "return_to": safe_back,
+            "pdf_filename": person_booklet_filename(settings, person_id),
             "error": error,
             "message": message,
         },
