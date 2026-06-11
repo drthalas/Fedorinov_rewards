@@ -62,14 +62,18 @@
     </div>
   </fieldset>
 
-  <fieldset class="form-section compact-text-section">
-    <legend>Краткая биография</legend>
-    <textarea class="biography-textarea" name="biography" rows="7">{{ person.biography or '' }}</textarea>
-  </fieldset>
-
-  <fieldset class="form-section compact-text-section">
-    <legend>Комментарий / заметки</legend>
-    <textarea name="comment" rows="3">{{ person.comment or '' }}</textarea>
+  <fieldset class="form-section compact-text-section person-notes-section">
+    <legend>Биография и заметки</legend>
+    <div class="form-grid two-columns person-notes-grid">
+      <label>
+        <span>Краткая биография</span>
+        <textarea class="biography-textarea" name="biography" rows="4">{{ person.biography or '' }}</textarea>
+      </label>
+      <label>
+        <span>Комментарий / заметки</span>
+        <textarea name="comment" rows="3">{{ person.comment or '' }}</textarea>
+      </label>
+    </div>
   </fieldset>
 
   <div class="actions">

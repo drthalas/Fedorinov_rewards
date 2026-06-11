@@ -107,6 +107,9 @@ class PersonBiographyTests(unittest.TestCase):
         self.assertIn("Ссылка на сайт “Память народа”", person_form)
         self.assertIn("Ссылка на сайт “Форум коллекционеров”", person_form)
         self.assertIn("Краткая биография", person_form)
+        self.assertIn('name="biography"', person_form)
+        self.assertIn("person-notes-section", person_form)
+        self.assertIn("person-notes-grid", person_form)
         self.assertIn("Ссылка на Монетный двор / справочник", reward_form)
         self.assertIn("Ссылка / дополнительное поле", mark_form)
         self.assertIn("/photos/upload", photo_management)
@@ -127,6 +130,18 @@ class PersonBiographyTests(unittest.TestCase):
         self.assertIn("#guide-tree", mark_form)
         self.assertIn('id="ranks"', guides)
         self.assertIn('id="guide-tree"', guides)
+
+    def test_person_edit_form_uses_more_compact_classes(self) -> None:
+        person_form = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("person-edit-workspace", person_form)
+        self.assertIn("compact-person-form", person_form)
+        self.assertIn("photo_manage_compact = true", person_form)
+        self.assertIn(".compact-person-form .biography-textarea", styles)
+        self.assertIn("min-height: 86px", styles)
+        self.assertIn(".photo-manage-section-compact .photo-frame", styles)
+        self.assertIn("height: 86px", styles)
 
 
 if __name__ == "__main__":

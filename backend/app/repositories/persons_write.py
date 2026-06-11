@@ -77,6 +77,11 @@ def _person_columns(connection) -> set[str]:
     return {row["name"] for row in connection.execute("pragma table_info(person)").fetchall()}
 
 
+def _ensure_biography_column(connection) -> None:
+    if "biography" not in _person_columns(connection):
+        connection.execute("alter table person add column biography text")
+
+
 def _active_fields(connection) -> tuple[str, ...]:
     columns = _person_columns(connection)
     optional = tuple(field for field in PERSON_OPTIONAL_FIELDS if field in columns)
@@ -84,7 +89,11 @@ def _active_fields(connection) -> tuple[str, ...]:
 
 
 def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, ...]:
-    return tuple(getattr(data, field) for field in fields)
+    optional_text_fields = {"link1", "link2", "comment", "biography"}
+    return tuple(
+        _empty_to_none(getattr(data, field)) if field in optional_text_fields else getattr(data, field)
+        for field in fields
+    )
 
 
 def _validate_person_data(data: PersonWriteData) -> None:
@@ -104,6 +113,7 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
     _validate_person_data(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        _ensure_biography_column(connection)
         fields = _active_fields(connection)
         columns = ", ".join(fields)
         placeholders = ", ".join("?" for _ in fields)
@@ -121,6 +131,7 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
     ensure_write_allowed(settings)
     _validate_person_data(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        _ensure_biography_column(connection)
         fields = _active_fields(connection)
         assignments = ", ".join(f"{field} = ?" for field in fields)
         cursor = connection.execute(

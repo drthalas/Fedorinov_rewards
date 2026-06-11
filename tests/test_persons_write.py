@@ -45,10 +45,11 @@ class PersonWriteTests(unittest.TestCase):
         values.update(overrides)
         return PersonWriteData(**values)
 
-    def _create_db(self) -> None:
+    def _create_db(self, with_biography: bool = True) -> None:
+        biography_column = ", biography text" if with_biography else ""
         with sqlite3.connect(self.db_path) as connection:
             connection.execute(
-                """
+                f"""
                 create table person (
                     id integer primary key autoincrement,
                     fio varchar,
@@ -63,8 +64,8 @@ class PersonWriteTests(unittest.TestCase):
                     card2_foto varchar,
                     link1 varchar,
                     link2 varchar,
-                    comment text,
-                    biography text
+                    comment text
+                    {biography_column}
                 )
                 """
             )
@@ -193,6 +194,18 @@ class PersonWriteTests(unittest.TestCase):
         update_person(self.settings(), person_id, self.person_data("Biography person", biography="Updated bio"))
         row = self.fetch_person(person_id)
         self.assertEqual(row["biography"], "Updated bio")
+
+    def test_update_person_adds_biography_column_when_missing(self) -> None:
+        self.db_path.unlink()
+        self._create_db(with_biography=False)
+        person_id = create_person(self.settings(), self.person_data("Biography migration", biography="Added bio"))
+        row = self.fetch_person(person_id)
+        self.assertIn("biography", row.keys())
+        self.assertEqual(row["biography"], "Added bio")
+
+        update_person(self.settings(), person_id, self.person_data("Biography migration", biography=""))
+        row = self.fetch_person(person_id)
+        self.assertIsNone(row["biography"])
 
     def test_empty_person_is_not_created(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:

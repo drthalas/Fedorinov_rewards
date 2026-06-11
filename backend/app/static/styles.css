@@ -543,8 +543,8 @@ th {
 }
 
 .photo-manage-section-compact .photo-frame {
-  height: 96px;
-  max-height: 96px;
+  height: 86px;
+  max-height: 86px;
   aspect-ratio: auto;
 }
 
@@ -567,6 +567,13 @@ th {
 
 .photo-manage-section-compact .photo-manage-actions {
   gap: 4px;
+}
+
+.photo-manage-section-compact .mini-button {
+  min-height: 26px;
+  min-width: 26px;
+  padding: 4px 6px;
+  font-size: 12px;
 }
 
 .photo-upload-form {
@@ -837,36 +844,40 @@ th {
 
 .compact-person-form {
   display: grid;
-  gap: 8px;
+  gap: 6px;
 }
 
 .compact-person-form .form-section {
   margin: 0;
-  padding: 8px;
+  padding: 6px 8px;
 }
 
 .compact-person-form label {
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .compact-person-form input,
 .compact-person-form select,
 .compact-person-form textarea {
-  padding: 7px 8px;
+  padding: 6px 8px;
 }
 
 .compact-person-form .biography-textarea {
-  min-height: 104px;
+  min-height: 86px;
 }
 
 .compact-person-form .compact-text-section textarea {
-  min-height: 72px;
+  min-height: 64px;
+}
+
+.person-notes-grid {
+  align-items: start;
 }
 
 .person-edit-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 430px);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+  gap: 10px;
   align-items: start;
 }
 
