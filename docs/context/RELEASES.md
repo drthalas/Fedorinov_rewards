@@ -184,7 +184,19 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 ## v0.1.5
 
-Статус: готовится к выпуску.
+Статус: выпущено.
+
+Release URL:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/tag/v0.1.5
+```
+
+Public latest.json:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
+```
 
 Состав:
 
@@ -206,3 +218,19 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 Known note:
 
 - Windows native Save As через отдельную Windows VM пока не проверялся владельцем; проверка отложена и не блокирует релиз.
+
+## v0.1.6
+
+Статус: выпущено.
+
+Состав:
+
+- Исправлен режим "мини-фото" во вкладке "Поиск".
+- Фотографии в таблице показываются компактными превью и не раздувают строки.
+- Placeholder для отсутствующих фото имеет такой же размер.
+- Полное фото открывается по клику в существующем просмотрщике.
+- Lightbox/zoom, resize колонок/строк и CSV остались рабочими.
+
+Known note:
+
+- Windows native Save As через отдельную Windows VM остаётся отложенной проверкой владельца и не входит в v0.1.6.

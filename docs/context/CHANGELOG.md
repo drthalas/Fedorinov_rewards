@@ -1,8 +1,31 @@
 # История изменений
 
+## v0.1.6
+
+Статус: выпущено.
+
+Ключевые изменения:
+
+- Исправлен режим "мини-фото" во вкладке "Поиск".
+- Фотографии в таблице теперь показываются компактными превью и не раздувают строки.
+- Placeholder для отсутствующих фото отображается в такой же рамке.
+- Полное фото открывается по клику в существующем просмотрщике.
+- Lightbox/zoom, изменение размеров таблицы и CSV остались рабочими.
+- Windows native Save As через отдельную Windows VM остаётся отложенной проверкой владельца.
+
+Ключевой commit:
+
+- `37003cd` Fix search photo thumbnails.
+
 ## v0.1.5
 
-Статус: готовится к выпуску.
+Статус: выпущено.
+
+Release URL:
+
+```text
+https://github.com/drthalas/Fedorinov_rewards/releases/tag/v0.1.5
+```
 
 Ключевые изменения:
 
@@ -29,6 +52,7 @@
 - `06a6e25` Add keyboard navigation and typeahead for rewards list.
 - `04fa030` Fix biography saving and edit form UX.
 - `2b41a0c` Add search photo mode and resizable table.
+- `6ce6f1c` Prepare v0.1.5 release.
 
 ## v0.1.4
 
