@@ -92,8 +92,9 @@
           {% endif %}
         </div>
         <div class="legacy-person-search">
-          <label for="legacy-person-search-input">Быстрый поиск</label>
-          <input id="legacy-person-search-input" type="search" placeholder="ФИО кавалера" autocomplete="off" data-person-quick-search>
+          <label for="legacy-person-search-input">Быстрый поиск по ФИО</label>
+          <input id="legacy-person-search-input" type="search" placeholder="Введите первые буквы ФИО" autocomplete="off" aria-label="Быстрый поиск по ФИО кавалера" data-person-quick-search data-person-search-primary>
+          <div class="legacy-person-search-hint">Enter открывает первое совпадение.</div>
         </div>
         <div class="legacy-list" tabindex="0" role="listbox" aria-label="Список кавалеров" data-person-list>
           {% for person in persons %}

@@ -12,6 +12,8 @@
       const handle = document.createElement("span");
       handle.className = "search-column-resize-handle";
       handle.setAttribute("data-column-resize-handle", "");
+      handle.setAttribute("data-resize-hint", "Изменить ширину колонки");
+      handle.setAttribute("title", "Изменить ширину колонки");
       handle.setAttribute("aria-hidden", "true");
       header.appendChild(handle);
 
@@ -56,6 +58,8 @@
       const handle = document.createElement("span");
       handle.className = "search-row-resize-handle";
       handle.setAttribute("data-row-resize-handle", "");
+      handle.setAttribute("data-resize-hint", "Изменить высоту строки");
+      handle.setAttribute("title", "Изменить высоту строки");
       handle.setAttribute("aria-hidden", "true");
       firstCell.appendChild(handle);
 

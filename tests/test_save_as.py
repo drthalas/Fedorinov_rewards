@@ -15,8 +15,8 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("Файл сохранён.", source)
         self.assertIn("fetch(url, options)", source)
         self.assertIn("Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.", source)
-        self.assertIn("Файл скачан. Откройте его из папки загрузок браузера.", source)
-        self.assertIn("Браузер не может открыть выбранную папку автоматически", source)
+        self.assertIn("Файл скачан. Браузер не разрешает приложению автоматически открыть папку", source)
+        self.assertIn("Файл сохранён. Браузер не разрешает приложению автоматически открыть папку", source)
         self.assertIn("Открыть копию файла", source)
 
     def test_file_picker_is_opened_before_fetch_to_keep_user_gesture(self) -> None:
@@ -51,7 +51,9 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("save-as-open-copy-link", source)
         self.assertIn('link.target = "_blank"', source)
         self.assertIn("showSavedMessage(form, result.blob, result.filename, \"picker\")", source)
-        self.assertIn("Браузер не может открыть выбранную папку автоматически", source)
+        self.assertIn("Браузер не разрешает приложению автоматически открыть папку", source)
+        self.assertIn("откройте файл из выбранной папки или используйте ссылку “Открыть копию файла”", source)
+        self.assertNotIn("Открыть папку", source)
         self.assertNotIn("Папка открыта", source)
 
     def test_missing_file_system_access_api_starts_blob_download(self) -> None:

@@ -395,7 +395,7 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('data-save-as-filename="{{ \'summary_matrix.pdf\' if summary_mode == \'matrix\' else \'summary.pdf\' }}"', template)
         self.assertIn('data-save-as-mime="application/pdf"', template)
         self.assertIn('form="summary-pdf-save-form">PDF</button>', template)
-        self.assertIn("Браузер не может открыть выбранную папку автоматически", save_as)
+        self.assertIn("Браузер не разрешает приложению автоматически открыть папку", save_as)
         self.assertIn("Открыть копию файла", save_as)
         self.assertNotIn('action="/summary_matrix.csv/save"', template)
         self.assertNotIn('action="/summary.csv/save"', template)

@@ -47,12 +47,19 @@ class LegacyShellLightboxTests(unittest.TestCase):
         script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
 
         self.assertIn("legacy-person-search-input", legacy_template)
-        self.assertIn('autocomplete="off" data-person-quick-search', legacy_template)
+        self.assertIn("Быстрый поиск по ФИО", legacy_template)
+        self.assertIn("Введите первые буквы ФИО", legacy_template)
+        self.assertIn("data-person-quick-search data-person-search-primary", legacy_template)
+        self.assertIn("Enter открывает первое совпадение.", legacy_template)
         self.assertIn("data-person-name", legacy_template)
         self.assertIn("data-person-empty", legacy_template)
         self.assertIn("Ничего не найдено.", legacy_template)
         self.assertIn("toLocaleLowerCase(\"ru-RU\")", script)
         self.assertIn("name.includes(query)", script)
+        self.assertIn("quickSearch.addEventListener(\"keydown\"", script)
+        self.assertIn('event.key === "Enter"', script)
+        self.assertIn("navigateToPersonRow(firstMatch)", script)
+        self.assertIn("quick-search-match-row", script)
 
     def test_legacy_rewards_person_list_is_keyboard_focusable(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -118,7 +125,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("personList.getBoundingClientRect()", script)
         self.assertIn("selectedPersonRow.getBoundingClientRect()", script)
         self.assertIn("scrollRowIntoList(row)", script)
-        self.assertIn("personList.focus({ preventScroll: true })", script)
+        self.assertIn("the visible search field is the primary quick-search path", script)
+        self.assertNotIn("document.activeElement === document.body", script)
         self.assertNotIn("selectedPersonRow.scrollIntoView", script)
 
     def test_legacy_person_rows_do_not_have_hover_title_links(self) -> None:

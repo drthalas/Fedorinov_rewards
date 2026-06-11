@@ -14,21 +14,43 @@ document.addEventListener("DOMContentLoaded", () => {
   const applyPersonSearch = () => {
     const query = normalize(quickSearch ? quickSearch.value : "");
     let visibleCount = 0;
+    let firstMatch = null;
     personRows.forEach((row) => {
       const name = normalize(row.dataset.personName);
       const visible = !query || name.includes(query);
       row.hidden = !visible;
+      row.classList.remove("quick-search-match-row");
       if (visible) {
         visibleCount += 1;
+        if (!firstMatch) {
+          firstMatch = row;
+        }
       }
     });
     if (emptySearch) {
       emptySearch.hidden = visibleCount !== 0;
     }
+    if (query && firstMatch) {
+      firstMatch.classList.add("quick-search-match-row");
+      scrollRowIntoList(firstMatch);
+    }
+    return firstMatch;
   };
 
   if (quickSearch) {
     quickSearch.addEventListener("input", applyPersonSearch);
+    quickSearch.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        const firstMatch = applyPersonSearch();
+        if (firstMatch && firstMatch.dataset.selectUrl) {
+          event.preventDefault();
+          navigateToPersonRow(firstMatch);
+        }
+      } else if (event.key === "Escape") {
+        quickSearch.value = "";
+        applyPersonSearch();
+      }
+    });
   }
 
   const visiblePersonRows = () => personRows.filter((row) => !row.hidden);
@@ -205,9 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         });
 
-        if (document.activeElement === document.body) {
-          personList.focus({ preventScroll: true });
-        }
+        // Do not auto-focus the list after page load: the visible search field is the primary quick-search path.
       });
     });
   };

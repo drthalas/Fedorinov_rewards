@@ -771,6 +771,10 @@ th {
   position: relative;
 }
 
+.search-results-table th {
+  padding-right: 18px;
+}
+
 .search-results-table.is-resizing {
   user-select: none;
 }
@@ -778,29 +782,58 @@ th {
 .search-column-resize-handle {
   position: absolute;
   top: 0;
-  right: -3px;
+  right: 0;
   z-index: 3;
-  width: 7px;
+  width: 12px;
   height: 100%;
   cursor: col-resize;
+  opacity: 0.85;
+  background: linear-gradient(to right, transparent 0, transparent 4px, rgba(100, 116, 139, 0.22) 4px, rgba(100, 116, 139, 0.22) 8px, transparent 8px);
 }
 
-.search-column-resize-handle:hover {
-  background: rgba(31, 41, 55, 0.16);
+.search-column-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: #64748b;
+}
+
+.search-column-resize-handle:hover,
+.search-column-resize-handle:active {
+  background: rgba(15, 118, 110, 0.18);
+  opacity: 1;
 }
 
 .search-row-resize-handle {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: -3px;
+  bottom: 0;
   z-index: 2;
-  height: 7px;
+  height: 10px;
   cursor: row-resize;
+  opacity: 0.8;
 }
 
-.search-row-resize-handle:hover {
-  background: rgba(31, 41, 55, 0.12);
+.search-row-resize-handle::after {
+  content: "";
+  position: absolute;
+  right: 10px;
+  bottom: 3px;
+  left: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: #94a3b8;
+}
+
+.search-row-resize-handle:hover,
+.search-row-resize-handle:active {
+  background: rgba(15, 118, 110, 0.12);
+  opacity: 1;
 }
 
 .search-photo-cell {
@@ -1454,6 +1487,12 @@ th {
   font-size: 12px;
 }
 
+.legacy-person-search-hint {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
 .tool-button {
   display: inline-flex;
   align-items: center;
@@ -1534,6 +1573,10 @@ th {
 .selected-row {
   background: #dbeafe;
   text-decoration: none;
+}
+
+.quick-search-match-row:not(.selected-row) {
+  background: #ecfdf3;
 }
 
 .legacy-main {
