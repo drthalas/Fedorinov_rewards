@@ -255,6 +255,17 @@
       {% macro search_sort_th(key, label) -%}
       <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
       {%- endmacro %}
+      {% macro search_photo_cell(row, flag_field, path_field, label) -%}
+      <td class="search-photo-cell" data-search-photo-field="{{ flag_field }}">
+        {% if photo_mode == "photos" and row.get(flag_field) and media_exists(row.get(path_field)) %}
+        <a class="photo-link search-photo-preview-link" href="{{ photo_view_url(row.get(path_field), label, search_return_to) }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(row.get(path_field)) }}">
+          <img class="search-photo-preview" src="{{ media_url(row.get(path_field)) }}" alt="{{ label }}">
+        </a>
+        {% else %}
+        <span class="search-photo-flag">{{ row.get(flag_field) or 0 }}</span>
+        {% endif %}
+      </td>
+      {%- endmacro %}
       <h1>Поиск</h1>
       <form class="legacy-search-form search-suggestions-form" method="get" action="/legacy" autocomplete="off">
         <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
@@ -286,6 +297,11 @@
             {% endfor %}
           </datalist>
         </label>
+        <fieldset class="search-photo-mode" aria-label="Режим фото">
+          <legend>Фото в таблице</legend>
+          <label><input type="radio" name="photo_mode" value="flags" {% if photo_mode != "photos" %}checked{% endif %}> 0/1</label>
+          <label><input type="radio" name="photo_mode" value="photos" {% if photo_mode == "photos" %}checked{% endif %}> мини-фото</label>
+        </fieldset>
         <button type="submit">Искать</button>
         <a class="button secondary-button" href="/legacy?tab=search">Сброс</a>
       </form>
@@ -311,7 +327,7 @@
             <h2>Награждённые ({{ search_results.counts.persons }})</h2>
             <p class="secondary">Показаны первые {{ search_results.persons|length }} из {{ search_results.counts.persons }}</p>
             <div class="legacy-table-wrap">
-              <table class="legacy-table">
+              <table class="legacy-table search-results-table resizable-search-table" data-resizable-table>
                 <thead>
                   <tr>
                     <th>№</th>
@@ -334,13 +350,13 @@
                     <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
                     <td>{{ person.rank_name|dash }}</td>
                     <td>{{ person.birthday|format_date }}</td>
-                    <td>{{ person.person_foto_flag }}</td>
-                    <td>{{ person.main_foto_flag }}</td>
-                    <td>{{ person.rewards_foto_flag }}</td>
-                    <td>{{ person.book1_foto_flag }}</td>
-                    <td>{{ person.book2_foto_flag }}</td>
-                    <td>{{ person.card1_foto_flag }}</td>
-                    <td>{{ person.card2_foto_flag }}</td>
+                    {{ search_photo_cell(person, "person_foto_flag", "person_foto", "Фото кавалера") }}
+                    {{ search_photo_cell(person, "main_foto_flag", "main_foto", "Главное фото") }}
+                    {{ search_photo_cell(person, "rewards_foto_flag", "rewards_foto", "Общее фото наград") }}
+                    {{ search_photo_cell(person, "book1_foto_flag", "book1_foto", "Фото наградной книжки, сторона 1") }}
+                    {{ search_photo_cell(person, "book2_foto_flag", "book2_foto", "Фото наградной книжки, сторона 2") }}
+                    {{ search_photo_cell(person, "card1_foto_flag", "card1_foto", "Фото учётной карточки, страница 1") }}
+                    {{ search_photo_cell(person, "card2_foto_flag", "card2_foto", "Фото учётной карточки, страница 2") }}
                   </tr>
                   {% else %}
                   <tr><td colspan="11">Не найдено.</td></tr>
@@ -355,7 +371,7 @@
             <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }} ({{ search_results.counts.rewards }})</h2>
             <p class="secondary">Показаны первые {{ search_results.rewards|length }} из {{ search_results.counts.rewards }}</p>
             <div class="legacy-table-wrap">
-              <table class="legacy-table">
+              <table class="legacy-table search-results-table resizable-search-table" data-resizable-table>
                 <thead>
                   <tr>
                     {{ search_sort_th("fio", "ФИО") }}
@@ -370,6 +386,8 @@
                     {{ search_sort_th("date_purchase", "Дата покупки") }}
                     {{ search_sort_th("price_purchase", "Цена покупки") }}
                     {{ search_sort_th("price_now", "Текущая цена") }}
+                    {{ search_sort_th("reward_book1_foto_flag", "Фото книжки награды, сторона 1") }}
+                    {{ search_sort_th("reward_book2_foto_flag", "Фото книжки награды, сторона 2") }}
                     {{ search_sort_th("front_foto_flag", "Фото награды: аверс") }}
                     {{ search_sort_th("back_foto_flag", "Фото награды: реверс") }}
                     {{ search_sort_th("reward_list_flag", "Наградной лист") }}
@@ -381,21 +399,23 @@
                     <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
                     <td>{{ reward.rank_name|dash }}</td>
                     <td>{{ reward.birthday|format_date }}</td>
-                    <td>{{ reward.person_book1_foto_flag }}</td>
-                    <td>{{ reward.person_book2_foto_flag }}</td>
-                    <td>{{ reward.person_card1_foto_flag }}</td>
-                    <td>{{ reward.person_card2_foto_flag }}</td>
+                    {{ search_photo_cell(reward, "person_book1_foto_flag", "person_book1_foto", "Фото наградной книжки кавалера, сторона 1") }}
+                    {{ search_photo_cell(reward, "person_book2_foto_flag", "person_book2_foto", "Фото наградной книжки кавалера, сторона 2") }}
+                    {{ search_photo_cell(reward, "person_card1_foto_flag", "person_card1_foto", "Фото учётной карточки, страница 1") }}
+                    {{ search_photo_cell(reward, "person_card2_foto_flag", "person_card2_foto", "Фото учётной карточки, страница 2") }}
                     <td><a href="/rewards/{{ reward.id }}?return_to={{ search_return_to|urlencode }}">{{ reward.name|dash }}</a></td>
                     <td>{{ reward.number|dash }}</td>
                     <td>{{ reward.date_purchase|format_date }}</td>
                     <td>{{ reward.price_purchase|format_money }}</td>
                     <td>{{ reward.price_now|format_money }}</td>
-                    <td>{{ reward.front_foto_flag }}</td>
-                    <td>{{ reward.back_foto_flag }}</td>
-                    <td>{{ reward.reward_list_flag }}</td>
+                    {{ search_photo_cell(reward, "reward_book1_foto_flag", "reward_book1_foto", "Фото книжки награды, сторона 1") }}
+                    {{ search_photo_cell(reward, "reward_book2_foto_flag", "reward_book2_foto", "Фото книжки награды, сторона 2") }}
+                    {{ search_photo_cell(reward, "front_foto_flag", "front_foto", "Фото награды: аверс") }}
+                    {{ search_photo_cell(reward, "back_foto_flag", "back_foto", "Фото награды: реверс") }}
+                    {{ search_photo_cell(reward, "reward_list_flag", "reward_list", "Наградной лист") }}
                   </tr>
                   {% else %}
-                  <tr><td colspan="15">Не найдено.</td></tr>
+                  <tr><td colspan="17">Не найдено.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>

@@ -118,11 +118,12 @@ class SearchRepositoryTests(unittest.TestCase):
                 """
                 insert into rewards (
                     id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number, instock,
-                    date_purchase, price_purchase, price_now, front_foto, back_foto, id_link, reward_list
+                    date_purchase, price_purchase, price_now, front_foto, back_foto, id_link, book1_foto, book2_foto, reward_list
                 )
                 values (
                     10, 1, 1, 1, 1, 1, 777, 1,
-                    '2024-01-02', 500, 700, 'Source/1/10/front.jpg', '', 'archive-link', 'Source/1/10/list.jpg'
+                    '2024-01-02', 500, 700, 'Source/1/10/front.jpg', '', 'archive-link',
+                    'Source/1/10/book1.jpg', '', 'Source/1/10/list.jpg'
                 )
                 """
             )
@@ -211,7 +212,7 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertEqual(person["card1_foto_flag"], 0)
         self.assertEqual(person["card2_foto_flag"], 0)
 
-    def test_reward_results_include_photo_document_flags_without_paths(self) -> None:
+    def test_reward_results_include_photo_document_flags_and_internal_paths_for_preview(self) -> None:
         result = search_all(self.db_path, "Орден", scope="rewards")
         reward = result["rewards"][0]
         self.assertEqual(reward["person_book1_foto_flag"], 1)
@@ -220,8 +221,11 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertEqual(reward["person_card2_foto_flag"], 0)
         self.assertEqual(reward["front_foto_flag"], 1)
         self.assertEqual(reward["back_foto_flag"], 0)
+        self.assertEqual(reward["reward_book1_foto_flag"], 1)
+        self.assertEqual(reward["reward_book2_foto_flag"], 0)
         self.assertEqual(reward["reward_list_flag"], 1)
-        self.assertNotIn("Source/1/10/front.jpg", str(reward))
+        self.assertEqual(reward["front_foto"], "Source/1/10/front.jpg")
+        self.assertEqual(reward["reward_book1_foto"], "Source/1/10/book1.jpg")
 
     def test_search_sorting_by_columns(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
@@ -298,8 +302,8 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("<th>№</th>", rendered)
         self.assertIn("Фото кавалера", rendered)
         self.assertIn("Фото наградной книжки, сторона 1", rendered)
-        self.assertIn("<td>1</td>", rendered)
-        self.assertIn("<td>0</td>", rendered)
+        self.assertIn("search-photo-flag\">1</span>", rendered)
+        self.assertIn("search-photo-flag\">0</span>", rendered)
         self.assertIn("return_to=", rendered)
         self.assertIn("Андросов Леонид Тест", rendered)
         self.assertIn("<datalist id=\"search-suggestions\">", rendered)
@@ -321,6 +325,8 @@ class SearchRepositoryTests(unittest.TestCase):
             "price_now": "#",
             "front_foto_flag": "#",
             "back_foto_flag": "#",
+            "reward_book1_foto_flag": "#",
+            "reward_book2_foto_flag": "#",
             "reward_list_flag": "#",
         }
         rendered = templates.env.get_template("search.html").render(
@@ -338,23 +344,77 @@ class SearchRepositoryTests(unittest.TestCase):
             search_sort={"sort": "number", "dir": "asc", "urls": sort_urls},
         )
         self.assertIn("Фото учётной карточки, страница 1", rendered)
+        self.assertIn("Фото книжки награды, сторона 1", rendered)
+        self.assertIn("Фото книжки награды, сторона 2", rendered)
         self.assertIn("Фото награды: аверс", rendered)
         self.assertIn("Наградной лист", rendered)
         self.assertIn("sort=number", rendered)
         self.assertIn("return_to=", rendered)
         self.assertIn("sort%3Dnumber", rendered)
-        self.assertIn("<td>1</td>", rendered)
+        self.assertIn("search-photo-flag\">1</span>", rendered)
         self.assertNotIn("Source/1/10/front.jpg", rendered)
+
+    def test_search_photo_mode_renders_preview_links_with_existing_lightbox(self) -> None:
+        results = search_all(self.db_path, "Орден", scope="rewards")
+        original_media_exists = templates.env.globals["media_exists"]
+        templates.env.globals["media_exists"] = lambda path: isinstance(path, str) and path.endswith(("front.jpg", "book1.jpg"))
+        try:
+            rendered = templates.env.get_template("search.html").render(
+                request=TemplateRequest(),
+                settings=SimpleNamespace(write_mode=False),
+                q="Орден",
+                scope="rewards",
+                mode="contains",
+                sort="",
+                dir="asc",
+                photo_mode="photos",
+                results=results,
+                message="",
+                search_suggestions=search_suggestions(self.db_path),
+                search_return_to="/search?q=%D0%9E%D1%80%D0%B4%D0%B5%D0%BD&scope=rewards&mode=contains&photo_mode=photos",
+                search_sort={"sort": "", "dir": "asc", "urls": {"front_foto_flag": "#", "reward_book1_foto_flag": "#"}},
+            )
+        finally:
+            templates.env.globals["media_exists"] = original_media_exists
+        self.assertIn('name="photo_mode" value="flags"', rendered)
+        self.assertIn('name="photo_mode" value="photos" checked', rendered)
+        self.assertIn("search-photo-preview-link", rendered)
+        self.assertIn("search-photo-preview", rendered)
+        self.assertIn("photo-link", rendered)
+        self.assertIn("data-lightbox-caption", rendered)
+        self.assertIn("Фото книжки награды, сторона 1", rendered)
+        self.assertIn("Source%2F1%2F10%2Ffront.jpg", rendered)
+        self.assertNotIn(">Source/1/10/front.jpg<", rendered)
+
+    def test_search_flags_mode_remains_default_and_resizable_table_is_present(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        search_js = (root / "backend" / "app" / "static" / "search_results.js").read_text(encoding="utf-8")
+        styles = (root / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('name="photo_mode" value="flags"', search_template)
+        self.assertIn('name="photo_mode" value="photos"', search_template)
+        self.assertIn('name="photo_mode" value="flags"', legacy_template)
+        self.assertIn('data-resizable-table', search_template)
+        self.assertIn('data-resizable-table', legacy_template)
+        self.assertIn("search-column-resize-handle", search_js)
+        self.assertIn("search-row-resize-handle", search_js)
+        self.assertIn("pointerdown", search_js)
+        self.assertIn("search-photo-preview", styles)
+        self.assertIn("object-fit: contain", styles)
 
     def test_search_csv_includes_reward_photo_document_columns(self) -> None:
         text = _search_csv_text("Орден", "rewards", "contains", "number", "asc", db_path=self.db_path)
         self.assertTrue(text.startswith("\ufeff"))
         self.assertIn("Фото наградной книжки, сторона 1", text)
         self.assertIn("Фото учётной карточки, страница 1", text)
+        self.assertIn("Фото книжки награды, сторона 1", text)
+        self.assertIn("Фото книжки награды, сторона 2", text)
         self.assertIn("Фото награды: аверс", text)
         self.assertIn("Наградной лист", text)
         self.assertIn("Орден Тестовый", text)
         self.assertIn(";1;", text)
+        self.assertNotIn("<img", text)
         self.assertNotIn("Source/1/10/front.jpg", text)
         self.assertNotIn("SourceMark", text)
 

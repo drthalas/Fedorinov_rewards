@@ -692,7 +692,7 @@ th {
 
 .search-controls {
   display: grid;
-  grid-template-columns: 180px 180px minmax(220px, 1fr) auto;
+  grid-template-columns: 180px 180px minmax(220px, 1fr) minmax(150px, auto) auto;
   gap: 10px;
   align-items: end;
   margin-bottom: 16px;
@@ -705,6 +705,34 @@ th {
 .search-controls label,
 .legacy-search-form label {
   display: block;
+}
+
+.search-photo-mode {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.search-photo-mode legend {
+  width: 100%;
+  margin-bottom: 4px;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.search-photo-mode label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.search-photo-mode input {
+  width: auto;
 }
 
 .search-controls label span,
@@ -731,6 +759,78 @@ th {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.search-results-table {
+  table-layout: fixed;
+  min-width: 100%;
+}
+
+.search-results-table th,
+.search-results-table td {
+  position: relative;
+}
+
+.search-results-table.is-resizing {
+  user-select: none;
+}
+
+.search-column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  z-index: 3;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.search-column-resize-handle:hover {
+  background: rgba(31, 41, 55, 0.16);
+}
+
+.search-row-resize-handle {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  z-index: 2;
+  height: 7px;
+  cursor: row-resize;
+}
+
+.search-row-resize-handle:hover {
+  background: rgba(31, 41, 55, 0.12);
+}
+
+.search-photo-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.search-photo-flag {
+  display: inline-block;
+  min-width: 1.5em;
+  text-align: center;
+}
+
+.search-photo-preview-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid #d9dee5;
+  border-radius: 4px;
+  background: #f5f7fa;
+}
+
+.search-photo-preview {
+  max-width: 48px;
+  max-height: 48px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .secondary-button {
@@ -1676,7 +1776,7 @@ th {
 
 .legacy-search-form {
   display: grid;
-  grid-template-columns: 180px 180px minmax(220px, 1fr) auto auto;
+  grid-template-columns: 180px 180px minmax(220px, 1fr) minmax(150px, auto) auto auto;
   gap: 8px;
   align-items: end;
   margin-bottom: 12px;

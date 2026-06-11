@@ -15,6 +15,10 @@ from .templates import templates
 router = APIRouter()
 
 
+def _clean_photo_mode(photo_mode: str = "") -> str:
+    return "photos" if str(photo_mode or "").strip() == "photos" else "flags"
+
+
 async def _read_form(request: Request) -> dict[str, object]:
     body = (await request.body()).decode("utf-8")
     parsed = parse_qs(body, keep_blank_values=True)
@@ -60,6 +64,8 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
         "Фото наградной книжки, сторона 2",
         "Фото учётной карточки, страница 1",
         "Фото учётной карточки, страница 2",
+        "Фото книжки награды, сторона 1",
+        "Фото книжки награды, сторона 2",
         "Фото награды: аверс",
         "Фото награды: реверс",
         "Наградной лист",
@@ -85,6 +91,8 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 "",
                 "",
                 "",
+                "",
+                "",
             ])
         for reward in results["rewards"]:
             writer.writerow([
@@ -103,12 +111,14 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 reward.get("person_book2_foto_flag"),
                 reward.get("person_card1_foto_flag"),
                 reward.get("person_card2_foto_flag"),
+                reward.get("reward_book1_foto_flag"),
+                reward.get("reward_book2_foto_flag"),
                 reward.get("front_foto_flag"),
                 reward.get("back_foto_flag"),
                 reward.get("reward_list_flag"),
             ])
         for mark in results["marks"]:
-            writer.writerow(["Знаки", mark.get("id"), "", "", "", mark.get("name"), mark.get("number"), "", "", "", mark.get("instock"), "", "", "", "", "", "", ""])
+            writer.writerow(["Знаки", mark.get("id"), "", "", "", mark.get("name"), mark.get("number"), "", "", "", mark.get("instock"), "", "", "", "", "", "", "", "", ""])
     return output.getvalue()
 
 
@@ -150,6 +160,8 @@ def _search_sort_context(path: str, q: str, scope: str, mode: str, current_sort:
         "person_card2_foto_flag",
         "front_foto_flag",
         "back_foto_flag",
+        "reward_book1_foto_flag",
+        "reward_book2_foto_flag",
         "reward_list_flag",
     ]
     return {
@@ -160,14 +172,24 @@ def _search_sort_context(path: str, q: str, scope: str, mode: str, current_sort:
 
 
 @router.get("/search")
-def search_index(request: Request, q: str = "", scope: str = "all", mode: str = "contains", sort: str = "", dir: str = "asc"):
+def search_index(
+    request: Request,
+    q: str = "",
+    scope: str = "all",
+    mode: str = "contains",
+    sort: str = "",
+    dir: str = "asc",
+    photo_mode: str = "flags",
+):
     settings = get_settings()
+    active_photo_mode = _clean_photo_mode(photo_mode)
     results = (
         search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
         if settings.db_exists
         else search_all(settings.rewards_db_path, "", limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
     )
-    return_to = _search_url("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"])
+    photo_extra = {"photo_mode": active_photo_mode} if active_photo_mode == "photos" else None
+    return_to = _search_url("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"], photo_extra)
     return templates.TemplateResponse(
         request,
         "search.html",
@@ -178,11 +200,12 @@ def search_index(request: Request, q: str = "", scope: str = "all", mode: str = 
             "mode": results["mode"],
             "sort": results["sort_by"],
             "dir": results["sort_dir"],
+            "photo_mode": active_photo_mode,
             "results": results,
             "message": request.query_params.get("message", ""),
             "search_suggestions": search_suggestions(settings.rewards_db_path) if settings.db_exists else {},
             "search_return_to": return_to,
-            "search_sort": _search_sort_context("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"]),
+            "search_sort": _search_sort_context("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"], photo_extra),
         },
     )
 
