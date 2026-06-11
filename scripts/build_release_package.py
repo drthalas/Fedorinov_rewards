@@ -17,7 +17,7 @@ REPOSITORY_SLUG = "drthalas/Fedorinov_rewards"
 PACKAGE_BASENAME = "FedorinovRewards_WebPreview"
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.app.version import APP_VERSION  # noqa: E402
+from backend.app.version import APP_VERSION, APP_VERSION_DATE  # noqa: E402
 from scripts import build_windows_preview_package  # noqa: E402
 
 
@@ -76,7 +76,7 @@ def build_release_package(version: str = APP_VERSION) -> dict[str, object]:
     checksum = sha256_file(target_zip)
     manifest = {
         "version": version,
-        "released_at": date.today().isoformat(),
+        "released_at": APP_VERSION_DATE or date.today().isoformat(),
         "download_url": download_url(version),
         "sha256": checksum,
         "notes": release_notes(version),
