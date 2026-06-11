@@ -178,6 +178,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-summary-strip", person_detail)
         self.assertIn('class="person-title wrap-text"', person_detail)
         self.assertIn("person-detail-list", person_detail)
+        self.assertIn("person-card-panel", person_detail)
+        self.assertIn("person-links-panel", person_detail)
+        self.assertIn("person-main-photo-panel", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
         self.assertIn("link-wrap", person_detail)
         self.assertIn("legacy-person-heading", legacy_template)
@@ -185,8 +188,20 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("legacy-person-meta wrap-text", legacy_template)
         self.assertIn("comment-text wrap-text", legacy_template)
         self.assertIn(".wrap-text", styles)
-        self.assertIn("overflow-wrap: anywhere", styles)
+        self.assertIn("overflow-wrap: break-word", styles)
         self.assertIn("word-break: normal", styles)
+        self.assertIn(".grid.person-detail-grid", styles)
+        self.assertIn(".details.person-detail-list", styles)
+        self.assertIn(".person-links-panel", styles)
+        self.assertIn("grid-template-columns: minmax(420px, 1fr) minmax(340px, 420px)", styles)
+        self.assertRegex(
+            styles,
+            re.compile(r"\.wrap-text,[^{]+\.legacy-person-title\s*\{[^}]*overflow-wrap:\s*break-word;[^}]*word-break:\s*normal;", re.S),
+        )
+        self.assertRegex(
+            styles,
+            re.compile(r"\.details\.person-detail-list dd\.link-wrap,[^{]+dd\.link-wrap a\s*\{[^}]*overflow-wrap:\s*anywhere;", re.S),
+        )
         self.assertIn(".legacy-person-heading", styles)
         self.assertIn(".person-summary-strip", styles)
         self.assertIn("booklet-title", booklet)

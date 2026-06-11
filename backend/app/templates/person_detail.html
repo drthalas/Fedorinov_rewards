@@ -33,7 +33,7 @@
 {% endif %}
 
 <section class="grid person-detail-grid">
-  <div class="panel">
+  <div class="panel person-card-panel">
     <h2>Карточка</h2>
     <dl class="details person-detail-list">
       <dt>ID</dt><dd>{{ person.id }}</dd>
@@ -42,11 +42,11 @@
       <dt>Звание/специальность</dt><dd class="wrap-text">{{ person.rank_name|dash }}</dd>
     </dl>
   </div>
-  <div class="panel">
+  <div class="panel person-bio-panel">
     <h2>Краткая биография</h2>
     <div class="text-block bio-text wrap-text">{{ person.biography|dash }}</div>
   </div>
-  <div class="panel">
+  <div class="panel person-links-panel">
     <h2>Ссылки</h2>
     <dl class="details person-detail-list">
       <dt>Ссылка на сайт "Память народа"</dt>
@@ -61,7 +61,7 @@
       </dd>
     </dl>
   </div>
-  <div class="panel">
+  <div class="panel person-main-photo-panel">
     <h2>Главное фото</h2>
     <div class="photo-frame">
     {% if has_media_path(person.main_foto) %}

@@ -238,7 +238,7 @@ def summary_totals(rows: list[dict[str, object]]) -> dict[str, int]:
 def summary_csv_text(rows: list[dict[str, object]]) -> str:
     output = io.StringIO()
     output.write("\ufeff")
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=";")
     writer.writerow(SUMMARY_CSV_HEADERS)
     for row in rows:
         writer.writerow(
@@ -406,7 +406,7 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
 def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
     output = io.StringIO()
     output.write("\ufeff")
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=";")
     photo_columns = list(matrix.get("photo_columns") or [])
     reward_columns = list(matrix.get("reward_columns") or [])
     show_numbers = bool(matrix.get("show_numbers"))

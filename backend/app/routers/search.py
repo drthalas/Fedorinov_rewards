@@ -43,7 +43,7 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
     )
     output = StringIO()
     output.write("\ufeff")
-    writer = csv.writer(output)
+    writer = csv.writer(output, delimiter=";")
     writer.writerow([
         "Группа",
         "ID",

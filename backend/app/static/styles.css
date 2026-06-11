@@ -111,20 +111,26 @@ button {
 }
 
 .wrap-text,
-.link-wrap,
 .bio-text,
 .comment-text,
 .person-title,
 .legacy-person-title {
   min-width: 0;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   word-break: normal;
+}
+
+.link-wrap {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .link-wrap a,
 a.link-wrap {
-  display: inline-block;
+  display: inline;
 }
 
 .person-title {
@@ -158,7 +164,54 @@ a.link-wrap {
 .person-summary-strip dd {
   min-width: 0;
   margin: 2px 0 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.grid.person-detail-grid {
+  grid-template-columns: minmax(420px, 1fr) minmax(340px, 420px);
+  align-items: start;
+}
+
+.person-card-panel,
+.person-bio-panel,
+.person-links-panel,
+.person-main-photo-panel {
+  min-width: 0;
+}
+
+.person-links-panel {
+  grid-column: 1 / -1;
+}
+
+.details.person-detail-list {
+  grid-template-columns: minmax(150px, 220px) minmax(280px, 1fr);
+}
+
+.details.person-detail-list dt,
+.details.person-detail-list dd {
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.details.person-detail-list dd.link-wrap,
+.details.person-detail-list dd.link-wrap a {
   overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .grid.person-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .person-links-panel {
+    grid-column: auto;
+  }
+
+  .details.person-detail-list {
+    grid-template-columns: minmax(130px, 180px) minmax(0, 1fr);
+  }
 }
 
 .grid {

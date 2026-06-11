@@ -354,8 +354,15 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("Фото награды: аверс", text)
         self.assertIn("Наградной лист", text)
         self.assertIn("Орден Тестовый", text)
-        self.assertIn(",1,", text)
+        self.assertIn(";1;", text)
         self.assertNotIn("Source/1/10/front.jpg", text)
+        self.assertNotIn("SourceMark", text)
+
+    def test_search_csv_uses_excel_semicolon_delimiter(self) -> None:
+        text = _search_csv_text("Орден", "rewards", "contains", "number", "asc", db_path=self.db_path)
+        first_line = text.splitlines()[0]
+        self.assertTrue(first_line.startswith("\ufeffГруппа;ID;ФИО;Звание / специальность"))
+        self.assertNotIn("Группа,ID,ФИО", first_line)
 
     def test_search_csv_uses_browser_save_as_form(self) -> None:
         root = Path(__file__).resolve().parents[1]

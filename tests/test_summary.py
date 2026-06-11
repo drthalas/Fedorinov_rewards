@@ -223,6 +223,13 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Страна", text)
         self.assertIn("Орден Тестовый", text)
 
+    def test_summary_csv_uses_excel_semicolon_delimiter(self) -> None:
+        rows = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))
+        text = summary_csv_text(rows)
+        first_line = text.splitlines()[0]
+        self.assertTrue(first_line.startswith("\ufeffСтрана;Категория;Подкатегория;Наименование"))
+        self.assertNotIn("Страна,Категория", first_line)
+
     def test_matrix_generates_person_rows_and_reward_columns(self) -> None:
         matrix = summary_matrix(self.db_path, normalized_summary_filters())
         self.assertEqual(matrix["person_total"], 2)
@@ -279,6 +286,13 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("Фото кавалера", text)
         self.assertNotIn("Source/1/person.jpg", text)
 
+    def test_matrix_csv_uses_excel_semicolon_delimiter(self) -> None:
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+        text = summary_matrix_csv_text(matrix)
+        first_line = text.splitlines()[0]
+        self.assertTrue(first_line.startswith("\ufeffФИО;Звание / специальность;Дата рождения"))
+        self.assertNotIn("ФИО,Звание / специальность", first_line)
+
     def test_summary_csv_route_returns_csv_response(self) -> None:
         response = summary_csv(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
         self.assertEqual(response.status_code, 200)
@@ -298,7 +312,7 @@ class SummaryTests(unittest.TestCase):
         matrix = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="fio", sort_dir="desc")
         text = summary_matrix_csv_text(matrix)
         data_lines = [line for line in text.splitlines() if line.strip()]
-        self.assertTrue(data_lines[-1].startswith("Итого,"))
+        self.assertTrue(data_lines[-1].startswith("Итого;"))
 
     def test_summary_pdf_route_returns_pdf_response(self) -> None:
         response = summary_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
