@@ -380,11 +380,36 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn('name="photo_mode" value="photos" checked', rendered)
         self.assertIn("search-photo-preview-link", rendered)
         self.assertIn("search-photo-preview", rendered)
+        self.assertIn("search-results-table--photo-mode", rendered)
+        self.assertIn("search-photo-cell--preview", rendered)
+        self.assertIn("search-photo-frame", rendered)
+        self.assertIn("search-photo-placeholder", rendered)
         self.assertIn("photo-link", rendered)
         self.assertIn("data-lightbox-caption", rendered)
         self.assertIn("Фото книжки награды, сторона 1", rendered)
         self.assertIn("Source%2F1%2F10%2Ffront.jpg", rendered)
         self.assertNotIn(">Source/1/10/front.jpg<", rendered)
+
+    def test_search_photo_mode_uses_compact_uniform_frames(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        styles = (root / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("search-results-table--photo-mode", search_template)
+        self.assertIn("search-results-table--photo-mode", legacy_template)
+        self.assertIn("search-photo-preview-link search-photo-frame", search_template)
+        self.assertIn("search-photo-preview-link search-photo-frame", legacy_template)
+        self.assertIn("search-photo-frame search-photo-placeholder", search_template)
+        self.assertIn("search-photo-frame search-photo-placeholder", legacy_template)
+        self.assertIn("width: 44px", styles)
+        self.assertIn("height: 44px", styles)
+        self.assertIn("max-width: 40px", styles)
+        self.assertIn("max-height: 40px", styles)
+        self.assertIn("height: 50px", styles)
+        self.assertIn("object-fit: contain", styles)
+        self.assertIn("width: auto !important", styles)
+        self.assertIn("height: auto !important", styles)
 
     def test_search_flags_mode_remains_default_and_resizable_table_is_present(self) -> None:
         root = Path(__file__).resolve().parents[1]

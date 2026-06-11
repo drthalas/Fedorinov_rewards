@@ -808,28 +808,61 @@ th {
   vertical-align: middle;
 }
 
+.search-results-table--photo-mode th,
+.search-results-table--photo-mode td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.search-results-table--photo-mode tbody tr {
+  height: 50px;
+}
+
+.search-photo-cell--preview {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+  padding: 3px 4px !important;
+}
+
 .search-photo-flag {
   display: inline-block;
   min-width: 1.5em;
   text-align: center;
 }
 
+.search-photo-frame,
 .search-photo-preview-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  overflow: hidden;
   border: 1px solid #d9dee5;
   border-radius: 4px;
   background: #f5f7fa;
+  vertical-align: middle;
+}
+
+.search-photo-preview-link {
+  color: inherit;
+  cursor: zoom-in;
+}
+
+.search-photo-placeholder {
+  color: #667085;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .search-photo-preview {
-  max-width: 48px;
-  max-height: 48px;
-  width: auto;
-  height: auto;
+  display: block;
+  max-width: 40px;
+  max-height: 40px;
+  width: auto !important;
+  height: auto !important;
   object-fit: contain;
 }
 

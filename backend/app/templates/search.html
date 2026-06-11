@@ -5,11 +5,15 @@
 <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
 {%- endmacro %}
 {% macro search_photo_cell(row, flag_field, path_field, label) -%}
-<td class="search-photo-cell" data-search-photo-field="{{ flag_field }}">
-  {% if photo_mode == "photos" and row.get(flag_field) and media_exists(row.get(path_field)) %}
-  <a class="photo-link search-photo-preview-link" href="{{ photo_view_url(row.get(path_field), label, search_return_to) }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(row.get(path_field)) }}">
+<td class="search-photo-cell {% if photo_mode == 'photos' %}search-photo-cell--preview{% endif %}" data-search-photo-field="{{ flag_field }}">
+  {% if photo_mode == "photos" %}
+    {% if row.get(flag_field) and media_exists(row.get(path_field)) %}
+  <a class="photo-link search-photo-preview-link search-photo-frame" href="{{ photo_view_url(row.get(path_field), label, search_return_to) }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(row.get(path_field)) }}">
     <img class="search-photo-preview" src="{{ media_url(row.get(path_field)) }}" alt="{{ label }}">
   </a>
+    {% else %}
+  <span class="search-photo-frame search-photo-placeholder" aria-label="{{ label }} отсутствует">0</span>
+    {% endif %}
   {% else %}
   <span class="search-photo-flag">{{ row.get(flag_field) or 0 }}</span>
   {% endif %}
@@ -88,7 +92,7 @@
     <h2>Награжденные</h2>
     <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.counts.persons }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table" data-resizable-table>
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
         <thead>
           <tr>
             <th>№</th>
@@ -132,7 +136,7 @@
     <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }}</h2>
     <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.counts.rewards }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table" data-resizable-table>
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
         <thead>
           <tr>
             {{ search_sort_th("fio", "ФИО") }}
