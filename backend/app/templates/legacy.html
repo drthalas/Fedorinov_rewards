@@ -6,6 +6,9 @@
   {% elif message %}
     <div class="notice notice-success">{{ message }}</div>
   {% endif %}
+  {% if error_message %}
+    <div class="notice notice-error">{{ error_message }}</div>
+  {% endif %}
   {% if status_message %}
     <div class="notice notice-success">{{ status_message }}</div>
   {% endif %}
@@ -725,8 +728,15 @@
     <section class="legacy-tab-panel">
       <h1>О программе</h1>
       <dl class="details">
-        <dt>Название</dt><dd>{{ app_name }}</dd>
-        <dt>Текущая версия</dt><dd>{{ app_version }}</dd>
+        <dt>Название</dt>
+        <dd>
+          <form class="about-title-form" method="post" action="/legacy/about/title">
+            <input type="hidden" name="return_to" value="/legacy?tab=about">
+            <input type="text" name="program_title" value="{{ app_display_name }}" placeholder="{{ app_name }}" maxlength="160" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>
+            <button type="submit" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>Сохранить</button>
+          </form>
+        </dd>
+        <dt>Текущая версия</dt><dd>{{ app_version }}{% if app_version_date %} · {{ app_version_date|format_date }}{% endif %}</dd>
         <dt>Режим</dt><dd>{% if settings.write_mode %}Рабочий режим{% else %}Режим просмотра{% endif %}</dd>
         <dt>Редактирование</dt><dd>{% if settings.write_mode and not settings.read_only %}Обычное редактирование включено{% else %}Редактирование выключено{% endif %}</dd>
         <dt>Резервные копии</dt><dd>Рекомендуется делать регулярно; опасные действия требуют отдельной защиты.</dd>

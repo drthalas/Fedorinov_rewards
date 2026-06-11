@@ -668,6 +668,21 @@ th {
   color: #fff;
 }
 
+.about-title-form {
+  display: grid;
+  grid-template-columns: minmax(240px, 420px) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.about-title-form input {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font: inherit;
+}
+
 .search-controls {
   display: grid;
   grid-template-columns: 180px 180px minmax(220px, 1fr) auto;

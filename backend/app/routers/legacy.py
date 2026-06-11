@@ -28,11 +28,13 @@ from ..repositories.summary import (
     summary_rows,
     summary_totals,
 )
+from ..services.app_settings import AppSettingsError, program_title, save_program_title
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.person_files import person_archive_filename
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
-from ..version import APP_NAME, APP_VERSION
+from ..services.write_guard import WriteBlockedError, ensure_write_allowed
+from ..version import APP_NAME, APP_VERSION, APP_VERSION_DATE
 from .templates import templates
 
 
@@ -133,6 +135,17 @@ def _with_message(url: str, message: str) -> str:
     query = [(key, value) for key, value in query if key != "message"]
     if message:
         query.append(("message", message))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
+def _with_error(url: str, error: str) -> str:
+    if not url:
+        url = "/legacy?tab=about"
+    parts = urlsplit(url)
+    query = parse_qsl(parts.query, keep_blank_values=True)
+    query = [(key, value) for key, value in query if key != "error"]
+    if error:
+        query.append(("error", error))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
@@ -270,6 +283,7 @@ def legacy_index(
     dir: str = "asc",
     status: str = "",
     message: str = "",
+    error: str = "",
     rank_id: str | None = None,
     country_id: str | None = None,
     category_id: str | None = None,
@@ -304,6 +318,7 @@ def legacy_index(
             ("about", "О программе"),
         ],
         "message": message,
+        "error_message": error,
         "status_message": STATUS_MESSAGES.get(status),
         "persons": [],
         "selected_person": None,
@@ -370,7 +385,9 @@ def legacy_index(
         "summary_aggregate_mode_url": "/legacy?tab=summary&summary_mode=aggregate",
         "commit": _current_commit(),
         "app_name": APP_NAME,
+        "app_display_name": program_title(settings),
         "app_version": APP_VERSION,
+        "app_version_date": APP_VERSION_DATE,
         "check_updates": str(check_updates or "").strip().lower() in {"1", "true", "yes", "on"},
         "update_check": None,
     }
@@ -454,6 +471,19 @@ def legacy_index(
         context["update_check"] = check_for_updates(settings)
 
     return templates.TemplateResponse(request, "legacy.html", context)
+
+
+@router.post("/legacy/about/title")
+async def legacy_about_title_update(request: Request):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = str(form_values.get("return_to") or "/legacy?tab=about")
+    try:
+        ensure_write_allowed(settings)
+        save_program_title(settings, form_values.get("program_title"))
+    except (WriteBlockedError, AppSettingsError, OSError) as exc:
+        return RedirectResponse(_with_error(return_to, str(exc)), status_code=303)
+    return RedirectResponse(_with_message(return_to, "Название программы сохранено."), status_code=303)
 
 
 @router.get("/summary.csv")

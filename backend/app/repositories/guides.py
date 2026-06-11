@@ -4,7 +4,8 @@ from .common import fetch_all, fetch_one
 
 
 def list_rank_guide(db_path: Path) -> list[dict[str, object]]:
-    return fetch_all(db_path, "select id, name from guide order by id")
+    rows = fetch_all(db_path, "select id, name from guide order by id")
+    return sorted(rows, key=lambda row: (str(row.get("name") or "").casefold().replace("ё", "е"), int(row.get("id") or 0)))
 
 
 def get_rank_guide_item(db_path: Path, rank_id: int) -> dict[str, object] | None:

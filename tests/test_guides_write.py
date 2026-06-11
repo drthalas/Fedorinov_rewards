@@ -5,6 +5,7 @@ import sqlite3
 import unittest
 
 from backend.app.config import Settings
+from backend.app.repositories.guides import list_rank_guide
 from backend.app.repositories.guides_write import (
     GuideDeleteBlockedError,
     GuideLevelData,
@@ -101,6 +102,22 @@ class GuideWriteTests(unittest.TestCase):
         self.assertEqual(row["name"], "QA TEST RANK UPDATED")
         delete_rank(self.settings(), rank_id, confirm=True)
         self.assertIsNone(self.fetch_one("guide", rank_id))
+
+    def test_rank_guide_is_listed_alphabetically(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.executemany(
+                "insert into guide (id, name) values (?, ?)",
+                [
+                    (1, "майор"),
+                    (2, "Капитан"),
+                    (3, "лейтенант"),
+                    (4, "Адмирал"),
+                ],
+            )
+
+        rows = list_rank_guide(self.db_path)
+
+        self.assertEqual([row["name"] for row in rows], ["Адмирал", "Капитан", "лейтенант", "майор"])
 
     def test_delete_rank_without_confirm_is_blocked(self) -> None:
         rank_id = create_rank(self.settings(), RankGuideData(name="NEEDS CONFIRM"))
