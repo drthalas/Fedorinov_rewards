@@ -1334,6 +1334,11 @@ th {
   background: #fff;
 }
 
+.legacy-list:focus {
+  outline: 2px solid #0f766e;
+  outline-offset: -2px;
+}
+
 .legacy-list-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1366,6 +1371,7 @@ th {
 }
 
 .legacy-list-row:hover,
+.legacy-list-row:focus,
 .selected-row {
   background: #dbeafe;
   text-decoration: none;

@@ -54,6 +54,57 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("toLocaleLowerCase(\"ru-RU\")", script)
         self.assertIn("name.includes(query)", script)
 
+    def test_legacy_rewards_person_list_is_keyboard_focusable(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn('class="legacy-list" tabindex="0" role="listbox" aria-label="Список кавалеров" data-person-list', legacy_template)
+        self.assertIn('role="option"', legacy_template)
+        self.assertIn('aria-selected="{{ \'true\' if selected_person and person.id == selected_person.id else \'false\' }}"', legacy_template)
+        self.assertIn(".legacy-list:focus", styles)
+        self.assertIn(".legacy-list-row:focus", styles)
+
+    def test_legacy_rewards_person_list_keyboard_navigation(self) -> None:
+        script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
+
+        self.assertIn("handlePersonListKeydown", script)
+        self.assertIn('event.key === "ArrowDown"', script)
+        self.assertIn('event.key === "ArrowUp"', script)
+        self.assertIn('event.key === "PageDown"', script)
+        self.assertIn('event.key === "PageUp"', script)
+        self.assertIn('event.key === "Home"', script)
+        self.assertIn('event.key === "End"', script)
+        self.assertIn("navigateByOffset(1)", script)
+        self.assertIn("navigateByOffset(-1)", script)
+        self.assertIn("navigateByOffset(pageStep())", script)
+        self.assertIn("navigateByOffset(-pageStep())", script)
+        self.assertIn('navigateToEdge("start")', script)
+        self.assertIn('navigateToEdge("end")', script)
+        self.assertIn("event.preventDefault()", script)
+        self.assertIn("personList.addEventListener(\"keydown\", handlePersonListKeydown)", script)
+
+    def test_legacy_rewards_typeahead_searches_person_names(self) -> None:
+        script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
+
+        self.assertIn("typeaheadBuffer", script)
+        self.assertIn("typeaheadNavigateTimer", script)
+        self.assertIn("handleTypeahead", script)
+        self.assertIn("event.key.length !== 1", script)
+        self.assertIn("typeaheadBuffer += key", script)
+        self.assertIn("startsWith(query)", script)
+        self.assertIn("scheduleTypeaheadNavigation(match)", script)
+        self.assertIn("window.setTimeout(() =>", script)
+        self.assertIn("}, 900)", script)
+        self.assertIn("}, 260)", script)
+        self.assertIn('replace(/ё/g, "е")', script)
+
+    def test_legacy_rewards_navigation_ignores_form_inputs(self) -> None:
+        script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
+
+        self.assertIn("isTextInputTarget", script)
+        self.assertIn('target.closest("input, textarea, select, [contenteditable=\'true\']")', script)
+        self.assertIn("if (isTextInputTarget(event.target))", script)
+
     def test_legacy_selected_person_scrolls_into_view(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
@@ -66,13 +117,16 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("personList.scrollTop", script)
         self.assertIn("personList.getBoundingClientRect()", script)
         self.assertIn("selectedPersonRow.getBoundingClientRect()", script)
+        self.assertIn("scrollRowIntoList(row)", script)
+        self.assertIn("personList.focus({ preventScroll: true })", script)
         self.assertNotIn("selectedPersonRow.scrollIntoView", script)
 
     def test_legacy_person_rows_do_not_have_hover_title_links(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
 
         self.assertIn("<button class=\"legacy-list-row", legacy_template)
-        self.assertIn('type="button" data-person-name', legacy_template)
+        self.assertIn('type="button" role="option"', legacy_template)
+        self.assertIn("data-person-name", legacy_template)
         self.assertNotIn("legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}\" href=", legacy_template)
 
     def test_legacy_rewards_scroll_and_photo_frames_are_present(self) -> None:
