@@ -33,9 +33,51 @@ BANNED_TERMS = [
     "pull",
     "push",
     "SQLite",
+    "fallback",
+    "unknown changes",
+    "technical changes without description",
+    "commit не распознан",
+    "есть изменения без пользовательского описания",
+    "перед проверкой нужно уточнить их смысл",
 ]
 
 CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
+    (
+        "Fix daily report fallback wording",
+        ["исправили ежедневный отчёт: служебные диагностические фразы больше не попадают в сообщение владельцу;"],
+    ),
+    (
+        "Prepare v0.1.4 release",
+        [
+            "подготовили и выпустили релиз v0.1.4;",
+            "проверили пакет обновления и основные сценарии перед уведомлением владельцу;",
+            "обновили задачи в Linear после релиза;",
+        ],
+    ),
+    (
+        "Fix daily report factual summaries",
+        ["исправили ежедневный отчёт: он должен показывать конкретные факты, а не общие фразы;"],
+    ),
+    (
+        "Polish owner feedback rewards screen",
+        ["улучшили главный экран и карточку кавалера по замечаниям владельца;"],
+    ),
+    (
+        "Improve summary filters and sorting",
+        ["улучшили сводную таблицу: добавили каскадные фильтры и сортировку;"],
+    ),
+    (
+        "Improve search award results",
+        ["улучшили поиск по наградам: добавили поиск по номеру и новые колонки с фото/документами;"],
+    ),
+    (
+        "Save pasted photos as JPEG",
+        ["исправили вставку фото из буфера: теперь изображения сохраняются в JPEG;"],
+    ),
+    (
+        "Fix owner feedback layout blockers",
+        ["исправили найденные при проверке проблемы с прокруткой списка и компактностью формы;"],
+    ),
     (
         "Fix daily report Russian wording",
         ["исправили ежедневный Telegram-отчёт: текст теперь формируется на русском языке;"],
@@ -239,10 +281,42 @@ TECH_REPLACEMENTS = [
 ]
 
 RUSSIAN_FALLBACK_ITEMS = [
-    "есть изменения без пользовательского описания; перед проверкой нужно уточнить их смысл;",
+    "вчера были изменения в проекте, но автоматический отчёт не смог точно определить пользовательское описание. Нужно сверить журнал разработки;",
 ]
 
 CHECK_PATTERNS: list[tuple[str, list[str]]] = [
+    (
+        "Fix daily report fallback wording",
+        ["проверить dry-run ежедневного отчёта: в сообщении не должно быть служебных диагностических фраз;"],
+    ),
+    (
+        "Prepare v0.1.4 release",
+        ["проверить обновление через кнопку и убедиться, что приложение видит версию v0.1.4;"],
+    ),
+    (
+        "Fix daily report factual summaries",
+        ["проверить dry-run ежедневного отчёта: он должен показывать конкретные факты за день;"],
+    ),
+    (
+        "Polish owner feedback rewards screen",
+        ["проверить главный экран “Награды” и удержание выбранного кавалера в списке;"],
+    ),
+    (
+        "Improve summary filters and sorting",
+        ["проверить сводную таблицу, каскадные фильтры и сортировку;"],
+    ),
+    (
+        "Improve search award results",
+        ["проверить поиск по номеру награды и новые фото/документные колонки;"],
+    ),
+    (
+        "Save pasted photos as JPEG",
+        ["проверить вставку фото из буфера и сохранение в JPEG;"],
+    ),
+    (
+        "Fix owner feedback layout blockers",
+        ["проверить компактную форму редактирования кавалера и видимость выбранной строки в списке;"],
+    ),
     (
         "Fix daily report Russian wording",
         ["проверить dry-run ежедневного отчёта: текст должен быть на русском и без английских технических строк;"],
@@ -296,6 +370,13 @@ CHECK_PATTERNS: list[tuple[str, list[str]]] = [
 ]
 
 NEXT_STEP_PATTERNS: list[tuple[str, list[str]]] = [
+    (
+        "Prepare v0.1.4 release",
+        [
+            "проверка владельцем после v0.1.4;",
+            "собрать замечания владельца и перевести их в Linear-задачи;",
+        ],
+    ),
     (
         "Prepare v0.1.3 release",
         [
@@ -438,6 +519,10 @@ def check_items(subjects: list[str], report_items: list[str]) -> list[str]:
     checks = _items_from_patterns(subjects, CHECK_PATTERNS, 4)
     if checks:
         return checks
+    if report_items and all(item in RUSSIAN_FALLBACK_ITEMS for item in report_items):
+        return [
+            "сверить журнал разработки и уточнить, какие изменения нужно проверить;",
+        ]
     return _dedupe_sentences(
         [f"проверить: {_strip_trailing_semicolon(item)}" for item in report_items[:3]],
         3,

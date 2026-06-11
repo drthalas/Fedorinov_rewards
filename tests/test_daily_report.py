@@ -84,10 +84,13 @@ class DailyReportTests(unittest.TestCase):
             text = generator.build_report(dt.date(2026, 6, 5))
 
         self.assertIn("Награды и награждённые", text)
-        self.assertIn("есть изменения без пользовательского описания", text)
+        self.assertIn("автоматический отчёт не смог точно определить пользовательское описание", text)
+        self.assertIn("Нужно сверить журнал разработки", text)
         self.assertNotIn("Refactor backend routes", text)
         self.assertNotIn("backend", text)
         self.assertNotIn("workflow", text)
+        self.assertNotIn("есть изменения без пользовательского описания", text)
+        self.assertNotIn("перед проверкой нужно уточнить их смысл", text)
 
     def test_recent_release_commits_have_factual_russian_summary(self) -> None:
         generator = load_generator()
@@ -162,6 +165,71 @@ class DailyReportTests(unittest.TestCase):
 
         for forbidden in ["Add", "Fix", "Improve", "Update", "Release", "backend", "endpoint", "route", "commit"]:
             self.assertNotIn(forbidden, text)
+
+    def test_internal_fallback_phrases_never_reach_report(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=["Unknown backend workflow cleanup"],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 10))
+
+        forbidden = [
+            "есть изменения без пользовательского описания",
+            "перед проверкой нужно уточнить их смысл",
+            "technical changes without description",
+            "unknown changes",
+            "fallback",
+            "commit не распознан",
+        ]
+        for fragment in forbidden:
+            self.assertNotIn(fragment, text)
+
+    def test_unrecognized_change_does_not_pollute_check_section(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=["Unknown backend workflow cleanup"],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 10))
+
+        check_section = text.split("Что теперь можно проверить:", 1)[1].split("Что дальше:", 1)[0]
+        self.assertIn("сверить журнал разработки", check_section)
+        self.assertNotIn("есть изменения без пользовательского описания", check_section)
+        self.assertNotIn("перед проверкой нужно уточнить их смысл", check_section)
+        self.assertNotIn("backend", check_section)
+        self.assertNotIn("workflow", check_section)
+
+    def test_v014_commits_have_specific_report_and_checks(self) -> None:
+        generator = load_generator()
+        with patch.object(
+            generator,
+            "git_subjects_for_date",
+            return_value=[
+                "Polish owner feedback rewards screen",
+                "Improve summary filters and sorting",
+                "Improve search award results",
+                "Save pasted photos as JPEG",
+                "Fix owner feedback layout blockers",
+                "Prepare v0.1.4 release",
+            ],
+        ):
+            text = generator.build_report(dt.date(2026, 6, 10))
+
+        self.assertIn("улучшили главный экран и карточку кавалера", text)
+        self.assertIn("улучшили сводную таблицу", text)
+        self.assertIn("улучшили поиск по наградам", text)
+        self.assertIn("сохраняются в JPEG", text)
+        self.assertIn("прокруткой списка и компактностью формы", text)
+        self.assertIn("подготовили и выпустили релиз v0.1.4", text)
+        self.assertIn("проверить главный экран “Награды”", text)
+        self.assertIn("проверить сводную таблицу", text)
+        self.assertIn("проверить поиск по номеру награды", text)
+        self.assertNotIn("доработали рабочий интерфейс и проверки", text)
+        self.assertNotIn("внесли технические улучшения в проект", text)
+        self.assertNotIn("есть изменения без пользовательского описания", text)
 
 
 if __name__ == "__main__":
