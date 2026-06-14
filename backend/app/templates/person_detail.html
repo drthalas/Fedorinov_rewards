@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
-<section class="person-detail-hero panel">
+<section class="person-detail-page compact-person-detail">
+<section class="person-detail-hero panel compact-person-detail-hero">
   <h1 class="person-title wrap-text">{{ person.fio }}</h1>
   <dl class="person-summary-strip">
     <div>
@@ -15,7 +16,7 @@
   </dl>
 </section>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-<p>
+<p class="person-detail-nav compact-actions">
   <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
   · <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Все фото</a>
   · <a href="/persons/{{ person.id }}/booklet?return_to={{ (return_to or '/persons/' ~ person.id)|urlencode }}">Сформировать буклет</a>
@@ -32,7 +33,7 @@
 </div>
 {% endif %}
 
-<section class="grid person-detail-grid">
+<section class="grid person-detail-grid compact-person-detail-grid">
   <div class="panel person-card-panel">
     <h2>Карточка</h2>
     <dl class="details person-detail-list">
@@ -61,7 +62,7 @@
       </dd>
     </dl>
   </div>
-  <div class="panel person-main-photo-panel">
+  <div class="panel person-main-photo-panel compact-main-photo-panel">
     <h2>Главное фото</h2>
     <div class="photo-frame">
     {% if has_media_path(person.main_foto) %}
@@ -75,8 +76,8 @@
   </div>
 </section>
 
-<h2>Фото</h2>
-<div class="photo-grid">
+<h2 class="compact-section-title">Фото</h2>
+<div class="photo-grid compact-photo-grid">
   {% for label, path in [
     ("Фото кавалера", person.person_foto),
     ("Общее фото наград", person.rewards_foto),
@@ -99,12 +100,27 @@
   </div>
   {% endfor %}
 </div>
+{% if additional_photos %}
+<h2 class="compact-section-title">Дополнительные фото из каталога</h2>
+<div class="photo-grid compact-photo-grid additional-person-photos" data-person-folder-extra-photos>
+  {% for photo in additional_photos %}
+  <div class="card">
+    <div class="photo-frame">
+      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/persons/' ~ person.id) }}">
+        <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+      </a>
+    </div>
+    <p>{{ photo.label }}</p>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
-<h2>Награды</h2>
+<h2 class="compact-section-title">Награды</h2>
 {% if settings.write_mode %}
 <p><a class="button" href="/persons/{{ person.id }}/rewards/new{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Добавить награду</a></p>
 {% endif %}
-<div class="table-wrap">
+<div class="table-wrap person-detail-rewards-wrap">
   <table>
     <thead>
       <tr><th>ID</th><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
@@ -131,4 +147,5 @@
     </tbody>
   </table>
 </div>
+</section>
 {% endblock %}

@@ -19,6 +19,13 @@ def _clean_photo_mode(photo_mode: str = "") -> str:
     return "photos" if str(photo_mode or "").strip() == "photos" else "flags"
 
 
+def _csv_bool(value: object) -> int:
+    if isinstance(value, bool):
+        return 1 if value else 0
+    normalized = str(value or "").strip().lower()
+    return 1 if normalized in {"1", "true", "yes", "y", "on", "да", "в наличии"} else 0
+
+
 async def _read_form(request: Request) -> dict[str, object]:
     body = (await request.body()).decode("utf-8")
     parsed = parse_qs(body, keep_blank_values=True)
@@ -84,10 +91,10 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 "",
                 "",
                 "",
-                person.get("book1_foto_flag"),
-                person.get("book2_foto_flag"),
-                person.get("card1_foto_flag"),
-                person.get("card2_foto_flag"),
+                _csv_bool(person.get("book1_foto_flag")),
+                _csv_bool(person.get("book2_foto_flag")),
+                _csv_bool(person.get("card1_foto_flag")),
+                _csv_bool(person.get("card2_foto_flag")),
                 "",
                 "",
                 "",
@@ -106,19 +113,19 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 reward.get("date_purchase"),
                 reward.get("price_purchase"),
                 reward.get("price_now"),
-                reward.get("instock"),
-                reward.get("person_book1_foto_flag"),
-                reward.get("person_book2_foto_flag"),
-                reward.get("person_card1_foto_flag"),
-                reward.get("person_card2_foto_flag"),
-                reward.get("reward_book1_foto_flag"),
-                reward.get("reward_book2_foto_flag"),
-                reward.get("front_foto_flag"),
-                reward.get("back_foto_flag"),
-                reward.get("reward_list_flag"),
+                _csv_bool(reward.get("instock")),
+                _csv_bool(reward.get("person_book1_foto_flag")),
+                _csv_bool(reward.get("person_book2_foto_flag")),
+                _csv_bool(reward.get("person_card1_foto_flag")),
+                _csv_bool(reward.get("person_card2_foto_flag")),
+                _csv_bool(reward.get("reward_book1_foto_flag")),
+                _csv_bool(reward.get("reward_book2_foto_flag")),
+                _csv_bool(reward.get("front_foto_flag")),
+                _csv_bool(reward.get("back_foto_flag")),
+                _csv_bool(reward.get("reward_list_flag")),
             ])
         for mark in results["marks"]:
-            writer.writerow(["Знаки", mark.get("id"), "", "", "", mark.get("name"), mark.get("number"), "", "", "", mark.get("instock"), "", "", "", "", "", "", "", "", ""])
+            writer.writerow(["Знаки", mark.get("id"), "", "", "", mark.get("name"), mark.get("number"), "", "", "", _csv_bool(mark.get("instock")), "", "", "", "", "", "", "", "", ""])
     return output.getvalue()
 
 

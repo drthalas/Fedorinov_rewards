@@ -368,7 +368,7 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
     for person_row in person_rows_sql:
         person = row_to_dict(person_row)
         person_id = int(person["id"])
-        photo_flags = {field: _has_value(person.get(field)) for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS}
+        photo_flags = {field: int(_has_value(person.get(field))) for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS}
         for field, value in photo_flags.items():
             photo_totals[field] += int(value)
         reward_counts = {column_id: counts.get((person_id, column_id), 0) for column_id in reward_column_ids}

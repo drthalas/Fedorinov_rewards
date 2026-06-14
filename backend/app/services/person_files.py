@@ -36,6 +36,7 @@ class ArchiveBytesResult:
 
 FORBIDDEN_ARCHIVE_PARTS = {".env", ".venv", "backups", "database", "logs", "archives", "Source", "SourceMark"}
 FORBIDDEN_ARCHIVE_SUFFIXES = {".zip", ".exe", ".dll"}
+ALLOWED_PERSON_FOLDER_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
 
 def safe_person_folder(settings: Settings, person_id: int) -> Path:
@@ -62,6 +63,34 @@ def open_person_folder(settings: Settings, person_id: int, opener=None) -> Path:
     opener = opener or _default_opener
     opener(folder)
     return folder
+
+
+def person_folder_image_items(
+    settings: Settings,
+    person_id: int,
+    known_paths: list[object] | tuple[object, ...] | None = None,
+) -> list[dict[str, str]]:
+    folder, exists = person_folder_status(settings, person_id)
+    if not exists:
+        return []
+
+    root = settings.rewards_data_dir.resolve()
+    known_absolute_paths = _known_absolute_paths(settings, known_paths or [])
+    items: list[dict[str, str]] = []
+    seen = set(known_absolute_paths)
+    for path in sorted(folder.rglob("*"), key=lambda item: item.as_posix().casefold()):
+        if not path.is_file() or not _allowed_person_folder_image(path, folder):
+            continue
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        try:
+            relative = resolved.relative_to(root).as_posix()
+        except ValueError:
+            continue
+        seen.add(resolved)
+        items.append({"label": f"Дополнительное фото: {path.name}", "path": relative})
+    return items
 
 
 def archive_person_folder(settings: Settings, person_id: int, fio: str, target_path: Path | None = None) -> ArchiveResult:
@@ -136,6 +165,48 @@ def _default_opener(path: Path) -> None:
         subprocess.run(["open", str(path)], check=False)
         return
     subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def _known_absolute_paths(settings: Settings, paths: list[object] | tuple[object, ...]) -> set[Path]:
+    root = settings.rewards_data_dir.resolve()
+    known: set[Path] = set()
+    for raw_path in paths:
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        normalized = raw_path.strip().replace("\\", "/")
+        candidate = Path(normalized)
+        if candidate.is_absolute():
+            resolved = candidate.resolve()
+        else:
+            parts = candidate.parts
+            if not parts:
+                continue
+            if parts[0] not in {"Source", "SourceMark", "default"}:
+                for index, part in enumerate(parts):
+                    if part in {"Source", "SourceMark", "default"}:
+                        candidate = Path(*parts[index:])
+                        break
+                else:
+                    continue
+            resolved = (root / candidate).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError:
+            continue
+        known.add(resolved)
+    return known
+
+
+def _allowed_person_folder_image(path: Path, folder: Path) -> bool:
+    try:
+        relative = path.relative_to(folder)
+    except ValueError:
+        return False
+    if any(part.startswith(".") for part in relative.parts):
+        return False
+    if path.suffix.lower() not in ALLOWED_PERSON_FOLDER_IMAGE_SUFFIXES:
+        return False
+    return True
 
 
 def _safe_filename(value: str) -> str:

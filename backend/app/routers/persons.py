@@ -16,7 +16,15 @@ from ..repositories.persons_write import (
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import safe_return_to, with_status
-from ..services.person_files import PersonFilesError, archive_person_folder, archive_person_folder_bytes, open_person_folder, person_archive_filename, person_folder_status
+from ..services.person_files import (
+    PersonFilesError,
+    archive_person_folder,
+    archive_person_folder_bytes,
+    open_person_folder,
+    person_archive_filename,
+    person_folder_image_items,
+    person_folder_status,
+)
 from ..services.photos import photo_items
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
@@ -164,6 +172,8 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     safe_back = safe_return_to(return_to)
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
+    photos = person_photo_items(person, rewards)
+    additional_photos = person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos])
     return templates.TemplateResponse(
         request,
         "person_detail.html",
@@ -171,6 +181,8 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "settings": settings,
             "person": person,
             "rewards": rewards,
+            "photos": photos,
+            "additional_photos": additional_photos,
             "status_message": STATUS_MESSAGES.get(status),
             "return_to": safe_back,
             "person_folder_exists": person_folder_exists,
@@ -393,6 +405,7 @@ def person_photos(request: Request, person_id: int, index: int | None = None, re
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     photos = person_photo_items(person, rewards)
+    photos.extend(person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos]))
     available_photos = [photo for photo in photos if photo.get("path")]
     safe_back = safe_return_to(return_to)
     current_photo = None

@@ -645,7 +645,7 @@
         <p class="secondary">Знаки не привязаны к кавалерам, поэтому в шахматке учитываются только награды. Для знаков используйте режим “Свод по наградам”.</p>
         {% endif %}
         <div class="legacy-table-wrap summary-matrix-wrap">
-          <table class="legacy-table summary-matrix person-reward-matrix">
+          <table class="legacy-table summary-matrix person-reward-matrix resizable-search-table" data-resizable-table>
             <thead>
               <tr>
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.fio }}">ФИО кавалера{% if summary_matrix_sort.sort == 'fio' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
@@ -701,7 +701,7 @@
         <p class="secondary">В ячейках показано количество наград выбранного наименования у кавалера: 0, 1 или больше.</p>
         {% else %}
         <div class="legacy-table-wrap summary-matrix-wrap">
-          <table class="legacy-table summary-matrix">
+          <table class="legacy-table summary-matrix resizable-search-table" data-resizable-table>
             <thead>
               <tr>
                 <th>Страна</th>

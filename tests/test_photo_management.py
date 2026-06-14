@@ -6,7 +6,13 @@ import unittest
 from zipfile import ZipFile
 
 from backend.app.config import Settings
-from backend.app.services.person_files import PersonFilesError, archive_person_folder, open_person_folder, safe_person_folder
+from backend.app.services.person_files import (
+    PersonFilesError,
+    archive_person_folder,
+    open_person_folder,
+    person_folder_image_items,
+    safe_person_folder,
+)
 from backend.app.services.photos import PhotoValidationError, clear_photo, save_photo
 from backend.app.services.write_guard import WriteBlockedError
 
@@ -181,6 +187,22 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertTrue(result.path.exists())
         with ZipFile(result.path) as archive:
             self.assertIn("photo.jpg", archive.namelist())
+
+    def test_person_folder_image_items_include_safe_extra_images_only(self) -> None:
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        (folder / "person.jpg").write_bytes(b"known")
+        (folder / "extra.jpg").write_bytes(b"extra")
+        (folder / "scan.png").write_bytes(b"scan")
+        (folder / "document.pdf").write_bytes(b"pdf")
+        (folder / "program.exe").write_bytes(b"exe")
+        (folder / ".hidden.jpg").write_bytes(b"hidden")
+
+        items = person_folder_image_items(self.settings(), 1, ["Source/1/person.jpg"])
+
+        self.assertEqual([item["path"] for item in items], ["Source/1/extra.jpg", "Source/1/scan.png"])
+        self.assertEqual([item["label"] for item in items], ["Дополнительное фото: extra.jpg", "Дополнительное фото: scan.png"])
+        self.assertNotIn(str(folder), str(items))
 
 
 if __name__ == "__main__":

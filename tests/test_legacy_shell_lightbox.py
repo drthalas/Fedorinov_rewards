@@ -243,6 +243,11 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-card-panel", person_detail)
         self.assertIn("person-links-panel", person_detail)
         self.assertIn("person-main-photo-panel", person_detail)
+        self.assertIn("compact-person-detail", person_detail)
+        self.assertIn("compact-person-detail-grid", person_detail)
+        self.assertIn("person-detail-rewards-wrap", person_detail)
+        self.assertIn("additional-person-photos", person_detail)
+        self.assertIn("data-person-folder-extra-photos", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
         self.assertIn("link-wrap", person_detail)
         self.assertIn("legacy-person-heading", legacy_template)
@@ -255,6 +260,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".grid.person-detail-grid", styles)
         self.assertIn(".details.person-detail-list", styles)
         self.assertIn(".person-links-panel", styles)
+        self.assertIn(".compact-person-detail", styles)
+        self.assertIn(".compact-photo-grid .photo-frame", styles)
+        self.assertIn(".person-detail-rewards-wrap", styles)
         self.assertIn("grid-template-columns: minmax(420px, 1fr) minmax(340px, 420px)", styles)
         self.assertRegex(
             styles,

@@ -3,6 +3,16 @@
 
   const MIN_COLUMN_WIDTH = 48;
   const MIN_ROW_HEIGHT = 28;
+  const MIN_PHOTO_FRAME_SIZE = 30;
+  const MAX_PHOTO_FRAME_SIZE = 120;
+
+  function applyRowPhotoFrameSize(row, rowHeight) {
+    if (!row || !row.querySelector(".search-photo-cell--preview")) {
+      return;
+    }
+    const nextSize = Math.max(MIN_PHOTO_FRAME_SIZE, Math.min(MAX_PHOTO_FRAME_SIZE, Math.round(rowHeight - 10)));
+    row.style.setProperty("--search-photo-frame-size", `${nextSize}px`);
+  }
 
   function initColumnResize(table) {
     Array.from(table.querySelectorAll("th")).forEach((header) => {
@@ -74,6 +84,7 @@
         const onMove = (moveEvent) => {
           const nextHeight = Math.max(MIN_ROW_HEIGHT, startHeight + moveEvent.clientY - startY);
           row.style.height = `${nextHeight}px`;
+          applyRowPhotoFrameSize(row, nextHeight);
         };
 
         const onEnd = () => {

@@ -173,6 +173,66 @@ a.link-wrap {
   align-items: start;
 }
 
+.compact-person-detail {
+  display: grid;
+  gap: 8px;
+}
+
+.compact-person-detail .panel,
+.compact-person-detail .card {
+  padding: 10px;
+}
+
+.compact-person-detail-hero {
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.compact-person-detail-hero .person-title {
+  font-size: clamp(24px, 2.6vw, 34px);
+}
+
+.compact-person-detail-grid {
+  gap: 8px;
+}
+
+.compact-person-detail .details {
+  gap: 5px 10px;
+  margin: 0;
+}
+
+.person-detail-nav {
+  margin: 2px 0 6px;
+}
+
+.compact-section-title {
+  margin: 8px 0 6px;
+  font-size: 18px;
+}
+
+.compact-photo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.compact-photo-grid .photo-frame {
+  height: 132px;
+}
+
+.compact-photo-grid p {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.compact-main-photo-panel .photo-frame {
+  height: 156px;
+}
+
+.person-detail-rewards-wrap {
+  max-height: min(36vh, 360px);
+  overflow: auto;
+}
+
 .person-card-panel,
 .person-bio-panel,
 .person-links-panel,
@@ -767,15 +827,19 @@ th {
 }
 
 .search-results-table th,
-.search-results-table td {
+.search-results-table td,
+.resizable-search-table th,
+.resizable-search-table td {
   position: relative;
 }
 
-.search-results-table th {
+.search-results-table th,
+.resizable-search-table th {
   padding-right: 18px;
 }
 
-.search-results-table.is-resizing {
+.search-results-table.is-resizing,
+.resizable-search-table.is-resizing {
   user-select: none;
 }
 
@@ -854,7 +918,7 @@ th {
 .search-photo-cell--preview {
   width: 52px;
   min-width: 52px;
-  max-width: 52px;
+  max-width: none;
   padding: 3px 4px !important;
 }
 
@@ -869,8 +933,10 @@ th {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: min(var(--search-photo-frame-size, 44px), calc(100% - 6px));
+  min-width: 30px;
+  height: var(--search-photo-frame-size, 44px);
+  max-height: 120px;
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid #d9dee5;
@@ -892,11 +958,15 @@ th {
 
 .search-photo-preview {
   display: block;
-  max-width: 40px;
-  max-height: 40px;
+  max-width: calc(100% - 4px);
+  max-height: calc(100% - 4px);
   width: auto !important;
   height: auto !important;
   object-fit: contain;
+}
+
+.search-results-table--photo-mode [data-resizable-row] {
+  --search-photo-frame-size: 44px;
 }
 
 .secondary-button {
