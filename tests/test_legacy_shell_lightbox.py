@@ -30,6 +30,24 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-lightbox-reset", (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text())
         self.assertIn("pointerdown", script)
         self.assertIn("wheel", script)
+        self.assertIn("data-lightbox-group", script)
+        self.assertIn("indexBySource", script)
+        self.assertIn("seen[key]", script)
+
+    def test_person_detail_lightbox_uses_complete_photo_group(self) -> None:
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn("person_lightbox_group", person_detail)
+        self.assertIn('data-lightbox-group="{{ person_lightbox_group }}"', person_detail)
+        self.assertIn("data-person-complete-slideshow", person_detail)
+        self.assertIn("person-lightbox-extra-link", person_detail)
+        self.assertIn("data-lightbox-src", person_detail)
+        self.assertIn("data-person-folder-extra-photo", person_detail)
+        self.assertIn("photo in photos", person_detail)
+        self.assertIn("photo in additional_photos", person_detail)
+        self.assertIn("person-lightbox-complete-list", styles)
+        self.assertIn("clip-path: inset(50%)", styles)
 
     def test_legacy_rewards_has_filters_totals_and_double_click(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -248,6 +266,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-detail-rewards-wrap", person_detail)
         self.assertIn("additional-person-photos", person_detail)
         self.assertIn("data-person-folder-extra-photos", person_detail)
+        self.assertIn("person-detail-photo-section", person_detail)
+        self.assertIn("person-detail-photo-grid", person_detail)
+        self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
         self.assertIn("link-wrap", person_detail)
         self.assertIn("legacy-person-heading", legacy_template)
@@ -262,8 +283,15 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".person-links-panel", styles)
         self.assertIn(".compact-person-detail", styles)
         self.assertIn(".compact-photo-grid .photo-frame", styles)
+        self.assertIn(".person-detail-photo-grid", styles)
+        self.assertIn("max-height: calc(100vh - 20px)", styles)
+        self.assertIn("overflow-x: hidden", styles)
+        self.assertIn("max-height: min(18vh, 150px)", styles)
         self.assertIn(".person-detail-rewards-wrap", styles)
-        self.assertIn("grid-template-columns: minmax(420px, 1fr) minmax(340px, 420px)", styles)
+        self.assertIn(
+            "grid-template-columns: minmax(260px, 0.95fr) minmax(250px, 1fr) minmax(250px, 1fr) minmax(150px, 190px)",
+            styles,
+        )
         self.assertRegex(
             styles,
             re.compile(r"\.wrap-text,[^{]+\.legacy-person-title\s*\{[^}]*overflow-wrap:\s*break-word;[^}]*word-break:\s*normal;", re.S),

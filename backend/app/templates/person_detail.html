@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
+{% set person_lightbox_group = 'person-' ~ person.id ~ '-all' %}
 <section class="person-detail-page compact-person-detail">
 <section class="person-detail-hero panel compact-person-detail-hero">
   <h1 class="person-title wrap-text">{{ person.fio }}</h1>
@@ -66,7 +67,7 @@
     <h2>Главное фото</h2>
     <div class="photo-frame">
     {% if has_media_path(person.main_foto) %}
-    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}">
+    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="Главное фото" data-lightbox-src="{{ media_url(person.main_foto) }}">
       <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Главное фото">
     </a>
     {% else %}
@@ -76,8 +77,12 @@
   </div>
 </section>
 
-<h2 class="compact-section-title">Фото</h2>
-<div class="photo-grid compact-photo-grid">
+<section class="panel person-detail-photo-section">
+<div class="person-detail-section-head">
+  <h2 class="compact-section-title">Фото</h2>
+  <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Показать все фото</a>
+</div>
+<div class="photo-grid compact-photo-grid person-detail-photo-grid" data-person-folder-extra-photos="{{ '1' if additional_photos else '0' }}">
   {% for label, path in [
     ("Фото кавалера", person.person_foto),
     ("Общее фото наград", person.rewards_foto),
@@ -89,7 +94,7 @@
   <div class="card {{ 'placeholder-card' if not has_media_path(path) else '' }}">
     <div class="photo-frame">
     {% if has_media_path(path) %}
-    <a class="photo-link" href="{{ photo_view_url(path, label, '/persons/' ~ person.id) }}">
+    <a class="photo-link" href="{{ photo_view_url(path, label, '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(path) }}">
       <img class="photo" src="{{ media_url(path) }}" alt="{{ label }}">
     </a>
     {% else %}
@@ -99,22 +104,33 @@
     <p>{{ label }}</p>
   </div>
   {% endfor %}
-</div>
 {% if additional_photos %}
-<h2 class="compact-section-title">Дополнительные фото из каталога</h2>
-<div class="photo-grid compact-photo-grid additional-person-photos" data-person-folder-extra-photos>
   {% for photo in additional_photos %}
-  <div class="card">
+  <div class="card additional-person-photos" data-person-folder-extra-photo>
     <div class="photo-frame">
-      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/persons/' ~ person.id) }}">
+      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="{{ photo.label }}" data-lightbox-src="{{ media_url(photo.path) }}">
         <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
     </div>
     <p>{{ photo.label }}</p>
   </div>
   {% endfor %}
-</div>
 {% endif %}
+</div>
+</section>
+
+<div class="person-lightbox-complete-list" data-person-complete-slideshow data-person-complete-slideshow-count="{{ (photos|length) + (additional_photos|length) }}" aria-hidden="true">
+  {% for photo in photos %}
+  {% if has_media_path(photo.path) %}
+  <a class="photo-link person-lightbox-extra-link" href="{{ photo_view_url(photo.path, photo.label, '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="{{ photo.label }}" data-lightbox-src="{{ media_url(photo.path) }}" tabindex="-1">{{ photo.label }}</a>
+  {% endif %}
+  {% endfor %}
+  {% for photo in additional_photos %}
+  {% if has_media_path(photo.path) %}
+  <a class="photo-link person-lightbox-extra-link" href="{{ photo_view_url(photo.path, photo.label, '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="{{ photo.label }}" data-lightbox-src="{{ media_url(photo.path) }}" tabindex="-1">{{ photo.label }}</a>
+  {% endif %}
+  {% endfor %}
+</div>
 
 <h2 class="compact-section-title">Награды</h2>
 {% if settings.write_mode %}

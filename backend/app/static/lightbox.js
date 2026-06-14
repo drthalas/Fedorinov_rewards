@@ -32,10 +32,36 @@
     return "";
   }
 
-  function collectLinks() {
+  function lightboxGroup(link) {
+    return link.getAttribute("data-lightbox-group") || "";
+  }
+
+  function collectLinks(group) {
+    var seen = {};
     return Array.prototype.slice.call(document.querySelectorAll("a.photo-link, a.photo-clickable")).filter(function (link) {
-      return Boolean(imageSource(link));
+      if (group && lightboxGroup(link) !== group) {
+        return false;
+      }
+      var src = imageSource(link);
+      if (!src) {
+        return false;
+      }
+      var key = (group || "__all__") + "|" + src;
+      if (seen[key]) {
+        return false;
+      }
+      seen[key] = true;
+      return true;
     });
+  }
+
+  function indexBySource(items, src) {
+    for (var index = 0; index < items.length; index += 1) {
+      if (imageSource(items[index]) === src) {
+        return index;
+      }
+    }
+    return -1;
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -52,7 +78,8 @@
     var zoomInButton = lightbox.querySelector("[data-lightbox-zoom-in]");
     var zoomOutButton = lightbox.querySelector("[data-lightbox-zoom-out]");
     var resetButton = lightbox.querySelector("[data-lightbox-reset]");
-    var links = collectLinks();
+    var currentGroup = "";
+    var links = collectLinks(currentGroup);
     var currentIndex = -1;
     var scale = 1;
     var offsetX = 0;
@@ -63,7 +90,7 @@
     var dragOriginX = 0;
     var dragOriginY = 0;
 
-    links.forEach(function (link, index) {
+    links.forEach(function (link) {
       link.classList.add("photo-clickable");
       link.setAttribute("aria-haspopup", "dialog");
       link.addEventListener("click", function (event) {
@@ -72,7 +99,10 @@
           return;
         }
         event.preventDefault();
-        open(index);
+        currentGroup = lightboxGroup(link);
+        links = collectLinks(currentGroup);
+        var index = indexBySource(links, src);
+        open(index >= 0 ? index : 0);
       });
     });
 
@@ -87,7 +117,7 @@
     }
 
     function open(index) {
-      links = collectLinks();
+      links = collectLinks(currentGroup);
       currentIndex = index;
       var link = links[currentIndex];
       if (!link) {
