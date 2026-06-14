@@ -102,7 +102,7 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             )
 
     def test_app_version_is_current_release(self) -> None:
-        self.assertEqual(APP_VERSION, "0.1.8")
+        self.assertEqual(APP_VERSION, "0.1.9")
 
 
 if __name__ == "__main__":
