@@ -68,9 +68,35 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
-## v0.1.7
+## v0.1.8
 
 Статус: готовится к выпуску.
+
+Дата релиза: 2026-06-14.
+
+Состав:
+
+- Включает стабильную базу v0.1.7.
+- Включает ALE-195: компактная карточка кавалера после double click.
+- Slideshow карточки кавалера дополняется безопасными фото из каталога кавалера.
+- Дубли фото убираются, absolute paths в UI не раскрываются.
+- CSV boolean `true/false` заменены на `1/0`, Excel-friendly формат сохранён.
+- Save As честно объясняет, что браузер не передаёт приложению путь выбранной папки.
+- В "Сводной таблице" добавлен resize колонок и строк.
+- В "Поиске" мини-фото масштабируются при изменении ширины колонок и высоты строк.
+- Lightbox после resize работает.
+
+Проверки:
+
+- Unit tests: 283 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Browser smoke: PASS.
+- Package SHA256 фиксируется в `latest.json`, GitHub Release и финальном отчёте после сборки.
+
+## v0.1.7
+
+Статус: выпущено.
 
 Дата релиза: 2026-06-12.
 
