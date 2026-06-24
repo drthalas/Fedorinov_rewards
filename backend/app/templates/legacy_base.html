@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <link rel="stylesheet" href="{{ static_url('styles.css') }}">
   </head>
   <body class="legacy-body">
     <header class="legacy-app-header">
@@ -26,13 +26,13 @@
       {% block content %}{% endblock %}
     </main>
     {% include "_lightbox.html" %}
-    <script src="{{ url_for('static', path='cascading_guides.js') }}" defer></script>
-    <script src="{{ url_for('static', path='search_suggestions.js') }}" defer></script>
-    <script src="{{ url_for('static', path='search_results.js') }}" defer></script>
-    <script src="{{ url_for('static', path='save_as.js') }}" defer></script>
-    <script src="{{ url_for('static', path='clipboard_paste.js') }}" defer></script>
-    <script src="{{ url_for('static', path='escape_back.js') }}" defer></script>
-    <script src="{{ url_for('static', path='legacy_rewards.js') }}" defer></script>
-    <script src="{{ url_for('static', path='update_progress.js') }}" defer></script>
+    <script src="{{ static_url('cascading_guides.js') }}" defer></script>
+    <script src="{{ static_url('search_suggestions.js') }}" defer></script>
+    <script src="{{ static_url('search_results.js') }}" defer></script>
+    <script src="{{ static_url('save_as.js') }}" defer></script>
+    <script src="{{ static_url('clipboard_paste.js') }}" defer></script>
+    <script src="{{ static_url('escape_back.js') }}" defer></script>
+    <script src="{{ static_url('legacy_rewards.js') }}" defer></script>
+    <script src="{{ static_url('update_progress.js') }}" defer></script>
   </body>
 </html>

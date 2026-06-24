@@ -18,6 +18,13 @@ from ..services.media import resolve_media_path
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
+STATIC_ASSET_VERSION = "20260624-hotfix-slideshow"
+
+
+def static_url(path: str) -> str:
+    return str(URL(path=f"/static/{path}").include_query_params(v=STATIC_ASSET_VERSION))
+
+
 def media_url(path: object) -> str:
     value = path if isinstance(path, str) else ""
     return str(URL(path="/media").include_query_params(path=value))
@@ -41,6 +48,8 @@ def media_exists(path: object) -> bool:
 
 templates.env.globals["media_url"] = media_url
 templates.env.globals["photo_view_url"] = photo_view_url
+templates.env.globals["static_url"] = static_url
+templates.env.globals["STATIC_ASSET_VERSION"] = STATIC_ASSET_VERSION
 templates.env.globals["media_exists"] = media_exists
 templates.env.globals["has_media_path"] = has_media_path
 templates.env.globals["safe_external_url"] = safe_external_url

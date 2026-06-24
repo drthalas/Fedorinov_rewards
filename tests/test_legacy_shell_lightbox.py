@@ -33,6 +33,27 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-lightbox-group", script)
         self.assertIn("indexBySource", script)
         self.assertIn("seen[key]", script)
+        self.assertIn("collectManifestItems", script)
+        self.assertIn("data-lightbox-items", script)
+        self.assertIn("JSON.parse", script)
+        self.assertIn('document.addEventListener("click"', script)
+        self.assertIn('target.closest("a.photo-link, a.photo-clickable")', script)
+        self.assertIn("itemSource", script)
+        self.assertIn("itemCaption", script)
+
+    def test_static_assets_are_cache_busted(self) -> None:
+        templates_py = (ROOT / "backend" / "app" / "routers" / "templates.py").read_text()
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
+        legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
+        lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
+        booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
+
+        self.assertIn('STATIC_ASSET_VERSION = "20260624-hotfix-slideshow"', templates_py)
+        self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
+        self.assertIn("static_url('styles.css')", base)
+        self.assertIn("static_url('styles.css')", legacy_base)
+        self.assertIn("static_url('lightbox.js')", lightbox)
+        self.assertIn("static_url('save_as.js')", booklet)
 
     def test_person_detail_lightbox_uses_complete_photo_group(self) -> None:
         person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
@@ -42,6 +63,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('data-lightbox-group="{{ person_lightbox_group }}"', person_detail)
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("person-lightbox-extra-link", person_detail)
+        self.assertIn('type="application/json" data-lightbox-items="{{ person_lightbox_group }}"', person_detail)
+        self.assertIn("data-person-full-lightbox-items", person_detail)
+        self.assertIn("media_url(photo.path)|tojson", person_detail)
         self.assertIn("data-lightbox-src", person_detail)
         self.assertIn("data-person-folder-extra-photo", person_detail)
         self.assertIn("photo in photos", person_detail)
@@ -284,12 +308,16 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".compact-person-detail", styles)
         self.assertIn(".compact-photo-grid .photo-frame", styles)
         self.assertIn(".person-detail-photo-grid", styles)
-        self.assertIn("max-height: calc(100vh - 20px)", styles)
+        self.assertIn("height: calc(100vh - 16px)", styles)
+        self.assertIn("max-height: calc(100vh - 16px)", styles)
+        self.assertIn(".compact-person-detail *", styles)
+        self.assertIn("box-sizing: border-box", styles)
         self.assertIn("overflow-x: hidden", styles)
-        self.assertIn("max-height: min(18vh, 150px)", styles)
+        self.assertIn("max-height: min(14vh, 112px)", styles)
+        self.assertIn("height: 60px", styles)
         self.assertIn(".person-detail-rewards-wrap", styles)
         self.assertIn(
-            "grid-template-columns: minmax(260px, 0.95fr) minmax(250px, 1fr) minmax(250px, 1fr) minmax(150px, 190px)",
+            "grid-template-columns: minmax(210px, 0.85fr) minmax(220px, 1fr) minmax(220px, 1fr) minmax(120px, 150px)",
             styles,
         )
         self.assertRegex(

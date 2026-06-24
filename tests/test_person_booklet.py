@@ -145,6 +145,26 @@ class PersonBookletTests(unittest.TestCase):
         self.assertEqual(context["person"]["fio"], "Иванов Иван")
         self.assertEqual(len(context["rewards"]), 1)
 
+    def test_person_detail_manifest_includes_folder_photos_not_only_visible_thumbnail_links(self) -> None:
+        (self.root / "Source" / "1" / "extra.jpg").write_bytes(b"extra")
+        (self.root / "Source" / "1" / "nested").mkdir()
+        (self.root / "Source" / "1" / "nested" / "extra2.png").write_bytes(b"extra")
+        (self.root / "Source" / "1" / "unsafe.exe").write_bytes(b"unsafe")
+
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = persons_router.person_detail(FakeRequest(path="/persons/1"), 1)
+        rendered = templates.env.get_template("person_detail.html").render(
+            request=FakeRequest(path="/persons/1"),
+            **context,
+        )
+
+        self.assertIn("data-person-full-lightbox-items", rendered)
+        self.assertIn("data-lightbox-items=\"person-1-all\"", rendered)
+        self.assertIn("Source%2F1%2Fextra.jpg", rendered)
+        self.assertIn("Source%2F1%2Fnested%2Fextra2.png", rendered)
+        self.assertNotIn("unsafe.exe", rendered)
+        self.assertNotIn(str(self.root), rendered)
+
     def test_booklet_preview_renders_person_biography_and_rewards(self) -> None:
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
             context = persons_router.person_booklet(FakeRequest(), 1, return_to="/persons/1")

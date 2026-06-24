@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Буклет кавалера · {{ person.fio|dash }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  <link rel="stylesheet" href="{{ static_url('styles.css') }}">
 </head>
 <body class="booklet-page">
   <header class="booklet-toolbar no-print">
@@ -124,6 +124,6 @@
       {% endfor %}
     </section>
   </main>
-  <script src="{{ url_for('static', path='save_as.js') }}" defer></script>
+  <script src="{{ static_url('save_as.js') }}" defer></script>
 </body>
 </html>

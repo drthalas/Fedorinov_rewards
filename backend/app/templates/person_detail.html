@@ -132,6 +132,32 @@
   {% endfor %}
 </div>
 
+<script type="application/json" data-lightbox-items="{{ person_lightbox_group }}" data-person-full-lightbox-items>
+[
+  {% set lightbox_json = namespace(first=true) %}
+  {% for photo in photos %}
+  {% if has_media_path(photo.path) %}
+  {% if not lightbox_json.first %},{% endif %}
+  {
+    "src": {{ media_url(photo.path)|tojson }},
+    "caption": {{ photo.label|tojson }}
+  }
+  {% set lightbox_json.first = false %}
+  {% endif %}
+  {% endfor %}
+  {% for photo in additional_photos %}
+  {% if has_media_path(photo.path) %}
+  {% if not lightbox_json.first %},{% endif %}
+  {
+    "src": {{ media_url(photo.path)|tojson }},
+    "caption": {{ photo.label|tojson }}
+  }
+  {% set lightbox_json.first = false %}
+  {% endif %}
+  {% endfor %}
+]
+</script>
+
 <h2 class="compact-section-title">Награды</h2>
 {% if settings.write_mode %}
 <p><a class="button" href="/persons/{{ person.id }}/rewards/new{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Добавить награду</a></p>

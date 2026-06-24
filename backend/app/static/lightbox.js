@@ -36,28 +36,85 @@
     return link.getAttribute("data-lightbox-group") || "";
   }
 
+  function itemSource(item) {
+    if (!item) {
+      return "";
+    }
+    if (item.src) {
+      return item.src;
+    }
+    return imageSource(item);
+  }
+
+  function itemCaption(item) {
+    if (!item) {
+      return "Фото";
+    }
+    if (item.caption) {
+      return item.caption;
+    }
+    return closestCaption(item);
+  }
+
+  function addLightboxItem(items, seen, group, src, caption, element) {
+    if (!src) {
+      return;
+    }
+    var key = (group || "__all__") + "|" + src;
+    if (seen[key]) {
+      return;
+    }
+    seen[key] = true;
+    items.push(element || { src: src, caption: caption || "Фото" });
+  }
+
+  function collectManifestItems(group, items, seen) {
+    if (!group) {
+      return;
+    }
+    Array.prototype.slice.call(document.querySelectorAll('script[type="application/json"][data-lightbox-items]')).forEach(function (node) {
+      if (node.getAttribute("data-lightbox-items") !== group) {
+        return;
+      }
+      var parsed;
+      try {
+        parsed = JSON.parse(node.textContent || "[]");
+      } catch (error) {
+        // Keep the visible DOM links usable if a malformed manifest slips in.
+        return;
+      }
+      if (!Array.isArray(parsed)) {
+        return;
+      }
+      parsed.forEach(function (item) {
+        if (!item || !item.src) {
+          return;
+        }
+        addLightboxItem(items, seen, group, item.src, item.caption, null);
+      });
+    });
+  }
+
   function collectLinks(group) {
     var seen = {};
-    return Array.prototype.slice.call(document.querySelectorAll("a.photo-link, a.photo-clickable")).filter(function (link) {
+    var items = [];
+    collectManifestItems(group, items, seen);
+    Array.prototype.slice.call(document.querySelectorAll("a.photo-link, a.photo-clickable")).forEach(function (link) {
       if (group && lightboxGroup(link) !== group) {
-        return false;
+        return;
       }
       var src = imageSource(link);
       if (!src) {
-        return false;
+        return;
       }
-      var key = (group || "__all__") + "|" + src;
-      if (seen[key]) {
-        return false;
-      }
-      seen[key] = true;
-      return true;
+      addLightboxItem(items, seen, group, src, closestCaption(link), link);
     });
+    return items;
   }
 
   function indexBySource(items, src) {
     for (var index = 0; index < items.length; index += 1) {
-      if (imageSource(items[index]) === src) {
+      if (itemSource(items[index]) === src) {
         return index;
       }
     }
@@ -90,20 +147,29 @@
     var dragOriginX = 0;
     var dragOriginY = 0;
 
-    links.forEach(function (link) {
+    Array.prototype.slice.call(document.querySelectorAll("a.photo-link, a.photo-clickable")).forEach(function (link) {
       link.classList.add("photo-clickable");
       link.setAttribute("aria-haspopup", "dialog");
-      link.addEventListener("click", function (event) {
-        var src = imageSource(link);
-        if (!src) {
-          return;
-        }
-        event.preventDefault();
-        currentGroup = lightboxGroup(link);
-        links = collectLinks(currentGroup);
-        var index = indexBySource(links, src);
-        open(index >= 0 ? index : 0);
-      });
+    });
+
+    document.addEventListener("click", function (event) {
+      var target = event.target;
+      if (!target || !target.closest) {
+        return;
+      }
+      var link = target.closest("a.photo-link, a.photo-clickable");
+      if (!link || !document.contains(link)) {
+        return;
+      }
+      var src = imageSource(link);
+      if (!src) {
+        return;
+      }
+      event.preventDefault();
+      currentGroup = lightboxGroup(link);
+      links = collectLinks(currentGroup);
+      var index = indexBySource(links, src);
+      open(index >= 0 ? index : 0);
     });
 
     function updateNavigation() {
@@ -123,14 +189,14 @@
       if (!link) {
         return;
       }
-      var src = imageSource(link);
+      var src = itemSource(link);
       if (!src) {
         return;
       }
       resetTransform();
       image.setAttribute("src", src);
-      image.setAttribute("alt", closestCaption(link));
-      caption.textContent = closestCaption(link);
+      image.setAttribute("alt", itemCaption(link));
+      caption.textContent = itemCaption(link);
       lightbox.classList.add("is-open");
       lightbox.setAttribute("aria-hidden", "false");
       document.body.classList.add("photo-lightbox-open");
