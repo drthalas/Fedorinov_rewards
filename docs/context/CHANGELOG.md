@@ -1,5 +1,38 @@
 # История изменений
 
+## v0.1.10
+
+Статус: выпущено.
+
+Дата релиза: 2026-06-24.
+
+Ключевые изменения:
+
+- Hotfix-релиз после проверки владельцем v0.1.9, включающий ALE-218, ALE-219 и ALE-220.
+- В Windows Edge длинные ссылки больше не ломают карточку кавалера: "Память народа" и "Форум коллекционеров" показываются compact labels, полный URL сохраняется в href/title.
+- Добавлен cache-busting для CSS/JS, чтобы браузер не оставлял старое поведение после обновления.
+- На вкладке "Награды" в правом блоке "Фото" клик по видимому фото открывает lightbox полного набора фото кавалера.
+- Для `/legacy?tab=rewards&person_id=77` visible thumbnails остаются компактными, а full lightbox содержит 16 фото.
+- "Показать все фото" больше не является единственным способом увидеть полный набор фото.
+- `/persons/77/photos` возвращает обратно в `/legacy?tab=rewards&person_id=77`.
+- В правый блок "Фото" добавлен компактный подблок "Документы" с учётными карточками 1/2 и наградными книжками 1/2.
+- Если документа нет, показывается placeholder "Нет фото".
+
+Проверки перед релизом:
+
+- Unit tests: 292 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Windows VM QA по ALE-218: PASS.
+- Owner/manual check по ALE-219/ALE-220: PASS.
+- Package SHA256 фиксируется в `latest.json`, GitHub Release и финальном отчёте после сборки.
+
+Ключевые commits:
+
+- `141f87f` Fix Windows person card link layout.
+- `110a250` Fix legacy rewards full photo slideshow and return link.
+- `bc285c1` Add key document photos to legacy rewards photo block.
+
 ## v0.1.9
 
 Статус: выпущено.

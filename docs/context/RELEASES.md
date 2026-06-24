@@ -68,6 +68,31 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v0.1.10
+
+Статус: выпущено.
+
+Дата релиза: 2026-06-24.
+
+Состав:
+
+- Включает стабильную базу v0.1.9.
+- Включает ALE-218: Windows Edge layout карточки кавалера, compact labels ссылок и cache-busting CSS/JS.
+- Включает ALE-219: полный lightbox из правого блока "Фото" во вкладке "Награды" и корректный возврат из `/persons/{id}/photos`.
+- Включает ALE-220: подблок "Документы" в правом блоке "Фото" на вкладке "Награды".
+- Для `/legacy?tab=rewards&person_id=77` visible thumbnails остаются компактными, а full lightbox содержит 16 фото.
+- Для `person_id=77` учётные карточки 1/2 показывают "Нет фото", наградные книжки 1/2 берутся из `Source/77/FotoBook1.jpg` и `Source/77/FotoBook2.jpg`.
+- "Показать все фото" остаётся отдельным обзором, но не является единственным способом увидеть полный набор.
+
+Проверки:
+
+- Unit tests: 292 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Windows VM QA по ALE-218: PASS.
+- Owner/manual check по ALE-219/ALE-220: PASS.
+- Package SHA256 фиксируется в `latest.json`, GitHub Release и финальном отчёте после сборки.
+
 ## v0.1.9
 
 Статус: выпущено.
