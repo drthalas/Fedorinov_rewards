@@ -55,6 +55,9 @@ class LegacyRewardsPhotoSlideshowTests(unittest.TestCase):
         for name in [
             "person.jpg",
             "main.jpg",
+            "card2.jpg",
+            "FotoBook1.jpg",
+            "FotoBook2.jpg",
             "reward-front.jpg",
             "folder-extra-a.jpg",
             "folder-extra-b.png",
@@ -141,7 +144,7 @@ class LegacyRewardsPhotoSlideshowTests(unittest.TestCase):
                 values (
                     77, 'Вукалович Семен Петрович', '1912-01-01', 1,
                     'Source/77/person.jpg', 'Source/77/main.jpg', '',
-                    '', '', '', '', '', '', '', ''
+                    '', '', '', 'Source/77/card2.jpg', '', '', '', ''
                 )
                 """
             )
@@ -170,11 +173,33 @@ class LegacyRewardsPhotoSlideshowTests(unittest.TestCase):
         self.assertIn('data-lightbox-group="legacy-person-77-all"', rendered)
         self.assertIn("data-legacy-person-complete-slideshow", rendered)
         self.assertIn("Source%2F77%2Freward-front.jpg", rendered)
+        self.assertIn("Source%2F77%2FFotoBook1.jpg", rendered)
+        self.assertIn("Source%2F77%2FFotoBook2.jpg", rendered)
         self.assertIn("Source%2F77%2Ffolder-extra-a.jpg", rendered)
         self.assertIn("Source%2F77%2Ffolder-extra-b.png", rendered)
         self.assertNotIn("unsafe.pdf", rendered)
         self.assertNotIn(str(self.root), rendered)
         self.assertIn("/persons/77/photos?return_to=/legacy%3Ftab%3Drewards%26person_id%3D77", rendered)
+
+    def test_legacy_rewards_photo_block_shows_key_document_slots(self) -> None:
+        with patch.object(legacy_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = legacy_router.legacy_index(FakeRequest(), tab="rewards", person_id=77)
+        rendered = templates.env.get_template("legacy.html").render(request=FakeRequest(), **context)
+
+        self.assertIn("legacy-document-photo-block", rendered)
+        self.assertIn("legacy-document-photo-grid", rendered)
+        self.assertIn("Документы", rendered)
+        self.assertIn("Учётная карточка, сторона 1", rendered)
+        self.assertIn("Учётная карточка, сторона 2", rendered)
+        self.assertIn("Наградная книжка, сторона 1", rendered)
+        self.assertIn("Наградная книжка, сторона 2", rendered)
+        self.assertIn('data-legacy-document-photo', rendered)
+        self.assertIn("Нет фото", rendered)
+        self.assertIn("Source%2F77%2Fcard2.jpg", rendered)
+        self.assertIn("Source%2F77%2FFotoBook1.jpg", rendered)
+        self.assertIn("Source%2F77%2FFotoBook2.jpg", rendered)
+        self.assertIn('data-lightbox-group="legacy-person-77-all"', rendered)
+        self.assertIn('data-legacy-person-complete-slideshow-count="8"', rendered)
 
     def test_person_photos_return_link_uses_safe_legacy_rewards_return_to(self) -> None:
         return_to = "/legacy?tab=rewards&person_id=77"
@@ -187,6 +212,8 @@ class LegacyRewardsPhotoSlideshowTests(unittest.TestCase):
 
         self.assertEqual(context["return_to"], return_to)
         self.assertIn('href="/legacy?tab=rewards&amp;person_id=77"', rendered)
+        self.assertEqual(len(context["available_photos"]), 8)
+        self.assertIn("Source%2F77%2FFotoBook1.jpg", rendered)
         self.assertIn("Source%2F77%2Ffolder-extra-a.jpg", rendered)
 
     def test_person_photos_rejects_external_return_to(self) -> None:

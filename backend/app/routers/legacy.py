@@ -52,6 +52,69 @@ STATUS_MESSAGES = {
     "mark_created": "Знак добавлен.",
     "mark_deleted": "Знак удалён.",
 }
+LEGACY_DOCUMENT_PHOTO_SLOTS = (
+    ("card1_foto", "FotoCard1", "Учётная карточка, сторона 1"),
+    ("card2_foto", "FotoCard2", "Учётная карточка, сторона 2"),
+    ("book1_foto", "FotoBook1", "Наградная книжка, сторона 1"),
+    ("book2_foto", "FotoBook2", "Наградная книжка, сторона 2"),
+)
+LEGACY_PERSON_PHOTO_LABELS = {
+    "Фото учётной карточки, страница 1": "Учётная карточка, сторона 1",
+    "Фото учётной карточки, страница 2": "Учётная карточка, сторона 2",
+    "Фото наградной книжки, сторона 1": "Наградная книжка, сторона 1",
+    "Фото наградной книжки, сторона 2": "Наградная книжка, сторона 2",
+}
+
+
+def _photo_path_key(path: object) -> str:
+    if not isinstance(path, str) or not path.strip():
+        return ""
+    return path.strip().replace("\\", "/").casefold()
+
+
+def _legacy_person_photo_items(person: dict[str, object], rewards: list[dict[str, object]]) -> list[dict[str, object]]:
+    items = person_photo_items(person, rewards)
+    for item in items:
+        label = LEGACY_PERSON_PHOTO_LABELS.get(str(item.get("label") or ""))
+        if label:
+            item["label"] = label
+    return items
+
+
+def _legacy_document_photo_items(
+    person: dict[str, object],
+    additional_photos: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    additional_by_stem: dict[str, dict[str, object]] = {}
+    for photo in additional_photos:
+        path = photo.get("path")
+        if not has_media_path(path):
+            continue
+        stem = Path(str(path).replace("\\", "/")).stem.casefold()
+        additional_by_stem.setdefault(stem, photo)
+
+    items: list[dict[str, object]] = []
+    for field, stem, label in LEGACY_DOCUMENT_PHOTO_SLOTS:
+        path = person.get(field)
+        if not has_media_path(path):
+            fallback = additional_by_stem.get(stem.casefold())
+            if fallback:
+                path = fallback.get("path")
+        items.append({"field": field, "label": label, "path": path})
+    return items
+
+
+def _unique_available_photo_items(items: list[dict[str, object]]) -> list[dict[str, object]]:
+    result: list[dict[str, object]] = []
+    seen: set[str] = set()
+    for item in items:
+        path = item.get("path")
+        key = _photo_path_key(path)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
 
 
 def _summary_query_params(filters) -> dict[str, object]:
@@ -346,6 +409,7 @@ def legacy_index(
         "selected_person": None,
         "selected_person_archive_filename": "",
         "selected_person_photos": [],
+        "selected_person_document_photos": [],
         "selected_person_additional_photos": [],
         "selected_person_full_photos": [],
         "selected_person_available_photos": [],
@@ -448,20 +512,18 @@ def legacy_index(
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
         if selected_person is not None:
             context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
-            selected_person_photos = person_photo_items(selected_person, selected_person_rewards)
+            selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
             selected_person_additional_photos = person_folder_image_items(
                 settings,
                 selected_person_id,
                 [photo.get("path") for photo in selected_person_photos],
             )
+            selected_person_document_photos = _legacy_document_photo_items(selected_person, selected_person_additional_photos)
             context["selected_person_photos"] = selected_person_photos
+            context["selected_person_document_photos"] = selected_person_document_photos
             context["selected_person_additional_photos"] = selected_person_additional_photos
-            context["selected_person_full_photos"] = selected_person_photos + selected_person_additional_photos
-            context["selected_person_available_photos"] = [
-                photo
-                for photo in context["selected_person_full_photos"]
-                if has_media_path(photo.get("path"))
-            ]
+            context["selected_person_full_photos"] = selected_person_photos + selected_person_document_photos + selected_person_additional_photos
+            context["selected_person_available_photos"] = _unique_available_photo_items(context["selected_person_full_photos"])
 
     selected_mark_id = mark_id or (int(marks[0]["id"]) if marks else None)
     if selected_mark_id is not None:
