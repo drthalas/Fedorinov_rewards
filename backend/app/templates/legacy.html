@@ -112,6 +112,7 @@
       <section class="legacy-main">
         <div class="legacy-person-workspace">
         {% if selected_person %}
+          {% set legacy_person_lightbox_group = 'legacy-person-' ~ selected_person.id ~ '-all' %}
           <div class="legacy-split-header">
             <div class="legacy-person-heading">
               <h1 class="legacy-person-title wrap-text">{{ selected_person.fio|dash }}</h1>
@@ -119,7 +120,7 @@
             </div>
             <div class="legacy-actions">
               <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
-              <a class="button" href="/persons/{{ selected_person.id }}/photos">Показать все фото</a>
+              <a class="button" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </div>
           </div>
 
@@ -222,7 +223,7 @@
                   <figure class="legacy-photo-card">
                     <div class="legacy-photo-frame">
                     {% if has_media_path(path) %}
-                    <a class="photo-link" href="{{ photo_view_url(path, label, '/legacy?tab=rewards&person_id=' ~ selected_person.id) }}">
+                    <a class="photo-link" href="{{ photo_view_url(path, label, selected_person_return) }}" data-lightbox-group="{{ legacy_person_lightbox_group }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(path) }}">
                       <img class="legacy-photo" src="{{ media_url(path) }}" alt="{{ label }}">
                     </a>
                     {% else %}
@@ -233,7 +234,25 @@
                   </figure>
                 {% endfor %}
               </div>
-              <a href="/persons/{{ selected_person.id }}/photos">Показать все фото</a>
+              <div class="person-lightbox-complete-list legacy-person-lightbox-complete-list" data-legacy-person-complete-slideshow data-legacy-person-complete-slideshow-count="{{ selected_person_available_photos|length }}" aria-hidden="true">
+                {% for photo in selected_person_available_photos %}
+                <a class="photo-link person-lightbox-extra-link" href="{{ photo_view_url(photo.path, photo.label, selected_person_return) }}" data-lightbox-group="{{ legacy_person_lightbox_group }}" data-lightbox-caption="{{ photo.label }}" data-lightbox-src="{{ media_url(photo.path) }}" tabindex="-1">{{ photo.label }}</a>
+                {% endfor %}
+              </div>
+              <script type="application/json" data-lightbox-items="{{ legacy_person_lightbox_group }}" data-legacy-person-full-lightbox-items>
+              [
+                {% set legacy_lightbox_json = namespace(first=true) %}
+                {% for photo in selected_person_available_photos %}
+                {% if not legacy_lightbox_json.first %},{% endif %}
+                {
+                  "src": {{ media_url(photo.path)|tojson }},
+                  "caption": {{ photo.label|tojson }}
+                }
+                {% set legacy_lightbox_json.first = false %}
+                {% endfor %}
+              ]
+              </script>
+              <a href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </section>
           </div>
         {% else %}

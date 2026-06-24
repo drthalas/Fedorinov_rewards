@@ -16,7 +16,7 @@ from ..repositories.legacy_rewards import (
     normalized_legacy_rewards_filters,
 )
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
-from ..repositories.persons import get_person, list_person_rewards
+from ..repositories.persons import get_person, list_person_rewards, person_photo_items
 from ..repositories.search import search_all, search_suggestions
 from ..repositories.summary import (
     summary_filter_cascade,
@@ -29,9 +29,10 @@ from ..repositories.summary import (
     summary_totals,
 )
 from ..services.app_settings import AppSettingsError, program_title, save_program_title
+from ..services.display import has_media_path
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
-from ..services.person_files import person_archive_filename
+from ..services.person_files import person_archive_filename, person_folder_image_items
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
 from ..version import APP_NAME, APP_VERSION, APP_VERSION_DATE
@@ -344,6 +345,10 @@ def legacy_index(
         "persons": [],
         "selected_person": None,
         "selected_person_archive_filename": "",
+        "selected_person_photos": [],
+        "selected_person_additional_photos": [],
+        "selected_person_full_photos": [],
+        "selected_person_available_photos": [],
         "person_rewards": [],
         "persons_total": 0,
         "rewards_filters": rewards_filters,
@@ -438,10 +443,25 @@ def legacy_index(
     if selected_person_id is not None:
         selected_person = get_person(settings.rewards_db_path, selected_person_id)
         context["selected_person"] = selected_person
-        context["person_rewards"] = list_person_rewards(settings.rewards_db_path, selected_person_id)
+        selected_person_rewards = list_person_rewards(settings.rewards_db_path, selected_person_id)
+        context["person_rewards"] = selected_person_rewards
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
         if selected_person is not None:
             context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
+            selected_person_photos = person_photo_items(selected_person, selected_person_rewards)
+            selected_person_additional_photos = person_folder_image_items(
+                settings,
+                selected_person_id,
+                [photo.get("path") for photo in selected_person_photos],
+            )
+            context["selected_person_photos"] = selected_person_photos
+            context["selected_person_additional_photos"] = selected_person_additional_photos
+            context["selected_person_full_photos"] = selected_person_photos + selected_person_additional_photos
+            context["selected_person_available_photos"] = [
+                photo
+                for photo in context["selected_person_full_photos"]
+                if has_media_path(photo.get("path"))
+            ]
 
     selected_mark_id = mark_id or (int(marks[0]["id"]) if marks else None)
     if selected_mark_id is not None:

@@ -73,6 +73,25 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-lightbox-complete-list", styles)
         self.assertIn("clip-path: inset(50%)", styles)
 
+    def test_legacy_rewards_photo_block_uses_complete_person_photo_group(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        legacy_router = (ROOT / "backend" / "app" / "routers" / "legacy.py").read_text()
+
+        self.assertIn("selected_person_available_photos", legacy_template)
+        self.assertIn("legacy_person_lightbox_group", legacy_template)
+        self.assertIn('data-lightbox-group="{{ legacy_person_lightbox_group }}"', legacy_template)
+        self.assertIn('type="application/json" data-lightbox-items="{{ legacy_person_lightbox_group }}"', legacy_template)
+        self.assertIn("data-legacy-person-full-lightbox-items", legacy_template)
+        self.assertIn("data-legacy-person-complete-slideshow", legacy_template)
+        self.assertIn("person-lightbox-extra-link", legacy_template)
+        self.assertIn("media_url(photo.path)|tojson", legacy_template)
+        self.assertIn("/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}", legacy_template)
+        self.assertIn("person_photo_items", legacy_router)
+        self.assertIn("person_folder_image_items", legacy_router)
+        self.assertIn("selected_person_full_photos", legacy_router)
+        self.assertIn("has_media_path(photo.get(\"path\"))", legacy_router)
+        self.assertIn("selected_person_photos + selected_person_additional_photos", legacy_router)
+
     def test_legacy_rewards_has_filters_totals_and_double_click(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         script = (ROOT / "backend" / "app" / "static" / "legacy_rewards.js").read_text()
