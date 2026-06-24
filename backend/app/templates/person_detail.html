@@ -51,15 +51,15 @@
   <div class="panel person-links-panel">
     <h2>Ссылки</h2>
     <dl class="details person-detail-list">
-      <dt>Ссылка на сайт "Память народа"</dt>
-      <dd class="link-wrap">
+      <dt>Память народа</dt>
+      <dd class="compact-link-value">
         {% set link_url = safe_external_url(person.link1) %}
-        {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link1 }}</a>{% else %}{{ person.link1|dash }}{% endif %}
+        {% if link_url %}<a class="compact-external-link" href="{{ link_url }}" title="{{ person.link1 }}" target="_blank" rel="noopener noreferrer">Память народа</a>{% else %}<span class="compact-link-text" title="{{ person.link1 }}">{{ person.link1|dash }}</span>{% endif %}
       </dd>
-      <dt>Ссылка на сайт "Форум коллекционеров"</dt>
-      <dd class="link-wrap">
+      <dt>Форум коллекционеров</dt>
+      <dd class="compact-link-value">
         {% set link_url = safe_external_url(person.link2) %}
-        {% if link_url %}<a class="link-wrap" href="{{ link_url }}" target="_blank" rel="noopener noreferrer">{{ person.link2 }}</a>{% else %}{{ person.link2|dash }}{% endif %}
+        {% if link_url %}<a class="compact-external-link" href="{{ link_url }}" title="{{ person.link2 }}" target="_blank" rel="noopener noreferrer">Форум коллекционеров</a>{% else %}<span class="compact-link-text" title="{{ person.link2 }}">{{ person.link2|dash }}</span>{% endif %}
       </dd>
     </dl>
   </div>

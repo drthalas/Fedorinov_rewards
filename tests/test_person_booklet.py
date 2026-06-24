@@ -165,6 +165,22 @@ class PersonBookletTests(unittest.TestCase):
         self.assertNotIn("unsafe.exe", rendered)
         self.assertNotIn(str(self.root), rendered)
 
+    def test_person_detail_links_use_compact_labels_and_keep_full_url_in_title(self) -> None:
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = persons_router.person_detail(FakeRequest(path="/persons/1"), 1)
+        rendered = templates.env.get_template("person_detail.html").render(
+            request=FakeRequest(path="/persons/1"),
+            **context,
+        )
+
+        self.assertIn("<dt>Память народа</dt>", rendered)
+        self.assertIn('class="compact-link-value"', rendered)
+        self.assertIn('class="compact-external-link"', rendered)
+        self.assertIn('href="https://example.com/memory"', rendered)
+        self.assertIn('title="https://example.com/memory"', rendered)
+        self.assertIn(">Память народа</a>", rendered)
+        self.assertNotIn(">https://example.com/memory</a>", rendered)
+
     def test_booklet_preview_renders_person_biography_and_rewards(self) -> None:
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
             context = persons_router.person_booklet(FakeRequest(), 1, return_to="/persons/1")

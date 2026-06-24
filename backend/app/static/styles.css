@@ -286,6 +286,41 @@ a.link-wrap {
   min-width: 0;
 }
 
+.person-links-panel .details.person-detail-list {
+  grid-template-columns: minmax(92px, 150px) minmax(0, 1fr);
+}
+
+.person-links-panel .details.person-detail-list dt,
+.person-links-panel .details.person-detail-list dd {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.person-links-panel .details.person-detail-list dt {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.compact-link-value {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.compact-external-link,
+.compact-link-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
 .person-bio-panel .bio-text {
   max-height: 72px;
   overflow: auto;

@@ -294,7 +294,11 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-detail-photo-grid", person_detail)
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
-        self.assertIn("link-wrap", person_detail)
+        self.assertIn("compact-link-value", person_detail)
+        self.assertIn("compact-external-link", person_detail)
+        self.assertIn('title="{{ person.link1 }}"', person_detail)
+        self.assertIn(">Память народа</a>", person_detail)
+        self.assertIn(">Форум коллекционеров</a>", person_detail)
         self.assertIn("legacy-person-heading", legacy_template)
         self.assertIn("legacy-person-title wrap-text", legacy_template)
         self.assertIn("legacy-person-meta wrap-text", legacy_template)
@@ -305,6 +309,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".grid.person-detail-grid", styles)
         self.assertIn(".details.person-detail-list", styles)
         self.assertIn(".person-links-panel", styles)
+        self.assertIn(".compact-link-value", styles)
+        self.assertIn(".compact-external-link", styles)
         self.assertIn(".compact-person-detail", styles)
         self.assertIn(".compact-photo-grid .photo-frame", styles)
         self.assertIn(".person-detail-photo-grid", styles)
@@ -326,7 +332,11 @@ class LegacyShellLightboxTests(unittest.TestCase):
         )
         self.assertRegex(
             styles,
-            re.compile(r"\.details\.person-detail-list dd\.link-wrap,[^{]+dd\.link-wrap a\s*\{[^}]*overflow-wrap:\s*anywhere;", re.S),
+            re.compile(r"\.person-links-panel \.details\.person-detail-list\s*\{[^}]*grid-template-columns:\s*minmax\(92px,\s*150px\) minmax\(0,\s*1fr\);", re.S),
+        )
+        self.assertRegex(
+            styles,
+            re.compile(r"\.compact-external-link,[^{]+\.compact-link-text\s*\{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;[^}]*overflow-wrap:\s*normal;[^}]*word-break:\s*normal;", re.S),
         )
         self.assertIn(".legacy-person-heading", styles)
         self.assertIn(".person-summary-strip", styles)
