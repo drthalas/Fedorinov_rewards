@@ -68,6 +68,27 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v0.1.11
+
+Статус: выпущено.
+
+Дата релиза: 2026-06-26.
+
+Состав:
+
+- Включает стабильную базу v0.1.10.
+- Включает ALE-222: loading state на вкладке "Награды", улучшенный typeahead по ФИО, навигация Arrow/Page/Home/End, удаление нижней дублирующей кнопки "Показать все фото".
+- Включает ALE-223: кнопка "Назад" в карточке кавалера, удаление дублирующего инфо-блока, увеличенные главное фото/биография/ссылки, фото в два ряда.
+- Включает ALE-224: длинные фильтры поиска, пагинация по 50 строк, синхронная высота строк, полный CSV export.
+
+Проверки:
+
+- Owner/manual PASS по ALE-222, ALE-223, ALE-224.
+- Unit tests: 299 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Package SHA256: `80e23581d58457d77e6c3a3021164ba4ec033acff6556a411fdf0730742b3fdb`.
+
 ## v0.1.10
 
 Статус: выпущено.
