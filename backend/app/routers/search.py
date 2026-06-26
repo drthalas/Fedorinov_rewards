@@ -43,12 +43,16 @@ def _with_message(url: str, message: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
+SEARCH_PAGE_SIZE = 50
+SEARCH_CSV_LIMIT = 10000
+
+
 def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: str = "asc", db_path: Path | None = None) -> str:
     settings = get_settings()
     active_db_path = db_path or settings.rewards_db_path
     db_available = db_path is not None or settings.db_exists
     results = (
-        search_all(active_db_path, q, limit=100, scope=scope, mode=mode, sort_by=sort, sort_dir=direction)
+        search_all(active_db_path, q, limit=SEARCH_CSV_LIMIT, page=1, scope=scope, mode=mode, sort_by=sort, sort_dir=direction)
         if db_available and (q.strip() or scope != "all")
         else None
     )
@@ -139,6 +143,41 @@ def _search_url(path: str, q: str, scope: str, mode: str, sort: str = "", direct
     return urlunsplit(("", "", path, urlencode(params), ""))
 
 
+def _search_pagination_context(
+    path: str,
+    q: str,
+    scope: str,
+    mode: str,
+    sort: str,
+    direction: str,
+    photo_mode: str,
+    results: dict[str, object],
+) -> dict[str, object]:
+    current_page = int(results.get("page") or 1)
+    total_pages = int(results.get("pages") or 1)
+
+    def url_for(page_number: int) -> str:
+        extra: dict[str, str] = {}
+        if _clean_photo_mode(photo_mode) == "photos":
+            extra["photo_mode"] = "photos"
+        if page_number > 1:
+            extra["page"] = str(page_number)
+        return _search_url(path, q, scope, mode, sort, direction, extra)
+
+    return {
+        "page": current_page,
+        "pages": total_pages,
+        "page_size": int(results.get("page_size") or SEARCH_PAGE_SIZE),
+        "total": int(results.get("total") or 0),
+        "range_start": int(results.get("range_start") or 0),
+        "range_end": int(results.get("range_end") or 0),
+        "prev_url": url_for(current_page - 1) if current_page > 1 else "",
+        "next_url": url_for(current_page + 1) if current_page < total_pages else "",
+        "first_url": url_for(1),
+        "last_url": url_for(total_pages),
+    }
+
+
 def _search_sort_context(path: str, q: str, scope: str, mode: str, current_sort: str, current_dir: str, extra: dict[str, str] | None = None) -> dict[str, object]:
     def url_for(sort_key: str) -> str:
         next_dir = "desc" if current_sort == sort_key and current_dir == "asc" else "asc"
@@ -187,16 +226,20 @@ def search_index(
     sort: str = "",
     dir: str = "asc",
     photo_mode: str = "flags",
+    page: int = 1,
 ):
     settings = get_settings()
     active_photo_mode = _clean_photo_mode(photo_mode)
     results = (
-        search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
+        search_all(settings.rewards_db_path, q, limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
         if settings.db_exists
-        else search_all(settings.rewards_db_path, "", limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
+        else search_all(settings.rewards_db_path, "", limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
     )
-    photo_extra = {"photo_mode": active_photo_mode} if active_photo_mode == "photos" else None
+    photo_extra = {"photo_mode": active_photo_mode} if active_photo_mode == "photos" else {}
+    if int(results["page"]) > 1:
+        photo_extra["page"] = str(results["page"])
     return_to = _search_url("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"], photo_extra)
+    sort_extra = {"photo_mode": active_photo_mode} if active_photo_mode == "photos" else None
     return templates.TemplateResponse(
         request,
         "search.html",
@@ -212,7 +255,17 @@ def search_index(
             "message": request.query_params.get("message", ""),
             "search_suggestions": search_suggestions(settings.rewards_db_path) if settings.db_exists else {},
             "search_return_to": return_to,
-            "search_sort": _search_sort_context("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"], photo_extra),
+            "search_sort": _search_sort_context("/search", q, results["scope"], results["mode"], results["sort_by"], results["sort_dir"], sort_extra),
+            "search_pagination": _search_pagination_context(
+                "/search",
+                q,
+                results["scope"],
+                results["mode"],
+                results["sort_by"],
+                results["sort_dir"],
+                active_photo_mode,
+                results,
+            ),
         },
     )
 

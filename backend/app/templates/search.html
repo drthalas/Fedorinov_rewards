@@ -4,6 +4,28 @@
 {% macro search_sort_th(key, label) -%}
 <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
 {%- endmacro %}
+{% macro search_pagination_controls(pagination) -%}
+{% if pagination and pagination.total > pagination.page_size %}
+<nav class="search-pagination" aria-label="Страницы результатов поиска">
+  <span class="search-pagination-range">Показаны {{ pagination.range_start }}–{{ pagination.range_end }} из {{ pagination.total }}</span>
+  {% if pagination.page > 1 %}
+  <a class="button secondary-button search-page-button" href="{{ pagination.first_url }}">Первая</a>
+  <a class="button secondary-button search-page-button" href="{{ pagination.prev_url }}">Предыдущая</a>
+  {% else %}
+  <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Первая</span>
+  <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Предыдущая</span>
+  {% endif %}
+  <span class="search-page-current">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+  {% if pagination.page < pagination.pages %}
+  <a class="button secondary-button search-page-button" href="{{ pagination.next_url }}">Следующая</a>
+  <a class="button secondary-button search-page-button" href="{{ pagination.last_url }}">Последняя</a>
+  {% else %}
+  <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Следующая</span>
+  <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Последняя</span>
+  {% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
 {% macro search_photo_cell(row, flag_field, path_field, label) -%}
 <td class="search-photo-cell {% if photo_mode == 'photos' %}search-photo-cell--preview{% endif %}" data-search-photo-field="{{ flag_field }}">
   {% if photo_mode == "photos" %}
@@ -25,14 +47,14 @@
 {% endif %}
 <form class="search-controls search-suggestions-form" method="get" action="/search" autocomplete="off">
   <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
-  <label>
+  <label class="search-scope-control">
     <span>Категория поиска</span>
-    <select name="scope">
-      <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
-      <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
-      <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
-      <option value="reward_numbers" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды</option>
-      <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
+    <select name="scope" title="Категория поиска">
+      <option value="all" title="Везде" {% if scope == "all" %}selected{% endif %}>Везде</option>
+      <option value="persons" title="Награждённые" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
+      <option value="rewards" title="Наименование награды" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
+      <option value="reward_numbers" title="Номер награды" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды</option>
+      <option value="marks" title="Знаки" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
     </select>
   </label>
   <label>
@@ -86,13 +108,14 @@
     <button class="link-button" type="submit">Сохранить CSV</button>
   </form>
 </div>
+{{ search_pagination_controls(search_pagination) }}
 <section class="grid">
   {% if scope in ["all", "persons"] %}
   <div class="panel">
     <h2>Награжденные</h2>
-    <p class="muted">Найдено: {{ results.counts.persons }} · показаны первые {{ results.persons|length }} из {{ results.counts.persons }}</p>
+    <p class="muted">Найдено: {{ results.counts.persons }} · показано на странице: {{ results.persons|length }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
         <thead>
           <tr>
             <th>№</th>
@@ -111,7 +134,7 @@
         <tbody>
           {% for person in results.persons %}
           <tr>
-            <td>{{ loop.index }}</td>
+            <td>{{ results.offset + loop.index }}</td>
             <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
             <td>{{ person.rank_name|dash }}</td>
             <td>{{ person.birthday|format_date }}</td>
@@ -134,9 +157,9 @@
   {% if scope in ["all", "rewards", "reward_numbers"] %}
   <div class="panel">
     <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }}</h2>
-    <p class="muted">Найдено: {{ results.counts.rewards }} · показаны первые {{ results.rewards|length }} из {{ results.counts.rewards }}</p>
+    <p class="muted">Найдено: {{ results.counts.rewards }} · показано на странице: {{ results.rewards|length }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
         <thead>
           <tr>
             {{ search_sort_th("fio", "ФИО") }}
@@ -190,7 +213,7 @@
   {% if scope in ["all", "marks"] %}
   <div class="panel">
     <h2>Знаки</h2>
-    <p class="muted">Найдено: {{ results.counts.marks }} · показаны первые {{ results.marks|length }} из {{ results.counts.marks }}</p>
+    <p class="muted">Найдено: {{ results.counts.marks }} · показано на странице: {{ results.marks|length }}</p>
     <ul>
       {% for mark in results.marks %}
       <li><a href="/marks/{{ mark.id }}?return_to={{ search_return_to|urlencode }}">#{{ mark.id }} · {{ mark.name|dash }}</a> · № {{ mark.number|dash }} · <span class="badge badge-{{ mark.instock|bool_class }}">{{ mark.instock|format_bool("В наличии", "Нет") }}</span></li>
@@ -201,7 +224,7 @@
   </div>
   {% endif %}
 </section>
-<p class="muted">По каждой группе показаны первые {{ results.limit }} результатов.</p>
+{{ search_pagination_controls(search_pagination) }}
 {% endif %}
 {% endif %}
 {% endblock %}

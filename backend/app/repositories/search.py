@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from math import ceil
 from time import perf_counter
 
 from .common import fetch_all
@@ -9,6 +10,7 @@ from .common import fetch_all
 VALID_SCOPES = {"all", "persons", "rewards", "reward_numbers", "marks"}
 VALID_MODES = {"contains", "starts", "exact"}
 DEFAULT_LIMIT = 50
+MAX_LIMIT = 10000
 
 
 def _normalize(value: object) -> str:
@@ -39,8 +41,27 @@ def _row_matches(row: dict[str, object], fields: tuple[str, ...], needle: str, m
     return any(_matches(row.get(field), needle, mode) for field in fields)
 
 
-def _limited(rows: list[dict[str, object]], limit: int) -> list[dict[str, object]]:
-    return rows[: max(0, limit)]
+def _slice_groups(
+    groups: list[list[dict[str, object]]],
+    offset: int,
+    limit: int,
+) -> list[list[dict[str, object]]]:
+    remaining_offset = max(0, offset)
+    remaining_limit = max(0, limit)
+    sliced_groups: list[list[dict[str, object]]] = []
+    for rows in groups:
+        if remaining_limit <= 0:
+            sliced_groups.append([])
+            continue
+        if remaining_offset >= len(rows):
+            remaining_offset -= len(rows)
+            sliced_groups.append([])
+            continue
+        selected = rows[remaining_offset : remaining_offset + remaining_limit]
+        sliced_groups.append(selected)
+        remaining_limit -= len(selected)
+        remaining_offset = 0
+    return sliced_groups
 
 
 def _sort_rows(rows: list[dict[str, object]], sort_by: str, sort_dir: str) -> list[dict[str, object]]:
@@ -83,8 +104,25 @@ def _sort_rows(rows: list[dict[str, object]], sort_by: str, sort_dir: str) -> li
     return sorted(rows, key=lambda row: (sortable(row), str(row.get("fio") or "").casefold(), int(row.get("id") or 0)), reverse=clean_dir == "desc")
 
 
-def _empty_result(query: str, scope: str, mode: str, limit: int, elapsed_ms: float = 0.0, sort_by: str = "", sort_dir: str = "asc") -> dict[str, object]:
+def _pagination(total: int, limit: int, requested_page: int) -> dict[str, int]:
+    page_size = max(1, min(int(limit), MAX_LIMIT))
+    page_count = max(1, ceil(total / page_size)) if total else 1
+    page = max(1, min(int(requested_page), page_count))
+    offset = (page - 1) * page_size if total else 0
+    return {
+        "page": page,
+        "pages": page_count,
+        "page_size": page_size,
+        "offset": offset,
+        "range_start": offset + 1 if total else 0,
+        "range_end": min(total, offset + page_size) if total else 0,
+        "total": total,
+    }
+
+
+def _empty_result(query: str, scope: str, mode: str, limit: int, elapsed_ms: float = 0.0, sort_by: str = "", sort_dir: str = "asc", page: int = 1) -> dict[str, object]:
     counts = {"persons": 0, "rewards": 0, "marks": 0}
+    pagination = _pagination(0, limit, page)
     return {
         "query": query,
         "scope": scope,
@@ -95,6 +133,12 @@ def _empty_result(query: str, scope: str, mode: str, limit: int, elapsed_ms: flo
         "elapsed_ms": elapsed_ms,
         "counts": counts,
         "total": 0,
+        "page": pagination["page"],
+        "pages": pagination["pages"],
+        "page_size": pagination["page_size"],
+        "offset": pagination["offset"],
+        "range_start": pagination["range_start"],
+        "range_end": pagination["range_end"],
         "persons": [],
         "rewards": [],
         "marks": [],
@@ -257,6 +301,7 @@ def search_all(
     db_path: Path,
     query: str,
     limit: int = DEFAULT_LIMIT,
+    page: int = 1,
     scope: str = "all",
     mode: str = "contains",
     sort_by: str = "",
@@ -266,14 +311,15 @@ def search_all(
     cleaned_query = query.strip()
     cleaned_scope = _clean_scope(scope)
     cleaned_mode = _clean_mode(mode)
-    safe_limit = max(1, min(int(limit), 100))
+    safe_limit = max(1, min(int(limit), MAX_LIMIT))
+    requested_page = max(1, int(page or 1))
     needle = _normalize(cleaned_query)
     persons: list[dict[str, object]] = []
     rewards: list[dict[str, object]] = []
     marks: list[dict[str, object]] = []
 
     if not needle and cleaned_scope == "all":
-        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit, sort_by=sort_by, sort_dir=sort_dir)
+        return _empty_result(cleaned_query, cleaned_scope, cleaned_mode, safe_limit, sort_by=sort_by, sort_dir=sort_dir, page=requested_page)
 
     if cleaned_scope in {"all", "persons"}:
         person_rows = _person_rows(db_path)
@@ -315,6 +361,9 @@ def search_all(
         marks = _sort_rows(marks, sort_by, sort_dir)
 
     counts = {"persons": len(persons), "rewards": len(rewards), "marks": len(marks)}
+    total = sum(counts.values())
+    pagination = _pagination(total, safe_limit, requested_page)
+    persons_page, rewards_page, marks_page = _slice_groups([persons, rewards, marks], pagination["offset"], safe_limit)
     elapsed_ms = round((perf_counter() - started) * 1000, 2)
     return {
         "query": cleaned_query,
@@ -325,8 +374,14 @@ def search_all(
         "limit": safe_limit,
         "elapsed_ms": elapsed_ms,
         "counts": counts,
-        "total": sum(counts.values()),
-        "persons": _limited(persons, safe_limit),
-        "rewards": _limited(rewards, safe_limit),
-        "marks": _limited(marks, safe_limit),
+        "total": total,
+        "page": pagination["page"],
+        "pages": pagination["pages"],
+        "page_size": pagination["page_size"],
+        "offset": pagination["offset"],
+        "range_start": pagination["range_start"],
+        "range_end": pagination["range_end"],
+        "persons": persons_page,
+        "rewards": rewards_page,
+        "marks": marks_page,
     }

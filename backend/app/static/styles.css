@@ -874,7 +874,7 @@ th {
 
 .search-controls {
   display: grid;
-  grid-template-columns: 180px 180px minmax(220px, 1fr) minmax(150px, auto) auto;
+  grid-template-columns: minmax(240px, 280px) minmax(170px, 200px) minmax(260px, 1fr) minmax(150px, auto) auto;
   gap: 10px;
   align-items: end;
   margin-bottom: 16px;
@@ -887,6 +887,11 @@ th {
 .search-controls label,
 .legacy-search-form label {
   display: block;
+  min-width: 0;
+}
+
+.search-scope-control {
+  min-width: 240px;
 }
 
 .search-photo-mode {
@@ -931,16 +936,46 @@ th {
 .legacy-search-form input,
 .legacy-search-form select {
   width: 100%;
+  min-width: 0;
   padding: 8px 9px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
   font: inherit;
 }
 
+.search-scope-control select {
+  min-width: 240px;
+  text-overflow: ellipsis;
+}
+
 .search-buttons {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.search-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 12px;
+  padding: 8px;
+  border: 1px solid #d9dee5;
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.search-pagination-range,
+.search-page-current {
+  color: #334155;
+  font-weight: 700;
+}
+
+.search-page-button {
+  min-width: 96px;
+  padding: 5px 10px;
+  text-align: center;
 }
 
 .search-results-table {
@@ -2125,7 +2160,7 @@ th {
 
 .legacy-search-form {
   display: grid;
-  grid-template-columns: 180px 180px minmax(220px, 1fr) minmax(150px, auto) auto auto;
+  grid-template-columns: minmax(240px, 280px) minmax(170px, 200px) minmax(260px, 1fr) minmax(150px, auto) auto auto;
   gap: 8px;
   align-items: end;
   margin-bottom: 12px;
@@ -2374,6 +2409,11 @@ th {
   .search-controls,
   .legacy-search-form {
     grid-template-columns: 1fr;
+  }
+
+  .search-scope-control,
+  .search-scope-control select {
+    min-width: 0;
   }
 
   .legacy-list {

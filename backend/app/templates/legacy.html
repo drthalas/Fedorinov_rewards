@@ -293,6 +293,28 @@
       {% macro search_sort_th(key, label) -%}
       <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
       {%- endmacro %}
+      {% macro search_pagination_controls(pagination) -%}
+      {% if pagination and pagination.total > pagination.page_size %}
+      <nav class="search-pagination" aria-label="Страницы результатов поиска">
+        <span class="search-pagination-range">Показаны {{ pagination.range_start }}–{{ pagination.range_end }} из {{ pagination.total }}</span>
+        {% if pagination.page > 1 %}
+        <a class="button secondary-button search-page-button" href="{{ pagination.first_url }}">Первая</a>
+        <a class="button secondary-button search-page-button" href="{{ pagination.prev_url }}">Предыдущая</a>
+        {% else %}
+        <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Первая</span>
+        <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Предыдущая</span>
+        {% endif %}
+        <span class="search-page-current">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+        {% if pagination.page < pagination.pages %}
+        <a class="button secondary-button search-page-button" href="{{ pagination.next_url }}">Следующая</a>
+        <a class="button secondary-button search-page-button" href="{{ pagination.last_url }}">Последняя</a>
+        {% else %}
+        <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Следующая</span>
+        <span class="button secondary-button disabled-button search-page-button" aria-disabled="true">Последняя</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+      {%- endmacro %}
       {% macro search_photo_cell(row, flag_field, path_field, label) -%}
       <td class="search-photo-cell {% if photo_mode == 'photos' %}search-photo-cell--preview{% endif %}" data-search-photo-field="{{ flag_field }}">
         {% if photo_mode == "photos" %}
@@ -312,14 +334,14 @@
       <form class="legacy-search-form search-suggestions-form" method="get" action="/legacy" autocomplete="off">
         <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
         <input type="hidden" name="tab" value="search">
-        <label>
+        <label class="search-scope-control">
           <span>Категория поиска</span>
-          <select name="scope">
-            <option value="all" {% if scope == "all" %}selected{% endif %}>Везде</option>
-            <option value="persons" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
-            <option value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
-            <option value="reward_numbers" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды</option>
-            <option value="marks" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
+          <select name="scope" title="Категория поиска">
+            <option value="all" title="Везде" {% if scope == "all" %}selected{% endif %}>Везде</option>
+            <option value="persons" title="Награждённые" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
+            <option value="rewards" title="Наименование награды" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
+            <option value="reward_numbers" title="Номер награды" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды</option>
+            <option value="marks" title="Знаки" {% if scope == "marks" %}selected{% endif %}>Знаки</option>
           </select>
         </label>
         <label>
@@ -364,12 +386,13 @@
         {% if search_results.total == 0 %}
           <div class="notice">Ничего не найдено.</div>
         {% else %}
+          {{ search_pagination_controls(search_pagination) }}
           {% if scope in ["all", "persons"] %}
           <section class="legacy-block">
             <h2>Награждённые ({{ search_results.counts.persons }})</h2>
-            <p class="secondary">Показаны первые {{ search_results.persons|length }} из {{ search_results.counts.persons }}</p>
+            <p class="secondary">Показано на странице: {{ search_results.persons|length }} из найденных {{ search_results.counts.persons }}</p>
             <div class="legacy-table-wrap">
-              <table class="legacy-table search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
+              <table class="legacy-table search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
                 <thead>
                   <tr>
                     <th>№</th>
@@ -388,7 +411,7 @@
                 <tbody>
                   {% for person in search_results.persons %}
                   <tr>
-                    <td>{{ loop.index }}</td>
+                    <td>{{ search_results.offset + loop.index }}</td>
                     <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
                     <td>{{ person.rank_name|dash }}</td>
                     <td>{{ person.birthday|format_date }}</td>
@@ -411,9 +434,9 @@
           {% if scope in ["all", "rewards", "reward_numbers"] %}
           <section class="legacy-block">
             <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }} ({{ search_results.counts.rewards }})</h2>
-            <p class="secondary">Показаны первые {{ search_results.rewards|length }} из {{ search_results.counts.rewards }}</p>
+            <p class="secondary">Показано на странице: {{ search_results.rewards|length }} из найденных {{ search_results.counts.rewards }}</p>
             <div class="legacy-table-wrap">
-              <table class="legacy-table search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table>
+              <table class="legacy-table search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
                 <thead>
                   <tr>
                     {{ search_sort_th("fio", "ФИО") }}
@@ -467,7 +490,7 @@
           {% if scope in ["all", "marks"] %}
           <section class="legacy-block">
             <h2>Знаки ({{ search_results.counts.marks }})</h2>
-            <p class="secondary">Показаны первые {{ search_results.marks|length }} из {{ search_results.counts.marks }}</p>
+            <p class="secondary">Показано на странице: {{ search_results.marks|length }} из найденных {{ search_results.counts.marks }}</p>
             <div class="legacy-table-wrap">
               <table class="legacy-table">
                 <thead><tr><th>ID</th><th>Наименование</th><th>Номер</th><th>Наличие</th></tr></thead>
@@ -487,7 +510,7 @@
             </div>
           </section>
           {% endif %}
-          <p class="secondary">Показаны первые {{ search_results.limit }} результатов в каждой группе.</p>
+          {{ search_pagination_controls(search_pagination) }}
         {% endif %}
       {% endif %}
     </section>

@@ -42,6 +42,7 @@ from .templates import templates
 router = APIRouter()
 
 VALID_TABS = {"rewards", "search", "marks", "summary", "about"}
+SEARCH_PAGE_SIZE = 50
 STATUS_MESSAGES = {
     "created": "Награждённый добавлен.",
     "updated": "Изменения сохранены.",
@@ -249,14 +250,45 @@ def _clean_photo_mode(photo_mode: str = "") -> str:
     return "photos" if str(photo_mode or "").strip() == "photos" else "flags"
 
 
-def _legacy_search_url(q: str, scope: str, mode: str, sort: str = "", direction: str = "asc", photo_mode: str = "flags") -> str:
+def _legacy_search_url(q: str, scope: str, mode: str, sort: str = "", direction: str = "asc", photo_mode: str = "flags", page: int = 1) -> str:
     params = {"tab": "search", "q": q, "scope": scope, "mode": mode}
     if sort:
         params["sort"] = sort
         params["dir"] = "desc" if direction == "desc" else "asc"
     if _clean_photo_mode(photo_mode) == "photos":
         params["photo_mode"] = "photos"
+    if int(page or 1) > 1:
+        params["page"] = str(page)
     return str(URL(path="/legacy").include_query_params(**params))
+
+
+def _legacy_search_pagination_context(
+    q: str,
+    scope: str,
+    mode: str,
+    sort: str,
+    direction: str,
+    photo_mode: str,
+    results: dict[str, object],
+) -> dict[str, object]:
+    current_page = int(results.get("page") or 1)
+    total_pages = int(results.get("pages") or 1)
+
+    def url_for(page_number: int) -> str:
+        return _legacy_search_url(q, scope, mode, sort, direction, photo_mode, page_number)
+
+    return {
+        "page": current_page,
+        "pages": total_pages,
+        "page_size": int(results.get("page_size") or SEARCH_PAGE_SIZE),
+        "total": int(results.get("total") or 0),
+        "range_start": int(results.get("range_start") or 0),
+        "range_end": int(results.get("range_end") or 0),
+        "prev_url": url_for(current_page - 1) if current_page > 1 else "",
+        "next_url": url_for(current_page + 1) if current_page < total_pages else "",
+        "first_url": url_for(1),
+        "last_url": url_for(total_pages),
+    }
 
 
 def _search_sort_context(
@@ -365,6 +397,7 @@ def legacy_index(
     sort: str = "",
     dir: str = "asc",
     photo_mode: str = "flags",
+    page: int = 1,
     status: str = "",
     message: str = "",
     error: str = "",
@@ -450,8 +483,9 @@ def legacy_index(
         "photo_mode": active_photo_mode,
         "search_results": None,
         "search_suggestions": {},
-        "search_return_to": _legacy_search_url(q, scope, mode, sort, dir, active_photo_mode),
+        "search_return_to": _legacy_search_url(q, scope, mode, sort, dir, active_photo_mode, page),
         "search_sort": _search_sort_context("/legacy", q, scope, mode, sort, "desc" if str(dir or "").strip().lower() == "desc" else "asc", active_photo_mode),
+        "search_pagination": None,
         "summary": None,
         "summary_filters": normalized_summary_filters(
             country_id=country_id,
@@ -532,7 +566,7 @@ def legacy_index(
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
 
     if active_tab == "search" and (q.strip() or scope != "all"):
-        search_results = search_all(settings.rewards_db_path, q, limit=50, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
+        search_results = search_all(settings.rewards_db_path, q, limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
         context["search_results"] = search_results
         context["scope"] = search_results["scope"]
         context["mode"] = search_results["mode"]
@@ -545,6 +579,7 @@ def legacy_index(
             search_results["sort_by"],
             search_results["sort_dir"],
             active_photo_mode,
+            int(search_results["page"]),
         )
         context["search_sort"] = _search_sort_context(
             "/legacy",
@@ -554,6 +589,15 @@ def legacy_index(
             search_results["sort_by"],
             search_results["sort_dir"],
             active_photo_mode,
+        )
+        context["search_pagination"] = _legacy_search_pagination_context(
+            q,
+            search_results["scope"],
+            search_results["mode"],
+            search_results["sort_by"],
+            search_results["sort_dir"],
+            active_photo_mode,
+            search_results,
         )
     if active_tab == "search":
         context["search_suggestions"] = search_suggestions(settings.rewards_db_path)

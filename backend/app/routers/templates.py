@@ -18,7 +18,7 @@ from ..services.media import resolve_media_path
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260626-person-card-layout"
+STATIC_ASSET_VERSION = "20260626-search-pagination"
 
 
 def static_url(path: str) -> str:

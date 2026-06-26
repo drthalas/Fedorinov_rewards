@@ -244,6 +244,35 @@ class SearchRepositoryTests(unittest.TestCase):
         by_birth = search_all(self.db_path, "", scope="rewards", sort_by="birthday", sort_dir="desc")
         self.assertEqual(by_birth["rewards"][0]["fio"], "Андросов Леонид Тест")
 
+    def test_search_results_are_paginated_with_range_metadata(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            for idx in range(2, 63):
+                connection.execute(
+                    """
+                    insert into rewards (
+                        id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number, instock
+                    )
+                    values (?, 1, 1, 1, 1, 1, ?, 1)
+                    """,
+                    (idx + 100, idx),
+                )
+
+        first_page = search_all(self.db_path, "", scope="rewards", limit=50, page=1, sort_by="number", sort_dir="asc")
+        second_page = search_all(self.db_path, "", scope="rewards", limit=50, page=2, sort_by="number", sort_dir="asc")
+        last_page = search_all(self.db_path, "", scope="rewards", limit=50, page=99, sort_by="number", sort_dir="asc")
+
+        self.assertEqual(first_page["total"], 62)
+        self.assertEqual(first_page["range_start"], 1)
+        self.assertEqual(first_page["range_end"], 50)
+        self.assertEqual(first_page["page"], 1)
+        self.assertEqual(first_page["pages"], 2)
+        self.assertEqual(len(first_page["rewards"]), 50)
+        self.assertEqual(second_page["range_start"], 51)
+        self.assertEqual(second_page["range_end"], 62)
+        self.assertEqual(second_page["page"], 2)
+        self.assertEqual(len(second_page["rewards"]), 12)
+        self.assertEqual(last_page["page"], 2)
+
     def test_search_suggestions_are_loaded_from_database(self) -> None:
         suggestions = search_suggestions(self.db_path)
         self.assertIn("Андросов Леонид Тест", suggestions["persons"])
@@ -275,12 +304,30 @@ class SearchRepositoryTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
         legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
-        self.assertIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', search_template)
-        self.assertIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', legacy_template)
-        self.assertIn('value="reward_numbers" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды', search_template)
-        self.assertIn('value="reward_numbers" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды', legacy_template)
+        styles = (root / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+        self.assertIn('class="search-scope-control"', search_template)
+        self.assertIn('class="search-scope-control"', legacy_template)
+        self.assertIn('value="rewards" title="Наименование награды" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', search_template)
+        self.assertIn('value="rewards" title="Наименование награды" {% if scope == "rewards" %}selected{% endif %}>Наименование награды', legacy_template)
+        self.assertIn('value="reward_numbers" title="Номер награды" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды', search_template)
+        self.assertIn('value="reward_numbers" title="Номер награды" {% if scope == "reward_numbers" %}selected{% endif %}>Номер награды', legacy_template)
+        self.assertIn("minmax(240px, 280px)", styles)
+        self.assertIn(".search-scope-control select", styles)
         self.assertNotIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>', search_template)
         self.assertNotIn('value="rewards" {% if scope == "rewards" %}selected{% endif %}>Награды</option>', legacy_template)
+
+    def test_search_templates_render_pagination_controls(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_template = (root / "backend" / "app" / "templates" / "search.html").read_text(encoding="utf-8")
+        legacy_template = (root / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn("search_pagination_controls", search_template)
+        self.assertIn("search_pagination_controls", legacy_template)
+        self.assertIn("Показаны {{ pagination.range_start }}–{{ pagination.range_end }} из {{ pagination.total }}", search_template)
+        self.assertIn("Предыдущая", search_template)
+        self.assertIn("Следующая", search_template)
+        self.assertIn("Последняя", search_template)
+        self.assertIn('data-sync-row-height data-row-height-storage-key="search-results-row-height"', search_template)
+        self.assertIn('data-sync-row-height data-row-height-storage-key="search-results-row-height"', legacy_template)
 
     def test_person_search_results_render_user_columns_without_id_header(self) -> None:
         results = search_all(self.db_path, "Андрос", scope="persons")
@@ -296,6 +343,7 @@ class SearchRepositoryTests(unittest.TestCase):
             search_return_to="/search?q=%D0%90%D0%BD%D0%B4%D1%80%D0%BE%D1%81&scope=persons&mode=contains",
             sort="",
             dir="asc",
+            search_pagination=None,
             search_sort={"sort": "", "dir": "asc", "urls": {"fio": "#", "rank_name": "#", "birthday": "#", "person_foto_flag": "#", "main_foto_flag": "#", "rewards_foto_flag": "#", "book1_foto_flag": "#", "book2_foto_flag": "#", "card1_foto_flag": "#", "card2_foto_flag": "#"}},
         )
         self.assertNotIn("<th>ID</th>", rendered)
@@ -341,6 +389,7 @@ class SearchRepositoryTests(unittest.TestCase):
             message="",
             search_suggestions=search_suggestions(self.db_path),
             search_return_to="/search?q=%D0%9E%D1%80%D0%B4%D0%B5%D0%BD&scope=rewards&mode=contains&sort=number&dir=asc",
+            search_pagination=None,
             search_sort={"sort": "number", "dir": "asc", "urls": sort_urls},
         )
         self.assertIn("Фото учётной карточки, страница 1", rendered)
@@ -372,6 +421,7 @@ class SearchRepositoryTests(unittest.TestCase):
                 message="",
                 search_suggestions=search_suggestions(self.db_path),
                 search_return_to="/search?q=%D0%9E%D1%80%D0%B4%D0%B5%D0%BD&scope=rewards&mode=contains&photo_mode=photos",
+                search_pagination=None,
                 search_sort={"sort": "", "dir": "asc", "urls": {"front_foto_flag": "#", "reward_book1_foto_flag": "#"}},
             )
         finally:
@@ -439,6 +489,16 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("--search-photo-frame-size", search_js)
         self.assertIn("MAX_PHOTO_FRAME_SIZE", search_js)
 
+    def test_search_row_resize_syncs_all_rows_and_persists_for_next_page(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        search_js = (root / "backend" / "app" / "static" / "search_results.js").read_text(encoding="utf-8")
+        self.assertIn("DEFAULT_ROW_HEIGHT_STORAGE_KEY", search_js)
+        self.assertIn("data-sync-row-height", search_js)
+        self.assertIn("applyTableRowHeight", search_js)
+        self.assertIn("localStorage.setItem(rowHeightStorageKey(table)", search_js)
+        self.assertIn("localStorage.getItem(rowHeightStorageKey(table))", search_js)
+        self.assertIn("Array.from(table.querySelectorAll(\"tbody tr\"))", search_js)
+
     def test_search_csv_includes_reward_photo_document_columns(self) -> None:
         text = _search_csv_text("Орден", "rewards", "contains", "number", "asc", db_path=self.db_path)
         self.assertTrue(text.startswith("\ufeff"))
@@ -455,6 +515,23 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertNotIn("<img", text)
         self.assertNotIn("Source/1/10/front.jpg", text)
         self.assertNotIn("SourceMark", text)
+
+    def test_search_csv_exports_more_than_current_page(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            for idx in range(2, 63):
+                connection.execute(
+                    """
+                    insert into rewards (
+                        id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number, instock
+                    )
+                    values (?, 1, 1, 1, 1, 1, ?, 1)
+                    """,
+                    (idx + 100, idx),
+                )
+
+        text = _search_csv_text("", "rewards", "contains", "number", "asc", db_path=self.db_path)
+        self.assertGreaterEqual(len(text.splitlines()), 63)
+        self.assertIn(";62;", text)
 
     def test_search_csv_uses_excel_semicolon_delimiter(self) -> None:
         text = _search_csv_text("Орден", "rewards", "contains", "number", "asc", db_path=self.db_path)
