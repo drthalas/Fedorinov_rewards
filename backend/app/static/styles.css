@@ -169,7 +169,7 @@ a.link-wrap {
 }
 
 .grid.person-detail-grid {
-  grid-template-columns: minmax(210px, 0.85fr) minmax(220px, 1fr) minmax(220px, 1fr) minmax(120px, 150px);
+  grid-template-columns: minmax(260px, 0.78fr) minmax(360px, 1.35fr) minmax(280px, 0.9fr);
   align-items: start;
 }
 
@@ -229,7 +229,15 @@ a.link-wrap {
 }
 
 .person-detail-nav {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   margin: 0;
+}
+
+.person-detail-nav .person-history-back {
+  padding: 4px 10px;
 }
 
 .compact-section-title {
@@ -250,28 +258,32 @@ a.link-wrap {
 }
 
 .person-detail-photo-grid {
-  max-height: min(14vh, 112px);
-  overflow: auto;
-  padding-right: 2px;
+  grid-auto-columns: minmax(120px, 148px);
+  grid-auto-flow: column;
+  grid-template-columns: none;
+  grid-template-rows: repeat(2, minmax(112px, auto));
+  max-height: min(35vh, 296px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 2px 4px 0;
 }
 
 .compact-photo-grid {
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  gap: 4px;
+  gap: 6px;
 }
 
 .compact-photo-grid .photo-frame {
-  height: 60px;
+  height: 84px;
 }
 
 .compact-photo-grid p {
-  margin: 2px 0 0;
-  font-size: 10px;
-  line-height: 1.12;
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.16;
 }
 
 .compact-main-photo-panel .photo-frame {
-  height: 74px;
+  height: clamp(190px, 30vh, 320px);
 }
 
 .person-detail-rewards-wrap {
@@ -279,15 +291,26 @@ a.link-wrap {
   overflow: auto;
 }
 
-.person-card-panel,
 .person-bio-panel,
 .person-links-panel,
 .person-main-photo-panel {
   min-width: 0;
 }
 
+.person-main-photo-panel {
+  grid-column: 1;
+}
+
+.person-bio-panel {
+  grid-column: 2;
+}
+
+.person-links-panel {
+  grid-column: 3;
+}
+
 .person-links-panel .details.person-detail-list {
-  grid-template-columns: minmax(92px, 150px) minmax(0, 1fr);
+  grid-template-columns: minmax(130px, 180px) minmax(0, 1fr);
 }
 
 .person-links-panel .details.person-detail-list dt,
@@ -322,7 +345,8 @@ a.link-wrap {
 }
 
 .person-bio-panel .bio-text {
-  max-height: 72px;
+  min-height: 180px;
+  max-height: min(34vh, 340px);
   overflow: auto;
 }
 
@@ -357,6 +381,12 @@ a.link-wrap {
     grid-template-columns: 1fr;
   }
 
+  .person-links-panel {
+    grid-column: auto;
+  }
+
+  .person-main-photo-panel,
+  .person-bio-panel,
   .person-links-panel {
     grid-column: auto;
   }

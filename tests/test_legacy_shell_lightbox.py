@@ -48,7 +48,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260626-rewards-navigation"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260626-person-card-layout"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -346,7 +346,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-summary-strip", person_detail)
         self.assertIn('class="person-title wrap-text"', person_detail)
         self.assertIn("person-detail-list", person_detail)
-        self.assertIn("person-card-panel", person_detail)
+        self.assertNotIn("person-card-panel", person_detail)
         self.assertIn("person-links-panel", person_detail)
         self.assertIn("person-main-photo-panel", person_detail)
         self.assertIn("compact-person-detail", person_detail)
@@ -358,6 +358,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-detail-photo-grid", person_detail)
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
+        self.assertIn("data-history-back", person_detail)
+        self.assertIn('data-history-fallback="{{ return_to or \'/persons\' }}"', person_detail)
         self.assertIn("compact-link-value", person_detail)
         self.assertIn("compact-external-link", person_detail)
         self.assertIn('title="{{ person.link1 }}"', person_detail)
@@ -383,11 +385,15 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".compact-person-detail *", styles)
         self.assertIn("box-sizing: border-box", styles)
         self.assertIn("overflow-x: hidden", styles)
-        self.assertIn("max-height: min(14vh, 112px)", styles)
-        self.assertIn("height: 60px", styles)
+        self.assertIn("grid-template-rows: repeat(2, minmax(112px, auto))", styles)
+        self.assertIn("grid-auto-flow: column", styles)
+        self.assertIn("max-height: min(35vh, 296px)", styles)
+        self.assertIn("height: 84px", styles)
+        self.assertIn("height: clamp(190px, 30vh, 320px)", styles)
+        self.assertIn("min-height: 180px", styles)
         self.assertIn(".person-detail-rewards-wrap", styles)
         self.assertIn(
-            "grid-template-columns: minmax(210px, 0.85fr) minmax(220px, 1fr) minmax(220px, 1fr) minmax(120px, 150px)",
+            "grid-template-columns: minmax(260px, 0.78fr) minmax(360px, 1.35fr) minmax(280px, 0.9fr)",
             styles,
         )
         self.assertRegex(
@@ -396,7 +402,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         )
         self.assertRegex(
             styles,
-            re.compile(r"\.person-links-panel \.details\.person-detail-list\s*\{[^}]*grid-template-columns:\s*minmax\(92px,\s*150px\) minmax\(0,\s*1fr\);", re.S),
+            re.compile(r"\.person-links-panel \.details\.person-detail-list\s*\{[^}]*grid-template-columns:\s*minmax\(130px,\s*180px\) minmax\(0,\s*1fr\);", re.S),
         )
         self.assertRegex(
             styles,
@@ -476,6 +482,10 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-escape-back", reward_form)
         self.assertIn("data-escape-back", mark_form)
         self.assertIn(".photo-lightbox.is-open", script)
+        self.assertIn("data-history-back", script)
+        self.assertIn("window.history.back()", script)
+        self.assertIn("document.referrer", script)
+        self.assertIn("internalFallback", script)
 
     def test_clipboard_paste_button_is_active_in_photo_controls(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()

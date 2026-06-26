@@ -116,6 +116,29 @@ class PersonDetailReturnTests(unittest.TestCase):
         self.assertIn("/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}", template)
         self.assertTrue(encoded.startswith("%2Flegacy%3Ftab%3Drewards"))
 
+    def test_person_detail_has_separate_history_back_button_and_keeps_list_link(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
+        script = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "escape_back.js").read_text(encoding="utf-8")
+
+        self.assertIn("data-history-back", template)
+        self.assertIn('data-history-fallback="{{ return_to or \'/persons\' }}"', template)
+        self.assertIn("← Назад", template)
+        self.assertIn("← к списку", template)
+        self.assertIn("window.history.back()", script)
+        self.assertIn("document.referrer", script)
+        self.assertIn("internalFallback", script)
+        self.assertIn('fallback.startsWith("//")', script)
+
+    def test_person_detail_removes_duplicate_card_info_panel(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
+
+        self.assertIn("person-summary-strip", template)
+        self.assertIn("<dt>ID</dt>", template)
+        self.assertIn("{{ person.id }}", template)
+        self.assertIn("Краткая биография", template)
+        self.assertNotIn("person-card-panel", template)
+        self.assertNotIn("<h2>Карточка</h2>", template)
+
 
 if __name__ == "__main__":
     unittest.main()

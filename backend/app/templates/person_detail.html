@@ -7,6 +7,10 @@
   <h1 class="person-title wrap-text">{{ person.fio }}</h1>
   <dl class="person-summary-strip">
     <div>
+      <dt>ID</dt>
+      <dd>{{ person.id }}</dd>
+    </div>
+    <div>
       <dt>Звание / специальность</dt>
       <dd class="wrap-text">{{ person.rank_name|dash }}</dd>
     </div>
@@ -18,6 +22,7 @@
 </section>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p class="person-detail-nav compact-actions">
+  <button class="button secondary-button person-history-back" type="button" data-history-back data-history-fallback="{{ return_to or '/persons' }}">← Назад</button>
   <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
   · <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Все фото</a>
   · <a href="/persons/{{ person.id }}/booklet?return_to={{ (return_to or '/persons/' ~ person.id)|urlencode }}">Сформировать буклет</a>
@@ -35,14 +40,17 @@
 {% endif %}
 
 <section class="grid person-detail-grid compact-person-detail-grid">
-  <div class="panel person-card-panel">
-    <h2>Карточка</h2>
-    <dl class="details person-detail-list">
-      <dt>ID</dt><dd>{{ person.id }}</dd>
-      <dt>ФИО</dt><dd class="wrap-text">{{ person.fio|dash }}</dd>
-      <dt>Дата рождения</dt><dd>{{ person.birthday|format_date }}</dd>
-      <dt>Звание/специальность</dt><dd class="wrap-text">{{ person.rank_name|dash }}</dd>
-    </dl>
+  <div class="panel person-main-photo-panel compact-main-photo-panel">
+    <h2>Главное фото</h2>
+    <div class="photo-frame">
+    {% if has_media_path(person.main_foto) %}
+    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="Главное фото" data-lightbox-src="{{ media_url(person.main_foto) }}">
+      <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Главное фото">
+    </a>
+    {% else %}
+    <div class="photo photo-placeholder">Нет фото</div>
+    {% endif %}
+    </div>
   </div>
   <div class="panel person-bio-panel">
     <h2>Краткая биография</h2>
@@ -62,18 +70,6 @@
         {% if link_url %}<a class="compact-external-link" href="{{ link_url }}" title="{{ person.link2 }}" target="_blank" rel="noopener noreferrer">Форум коллекционеров</a>{% else %}<span class="compact-link-text" title="{{ person.link2 }}">{{ person.link2|dash }}</span>{% endif %}
       </dd>
     </dl>
-  </div>
-  <div class="panel person-main-photo-panel compact-main-photo-panel">
-    <h2>Главное фото</h2>
-    <div class="photo-frame">
-    {% if has_media_path(person.main_foto) %}
-    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="Главное фото" data-lightbox-src="{{ media_url(person.main_foto) }}">
-      <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Главное фото">
-    </a>
-    {% else %}
-    <div class="photo photo-placeholder">Нет фото</div>
-    {% endif %}
-    </div>
   </div>
 </section>
 
