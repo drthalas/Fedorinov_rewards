@@ -16,7 +16,7 @@
   {% if not settings.db_exists %}
     <div class="notice notice-error">База не найдена: {{ settings.rewards_db_path }}</div>
   {% elif tab == "rewards" %}
-    <div class="legacy-layout">
+    <div class="legacy-layout" data-legacy-rewards-layout>
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
         <form class="legacy-rewards-filters guide-cascade" method="get" action="/legacy">
@@ -110,7 +110,7 @@
       </aside>
 
       <section class="legacy-main">
-        <div class="legacy-person-workspace">
+        <div class="legacy-person-workspace" data-legacy-person-workspace aria-live="polite" aria-busy="false">
         {% if selected_person %}
           {% set legacy_person_lightbox_group = 'legacy-person-' ~ selected_person.id ~ '-all' %}
           <div class="legacy-split-header">
@@ -120,7 +120,7 @@
             </div>
             <div class="legacy-actions">
               <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
-              <a class="button" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
+              <a class="button legacy-show-all-photos-link" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </div>
           </div>
 
@@ -271,7 +271,6 @@
                 {% endfor %}
               ]
               </script>
-              <a class="legacy-show-all-photos-link" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </section>
           </div>
         {% else %}

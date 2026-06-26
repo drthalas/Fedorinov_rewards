@@ -47,6 +47,10 @@
   }
 
   function initCascade(container) {
+    const state = container.dataset || {};
+    if (state.guideCascadeInitialized === "true") {
+      return;
+    }
     const options = parseOptions(container);
     if (!options) {
       return;
@@ -72,10 +76,17 @@
     country.addEventListener("change", () => refresh("country"));
     category.addEventListener("change", () => refresh("category"));
     subcategory.addEventListener("change", () => refresh("subcategory"));
+    if (container.dataset) {
+      container.dataset.guideCascadeInitialized = "true";
+    }
     refresh("init");
   }
 
-  document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll(".guide-cascade").forEach(initCascade);
-  });
+  function initAll(root) {
+    const scope = root || document;
+    scope.querySelectorAll(".guide-cascade").forEach(initCascade);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => initAll(document));
+  document.addEventListener("legacy:content-updated", (event) => initAll(event && event.detail && event.detail.root ? event.detail.root : document));
 })();
