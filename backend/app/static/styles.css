@@ -257,12 +257,16 @@ a.link-wrap {
   min-width: 0;
 }
 
+.person-detail-rewards-section {
+  min-width: 0;
+}
+
 .person-detail-photo-grid {
   grid-auto-columns: minmax(120px, 148px);
   grid-auto-flow: column;
   grid-template-columns: none;
   grid-template-rows: repeat(2, minmax(112px, auto));
-  max-height: min(35vh, 296px);
+  max-height: min(30vh, 252px);
   overflow-x: auto;
   overflow-y: hidden;
   padding: 0 2px 4px 0;
@@ -273,7 +277,7 @@ a.link-wrap {
 }
 
 .compact-photo-grid .photo-frame {
-  height: 84px;
+  height: 76px;
 }
 
 .compact-photo-grid p {
@@ -283,12 +287,14 @@ a.link-wrap {
 }
 
 .compact-main-photo-panel .photo-frame {
-  height: clamp(190px, 30vh, 320px);
+  height: clamp(160px, 22vh, 220px);
 }
 
 .person-detail-rewards-wrap {
-  max-height: min(18vh, 168px);
+  max-height: clamp(210px, 32vh, 300px);
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .person-bio-panel,
@@ -345,8 +351,8 @@ a.link-wrap {
 }
 
 .person-bio-panel .bio-text {
-  min-height: 180px;
-  max-height: min(34vh, 340px);
+  min-height: 150px;
+  max-height: min(24vh, 220px);
   overflow: auto;
 }
 

@@ -354,8 +354,10 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("person-detail-rewards-wrap", person_detail)
         self.assertIn("additional-person-photos", person_detail)
         self.assertIn("data-person-folder-extra-photos", person_detail)
+        self.assertIn("person-detail-rewards-section", person_detail)
         self.assertIn("person-detail-photo-section", person_detail)
         self.assertIn("person-detail-photo-grid", person_detail)
+        self.assertLess(person_detail.index("person-detail-rewards-section"), person_detail.index("person-detail-photo-section"))
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
         self.assertIn("data-history-back", person_detail)
@@ -387,11 +389,13 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("overflow-x: hidden", styles)
         self.assertIn("grid-template-rows: repeat(2, minmax(112px, auto))", styles)
         self.assertIn("grid-auto-flow: column", styles)
-        self.assertIn("max-height: min(35vh, 296px)", styles)
-        self.assertIn("height: 84px", styles)
-        self.assertIn("height: clamp(190px, 30vh, 320px)", styles)
-        self.assertIn("min-height: 180px", styles)
+        self.assertIn("max-height: min(30vh, 252px)", styles)
+        self.assertIn("height: 76px", styles)
+        self.assertIn("height: clamp(160px, 22vh, 220px)", styles)
+        self.assertIn("min-height: 150px", styles)
         self.assertIn(".person-detail-rewards-wrap", styles)
+        self.assertIn("max-height: clamp(210px, 32vh, 300px)", styles)
+        self.assertIn("scrollbar-gutter: stable", styles)
         self.assertIn(
             "grid-template-columns: minmax(260px, 0.78fr) minmax(360px, 1.35fr) minmax(280px, 0.9fr)",
             styles,
