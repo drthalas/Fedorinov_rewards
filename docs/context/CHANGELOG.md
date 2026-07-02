@@ -1,5 +1,35 @@
 # История изменений
 
+## v0.1.12
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-03.
+
+Ключевые изменения:
+
+- Точечный hotfix поверх v0.1.11, включающий ALE-228.
+- Убран эффект "браузер внутри браузера" на standalone-карточке кавалера `/persons/{id}`.
+- Карточка кавалера теперь выглядит как часть единого окна приложения.
+- Убран лишний вложенный full-page scroll у карточки кавалера.
+- Основной document scroll сохранён.
+- Functional scroll блока "Награды" сохранён.
+- Фото-блок, lightbox, `/persons/{id}/photos`, Legacy, Search и Summary не сломаны.
+- ALE-227 остаётся pending и не входит в этот релиз.
+
+Проверки перед релизом:
+
+- Owner/manual PASS по ALE-228.
+- Unit tests: 299 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Package SHA256: `b8cb2c5e8f74224d7f4f729476eca8cf914c3709325789b062ecdb685ddbf28a`.
+- Public verification перед Telegram обязательна.
+
+Ключевой commit:
+
+- `8b4e18a` Remove nested browser-like person detail scroll.
+
 ## v0.1.11
 
 Статус: выпущено.

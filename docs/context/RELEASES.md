@@ -68,6 +68,32 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v0.1.12
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-03.
+
+Тип: hotfix.
+
+Состав:
+
+- Включает стабильную базу v0.1.11.
+- Включает ALE-228: убран эффект "браузер внутри браузера" на standalone-карточке кавалера.
+- Карточка кавалера использует основной scroll страницы вместо вложенного full-page scroll.
+- Functional scroll блока "Награды" сохранён.
+- Фото-блок, lightbox, `/persons/{id}/photos`, Legacy, Search и Summary не сломаны.
+- ALE-227 не включён и остаётся отдельной pending-задачей.
+
+Проверки:
+
+- Owner/manual PASS по ALE-228.
+- Unit tests: 299 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Package SHA256: `b8cb2c5e8f74224d7f4f729476eca8cf914c3709325789b062ecdb685ddbf28a`.
+- Public verification перед Telegram обязательна.
+
 ## v0.1.11
 
 Статус: выпущено.
