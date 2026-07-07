@@ -605,6 +605,7 @@
           <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="summary">
           <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
+          <input type="hidden" name="summary_applied" value="1">
           <input type="hidden" name="matrix_sort" value="{{ matrix_sort }}">
           <input type="hidden" name="matrix_dir" value="{{ matrix_dir }}">
           <div class="summary-mode-switch" aria-label="Режим сводной таблицы">
@@ -662,12 +663,15 @@
           </label>
           <div class="summary-filter-actions">
             <button type="submit">Показать</button>
-            <a class="button secondary-button" href="/legacy?tab=summary">Сброс</a>
+            <a class="button secondary-button" href="{{ summary_reset_url }}">Сброс</a>
+            {% if summary_has_result %}
             <button class="button secondary-button" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
             <button class="button secondary-button" type="submit" form="summary-save-form">CSV свод</button>
             <button class="button secondary-button" type="submit" form="summary-pdf-save-form">PDF</button>
+            {% endif %}
           </div>
         </form>
+        {% if summary_has_result %}
         <form id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form data-save-as-filename="summary_matrix.csv" data-save-as-mime="text/csv">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
@@ -692,6 +696,10 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
+        {% endif %}
+        {% if not summary_has_result %}
+        <section class="notice summary-start-notice">Выберите фильтры и нажмите «Показать».</section>
+        {% else %}
         <div class="grid">
           <div class="card"><strong>Награждённых</strong><br>{{ summary.counts.person }}</div>
           <div class="card"><strong>Наград</strong><br>{{ summary.counts.rewards }}</div>
@@ -806,6 +814,7 @@
           </table>
         </div>
         <p class="secondary">По умолчанию таблица показывает награды. Чтобы включить знаки, отметьте “Знаки” и нажмите “Показать”.</p>
+        {% endif %}
         {% endif %}
       {% endif %}
     </section>

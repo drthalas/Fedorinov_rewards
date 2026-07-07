@@ -19,6 +19,7 @@ from backend.app.repositories.summary import (
     summary_rows,
 )
 from backend.app.routers.legacy import (
+    legacy_index,
     summary_csv,
     summary_csv_save,
     summary_matrix_csv,
@@ -35,6 +36,10 @@ class FakeRequest:
 
     async def body(self) -> bytes:
         return self._body
+
+
+class FakeTemplateRequest(FakeRequest):
+    pass
 
 
 class SummaryTests(unittest.TestCase):
@@ -358,6 +363,56 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertFalse(selected_path.exists())
 
+    def test_legacy_summary_tab_does_not_auto_build_result(self) -> None:
+        with (
+            patch("backend.app.routers.legacy.summary_rows") as rows_mock,
+            patch("backend.app.routers.legacy.summary_matrix") as matrix_mock,
+            patch("backend.app.routers.legacy._legacy_summary") as summary_mock,
+            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
+            patch("backend.app.routers.legacy.count_marks", return_value=0),
+            patch("backend.app.routers.legacy.list_marks", return_value=[]),
+            patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
+        ):
+            context = legacy_index(FakeTemplateRequest(), tab="summary")
+
+        rows_mock.assert_not_called()
+        matrix_mock.assert_not_called()
+        summary_mock.assert_not_called()
+        self.assertFalse(context["summary_has_result"])
+        self.assertFalse(context["summary_applied"])
+        self.assertIsNone(context["summary_matrix"])
+        self.assertEqual(context["summary_rows"], [])
+        self.assertEqual(context["summary_reset_url"], "/legacy?tab=summary&summary_mode=matrix")
+
+    def test_legacy_summary_tab_builds_after_show(self) -> None:
+        with (
+            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
+            patch("backend.app.routers.legacy.count_marks", return_value=0),
+            patch("backend.app.routers.legacy.list_marks", return_value=[]),
+            patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
+        ):
+            context = legacy_index(FakeTemplateRequest(), tab="summary", summary_applied="1", name_id="1")
+
+        self.assertTrue(context["summary_has_result"])
+        self.assertTrue(context["summary_applied"])
+        self.assertIsNotNone(context["summary_matrix"])
+        self.assertGreaterEqual(len(context["summary_rows"]), 1)
+        self.assertIn("summary_applied=1", context["summary_matrix_mode_url"])
+        self.assertIn("summary_applied=1", context["summary_aggregate_mode_url"])
+        self.assertIn("summary_applied=1", context["summary_matrix_sort"]["urls"]["fio"])
+
+    def test_legacy_summary_reset_returns_to_unapplied_state(self) -> None:
+        with (
+            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
+            patch("backend.app.routers.legacy.count_marks", return_value=0),
+            patch("backend.app.routers.legacy.list_marks", return_value=[]),
+            patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
+        ):
+            context = legacy_index(FakeTemplateRequest(), tab="summary", summary_mode="aggregate", summary_applied="1", name_id="1")
+
+        self.assertEqual(context["summary_reset_url"], "/legacy?tab=summary&summary_mode=aggregate")
+        self.assertNotIn("summary_applied", context["summary_reset_url"])
+
     def test_summary_routes_are_registered(self) -> None:
         legacy_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/legacy" and "GET" in getattr(route, "methods", set())
@@ -387,6 +442,11 @@ class SummaryTests(unittest.TestCase):
     def test_summary_csv_buttons_use_browser_save_as_forms(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
         save_as = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
+        self.assertIn('name="summary_applied" value="1"', template)
+        self.assertIn("Выберите фильтры и нажмите «Показать».", template)
+        self.assertIn("{% if summary_has_result %}", template)
+        self.assertIn("{% if not summary_has_result %}", template)
+        self.assertIn('href="{{ summary_reset_url }}"', template)
         self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form', template)
         self.assertIn('data-save-as-filename="summary_matrix.csv"', template)
         self.assertIn('id="summary-save-form" method="get" action="/summary.csv" data-save-as-form', template)

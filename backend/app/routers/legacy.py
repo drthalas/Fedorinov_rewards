@@ -135,9 +135,15 @@ def _summary_query_params(filters) -> dict[str, object]:
     return params
 
 
-def _summary_url(filters, summary_mode: str) -> str:
+def _truthy_query_flag(value: object) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _summary_url(filters, summary_mode: str, summary_applied: bool = False) -> str:
     params = {"tab": "summary", "summary_mode": summary_mode}
     params.update(_summary_query_params(filters))
+    if summary_applied:
+        params["summary_applied"] = "1"
     return str(URL(path="/legacy").include_query_params(**params))
 
 
@@ -149,7 +155,7 @@ def _normalized_matrix_sort(sort_by: str = "", sort_dir: str = "") -> tuple[str,
     return clean_sort, clean_dir
 
 
-def _summary_sort_url(filters, sort_key: str, current_sort: str, current_dir: str) -> str:
+def _summary_sort_url(filters, sort_key: str, current_sort: str, current_dir: str, summary_applied: bool = False) -> str:
     next_dir = "desc" if sort_key == current_sort and current_dir == "asc" else "asc"
     params = {
         "tab": "summary",
@@ -158,23 +164,31 @@ def _summary_sort_url(filters, sort_key: str, current_sort: str, current_dir: st
         "matrix_dir": next_dir,
     }
     params.update(_summary_query_params(filters))
+    if summary_applied:
+        params["summary_applied"] = "1"
     return str(URL(path="/legacy").include_query_params(**params))
 
 
-def _matrix_sort_context(matrix: dict[str, object], filters, current_sort: str, current_dir: str) -> dict[str, object]:
+def _matrix_sort_context(
+    matrix: dict[str, object],
+    filters,
+    current_sort: str,
+    current_dir: str,
+    summary_applied: bool = False,
+) -> dict[str, object]:
     sort_urls = {
-        "fio": _summary_sort_url(filters, "fio", current_sort, current_dir),
-        "rank_name": _summary_sort_url(filters, "rank_name", current_sort, current_dir),
-        "birthday": _summary_sort_url(filters, "birthday", current_sort, current_dir),
-        "numbers": _summary_sort_url(filters, "numbers", current_sort, current_dir),
-        "row_total": _summary_sort_url(filters, "row_total", current_sort, current_dir),
+        "fio": _summary_sort_url(filters, "fio", current_sort, current_dir, summary_applied),
+        "rank_name": _summary_sort_url(filters, "rank_name", current_sort, current_dir, summary_applied),
+        "birthday": _summary_sort_url(filters, "birthday", current_sort, current_dir, summary_applied),
+        "numbers": _summary_sort_url(filters, "numbers", current_sort, current_dir, summary_applied),
+        "row_total": _summary_sort_url(filters, "row_total", current_sort, current_dir, summary_applied),
     }
     photo_sort_urls = {
-        str(column["field"]): _summary_sort_url(filters, f"photo:{column['field']}", current_sort, current_dir)
+        str(column["field"]): _summary_sort_url(filters, f"photo:{column['field']}", current_sort, current_dir, summary_applied)
         for column in matrix.get("photo_columns") or []
     }
     reward_sort_urls = {
-        str(column["id"]): _summary_sort_url(filters, f"reward:{column['id']}", current_sort, current_dir)
+        str(column["id"]): _summary_sort_url(filters, f"reward:{column['id']}", current_sort, current_dir, summary_applied)
         for column in matrix.get("reward_columns") or []
     }
     return {
@@ -409,6 +423,7 @@ def legacy_index(
     extra: str = "",
     include_marks: str | None = None,
     summary_mode: str = "matrix",
+    summary_applied: str = "",
     matrix_sort: str = "fio",
     matrix_dir: str = "asc",
     check_updates: str | None = None,
@@ -416,6 +431,7 @@ def legacy_index(
     settings = get_settings()
     active_tab = tab if tab in VALID_TABS else "rewards"
     active_summary_mode = "aggregate" if summary_mode == "aggregate" else "matrix"
+    active_summary_applied = _truthy_query_flag(summary_applied)
     active_matrix_sort, active_matrix_dir = _normalized_matrix_sort(matrix_sort, matrix_dir)
     active_photo_mode = _clean_photo_mode(photo_mode)
     rewards_filters = normalized_legacy_rewards_filters(
@@ -500,6 +516,8 @@ def legacy_index(
         "summary_rows": [],
         "summary_totals": {"total": 0, "in_stock": 0, "not_in_stock": 0, "price_purchase_sum": 0, "price_now_sum": 0},
         "summary_mode": active_summary_mode,
+        "summary_applied": active_summary_applied,
+        "summary_has_result": False,
         "matrix_sort": active_matrix_sort,
         "matrix_dir": active_matrix_dir,
         "summary_matrix_sort": {"sort": active_matrix_sort, "dir": active_matrix_dir, "urls": {}, "photo_urls": {}, "reward_urls": {}},
@@ -508,6 +526,7 @@ def legacy_index(
         "summary_matrix_csv_url": "/summary_matrix.csv",
         "summary_matrix_mode_url": "/legacy?tab=summary&summary_mode=matrix",
         "summary_aggregate_mode_url": "/legacy?tab=summary&summary_mode=aggregate",
+        "summary_reset_url": "/legacy?tab=summary",
         "commit": _current_commit(),
         "app_name": APP_NAME,
         "app_display_name": program_title(settings),
@@ -603,9 +622,17 @@ def legacy_index(
         context["search_suggestions"] = search_suggestions(settings.rewards_db_path)
 
     if active_tab == "summary":
-        context["summary"] = _legacy_summary(settings.rewards_db_path)
+        context["summary"] = {"counts": {"person": 0, "rewards": 0, "mark": 0}}
         context["summary_options"] = summary_filter_options(settings.rewards_db_path, context["summary_filters"])
         context["summary_filter_cascade"] = summary_filter_cascade(settings.rewards_db_path)
+        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix", active_summary_applied)
+        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate", active_summary_applied)
+        context["summary_reset_url"] = _summary_url(normalized_summary_filters(), active_summary_mode, False)
+        if not active_summary_applied:
+            return templates.TemplateResponse(request, "legacy.html", context)
+
+        context["summary"] = _legacy_summary(settings.rewards_db_path)
+        context["summary_has_result"] = True
         rows = summary_rows(settings.rewards_db_path, context["summary_filters"])
         context["summary_rows"] = rows
         context["summary_totals"] = summary_totals(rows)
@@ -619,9 +646,10 @@ def legacy_index(
             context["summary_filters"],
             active_matrix_sort,
             active_matrix_dir,
+            True,
         )
-        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix")
-        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate")
+        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix", True)
+        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate", True)
 
     if active_tab == "about" and context["check_updates"]:
         context["update_check"] = check_for_updates(settings)
