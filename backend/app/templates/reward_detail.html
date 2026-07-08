@@ -1,16 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Награда #{{ reward.id }}{% endblock %}
+{% block title %}{{ reward_heading }}{% endblock %}
 {% block content %}
-<h1>Награда #{{ reward.id }}</h1>
+<h1 class="wrap-text">{{ reward_heading }}</h1>
+{% if reward_name %}
+<p class="secondary">ID награды: #{{ reward.id }}</p>
+{% endif %}
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-{% set reward_person_url = '/persons/' ~ reward.person_id %}
-{% set reward_list_url = '/legacy?tab=rewards&person_id=' ~ reward.person_id %}
 <p class="compact-actions">
-  {% if return_to and ('tab=search' in return_to or return_to.startswith('/search')) %}
-  <a data-escape-back href="{{ return_to }}">← Вернуться к результатам поиска</a> ·
-  {% endif %}
-  <a href="{{ reward_person_url }}">К карточке кавалера</a>
-  · <a href="{{ reward_list_url }}">К списку наград</a>
+  <a class="button secondary-button" data-escape-back href="{{ reward_back_url }}">← Назад</a>
 </p>
 {% if settings.write_mode %}
 <div class="actions">

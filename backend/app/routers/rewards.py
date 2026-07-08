@@ -80,6 +80,20 @@ def _reward_created_edit_url(reward_id: int, return_to: str = "") -> str:
     return f"/rewards/{reward_id}/edit?{urlencode(query)}"
 
 
+def _reward_display_name(reward: dict[str, object]) -> str:
+    return str(reward.get("name") or "").strip()
+
+
+def _reward_heading(reward: dict[str, object]) -> str:
+    reward_name = _reward_display_name(reward)
+    return f"Награда: {reward_name}" if reward_name else f"Награда #{reward.get('id')}"
+
+
+def _reward_legacy_back_url(reward: dict[str, object]) -> str:
+    person_id = _safe_int(reward.get("person_id"))
+    return f"/legacy?tab=rewards&person_id={person_id}" if person_id is not None else "/legacy?tab=rewards"
+
+
 @router.get("/rewards/check-duplicate")
 def reward_duplicate_check(id_name: str = "", number: str = "", current_reward_id: str = ""):
     settings = get_settings()
@@ -172,15 +186,19 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
         raise HTTPException(status_code=404, detail="Награда не найдена.")
+    safe_back = safe_return_to(return_to)
     return templates.TemplateResponse(
         request,
         "reward_detail.html",
         {
             "settings": settings,
             "reward": reward,
+            "reward_name": _reward_display_name(reward),
+            "reward_heading": _reward_heading(reward),
+            "reward_back_url": safe_back or _reward_legacy_back_url(reward),
             "photos": reward_photo_items(reward),
             "status_message": STATUS_MESSAGES.get(status),
-            "return_to": safe_return_to(return_to),
+            "return_to": safe_back,
         },
     )
 

@@ -324,13 +324,62 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("К карточке кавалера", template)
         self.assertIn("К списку наград", template)
         self.assertIn("/legacy?tab=rewards", template)
-        self.assertIn("К карточке кавалера", detail_template)
-        self.assertIn("К списку наград", detail_template)
+        self.assertIn("← Назад", detail_template)
+        self.assertIn('data-escape-back href="{{ reward_back_url }}"', detail_template)
+        self.assertNotIn("К карточке кавалера", detail_template)
+        self.assertNotIn("К списку наград", detail_template)
         self.assertNotIn("← к владельцу", detail_template)
         self.assertIn("/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}", person_template)
         self.assertIn("/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}", person_template)
         self.assertIn("/rewards/{{ reward.id }}?return_to={{ selected_person_return|urlencode }}", legacy_template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
+
+    def test_reward_detail_shows_human_title_and_safe_back(self) -> None:
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_detail(object(), 10, return_to="/legacy?tab=rewards&person_id=1")
+
+        context = response["context"]
+        self.assertEqual(context["reward_name"], "Орден Красной Звезды")
+        self.assertEqual(context["reward_heading"], "Награда: Орден Красной Звезды")
+        self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
+        self.assertEqual(context["reward_back_url"], "/legacy?tab=rewards&person_id=1")
+
+    def test_reward_detail_356_title_contains_order_slavy(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("insert into guide_lev_3 (id, idl, name) values (5, 3, 'Орден Славы III степени')")
+            connection.execute(
+                """
+                insert into rewards (id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number, date_purchase)
+                values (356, 1, 1, 2, 3, 5, 356, '2026-01-04')
+                """
+            )
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_detail(object(), 356, return_to="/legacy?tab=rewards&person_id=1")
+
+        self.assertIn("Орден Славы III степени", response["context"]["reward_heading"])
+        self.assertNotEqual(response["context"]["reward_heading"], "Награда #356")
+
+    def test_reward_detail_falls_back_to_id_when_name_missing(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute(
+                """
+                insert into rewards (id, person_id, id_gos, id_catigory, id_sub_catigory, id_name, number)
+                values (99, 1, 1, 2, 3, null, 99)
+                """
+            )
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_detail(object(), 99)
+
+        self.assertEqual(response["context"]["reward_name"], "")
+        self.assertEqual(response["context"]["reward_heading"], "Награда #99")
+        self.assertEqual(response["context"]["reward_back_url"], "/legacy?tab=rewards&person_id=1")
+
+    def test_reward_detail_rejects_external_return_to(self) -> None:
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_detail(object(), 10, return_to="https://evil.example")
+
+        self.assertEqual(response["context"]["return_to"], "")
+        self.assertEqual(response["context"]["reward_back_url"], "/legacy?tab=rewards&person_id=1")
 
     def test_reward_edit_rejects_external_return_to(self) -> None:
         with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
