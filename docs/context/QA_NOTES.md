@@ -114,3 +114,13 @@ APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false
 - Generated PDF/archives/logs ignored и не должны попадать в Git.
 - Автоматический restart после update отложен.
 - Read-only/write-mode как пользовательские режимы позже нужно убрать из интерфейса.
+
+## v0.1.13 QA
+
+- Owner manual QA перед релизом: PASS ("протестировал, всё хорошо").
+- Unit tests: 327 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media baseline: total 958, existing 950, missing 8.
+- Direct route smoke: PASS.
+- Platform note: локальный bind dev-server из Codex sandbox был заблокирован лимитом эскалаций, поэтому автоматический route smoke выполнен in-process; owner manual QA в Chrome на Mac покрывает браузерную часть.
+- Реальные данные и фото не менялись.
