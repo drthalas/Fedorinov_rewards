@@ -224,6 +224,8 @@ async def reward_delete(request: Request, reward_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("delete_reward_confirm") != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
         person_id = delete_reward(settings, reward_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:

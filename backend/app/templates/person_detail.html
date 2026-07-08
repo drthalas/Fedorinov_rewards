@@ -98,9 +98,17 @@
         <td>{{ reward.date_purchase|format_date }}</td>
         <td>{{ reward.price_purchase|format_money }}</td>
         <td>{{ reward.price_now|format_money }}</td>
-        <td>
+        <td class="compact-actions">
           <a href="/rewards/{{ reward.id }}">Открыть</a>
-          {% if settings.write_mode %} · <a href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>{% endif %}
+          {% if settings.write_mode %}
+          · <a href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
+          · <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Вы действительно хотите удалить награду?');">
+            <input type="hidden" name="confirm" value="true">
+            <input type="hidden" name="delete_reward_confirm" value="true">
+            <input type="hidden" name="return_to" value="/persons/{{ person.id }}">
+            <button type="submit" class="link-button">Удалить</button>
+          </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

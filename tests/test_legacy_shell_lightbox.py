@@ -279,6 +279,25 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('form_values.get("delete_person_confirm") != "true"', persons_router)
         self.assertIn("Действие требует подтверждения.", persons_router)
 
+    def test_reward_delete_requires_confirmation_in_ui_and_route(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        reward_detail = (ROOT / "backend" / "app" / "templates" / "reward_detail.html").read_text()
+        rewards_router = (ROOT / "backend" / "app" / "routers" / "rewards.py").read_text()
+
+        expected_text = "Вы действительно хотите удалить награду?"
+        self.assertIn(expected_text, legacy_template)
+        self.assertIn(expected_text, person_detail)
+        self.assertIn(expected_text, reward_detail)
+        self.assertIn('/rewards/{{ reward.id }}/delete', person_detail)
+        self.assertIn('name="confirm" value="true"', person_detail)
+        self.assertIn('name="delete_reward_confirm" value="true"', legacy_template)
+        self.assertIn('name="delete_reward_confirm" value="true"', person_detail)
+        self.assertIn('name="delete_reward_confirm" value="true"', reward_detail)
+        self.assertIn('name="return_to" value="/persons/{{ person.id }}"', person_detail)
+        self.assertIn('form_values.get("delete_reward_confirm") != "true"', rewards_router)
+        self.assertNotIn('@router.get("/rewards/{reward_id}/delete"', rewards_router)
+
     def test_photo_frames_do_not_stretch_real_images(self) -> None:
         styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
 

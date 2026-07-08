@@ -6,10 +6,12 @@ import sqlite3
 import unittest
 from urllib.parse import urlencode
 
+from fastapi import HTTPException
+
 from backend.app.routers.dashboard import dashboard, dashboard_head
 from backend.app.routers.marks import mark_update
 from backend.app.routers.persons import person_update
-from backend.app.routers.rewards import reward_update
+from backend.app.routers.rewards import reward_delete, reward_update
 from backend.app.routers.templates import photo_view_url
 from backend.app.services.navigation import safe_return_to, with_status
 
@@ -175,6 +177,24 @@ class ReturnNavigationTests(unittest.TestCase):
         request = FakeRequest({"number": "101", "return_to": "/legacy?tab=rewards&person_id=1"})
         response = asyncio.run(reward_update(request, 10))
         self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=updated")
+
+    def test_reward_delete_without_explicit_confirmation_does_not_delete(self) -> None:
+        request = FakeRequest({"confirm": "true", "return_to": "/persons/1"})
+        with self.assertRaises(HTTPException) as blocked:
+            asyncio.run(reward_delete(request, 10))
+        self.assertEqual(blocked.exception.status_code, 400)
+        self.assertEqual(blocked.exception.detail, "Действие требует подтверждения.")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from rewards where id = 10").fetchone()
+        self.assertIsNotNone(row)
+
+    def test_reward_delete_from_person_card_returns_to_same_person(self) -> None:
+        request = FakeRequest({"confirm": "true", "delete_reward_confirm": "true", "return_to": "/persons/1"})
+        response = asyncio.run(reward_delete(request, 10))
+        self.assertEqual(response.headers["location"], "/persons/1?status=reward_deleted")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from rewards where id = 10").fetchone()
+        self.assertIsNone(row)
 
     def test_mark_edit_post_respects_safe_return_to(self) -> None:
         request = FakeRequest({"number": "201", "return_to": "/legacy?tab=marks&mark_id=20"})
