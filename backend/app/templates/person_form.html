@@ -2,9 +2,8 @@
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного #{{ person.id }}{% endif %}</h1>
-<p>
-  <a data-escape-back href="{{ return_to or '/persons' }}">← Вернуться</a>
-  {% if mode == "edit" %} · <a href="/persons/{{ person.id }}">к карточке</a>{% endif %}
+<p class="local-back-nav compact-actions">
+  <a class="button secondary-button" data-escape-back href="{{ return_to or ('/legacy?tab=rewards&person_id=' ~ person.id if mode == 'edit' else '/legacy?tab=rewards') }}">← Назад</a>
 </p>
 
 {% if error %}
@@ -87,7 +86,6 @@
   <div class="actions">
     <a class="button secondary-button" href="#person-photo-management">Добавить фото и документы</a>
     <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ form_return_path|urlencode }}">Добавить награду</a>
-    <a class="button secondary-button" href="/persons/{{ person.id }}">Вернуться к карточке</a>
   </div>
 </section>
 {% endif %}

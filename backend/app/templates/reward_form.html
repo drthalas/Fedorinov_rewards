@@ -6,10 +6,8 @@
 <p class="secondary">Кавалер: {{ person.fio|dash }}</p>
 {% endif %}
 {% set reward_list_url = '/legacy?tab=rewards' ~ ('&person_id=' ~ person.id if person else '') %}
-<p class="compact-actions">
-  {% if person %}<a href="/persons/{{ person.id }}">← К карточке кавалера</a> · {% endif %}
-  <a href="{{ reward_list_url }}">К списку наград</a>
-  {% if mode == "edit" %} · <a href="/rewards/{{ reward.id }}{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">К карточке награды</a>{% endif %}
+<p class="local-back-nav compact-actions">
+  <a class="button secondary-button" data-escape-back href="{{ return_to or ('/persons/' ~ person.id if mode == 'create' and person else ('/rewards/' ~ reward.id if mode == 'edit' else reward_list_url)) }}">← Назад</a>
 </p>
 
 {% if error %}
@@ -121,8 +119,6 @@
   <div class="actions">
     <a class="button secondary-button" href="#reward-photo-management">Редактировать фото и документы</a>
     <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ person_back_url|urlencode }}">Добавить ещё награду</a>
-    <a class="button secondary-button" href="/persons/{{ person.id }}">К карточке кавалера</a>
-    <a class="button secondary-button" href="{{ reward_list_url }}">К списку наград</a>
   </div>
 </section>
 {% endif %}

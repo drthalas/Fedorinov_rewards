@@ -21,11 +21,8 @@
   </dl>
 </section>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-<p class="person-detail-nav compact-actions">
-  <button class="button secondary-button person-history-back" type="button" data-history-back data-history-fallback="{{ return_to or '/persons' }}">← Назад</button>
-  <a href="{{ return_to or '/persons' }}">{% if return_to and 'tab=search' in return_to or return_to and return_to.startswith('/search') %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a>
-  · <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Все фото</a>
-  · <a href="/persons/{{ person.id }}/booklet?return_to={{ (return_to or '/persons/' ~ person.id)|urlencode }}">Сформировать буклет</a>
+<p class="person-detail-nav local-back-nav compact-actions">
+  <button class="button secondary-button person-history-back" type="button" data-history-back data-history-fallback="{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}">← Назад</button>
 </p>
 {% if settings.write_mode %}
 <div class="actions">

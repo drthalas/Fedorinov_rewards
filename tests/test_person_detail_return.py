@@ -111,19 +111,22 @@ class PersonDetailReturnTests(unittest.TestCase):
         return_to = "/legacy?tab=rewards&person_id=2"
         encoded = quote(return_to, safe="")
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
-        self.assertIn("return_to or '/persons'", template)
+        self.assertIn("return_to or '/legacy?tab=rewards&person_id=' ~ person.id", template)
         self.assertIn("/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}", template)
         self.assertIn("/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}", template)
         self.assertTrue(encoded.startswith("%2Flegacy%3Ftab%3Drewards"))
 
-    def test_person_detail_has_separate_history_back_button_and_keeps_list_link(self) -> None:
+    def test_person_detail_has_only_local_history_back_button(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
         script = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "escape_back.js").read_text(encoding="utf-8")
 
         self.assertIn("data-history-back", template)
-        self.assertIn('data-history-fallback="{{ return_to or \'/persons\' }}"', template)
+        self.assertIn("data-history-fallback=\"{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}\"", template)
         self.assertIn("← Назад", template)
-        self.assertIn("← к списку", template)
+        nav_block = template.split('<p class="person-detail-nav local-back-nav compact-actions">', 1)[1].split("</p>", 1)[0]
+        self.assertNotIn("к списку", nav_block)
+        self.assertNotIn("Все фото", nav_block)
+        self.assertNotIn("Сформировать буклет", nav_block)
         self.assertIn("window.history.back()", script)
         self.assertIn("document.referrer", script)
         self.assertIn("internalFallback", script)

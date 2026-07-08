@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Знак #{{ mark.id }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-<p><a href="{{ return_to or '/marks' }}">{% if return_to %}← Вернуться к результатам поиска{% else %}← к списку{% endif %}</a></p>
+<p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/marks' }}">← Назад</a></p>
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/marks/{{ mark.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>

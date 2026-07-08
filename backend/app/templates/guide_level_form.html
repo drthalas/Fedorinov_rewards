@@ -2,7 +2,7 @@
 {% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}Изменить элемент справочника #{{ item.id }}{% endif %}{% endblock %}
 {% block content %}
 <h1>{% if mode == "create" %}Добавить: {{ level_label }}{% else %}Изменить: {{ level_label }} #{{ item.id }}{% endif %}</h1>
-<p><a data-escape-back href="{{ return_to or '/guides' }}">← Вернуться</a></p>
+<p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
 <form class="edit-form" method="post" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">

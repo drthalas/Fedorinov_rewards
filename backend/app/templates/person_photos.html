@@ -2,13 +2,13 @@
 {% block title %}Фото награжденного #{{ person.id }}{% endblock %}
 {% block content %}
 <h1>Фото: {{ person.fio }}</h1>
-<p><a href="{{ return_to or '/persons/' ~ person.id }}">← Вернуться</a></p>
+<p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">← Назад</a></p>
 {% if current_photo %}
 <section class="slideshow panel">
   <div class="slideshow-nav">
     <a class="button" href="/persons/{{ person.id }}/photos?index={{ previous_index }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">Предыдущее</a>
     <a class="button" href="/persons/{{ person.id }}/photos?index={{ next_index }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">Следующее</a>
-    <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Вернуться к галерее</a>
+    <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Галерея</a>
   </div>
   <a class="photo-link" href="{{ photo_view_url(current_photo.path, current_photo.label, '/persons/' ~ person.id ~ '/photos?index=' ~ next_index ~ ('&return_to=' ~ return_to|urlencode if return_to else '')) }}">
     <img class="slideshow-image" src="{{ media_url(current_photo.path) }}" alt="{{ current_photo.label }}">

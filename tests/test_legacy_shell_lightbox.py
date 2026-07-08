@@ -42,6 +42,30 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}', legacy_template)
         self.assertIn('action="/persons/{{ selected_person.id }}/delete"', legacy_template)
 
+    def test_internal_pages_use_single_local_back_label(self) -> None:
+        person_form = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text()
+        reward_form = (ROOT / "backend" / "app" / "templates" / "reward_form.html").read_text()
+        person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
+        person_photos = (ROOT / "backend" / "app" / "templates" / "person_photos.html").read_text()
+        guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text()
+
+        for template in [person_form, reward_form, person_detail, person_photos, guides]:
+            self.assertIn("local-back-nav", template)
+            self.assertIn("Назад", template)
+
+        person_nav = person_detail.split('<p class="person-detail-nav local-back-nav compact-actions">', 1)[1].split("</p>", 1)[0]
+        self.assertEqual(person_nav.count("Назад"), 1)
+        self.assertNotIn("к списку", person_nav)
+        self.assertNotIn("Все фото", person_nav)
+        self.assertNotIn("Сформировать буклет", person_nav)
+
+        self.assertNotIn("← Вернуться", person_form)
+        self.assertNotIn("← Вернуться", reward_form)
+        self.assertNotIn("← Вернуться", person_photos)
+        self.assertNotIn("← Вернуться", guides)
+        self.assertNotIn("К карточке кавалера", reward_form)
+        self.assertNotIn("К списку наград", reward_form)
+
     def test_lightbox_is_loaded_by_base_layouts(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
@@ -439,7 +463,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
         self.assertIn("data-history-back", person_detail)
-        self.assertIn('data-history-fallback="{{ return_to or \'/persons\' }}"', person_detail)
+        self.assertIn("data-history-fallback=\"{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}\"", person_detail)
         self.assertIn("compact-link-value", person_detail)
         self.assertIn("compact-external-link", person_detail)
         self.assertIn('title="{{ person.link1 }}"', person_detail)
