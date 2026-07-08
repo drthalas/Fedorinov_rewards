@@ -3,7 +3,15 @@
 {% block content %}
 <h1>Награда #{{ reward.id }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-<p><a href="{{ return_to or '/persons/' ~ reward.person_id }}">{% if return_to %}← Вернуться к результатам поиска{% else %}← к владельцу{% endif %}</a></p>
+{% set reward_person_url = '/persons/' ~ reward.person_id %}
+{% set reward_list_url = '/legacy?tab=rewards&person_id=' ~ reward.person_id %}
+<p class="compact-actions">
+  {% if return_to and ('tab=search' in return_to or return_to.startswith('/search')) %}
+  <a data-escape-back href="{{ return_to }}">← Вернуться к результатам поиска</a> ·
+  {% endif %}
+  <a href="{{ reward_person_url }}">К карточке кавалера</a>
+  · <a href="{{ reward_list_url }}">К списку наград</a>
+</p>
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>

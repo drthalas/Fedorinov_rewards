@@ -74,6 +74,7 @@
 </section>
 
 <section class="panel person-detail-rewards-section">
+{% set person_card_return = '/persons/' ~ person.id %}
 <div class="person-detail-section-head">
   <h2 class="compact-section-title">Награды</h2>
   {% if settings.write_mode %}
@@ -99,9 +100,9 @@
         <td>{{ reward.price_purchase|format_money }}</td>
         <td>{{ reward.price_now|format_money }}</td>
         <td class="compact-actions">
-          <a href="/rewards/{{ reward.id }}">Открыть</a>
+          <a href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}">Открыть</a>
           {% if settings.write_mode %}
-          · <a href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
+          · <a href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}">Изменить</a>
           · <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Вы действительно хотите удалить награду?');">
             <input type="hidden" name="confirm" value="true">
             <input type="hidden" name="delete_reward_confirm" value="true">

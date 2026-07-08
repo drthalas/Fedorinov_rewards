@@ -264,7 +264,9 @@ class FormPolishTests(unittest.TestCase):
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_form.html").read_text(
             encoding="utf-8"
         )
-        self.assertIn("Добавление награды для кавалера", template)
+        self.assertIn("Добавить награду", template)
+        self.assertIn("Кавалер: {{ person.fio|dash }}", template)
+        self.assertNotIn("Добавление награды для кавалера", template)
 
     def test_successful_reward_create_redirects_to_edit_with_created_message(self) -> None:
         request = FakeRequest(
@@ -303,13 +305,38 @@ class FormPolishTests(unittest.TestCase):
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_form.html").read_text(
             encoding="utf-8"
         )
+        detail_template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_detail.html").read_text(
+            encoding="utf-8"
+        )
+        person_template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(
+            encoding="utf-8"
+        )
+        legacy_template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(
+            encoding="utf-8"
+        )
         photo_template = (
             Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "photo_management.html"
         ).read_text(encoding="utf-8")
+        self.assertIn("Изменить награду: {{ reward_edit_name }}", template)
+        self.assertNotIn("Изменить награду #", template)
         self.assertIn("Редактировать фото и документы", template)
         self.assertIn("Добавить ещё награду", template)
-        self.assertIn("Вернуться к кавалеру", template)
+        self.assertIn("К карточке кавалера", template)
+        self.assertIn("К списку наград", template)
+        self.assertIn("/legacy?tab=rewards", template)
+        self.assertIn("К карточке кавалера", detail_template)
+        self.assertIn("К списку наград", detail_template)
+        self.assertNotIn("← к владельцу", detail_template)
+        self.assertIn("/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}", person_template)
+        self.assertIn("/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}", person_template)
+        self.assertIn("/rewards/{{ reward.id }}?return_to={{ selected_person_return|urlencode }}", legacy_template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
+
+    def test_reward_edit_rejects_external_return_to(self) -> None:
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = rewards_router.reward_edit(object(), 10, return_to="https://evil.example/rewards")
+
+        self.assertEqual(response["context"]["return_to"], "")
 
     def test_reward_form_has_duplicate_number_status_ui(self) -> None:
         root = Path(__file__).resolve().parents[1]
