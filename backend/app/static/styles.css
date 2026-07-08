@@ -1932,8 +1932,14 @@ th {
 }
 
 .legacy-rewards-block {
-  flex: 0 1 auto;
-  min-height: 0;
+  display: flex;
+  flex: 1 1 clamp(220px, 34vh, 340px);
+  flex-direction: column;
+  min-height: clamp(190px, 28vh, 220px);
+}
+
+.legacy-rewards-block .legacy-block-head {
+  flex: 0 0 auto;
 }
 
 .legacy-block h2 {
@@ -1950,7 +1956,12 @@ th {
 }
 
 .legacy-rewards-table-scroll {
-  max-height: clamp(180px, 34vh, 360px);
+  flex: 1 1 auto;
+  min-height: 132px;
+  max-height: none;
+  padding-bottom: 8px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .legacy-table {
