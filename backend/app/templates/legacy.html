@@ -162,9 +162,9 @@
                       {% if settings.write_mode %}
                         <td class="compact-actions">
                           <a href="/rewards/{{ reward.id }}/edit?return_to={{ selected_person_return|urlencode }}">✏️</a>
-                          <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Вы действительно хотите удалить награду?')">
-                            <input type="hidden" name="confirm" value="true">
-                            <input type="hidden" name="delete_reward_confirm" value="true">
+                          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
+                            <input type="hidden" name="confirm" value="">
+                            <input type="hidden" name="delete_reward_confirm" value="">
                             <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                             <button type="submit" class="link-button">❌</button>
                           </form>

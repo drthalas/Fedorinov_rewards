@@ -15,9 +15,9 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/rewards/{{ reward.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Вы действительно хотите удалить награду?');">
-    <input type="hidden" name="confirm" value="true">
-    <input type="hidden" name="delete_reward_confirm" value="true">
+  <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
+    <input type="hidden" name="confirm" value="">
+    <input type="hidden" name="delete_reward_confirm" value="">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>

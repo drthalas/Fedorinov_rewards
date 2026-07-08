@@ -188,10 +188,34 @@ class ReturnNavigationTests(unittest.TestCase):
             row = connection.execute("select id from rewards where id = 10").fetchone()
         self.assertIsNotNone(row)
 
+    def test_reward_delete_without_confirm_true_does_not_delete(self) -> None:
+        request = FakeRequest({"delete_reward_confirm": "true", "return_to": "/persons/1"})
+        with self.assertRaises(HTTPException) as blocked:
+            asyncio.run(reward_delete(request, 10))
+        self.assertEqual(blocked.exception.status_code, 400)
+        self.assertEqual(blocked.exception.detail, "Действие требует подтверждения.")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from rewards where id = 10").fetchone()
+        self.assertIsNotNone(row)
+
     def test_reward_delete_from_person_card_returns_to_same_person(self) -> None:
         request = FakeRequest({"confirm": "true", "delete_reward_confirm": "true", "return_to": "/persons/1"})
         response = asyncio.run(reward_delete(request, 10))
         self.assertEqual(response.headers["location"], "/persons/1?status=reward_deleted")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from rewards where id = 10").fetchone()
+        self.assertIsNone(row)
+
+    def test_reward_delete_from_legacy_returns_to_selected_person(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_reward_confirm": "true",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        response = asyncio.run(reward_delete(request, 10))
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=reward_deleted")
         with sqlite3.connect(self.db_path) as connection:
             row = connection.execute("select id from rewards where id = 10").fetchone()
         self.assertIsNone(row)

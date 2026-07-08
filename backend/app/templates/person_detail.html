@@ -103,9 +103,9 @@
           <a href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}">Открыть</a>
           {% if settings.write_mode %}
           · <a href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}">Изменить</a>
-          · <form method="post" action="/rewards/{{ reward.id }}/delete" onsubmit="return confirm('Вы действительно хотите удалить награду?');">
-            <input type="hidden" name="confirm" value="true">
-            <input type="hidden" name="delete_reward_confirm" value="true">
+          · <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
+            <input type="hidden" name="confirm" value="">
+            <input type="hidden" name="delete_reward_confirm" value="">
             <input type="hidden" name="return_to" value="/persons/{{ person.id }}">
             <button type="submit" class="link-button">Удалить</button>
           </form>

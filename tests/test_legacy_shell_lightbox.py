@@ -52,6 +52,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
+        self.assertIn("static_url('confirm_submit.js')", base)
+        self.assertIn("static_url('confirm_submit.js')", legacy_base)
         self.assertIn("static_url('lightbox.js')", lightbox)
         self.assertIn("static_url('save_as.js')", booklet)
 
@@ -288,22 +290,41 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("Действие требует подтверждения.", persons_router)
 
     def test_reward_delete_requires_confirmation_in_ui_and_route(self) -> None:
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
+        legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
         reward_detail = (ROOT / "backend" / "app" / "templates" / "reward_detail.html").read_text()
         rewards_router = (ROOT / "backend" / "app" / "routers" / "rewards.py").read_text()
+        confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
         expected_text = "Вы действительно хотите удалить награду?"
         self.assertIn(expected_text, legacy_template)
         self.assertIn(expected_text, person_detail)
         self.assertIn(expected_text, reward_detail)
         self.assertIn('/rewards/{{ reward.id }}/delete', person_detail)
-        self.assertIn('name="confirm" value="true"', person_detail)
-        self.assertIn('name="delete_reward_confirm" value="true"', legacy_template)
-        self.assertIn('name="delete_reward_confirm" value="true"', person_detail)
-        self.assertIn('name="delete_reward_confirm" value="true"', reward_detail)
+        self.assertIn("static_url('confirm_submit.js')", base)
+        self.assertIn("static_url('confirm_submit.js')", legacy_base)
+        self.assertIn('data-confirm-submit="reward-delete"', legacy_template)
+        self.assertIn('data-confirm-submit="reward-delete"', person_detail)
+        self.assertIn('data-confirm-submit="reward-delete"', reward_detail)
+        self.assertIn('name="confirm" value=""', legacy_template)
+        self.assertIn('name="confirm" value=""', person_detail)
+        self.assertIn('name="confirm" value=""', reward_detail)
+        self.assertIn('name="delete_reward_confirm" value=""', legacy_template)
+        self.assertIn('name="delete_reward_confirm" value=""', person_detail)
+        self.assertIn('name="delete_reward_confirm" value=""', reward_detail)
+        self.assertIn(
+            'action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">\n'
+            '            <input type="hidden" name="confirm" value="">',
+            person_detail,
+        )
         self.assertIn('name="return_to" value="/persons/{{ person.id }}"', person_detail)
-        self.assertIn('form_values.get("delete_reward_confirm") != "true"', rewards_router)
+        self.assertIn('form_values.get("delete_reward_confirm") != "true" or form_values.get("confirm") != "true"', rewards_router)
+        self.assertIn("event.preventDefault()", confirm_js)
+        self.assertIn('setInputValue(form, "confirm", "")', confirm_js)
+        self.assertIn('setInputValue(form, "confirm", "true")', confirm_js)
+        self.assertIn('setInputValue(form, "delete_reward_confirm", "true")', confirm_js)
         self.assertNotIn('@router.get("/rewards/{reward_id}/delete"', rewards_router)
 
     def test_photo_frames_do_not_stretch_real_images(self) -> None:
