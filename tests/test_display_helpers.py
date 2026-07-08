@@ -1,6 +1,6 @@
 import unittest
 
-from backend.app.services.display import format_bool, format_date, format_money, pagination, safe_external_url
+from backend.app.services.display import format_birth_year, format_bool, format_date, format_money, pagination, safe_external_url
 
 
 class DisplayHelperTests(unittest.TestCase):
@@ -9,6 +9,14 @@ class DisplayHelperTests(unittest.TestCase):
         self.assertEqual(format_date("1913"), "1913")
         self.assertEqual(format_date(""), "—")
         self.assertEqual(format_date("bad date"), "—")
+
+    def test_format_birth_year(self) -> None:
+        self.assertEqual(format_birth_year("1913-05-09"), "1913")
+        self.assertEqual(format_birth_year("09.05.1913"), "1913")
+        self.assertEqual(format_birth_year("1913"), "1913")
+        self.assertEqual(format_birth_year(1913), "1913")
+        self.assertEqual(format_birth_year(""), "—")
+        self.assertEqual(format_birth_year("bad date"), "—")
 
     def test_safe_external_url(self) -> None:
         self.assertEqual(safe_external_url("https://example.com/path"), "https://example.com/path")

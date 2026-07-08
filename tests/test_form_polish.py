@@ -170,7 +170,7 @@ class FormPolishTests(unittest.TestCase):
             response = asyncio.run(persons_router.person_create(request))
         context = response["context"]
         self.assertEqual(response["status_code"], 400)
-        self.assertEqual(context["error"], "Укажите дату в формате ДД.ММ.ГГГГ.")
+        self.assertEqual(context["error"], "Укажите год рождения в формате ГГГГ.")
         self.assertEqual(context["person"]["fio"], "Петров Пётр")
         self.assertEqual(context["person"]["link1"], "https://example.test/person")
         self.assertEqual(context["person"]["comment"], "Комментарий")
@@ -181,7 +181,7 @@ class FormPolishTests(unittest.TestCase):
         request = FakeRequest(
             {
                 "fio": "Петров Пётр Петрович",
-                "birthday": "10.05.1914",
+                "birthday": "1914",
                 "id_rank": "1",
                 "return_to": "/legacy?tab=rewards",
             }
@@ -217,6 +217,12 @@ class FormPolishTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertIn("Добавить фото и документы", template)
         self.assertIn("Добавить награду", template)
+        self.assertIn("Год рождения", template)
+        self.assertIn("format_birth_year_input", template)
+        self.assertIn('placeholder="ГГГГ"', template)
+        self.assertIn('inputmode="numeric"', template)
+        self.assertNotIn('type="date"', template)
+        self.assertNotIn("ДД.ММ.ГГГГ", template)
         self.assertNotIn("Вернуться к карточке", template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
         self.assertIn("Вставить из буфера", photo_template)
@@ -331,6 +337,9 @@ class FormPolishTests(unittest.TestCase):
         self.assertNotIn("К карточке кавалера", detail_template)
         self.assertNotIn("К списку наград", detail_template)
         self.assertNotIn("← к владельцу", detail_template)
+        self.assertIn('aria-label="Открыть награду"', person_template)
+        self.assertIn('aria-label="Изменить награду"', person_template)
+        self.assertIn('aria-label="Удалить награду"', person_template)
         self.assertIn("/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}", person_template)
         self.assertIn("/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}", person_template)
         self.assertIn("/rewards/{{ reward.id }}?return_to={{ selected_person_return|urlencode }}", legacy_template)

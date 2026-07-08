@@ -15,8 +15,8 @@
       <dd class="wrap-text">{{ person.rank_name|dash }}</dd>
     </div>
     <div>
-      <dt>Дата рождения</dt>
-      <dd>{{ person.birthday|format_date }}</dd>
+      <dt>Год рождения</dt>
+      <dd>{{ person.birthday|format_birth_year }}</dd>
     </div>
   </dl>
 </section>
@@ -96,15 +96,15 @@
         <td>{{ reward.date_purchase|format_date }}</td>
         <td>{{ reward.price_purchase|format_money }}</td>
         <td>{{ reward.price_now|format_money }}</td>
-        <td class="compact-actions">
-          <a href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}">Открыть</a>
+        <td class="compact-actions reward-icon-actions">
+          <a class="reward-icon-action" href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}" title="Открыть награду" aria-label="Открыть награду">👁️</a>
           {% if settings.write_mode %}
-          · <a href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}">Изменить</a>
-          · <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
+          <a class="reward-icon-action" href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}" title="Изменить награду" aria-label="Изменить награду">✏️</a>
+          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
             <input type="hidden" name="return_to" value="/persons/{{ person.id }}">
-            <button type="submit" class="link-button">Удалить</button>
+            <button type="submit" class="link-button reward-icon-action reward-icon-danger" title="Удалить награду" aria-label="Удалить награду">❌</button>
           </form>
           {% endif %}
         </td>

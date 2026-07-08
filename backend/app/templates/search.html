@@ -121,7 +121,7 @@
             <th>№</th>
             {{ search_sort_th("fio", "ФИО") }}
             {{ search_sort_th("rank_name", "Звание / специальность") }}
-            {{ search_sort_th("birthday", "Дата рождения") }}
+            {{ search_sort_th("birthday", "Год рождения") }}
             {{ search_sort_th("person_foto_flag", "Фото кавалера") }}
             {{ search_sort_th("main_foto_flag", "Главное фото") }}
             {{ search_sort_th("rewards_foto_flag", "Общее фото наград") }}
@@ -137,7 +137,7 @@
             <td>{{ results.offset + loop.index }}</td>
             <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
             <td>{{ person.rank_name|dash }}</td>
-            <td>{{ person.birthday|format_date }}</td>
+            <td>{{ person.birthday|format_birth_year }}</td>
             {{ search_photo_cell(person, "person_foto_flag", "person_foto", "Фото кавалера") }}
             {{ search_photo_cell(person, "main_foto_flag", "main_foto", "Главное фото") }}
             {{ search_photo_cell(person, "rewards_foto_flag", "rewards_foto", "Общее фото наград") }}
@@ -164,7 +164,7 @@
           <tr>
             {{ search_sort_th("fio", "ФИО") }}
             {{ search_sort_th("rank_name", "Звание / специальность") }}
-            {{ search_sort_th("birthday", "Дата рождения") }}
+            {{ search_sort_th("birthday", "Год рождения") }}
             {{ search_sort_th("person_book1_foto_flag", "Фото наградной книжки, сторона 1") }}
             {{ search_sort_th("person_book2_foto_flag", "Фото наградной книжки, сторона 2") }}
             {{ search_sort_th("person_card1_foto_flag", "Фото учётной карточки, страница 1") }}
@@ -186,7 +186,7 @@
           <tr>
             <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
             <td>{{ reward.rank_name|dash }}</td>
-            <td>{{ reward.birthday|format_date }}</td>
+            <td>{{ reward.birthday|format_birth_year }}</td>
             {{ search_photo_cell(reward, "person_book1_foto_flag", "person_book1_foto", "Фото наградной книжки кавалера, сторона 1") }}
             {{ search_photo_cell(reward, "person_book2_foto_flag", "person_book2_foto", "Фото наградной книжки кавалера, сторона 2") }}
             {{ search_photo_cell(reward, "person_card1_foto_flag", "person_card1_foto", "Фото учётной карточки, страница 1") }}

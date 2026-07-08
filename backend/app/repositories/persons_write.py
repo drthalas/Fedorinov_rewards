@@ -4,7 +4,7 @@ from contextlib import closing
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
-from ..services.dates import normalize_date_input
+from ..services.dates import normalize_birth_year_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -46,11 +46,7 @@ def person_data_from_mapping(values: dict[str, object]) -> PersonWriteData:
         raise PersonValidationError("Заполните ФИО.")
 
     try:
-        birthday = normalize_date_input(
-            values.get("birthday"),
-            required=True,
-            required_message="Укажите дату рождения.",
-        )
+        birthday = normalize_birth_year_input(values.get("birthday"))
     except ValueError as exc:
         raise PersonValidationError(str(exc)) from exc
 
@@ -99,12 +95,11 @@ def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, 
 def _validate_person_data(data: PersonWriteData) -> None:
     if not data.fio.strip():
         raise PersonValidationError("Заполните ФИО.")
-    if not data.birthday:
-        raise PersonValidationError("Укажите дату рождения.")
-    try:
-        normalize_date_input(data.birthday, required=True, required_message="Укажите дату рождения.")
-    except ValueError as exc:
-        raise PersonValidationError(str(exc)) from exc
+    if data.birthday:
+        try:
+            normalize_birth_year_input(data.birthday)
+        except ValueError as exc:
+            raise PersonValidationError(str(exc)) from exc
     if data.id_rank is None:
         raise PersonValidationError("Выберите звание / специальность.")
 

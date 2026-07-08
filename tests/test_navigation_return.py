@@ -165,7 +165,7 @@ class ReturnNavigationTests(unittest.TestCase):
         request = FakeRequest(
             {
                 "fio": "Updated Person",
-                "birthday": "09.05.1913",
+                "birthday": "1913",
                 "id_rank": "1",
                 "return_to": "/legacy?tab=rewards&person_id=1",
             }

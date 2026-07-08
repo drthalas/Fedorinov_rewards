@@ -1999,6 +1999,37 @@ th {
   margin: 0;
 }
 
+.reward-icon-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reward-icon-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f172a;
+  text-decoration: none;
+  line-height: 1;
+}
+
+.reward-icon-action:hover,
+.reward-icon-action:focus-visible {
+  background: #eef2ff;
+  border-color: #94a3b8;
+  text-decoration: none;
+}
+
+.reward-icon-danger {
+  color: #991b1b;
+}
+
 .link-button {
   display: inline;
   padding: 0;
@@ -2007,6 +2038,20 @@ th {
   background: transparent;
   font: inherit;
   cursor: pointer;
+}
+
+.link-button.reward-icon-action {
+  display: inline-flex;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  font: inherit;
+}
+
+.link-button.reward-icon-action:hover,
+.link-button.reward-icon-action:focus-visible {
+  background: #eef2ff;
+  border-color: #94a3b8;
 }
 
 .legacy-bottom-grid,

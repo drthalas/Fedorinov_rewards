@@ -13,7 +13,7 @@ from ..repositories.summary import (
     summary_rows,
     summary_totals,
 )
-from .display import format_date, format_money
+from .display import format_birth_year, format_date, format_money
 
 
 SUMMARY_MATRIX_MAX_COLUMNS = 130
@@ -82,7 +82,7 @@ def generate_summary_matrix_pdf(db_path: Path, filters: SummaryFilters) -> Summa
     reward_columns = list(matrix.get("reward_columns") or [])
     show_numbers = bool(matrix.get("show_numbers"))
 
-    headers = ["ФИО", "Звание / специальность", "Дата рождения"]
+    headers = ["ФИО", "Звание / специальность", "Год рождения"]
     headers.extend(str(column["label"]) for column in photo_columns)
     headers.extend(str(column["name"]) for column in reward_columns)
     if show_numbers:
@@ -96,7 +96,7 @@ def generate_summary_matrix_pdf(db_path: Path, filters: SummaryFilters) -> Summa
     for row in matrix.get("rows") or []:
         photo_flags = row.get("photo_flags") or {}
         reward_counts = row.get("reward_counts") or {}
-        values = [row.get("fio") or "—", row.get("rank_name") or "—", format_date(row.get("birthday"))]
+        values = [row.get("fio") or "—", row.get("rank_name") or "—", format_birth_year(row.get("birthday"))]
         values.extend(int(photo_flags.get(column["field"], 0)) for column in photo_columns)
         values.extend(int(reward_counts.get(int(column["id"]), 0)) for column in reward_columns)
         if show_numbers:

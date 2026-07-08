@@ -41,7 +41,7 @@ class PersonWriteTests(unittest.TestCase):
         )
 
     def person_data(self, fio: str = "Test Person", **overrides) -> PersonWriteData:
-        values = {"fio": fio, "birthday": "1913-05-09", "id_rank": 1}
+        values = {"fio": fio, "birthday": "1913", "id_rank": 1}
         values.update(overrides)
         return PersonWriteData(**values)
 
@@ -146,12 +146,12 @@ class PersonWriteTests(unittest.TestCase):
     def test_create_person_works(self) -> None:
         person_id = create_person(
             self.settings(),
-            PersonWriteData(fio="TEST DEV PERSON", birthday="1913-05-09", id_rank=2, link1="a", link2="b"),
+            PersonWriteData(fio="TEST DEV PERSON", birthday="1913", id_rank=2, link1="a", link2="b"),
         )
         row = self.fetch_person(person_id)
         self.assertIsNotNone(row)
         self.assertEqual(row["fio"], "TEST DEV PERSON")
-        self.assertEqual(row["birthday"], "1913-05-09")
+        self.assertEqual(str(row["birthday"]), "1913")
         self.assertEqual(row["id_rank"], 2)
 
     def test_update_person_works(self) -> None:
@@ -159,7 +159,7 @@ class PersonWriteTests(unittest.TestCase):
         update_person(
             self.settings(),
             person_id,
-            PersonWriteData(fio="After", birthday="1920-01-02", id_rank=3, comment="Updated"),
+            PersonWriteData(fio="After", birthday="1920", id_rank=3, comment="Updated"),
         )
         row = self.fetch_person(person_id)
         self.assertEqual(row["fio"], "After")
@@ -209,22 +209,31 @@ class PersonWriteTests(unittest.TestCase):
 
     def test_empty_person_is_not_created(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
-            person_data_from_mapping({"fio": "", "birthday": "01.01.1913", "id_rank": "1"})
+            person_data_from_mapping({"fio": "", "birthday": "1913", "id_rank": "1"})
         self.assertEqual(str(exc.exception), "Заполните ФИО.")
 
-    def test_person_without_birthday_is_not_created(self) -> None:
-        with self.assertRaises(PersonValidationError) as exc:
-            person_data_from_mapping({"fio": "No birthday", "birthday": "", "id_rank": "1"})
-        self.assertEqual(str(exc.exception), "Укажите дату рождения.")
+    def test_person_without_birthday_is_allowed(self) -> None:
+        data = person_data_from_mapping({"fio": "No birthday", "birthday": "", "id_rank": "1"})
+        self.assertIsNone(data.birthday)
 
     def test_person_without_rank_is_not_created(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
-            person_data_from_mapping({"fio": "No rank", "birthday": "01.01.1913", "id_rank": ""})
+            person_data_from_mapping({"fio": "No rank", "birthday": "1913", "id_rank": ""})
         self.assertEqual(str(exc.exception), "Выберите звание / специальность.")
 
-    def test_birthday_is_normalized_from_user_format(self) -> None:
-        data = person_data_from_mapping({"fio": "Date user", "birthday": "09.05.1913", "id_rank": "2"})
-        self.assertEqual(data.birthday, "1913-05-09")
+    def test_birthday_accepts_year_only(self) -> None:
+        data = person_data_from_mapping({"fio": "Date user", "birthday": "1913", "id_rank": "2"})
+        self.assertEqual(data.birthday, "1913")
+
+    def test_birthday_rejects_full_date(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "Date user", "birthday": "09.05.1913", "id_rank": "2"})
+        self.assertEqual(str(exc.exception), "Укажите год рождения в формате ГГГГ.")
+
+    def test_birthday_rejects_out_of_range_year(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "Date user", "birthday": "1799", "id_rank": "2"})
+        self.assertEqual(str(exc.exception), "Год рождения должен быть от 1800 до текущего года.")
 
 
 if __name__ == "__main__":

@@ -115,10 +115,10 @@
           <div class="legacy-split-header">
             <div class="legacy-person-heading">
               <h1 class="legacy-person-title wrap-text">{{ selected_person.fio|dash }}</h1>
-              <p class="secondary legacy-person-meta wrap-text">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_date }}</p>
+              <p class="secondary legacy-person-meta wrap-text">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_birth_year }}</p>
             </div>
             <div class="legacy-actions">
-              <a class="button" href="/persons/{{ selected_person.id }}">Карточка</a>
+              <a class="button" href="/persons/{{ selected_person.id }}">Карточка кавалера</a>
               <a class="button legacy-show-all-photos-link" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </div>
           </div>
@@ -126,15 +126,6 @@
           <section class="legacy-block legacy-rewards-block">
             <div class="legacy-block-head">
               <h2>Перечень наград</h2>
-              <div class="legacy-toolbar">
-                {% if settings.write_mode %}
-                  <a class="tool-button" href="/persons/{{ selected_person.id }}/rewards/new?return_to={{ selected_person_return|urlencode }}">➕ Добавить награду</a>
-                {% else %}
-                  <span class="tool-button disabled">➕ Добавить награду</span>
-                  <span class="tool-button disabled">✏️ Изменить</span>
-                  <span class="tool-button disabled">❌ Удалить</span>
-                {% endif %}
-              </div>
             </div>
             <div class="legacy-table-wrap legacy-rewards-table-scroll" data-legacy-rewards-scroll aria-label="Перечень наград">
               <table class="legacy-table">
@@ -146,7 +137,6 @@
                     <th>Дата покупки</th>
                     <th>Цена покупки</th>
                     <th>Текущая цена</th>
-                    {% if settings.write_mode %}<th>Действия</th>{% endif %}
                   </tr>
                 </thead>
                 <tbody>
@@ -158,20 +148,9 @@
                       <td>{{ reward.date_purchase|format_date }}</td>
                       <td>{{ reward.price_purchase|format_money }}</td>
                       <td>{{ reward.price_now|format_money }}</td>
-                      {% if settings.write_mode %}
-                        <td class="compact-actions">
-                          <a href="/rewards/{{ reward.id }}/edit?return_to={{ selected_person_return|urlencode }}">✏️</a>
-                          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
-                            <input type="hidden" name="confirm" value="">
-                            <input type="hidden" name="delete_reward_confirm" value="">
-                            <input type="hidden" name="return_to" value="{{ selected_person_return }}">
-                            <button type="submit" class="link-button">❌</button>
-                          </form>
-                        </td>
-                      {% endif %}
                     </tr>
                   {% else %}
-                    <tr><td colspan="{% if settings.write_mode %}7{% else %}6{% endif %}">Награды не найдены.</td></tr>
+                    <tr><td colspan="6">Награды не найдены.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>
@@ -398,7 +377,7 @@
                     <th>№</th>
                     {{ search_sort_th("fio", "ФИО") }}
                     {{ search_sort_th("rank_name", "Звание / специальность") }}
-                    {{ search_sort_th("birthday", "Дата рождения") }}
+                    {{ search_sort_th("birthday", "Год рождения") }}
                     {{ search_sort_th("person_foto_flag", "Фото кавалера") }}
                     {{ search_sort_th("main_foto_flag", "Главное фото") }}
                     {{ search_sort_th("rewards_foto_flag", "Общее фото наград") }}
@@ -414,7 +393,7 @@
                     <td>{{ search_results.offset + loop.index }}</td>
                     <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
                     <td>{{ person.rank_name|dash }}</td>
-                    <td>{{ person.birthday|format_date }}</td>
+                    <td>{{ person.birthday|format_birth_year }}</td>
                     {{ search_photo_cell(person, "person_foto_flag", "person_foto", "Фото кавалера") }}
                     {{ search_photo_cell(person, "main_foto_flag", "main_foto", "Главное фото") }}
                     {{ search_photo_cell(person, "rewards_foto_flag", "rewards_foto", "Общее фото наград") }}
@@ -441,7 +420,7 @@
                   <tr>
                     {{ search_sort_th("fio", "ФИО") }}
                     {{ search_sort_th("rank_name", "Звание / специальность") }}
-                    {{ search_sort_th("birthday", "Дата рождения") }}
+                    {{ search_sort_th("birthday", "Год рождения") }}
                     {{ search_sort_th("person_book1_foto_flag", "Фото наградной книжки, сторона 1") }}
                     {{ search_sort_th("person_book2_foto_flag", "Фото наградной книжки, сторона 2") }}
                     {{ search_sort_th("person_card1_foto_flag", "Фото учётной карточки, страница 1") }}
@@ -463,7 +442,7 @@
                   <tr>
                     <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
                     <td>{{ reward.rank_name|dash }}</td>
-                    <td>{{ reward.birthday|format_date }}</td>
+                    <td>{{ reward.birthday|format_birth_year }}</td>
                     {{ search_photo_cell(reward, "person_book1_foto_flag", "person_book1_foto", "Фото наградной книжки кавалера, сторона 1") }}
                     {{ search_photo_cell(reward, "person_book2_foto_flag", "person_book2_foto", "Фото наградной книжки кавалера, сторона 2") }}
                     {{ search_photo_cell(reward, "person_card1_foto_flag", "person_card1_foto", "Фото учётной карточки, страница 1") }}
@@ -718,7 +697,7 @@
               <tr>
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.fio }}">ФИО кавалера{% if summary_matrix_sort.sort == 'fio' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.rank_name }}">Звание / специальность{% if summary_matrix_sort.sort == 'rank_name' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
-                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.birthday }}">Дата рождения{% if summary_matrix_sort.sort == 'birthday' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+                <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.birthday }}">Год рождения{% if summary_matrix_sort.sort == 'birthday' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 {% for column in summary_matrix.photo_columns %}
                 {% set sort_key = 'photo:' ~ column.field %}
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.photo_urls.get(column.field) }}">{{ column.label }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
@@ -736,7 +715,7 @@
               <tr>
                 <td><a href="/persons/{{ row.id }}?return_to=/legacy%3Ftab%3Dsummary%26summary_mode%3Dmatrix">{{ row.fio|dash }}</a></td>
                 <td>{{ row.rank_name|dash }}</td>
-                <td>{{ row.birthday|format_date }}</td>
+                <td>{{ row.birthday|format_birth_year }}</td>
                 {% for column in summary_matrix.photo_columns %}
                 <td class="number-cell {{ 'stock-yes' if row.photo_flags.get(column.field) else 'stock-no' }}">{{ row.photo_flags.get(column.field, 0) }}</td>
                 {% endfor %}

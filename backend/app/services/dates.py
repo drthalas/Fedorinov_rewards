@@ -1,7 +1,10 @@
 from datetime import date, datetime
+import re
 
 
 DATE_INPUT_MESSAGE = "Укажите дату в формате ДД.ММ.ГГГГ."
+BIRTH_YEAR_INPUT_MESSAGE = "Укажите год рождения в формате ГГГГ."
+BIRTH_YEAR_RANGE_MESSAGE = "Год рождения должен быть от 1800 до текущего года."
 
 
 def today_iso() -> str:
@@ -22,6 +25,22 @@ def format_date_input(value: object) -> str:
     return text
 
 
+def format_birth_year_input(value: object) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    for pattern in ("%Y-%m-%d", "%Y/%m/%d", "%d.%m.%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text[:10], pattern).strftime("%Y")
+        except ValueError:
+            continue
+    return text
+
+
 def normalize_date_input(value: object, *, required: bool = False, required_message: str = DATE_INPUT_MESSAGE) -> str | None:
     text = "" if value is None else str(value).strip()
     if not text:
@@ -34,3 +53,15 @@ def normalize_date_input(value: object, *, required: bool = False, required_mess
         except ValueError:
             continue
     raise ValueError(DATE_INPUT_MESSAGE)
+
+
+def normalize_birth_year_input(value: object) -> str | None:
+    text = "" if value is None else str(value).strip()
+    if not text:
+        return None
+    if not re.fullmatch(r"\d{4}", text):
+        raise ValueError(BIRTH_YEAR_INPUT_MESSAGE)
+    year = int(text)
+    if year < 1800 or year > date.today().year:
+        raise ValueError(BIRTH_YEAR_RANGE_MESSAGE)
+    return text

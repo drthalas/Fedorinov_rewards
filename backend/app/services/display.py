@@ -42,6 +42,31 @@ def format_date(value: object) -> str:
     return DASH
 
 
+def format_birth_year(value: object) -> str:
+    if value is None:
+        return DASH
+    if isinstance(value, datetime):
+        return value.strftime("%Y")
+    if isinstance(value, date):
+        return value.strftime("%Y")
+    if isinstance(value, int) and 1000 <= value <= 9999:
+        return str(value)
+    if not isinstance(value, str):
+        return DASH
+
+    text = value.strip()
+    if not text:
+        return DASH
+    if re.fullmatch(r"\d{4}", text):
+        return text
+    for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d.%m.%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text[:10], fmt).strftime("%Y")
+        except ValueError:
+            continue
+    return DASH
+
+
 def format_money(value: object) -> str:
     if value is None:
         return DASH

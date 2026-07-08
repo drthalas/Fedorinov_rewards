@@ -8,7 +8,7 @@ import re
 
 from ..config import Settings
 from ..repositories.persons import get_person, list_person_rewards
-from .display import format_bool, format_date, format_money, has_media_path, safe_external_url
+from .display import format_birth_year, format_bool, format_date, format_money, has_media_path, safe_external_url
 from .media import resolve_media
 from .person_files import _safe_filename
 from .photos import PERSON_PHOTO_FIELDS, REWARD_PHOTO_FIELDS
@@ -98,7 +98,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         [
             ("ФИО", person.get("fio")),
             ("Звание / специальность", person.get("rank_name")),
-            ("Дата рождения", format_date(person.get("birthday"))),
+            ("Год рождения", format_birth_year(person.get("birthday"))),
         ],
         Paragraph,
         Table,

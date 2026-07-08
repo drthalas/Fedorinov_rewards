@@ -12,7 +12,7 @@
 <div class="table-wrap">
   <table>
     <thead>
-      <tr><th>Фото</th><th>ID</th><th>ФИО</th><th>Дата рождения</th><th>Звание/специальность</th><th>Наград</th><th></th></tr>
+      <tr><th>Фото</th><th>ID</th><th>ФИО</th><th>Год рождения</th><th>Звание/специальность</th><th>Наград</th><th></th></tr>
     </thead>
     <tbody>
       {% for person in persons %}
@@ -29,7 +29,7 @@
         </td>
         <td>{{ person.id }}</td>
         <td>{{ person.fio|dash }}</td>
-        <td>{{ person.birthday|format_date }}</td>
+        <td>{{ person.birthday|format_birth_year }}</td>
         <td>{{ person.rank_name|dash }}</td>
         <td>{{ person.rewards_count }}</td>
         <td><a href="/persons/{{ person.id }}">Открыть</a></td>

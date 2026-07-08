@@ -25,8 +25,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('{% include "_user_nav.html" %}', base)
         self.assertIn('{% include "_user_nav.html" %}', legacy_base)
         self.assertIn('class="legacy-tabs"', user_nav)
-        for label in ["Награды", "Поиск", "Знаки", "Свод.таблица", "Справочник", "О программе"]:
+        for label in ["Кавалеры", "Поиск", "Знаки", "Свод.таблица", "Справочник", "О программе"]:
             self.assertIn(label, user_nav)
+        self.assertNotIn(">Награды</a>", user_nav)
         self.assertIn('/guides?return_to=', user_nav)
         self.assertIn("current_url|urlencode", user_nav)
         self.assertIn('active_nav == \'guides\'', user_nav)
@@ -97,7 +98,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260703-v012-person-card-scroll"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260708-cavaliers-owner-qa"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -299,6 +300,13 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("legacy-rewards-table-scroll", legacy_template)
         self.assertIn("data-legacy-rewards-scroll", legacy_template)
         self.assertIn('aria-label="Перечень наград"', legacy_template)
+        person_header_actions = legacy_template.split('<div class="legacy-actions">', 1)[1].split("</div>", 1)[0]
+        self.assertIn("Карточка кавалера", person_header_actions)
+        self.assertNotIn(">Карточка</a>", person_header_actions)
+        rewards_block = legacy_template.split('<section class="legacy-block legacy-rewards-block">', 1)[1].split("</section>", 1)[0]
+        self.assertNotIn("Добавить награду", rewards_block)
+        self.assertNotIn("/edit?return_to={{ selected_person_return|urlencode }}", rewards_block)
+        self.assertNotIn("data-confirm-submit=\"reward-delete\"", rewards_block)
         self.assertIn(".legacy-rewards-table-scroll", styles)
         self.assertIn(".legacy-rewards-block .legacy-block-head", styles)
         self.assertIn("flex: 1 1 clamp(220px, 34vh, 340px)", styles)
@@ -353,19 +361,16 @@ class LegacyShellLightboxTests(unittest.TestCase):
         confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
         expected_text = "Вы действительно хотите удалить награду?"
-        self.assertIn(expected_text, legacy_template)
         self.assertIn(expected_text, person_detail)
         self.assertIn(expected_text, reward_detail)
         self.assertIn('/rewards/{{ reward.id }}/delete', person_detail)
         self.assertIn("static_url('confirm_submit.js')", base)
         self.assertIn("static_url('confirm_submit.js')", legacy_base)
-        self.assertIn('data-confirm-submit="reward-delete"', legacy_template)
         self.assertIn('data-confirm-submit="reward-delete"', person_detail)
         self.assertIn('data-confirm-submit="reward-delete"', reward_detail)
         self.assertIn('name="confirm" value=""', legacy_template)
         self.assertIn('name="confirm" value=""', person_detail)
         self.assertIn('name="confirm" value=""', reward_detail)
-        self.assertIn('name="delete_reward_confirm" value=""', legacy_template)
         self.assertIn('name="delete_reward_confirm" value=""', person_detail)
         self.assertIn('name="delete_reward_confirm" value=""', reward_detail)
         self.assertIn(

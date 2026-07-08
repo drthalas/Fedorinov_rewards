@@ -31,9 +31,9 @@
         <input name="fio" value="{{ person.fio or '' }}" required>
       </label>
       <label>
-        <span>Дата рождения / год рождения</span>
-        <input name="birthday" value="{{ person.birthday|format_date_input }}" placeholder="ДД.ММ.ГГГГ" required>
-        {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_date }}</small>{% endif %}
+        <span>Год рождения</span>
+        <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" maxlength="4">
+        {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_birth_year }}</small>{% endif %}
       </label>
     </div>
     <label>
