@@ -7,21 +7,7 @@
     <link rel="stylesheet" href="{{ static_url('styles.css') }}">
   </head>
   <body class="legacy-body">
-    <header class="legacy-app-header">
-      <div class="legacy-titlebar">
-        <span>Fedorinov Rewards</span>
-        {% if settings is defined and settings.write_mode %}
-        <span class="legacy-mode legacy-mode-write">Рабочий режим</span>
-        {% else %}
-        <span class="legacy-mode legacy-mode-readonly">Режим просмотра</span>
-        {% endif %}
-      </div>
-      <nav class="legacy-tabs" aria-label="Разделы">
-        {% for tab_id, label in tabs %}
-          <a class="{% if tab == tab_id %}active{% endif %}" href="/legacy?tab={{ tab_id }}">{{ label }}</a>
-        {% endfor %}
-      </nav>
-    </header>
+    {% include "_user_nav.html" %}
     <main class="legacy-shell">
       {% block content %}{% endblock %}
     </main>

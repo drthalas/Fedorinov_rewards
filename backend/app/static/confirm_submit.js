@@ -24,6 +24,8 @@ document.addEventListener(
     setInputValue(form, "confirm", "true");
     if (form.dataset.confirmSubmit === "reward-delete") {
       setInputValue(form, "delete_reward_confirm", "true");
+    } else if (form.dataset.confirmSubmit === "person-delete") {
+      setInputValue(form, "delete_person_confirm", "true");
     }
   },
   true

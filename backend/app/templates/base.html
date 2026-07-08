@@ -6,21 +6,8 @@
     <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
     <link rel="stylesheet" href="{{ static_url('styles.css') }}">
   </head>
-  <body>
-    <nav class="topbar">
-      <a href="/legacy?tab=rewards">Главная</a>
-      <a href="/legacy?tab=rewards">Награды</a>
-      <a href="/legacy?tab=marks">Знаки</a>
-      <a href="/legacy?tab=search">Поиск</a>
-      <a href="/guides">Справочник</a>
-      <a href="/dashboard">Диагностика</a>
-      <a href="/health">Health</a>
-    </nav>
-    {% if settings is defined and settings.write_mode %}
-    <div class="mode-banner mode-write">Рабочий режим · обычное редактирование включено</div>
-    {% else %}
-    <div class="mode-banner mode-readonly">Режим просмотра · редактирование выключено</div>
-    {% endif %}
+  <body class="legacy-body">
+    {% include "_user_nav.html" %}
     <main class="page">
       {% block content %}{% endblock %}
     </main>

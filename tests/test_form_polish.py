@@ -324,7 +324,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("К карточке кавалера", template)
         self.assertIn("К списку наград", template)
         self.assertIn("/legacy?tab=rewards", template)
-        self.assertIn("← Назад", detail_template)
+        self.assertIn(">Назад</a>", detail_template)
         self.assertIn('data-escape-back href="{{ reward_back_url }}"', detail_template)
         self.assertNotIn("К карточке кавалера", detail_template)
         self.assertNotIn("К списку наград", detail_template)

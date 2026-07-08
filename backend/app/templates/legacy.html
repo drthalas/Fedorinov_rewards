@@ -73,14 +73,13 @@
           </div>
         </form>
         <div class="legacy-toolbar">
-          <a class="tool-button" href="/guides?return_to={{ rewards_tab_return|urlencode }}" title="Справочник">📚 Справочник</a>
           {% if settings.write_mode %}
             <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
             {% if selected_person %}
               <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
-              <form method="post" action="/persons/{{ selected_person.id }}/delete" onsubmit="return confirm('Вы точно хотите удалить кавалера? Это действие нельзя отменить.')">
-                <input type="hidden" name="confirm" value="true">
-                <input type="hidden" name="delete_person_confirm" value="true">
+              <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-message="Вы точно хотите удалить кавалера? Это действие нельзя отменить.">
+                <input type="hidden" name="confirm" value="">
+                <input type="hidden" name="delete_person_confirm" value="">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
                 <button class="tool-button danger" type="submit">❌ Удалить</button>
               </form>

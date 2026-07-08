@@ -1,0 +1,48 @@
+{% set current_path = "" %}
+{% set current_query = "" %}
+{% if request is defined and request.url is defined %}
+  {% set current_path = request.url.path|default("", true) %}
+  {% set current_query = request.url.query|default("", true) %}
+{% endif %}
+{% set current_url = current_path %}
+{% if current_query %}
+  {% set current_url = current_path ~ "?" ~ current_query %}
+{% endif %}
+{% set active_nav = "" %}
+{% if current_path == "/legacy" %}
+  {% if request is defined and request.query_params is defined %}
+    {% set active_nav = request.query_params.get("tab", "rewards") %}
+  {% else %}
+    {% set active_nav = tab|default("rewards", true) %}
+  {% endif %}
+{% elif current_path.startswith("/persons") or current_path.startswith("/rewards") %}
+  {% set active_nav = "rewards" %}
+{% elif current_path.startswith("/marks") %}
+  {% set active_nav = "marks" %}
+{% elif current_path.startswith("/search") %}
+  {% set active_nav = "search" %}
+{% elif current_path.startswith("/guides") %}
+  {% set active_nav = "guides" %}
+{% endif %}
+{% set guides_href = "/guides" %}
+{% if current_url and active_nav != "guides" %}
+  {% set guides_href = "/guides?return_to=" ~ current_url|urlencode %}
+{% endif %}
+<header class="legacy-app-header">
+  <div class="legacy-titlebar">
+    <span>Fedorinov Rewards</span>
+    {% if settings is defined and settings.write_mode %}
+    <span class="legacy-mode legacy-mode-write">Рабочий режим</span>
+    {% else %}
+    <span class="legacy-mode legacy-mode-readonly">Режим просмотра</span>
+    {% endif %}
+  </div>
+  <nav class="legacy-tabs" aria-label="Разделы">
+    <a class="{% if active_nav == 'rewards' %}active{% endif %}" href="/legacy?tab=rewards">Награды</a>
+    <a class="{% if active_nav == 'search' %}active{% endif %}" href="/legacy?tab=search">Поиск</a>
+    <a class="{% if active_nav == 'marks' %}active{% endif %}" href="/legacy?tab=marks">Знаки</a>
+    <a class="{% if active_nav == 'summary' %}active{% endif %}" href="/legacy?tab=summary">Свод.таблица</a>
+    <a class="{% if active_nav == 'guides' %}active{% endif %}" href="{{ guides_href }}">Справочник</a>
+    <a class="{% if active_nav == 'about' %}active{% endif %}" href="/legacy?tab=about">О программе</a>
+  </nav>
+</header>

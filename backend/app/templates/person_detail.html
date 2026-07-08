@@ -30,9 +30,9 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/persons/{{ person.id }}/delete" onsubmit="return confirm('Вы точно хотите удалить кавалера? Это действие нельзя отменить.');">
-    <input type="hidden" name="confirm" value="true">
-    <input type="hidden" name="delete_person_confirm" value="true">
+  <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-message="Вы точно хотите удалить кавалера? Это действие нельзя отменить.">
+    <input type="hidden" name="confirm" value="">
+    <input type="hidden" name="delete_person_confirm" value="">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>

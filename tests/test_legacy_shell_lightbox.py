@@ -12,10 +12,35 @@ class LegacyShellLightboxTests(unittest.TestCase):
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
 
         self.assertIn('{% extends "legacy_base.html" %}', legacy_template)
-        self.assertIn("legacy-tabs", legacy_base)
+        self.assertIn('{% include "_user_nav.html" %}', legacy_base)
         self.assertNotIn("Dashboard", legacy_base)
         self.assertNotIn("Health", legacy_base)
         self.assertNotIn("topbar", legacy_base)
+
+    def test_user_navigation_is_shared_and_owner_facing(self) -> None:
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
+        legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
+        user_nav = (ROOT / "backend" / "app" / "templates" / "_user_nav.html").read_text()
+
+        self.assertIn('{% include "_user_nav.html" %}', base)
+        self.assertIn('{% include "_user_nav.html" %}', legacy_base)
+        self.assertIn('class="legacy-tabs"', user_nav)
+        for label in ["Награды", "Поиск", "Знаки", "Свод.таблица", "Справочник", "О программе"]:
+            self.assertIn(label, user_nav)
+        self.assertIn('/guides?return_to=', user_nav)
+        self.assertIn("current_url|urlencode", user_nav)
+        self.assertIn('active_nav == \'guides\'', user_nav)
+        for forbidden in ["Главная", "Диагностика", "Health", "/dashboard", "/health", "topbar"]:
+            self.assertNotIn(forbidden, user_nav)
+            self.assertNotIn(forbidden, base)
+
+    def test_legacy_rewards_toolbar_keeps_only_person_actions(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+
+        self.assertNotIn('/guides?return_to={{ rewards_tab_return|urlencode }}', legacy_template)
+        self.assertIn('/persons/new?return_to={{ rewards_tab_return|urlencode }}', legacy_template)
+        self.assertIn('/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}', legacy_template)
+        self.assertIn('action="/persons/{{ selected_person.id }}/delete"', legacy_template)
 
     def test_lightbox_is_loaded_by_base_layouts(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
@@ -279,15 +304,20 @@ class LegacyShellLightboxTests(unittest.TestCase):
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         person_detail = (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text()
         persons_router = (ROOT / "backend" / "app" / "routers" / "persons.py").read_text()
+        confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
         expected_text = "Вы точно хотите удалить кавалера? Это действие нельзя отменить."
         self.assertIn(expected_text, legacy_template)
         self.assertIn(expected_text, person_detail)
-        self.assertIn('name="confirm" value="true"', legacy_template)
-        self.assertIn('name="delete_person_confirm" value="true"', legacy_template)
-        self.assertIn('name="delete_person_confirm" value="true"', person_detail)
+        self.assertIn('data-confirm-submit="person-delete"', legacy_template)
+        self.assertIn('data-confirm-submit="person-delete"', person_detail)
+        self.assertIn('name="confirm" value=""', legacy_template)
+        self.assertIn('name="confirm" value=""', person_detail)
+        self.assertIn('name="delete_person_confirm" value=""', legacy_template)
+        self.assertIn('name="delete_person_confirm" value=""', person_detail)
         self.assertIn('form_values.get("delete_person_confirm") != "true"', persons_router)
         self.assertIn("Действие требует подтверждения.", persons_router)
+        self.assertIn('setInputValue(form, "delete_person_confirm", "true")', confirm_js)
 
     def test_reward_delete_requires_confirmation_in_ui_and_route(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
