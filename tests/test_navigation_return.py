@@ -11,7 +11,7 @@ from fastapi import HTTPException
 from backend.app.routers.dashboard import dashboard, dashboard_head
 from backend.app.routers.marks import mark_update
 from backend.app.routers.persons import person_update
-from backend.app.routers.rewards import reward_delete, reward_update
+from backend.app.routers.rewards import reward_delete, reward_duplicate_check, reward_update
 from backend.app.routers.templates import photo_view_url
 from backend.app.services.navigation import safe_return_to, with_status
 
@@ -195,6 +195,37 @@ class ReturnNavigationTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as connection:
             row = connection.execute("select id from rewards where id = 10").fetchone()
         self.assertIsNone(row)
+
+    def test_reward_duplicate_check_returns_free_status(self) -> None:
+        result = reward_duplicate_check(id_name="2", number="101")
+
+        self.assertFalse(result["duplicate"])
+        self.assertEqual(result["message"], "Номер свободен")
+
+    def test_reward_duplicate_check_returns_existing_record(self) -> None:
+        result = reward_duplicate_check(id_name="2", number="100")
+
+        self.assertTrue(result["duplicate"])
+        self.assertIn("Награда с таким наименованием и номером уже есть в базе.", result["message"])
+        self.assertEqual(result["existing_reward_id"], 10)
+        self.assertEqual(result["existing_person_id"], 1)
+        self.assertEqual(result["existing_person_name"], "Test Person")
+        self.assertEqual(result["existing_url"], "/persons/1")
+
+    def test_reward_duplicate_check_excludes_current_reward(self) -> None:
+        result = reward_duplicate_check(id_name="2", number="100", current_reward_id="10")
+
+        self.assertFalse(result["duplicate"])
+        self.assertEqual(result["message"], "Номер свободен")
+
+    def test_reward_duplicate_check_handles_empty_number_and_missing_name(self) -> None:
+        empty_number = reward_duplicate_check(id_name="2", number="")
+        missing_name = reward_duplicate_check(id_name="", number="100")
+
+        self.assertFalse(empty_number["duplicate"])
+        self.assertEqual(empty_number["message"], "")
+        self.assertFalse(missing_name["duplicate"])
+        self.assertEqual(missing_name["message"], "Выберите наименование награды для проверки номера")
 
     def test_mark_edit_post_respects_safe_return_to(self) -> None:
         request = FakeRequest({"number": "201", "return_to": "/legacy?tab=marks&mark_id=20"})

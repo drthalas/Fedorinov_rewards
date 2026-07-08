@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from contextlib import closing
 
 from ..config import Settings
-from ..db import open_write_connection
+from ..db import open_readonly_connection, open_write_connection
 from ..services.audit import log_action
 from ..services.dates import normalize_date_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
@@ -29,6 +29,12 @@ REWARD_FIELDS = (
 
 class RewardValidationError(ValueError):
     pass
+
+
+DUPLICATE_REWARD_MESSAGE = (
+    "Награда с таким наименованием и номером уже есть в базе. "
+    "Проверьте номер или откройте существующую запись."
+)
 
 
 NUMERIC_FIELD_ERRORS = {
@@ -139,12 +145,76 @@ def _person_exists(connection, person_id: int) -> bool:
     return row is not None
 
 
+def _duplicate_payload(row) -> dict[str, object]:
+    return {
+        "existing_reward_id": int(row["existing_reward_id"]),
+        "existing_person_id": int(row["existing_person_id"]) if row["existing_person_id"] is not None else None,
+        "existing_person_name": str(row["existing_person_name"] or ""),
+        "existing_url": f"/persons/{int(row['existing_person_id'])}" if row["existing_person_id"] is not None else "",
+    }
+
+
+def _find_reward_duplicate(connection, id_name: int | None, number: int | None, current_reward_id: int | None = None) -> dict[str, object] | None:
+    if id_name is None or number is None:
+        return None
+    conditions = [
+        "r.id_name = ?",
+        "trim(cast(r.number as text)) = ?",
+    ]
+    params: list[object] = [id_name, str(number).strip()]
+    if current_reward_id is not None:
+        conditions.append("r.id != ?")
+        params.append(current_reward_id)
+    row = connection.execute(
+        f"""
+        select
+            r.id as existing_reward_id,
+            r.person_id as existing_person_id,
+            p.fio as existing_person_name
+        from rewards r
+        left join person p on p.id = r.person_id
+        where {" and ".join(conditions)}
+        order by r.id
+        limit 1
+        """,
+        tuple(params),
+    ).fetchone()
+    return _duplicate_payload(row) if row is not None else None
+
+
+def reward_duplicate_message(duplicate: dict[str, object] | None) -> str:
+    if not duplicate:
+        return ""
+    person_name = str(duplicate.get("existing_person_name") or "").strip()
+    person_id = duplicate.get("existing_person_id")
+    reward_id = duplicate.get("existing_reward_id")
+    if person_name and person_id and reward_id:
+        return f"{DUPLICATE_REWARD_MESSAGE} Существующая запись: {person_name}, кавалер #{person_id}, награда #{reward_id}."
+    if person_id and reward_id:
+        return f"{DUPLICATE_REWARD_MESSAGE} Существующая запись: кавалер #{person_id}, награда #{reward_id}."
+    return DUPLICATE_REWARD_MESSAGE
+
+
+def check_reward_duplicate(settings: Settings, id_name: int | None, number: int | None, current_reward_id: int | None = None) -> dict[str, object] | None:
+    if id_name is None or number is None:
+        return None
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        return _find_reward_duplicate(connection, id_name, number, current_reward_id)
+
+
+def _validate_unique_reward_number(connection, data: RewardWriteData, current_reward_id: int | None = None) -> None:
+    duplicate = _find_reward_duplicate(connection, data.id_name, data.number, current_reward_id)
+    if duplicate:
+        raise RewardValidationError(reward_duplicate_message(duplicate))
+
+
 def create_reward(settings: Settings, person_id: int, data: RewardWriteData) -> int:
     ensure_write_allowed(settings)
     _validate_required_name(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _person_exists(connection, person_id):
             raise RewardValidationError("Награжденный не найден.")
+        _validate_unique_reward_number(connection, data)
         cursor = connection.execute(
             """
             insert into rewards (
@@ -174,6 +244,7 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
         person_id = int(row["person_id"])
         data = _preserve_existing_guide_ids(data, row)
         _validate_required_name(data)
+        _validate_unique_reward_number(connection, data, reward_id)
         cursor = connection.execute(
             """
             update rewards

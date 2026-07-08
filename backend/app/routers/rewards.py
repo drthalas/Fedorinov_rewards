@@ -10,9 +10,11 @@ from ..repositories.persons import get_person
 from ..repositories.rewards import get_reward, reward_photo_items
 from ..repositories.rewards_write import (
     RewardValidationError,
+    check_reward_duplicate,
     create_reward,
     delete_reward,
     reward_data_from_mapping,
+    reward_duplicate_message,
     update_reward,
 )
 from ..services.navigation import safe_return_to, with_status
@@ -76,6 +78,32 @@ def _reward_created_edit_url(reward_id: int, return_to: str = "") -> str:
     if return_to:
         query.append(("return_to", return_to))
     return f"/rewards/{reward_id}/edit?{urlencode(query)}"
+
+
+@router.get("/rewards/check-duplicate")
+def reward_duplicate_check(id_name: str = "", number: str = "", current_reward_id: str = ""):
+    settings = get_settings()
+    raw_number = str(number or "").strip()
+    name_id = _safe_int(id_name)
+    reward_number = _safe_int(raw_number)
+    current_id = _safe_int(current_reward_id)
+
+    if not settings.db_exists:
+        return {"duplicate": False, "message": ""}
+    if not raw_number:
+        return {"duplicate": False, "message": ""}
+    if name_id is None:
+        return {"duplicate": False, "message": "Выберите наименование награды для проверки номера"}
+    if reward_number is None:
+        return {"duplicate": False, "message": "Укажите корректный номер награды."}
+    duplicate = check_reward_duplicate(settings, name_id, reward_number, current_id)
+    if not duplicate:
+        return {"duplicate": False, "message": "Номер свободен"}
+    return {
+        "duplicate": True,
+        "message": reward_duplicate_message(duplicate),
+        **duplicate,
+    }
 
 
 @router.get("/persons/{person_id}/rewards/new")

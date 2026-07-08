@@ -71,6 +71,7 @@ class RewardWriteTests(unittest.TestCase):
                 """
             )
             connection.execute("insert into person (id, fio) values (1, 'Person')")
+            connection.execute("insert into person (id, fio) values (2, 'Other Person')")
 
     def fetch_reward(self, reward_id: int) -> sqlite3.Row | None:
         with sqlite3.connect(self.db_path) as connection:
@@ -99,6 +100,22 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["number"], 77)
         self.assertEqual(row["instock"], 1)
 
+    def test_create_reward_with_empty_number_skips_duplicate_validation(self) -> None:
+        first_id = create_reward(self.settings(), 1, self.reward_data(number=None))
+        second_id = create_reward(self.settings(), 2, self.reward_data(number=None))
+
+        self.assertIsNotNone(self.fetch_reward(first_id))
+        self.assertIsNotNone(self.fetch_reward(second_id))
+
+    def test_create_reward_blocks_duplicate_name_and_number_across_database(self) -> None:
+        create_reward(self.settings(), 1, self.reward_data(number=555))
+
+        with self.assertRaises(RewardValidationError) as blocked:
+            create_reward(self.settings(), 2, self.reward_data(number=555))
+
+        self.assertIn("Награда с таким наименованием и номером уже есть в базе.", str(blocked.exception))
+        self.assertIn("Person, кавалер #1", str(blocked.exception))
+
     def test_update_reward_works(self) -> None:
         reward_id = create_reward(self.settings(), 1, self.reward_data(number=1, price_now=100))
         update_reward(
@@ -111,6 +128,27 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["price_purchase"], 500)
         self.assertEqual(row["price_now"], 700)
         self.assertEqual(row["instock"], 0)
+
+    def test_update_reward_keeps_same_name_and_number_without_duplicate_error(self) -> None:
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=777))
+
+        update_reward(self.settings(), reward_id, self.reward_data(number=777, price_now=900))
+
+        row = self.fetch_reward(reward_id)
+        self.assertEqual(row["number"], 777)
+        self.assertEqual(row["price_now"], 900)
+
+    def test_update_reward_blocks_duplicate_name_and_number_from_other_row(self) -> None:
+        create_reward(self.settings(), 1, self.reward_data(number=888))
+        reward_id = create_reward(self.settings(), 2, self.reward_data(id_name=5, number=999))
+
+        with self.assertRaises(RewardValidationError) as blocked:
+            update_reward(self.settings(), reward_id, self.reward_data(id_name=4, number=888))
+
+        self.assertIn("Награда с таким наименованием и номером уже есть в базе.", str(blocked.exception))
+        row = self.fetch_reward(reward_id)
+        self.assertEqual(row["id_name"], 5)
+        self.assertEqual(row["number"], 999)
 
     def test_delete_reward_removes_row_but_not_media_folder(self) -> None:
         media_dir = self.root / "Source" / "1" / "1"

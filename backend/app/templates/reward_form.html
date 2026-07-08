@@ -24,7 +24,7 @@
   {% set person_back_url = '/persons' %}
 {% endif %}
 
-<form class="edit-form legacy-edit-form guide-cascade" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form guide-cascade" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" data-reward-duplicate-check data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}">
   <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
@@ -79,7 +79,8 @@
     <div class="form-grid two-columns">
       <label>
         <span>Номер</span>
-        <input name="number" value="{{ reward.number or '' }}" inputmode="numeric">
+        <input name="number" value="{{ reward.number or '' }}" inputmode="numeric" data-reward-number>
+        <p class="secondary reward-duplicate-status" data-reward-duplicate-status role="status" aria-live="polite" hidden></p>
       </label>
       <label>
         <span>Дата покупки</span>

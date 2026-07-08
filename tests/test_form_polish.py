@@ -311,6 +311,24 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("Вернуться к кавалеру", template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
 
+    def test_reward_form_has_duplicate_number_status_ui(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        base_template = (root / "backend" / "app" / "templates" / "base.html").read_text(encoding="utf-8")
+        reward_template = (root / "backend" / "app" / "templates" / "reward_form.html").read_text(encoding="utf-8")
+        duplicate_js = (root / "backend" / "app" / "static" / "reward_duplicate_check.js").read_text(encoding="utf-8")
+        person_detail = (root / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
+
+        self.assertIn("reward_duplicate_check.js", base_template)
+        self.assertIn("data-reward-duplicate-check", reward_template)
+        self.assertIn("data-current-reward-id", reward_template)
+        self.assertIn("data-reward-number", reward_template)
+        self.assertIn("data-reward-duplicate-status", reward_template)
+        self.assertIn("Выберите наименование награды для проверки номера", duplicate_js)
+        self.assertIn("Номер свободен", duplicate_js)
+        self.assertIn("Такая награда с этим номером уже есть в базе", duplicate_js)
+        self.assertIn("/rewards/check-duplicate", duplicate_js)
+        self.assertIn("Вы действительно хотите удалить награду?", person_detail)
+
     def test_mark_form_preserves_cascading_guides_after_validation_error(self) -> None:
         request = FakeRequest(
             {
