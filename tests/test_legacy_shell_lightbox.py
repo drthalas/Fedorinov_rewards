@@ -378,7 +378,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
             '            <input type="hidden" name="confirm" value="">',
             person_detail,
         )
-        self.assertIn('name="return_to" value="/persons/{{ person.id }}"', person_detail)
+        self.assertIn('name="return_to" value="{{ person_card_return }}"', person_detail)
         self.assertIn('form_values.get("delete_reward_confirm") != "true" or form_values.get("confirm") != "true"', rewards_router)
         self.assertIn("event.preventDefault()", confirm_js)
         self.assertIn('setInputValue(form, "confirm", "")', confirm_js)
@@ -467,8 +467,11 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertLess(person_detail.index("person-detail-rewards-section"), person_detail.index("person-detail-photo-section"))
         self.assertIn("data-person-complete-slideshow", person_detail)
         self.assertIn("bio-text wrap-text", person_detail)
-        self.assertIn("data-history-back", person_detail)
-        self.assertIn("data-history-fallback=\"{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}\"", person_detail)
+        self.assertIn('data-escape-back href="{{ person_back_url }}"', person_detail)
+        self.assertIn(
+            "{% set person_card_return = '/persons/' ~ person.id ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}",
+            person_detail,
+        )
         self.assertIn("compact-link-value", person_detail)
         self.assertIn("compact-external-link", person_detail)
         self.assertIn('title="{{ person.link1 }}"', person_detail)
@@ -599,6 +602,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-escape-back", person_form)
         self.assertIn("data-escape-back", reward_form)
         self.assertIn("data-escape-back", mark_form)
+        self.assertIn("data-escape-back", (ROOT / "backend" / "app" / "templates" / "person_detail.html").read_text())
         self.assertIn(".photo-lightbox.is-open", script)
         self.assertIn("data-history-back", script)
         self.assertIn("window.history.back()", script)

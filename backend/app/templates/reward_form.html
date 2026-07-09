@@ -19,7 +19,7 @@
 {% endif %}
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
-{% if return_to and return_to.startswith('/legacy') %}
+{% if return_to and (return_to.startswith('/legacy') or return_to.startswith('/persons/')) %}
   {% set person_back_url = return_to %}
 {% elif person %}
   {% set person_back_url = '/persons/' ~ person.id %}

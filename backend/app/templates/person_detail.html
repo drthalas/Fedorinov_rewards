@@ -2,6 +2,8 @@
 {% block title %}Награжденный #{{ person.id }}{% endblock %}
 {% block content %}
 {% set person_lightbox_group = 'person-' ~ person.id ~ '-all' %}
+{% set person_back_url = return_to or '/legacy?tab=rewards&person_id=' ~ person.id %}
+{% set person_card_return = '/persons/' ~ person.id ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 <section class="person-detail-page compact-person-detail">
 <section class="person-detail-hero panel compact-person-detail-hero">
   <h1 class="person-title wrap-text">{{ person.fio }}</h1>
@@ -22,7 +24,7 @@
 </section>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p class="person-detail-nav local-back-nav compact-actions">
-  <button class="button secondary-button person-history-back" type="button" data-history-back data-history-fallback="{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}">← Назад</button>
+  <a class="button secondary-button person-history-back" data-escape-back href="{{ person_back_url }}">← Назад</a>
 </p>
 {% if settings.write_mode %}
 <div class="actions">
@@ -71,11 +73,10 @@
 </section>
 
 <section class="panel person-detail-rewards-section">
-{% set person_card_return = '/persons/' ~ person.id %}
 <div class="person-detail-section-head">
   <h2 class="compact-section-title">Награды</h2>
   {% if settings.write_mode %}
-  <a class="button" href="/persons/{{ person.id }}/rewards/new{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Добавить награду</a>
+  <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ person_card_return|urlencode }}">Добавить награду</a>
   {% endif %}
 </div>
 <div class="table-wrap person-detail-rewards-wrap">
@@ -103,7 +104,7 @@
           <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
-            <input type="hidden" name="return_to" value="/persons/{{ person.id }}">
+            <input type="hidden" name="return_to" value="{{ person_card_return }}">
             <button type="submit" class="link-button reward-icon-action reward-icon-danger" title="Удалить награду" aria-label="Удалить награду">❌</button>
           </form>
           {% endif %}
@@ -118,7 +119,7 @@
 <section class="panel person-detail-photo-section">
 <div class="person-detail-section-head">
   <h2 class="compact-section-title">Фото</h2>
-  <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Показать все фото</a>
+  <a href="/persons/{{ person.id }}/photos?return_to={{ person_card_return|urlencode }}">Показать все фото</a>
 </div>
 <div class="photo-grid compact-photo-grid person-detail-photo-grid" data-person-folder-extra-photos="{{ '1' if additional_photos else '0' }}">
   {% for label, path in [

@@ -83,6 +83,17 @@ def _person_created_edit_url(person_id: int, return_to: str = "") -> str:
     return f"/persons/{person_id}/edit?{urlencode(query)}"
 
 
+def _person_detail_return_to(person_id: int, return_to: str = "") -> str:
+    safe_back = safe_return_to(return_to)
+    if not safe_back:
+        return ""
+    path = urlsplit(safe_back).path.rstrip("/")
+    person_path = f"/persons/{person_id}"
+    if path == person_path or path.startswith(f"{person_path}/"):
+        return ""
+    return safe_back
+
+
 def _attachment_header(filename: str) -> str:
     safe_fallback = "".join(ch if ch.isascii() and ch not in {'"', "\\", ";"} else "_" for ch in filename) or "download"
     return f"attachment; filename=\"{safe_fallback}\"; filename*=UTF-8''{quote(filename)}"
@@ -170,7 +181,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     if person is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
-    safe_back = safe_return_to(return_to)
+    safe_back = _person_detail_return_to(person_id, return_to)
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
     photos = person_photo_items(person, rewards)
     additional_photos = person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos])

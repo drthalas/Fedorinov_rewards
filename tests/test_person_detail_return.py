@@ -107,21 +107,31 @@ class PersonDetailReturnTests(unittest.TestCase):
             context = persons_router.person_detail(object(), 2, return_to="http://evil.com")
         self.assertEqual(context["return_to"], "")
 
+    def test_person_detail_rejects_nested_person_return_to(self) -> None:
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = persons_router.person_detail(object(), 2, return_to="/persons/2/rewards/new")
+        self.assertEqual(context["return_to"], "")
+
     def test_person_detail_edit_and_photos_preserve_safe_return_to(self) -> None:
         return_to = "/legacy?tab=rewards&person_id=2"
         encoded = quote(return_to, safe="")
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
-        self.assertIn("return_to or '/legacy?tab=rewards&person_id=' ~ person.id", template)
+        self.assertIn("{% set person_back_url = return_to or '/legacy?tab=rewards&person_id=' ~ person.id %}", template)
+        self.assertIn(
+            "{% set person_card_return = '/persons/' ~ person.id ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}",
+            template,
+        )
         self.assertIn("/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}", template)
-        self.assertIn("/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}", template)
+        self.assertIn("/persons/{{ person.id }}/rewards/new?return_to={{ person_card_return|urlencode }}", template)
+        self.assertIn("/persons/{{ person.id }}/photos?return_to={{ person_card_return|urlencode }}", template)
         self.assertTrue(encoded.startswith("%2Flegacy%3Ftab%3Drewards"))
 
-    def test_person_detail_has_only_local_history_back_button(self) -> None:
+    def test_person_detail_has_only_local_safe_back_link(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
         script = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "escape_back.js").read_text(encoding="utf-8")
 
-        self.assertIn("data-history-back", template)
-        self.assertIn("data-history-fallback=\"{{ return_to or '/legacy?tab=rewards&person_id=' ~ person.id }}\"", template)
+        self.assertIn('data-escape-back href="{{ person_back_url }}"', template)
+        self.assertNotIn("data-history-back", template)
         self.assertIn("← Назад", template)
         nav_block = template.split('<p class="person-detail-nav local-back-nav compact-actions">', 1)[1].split("</p>", 1)[0]
         self.assertNotIn("к списку", nav_block)
