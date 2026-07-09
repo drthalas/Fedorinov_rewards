@@ -115,7 +115,11 @@
           <div class="legacy-split-header">
             <div class="legacy-person-heading">
               <h1 class="legacy-person-title wrap-text">{{ selected_person.fio|dash }}</h1>
-              <p class="secondary legacy-person-meta wrap-text">ID {{ selected_person.id }} · {{ selected_person.rank_name|dash }} · {{ selected_person.birthday|format_birth_year }}</p>
+              {% set selected_person_rank = selected_person.rank_name|default('', true)|trim %}
+              {% set selected_person_birth_year = selected_person.birthday|format_birth_year if selected_person.birthday else '' %}
+              {% if selected_person_rank or selected_person_birth_year %}
+              <p class="secondary legacy-person-meta wrap-text">{% if selected_person_rank %}{{ selected_person_rank }}{% endif %}{% if selected_person_rank and selected_person_birth_year %} · {% endif %}{% if selected_person_birth_year %}{{ selected_person_birth_year }}{% endif %}</p>
+              {% endif %}
             </div>
             <div class="legacy-actions">
               <a class="button" href="/persons/{{ selected_person.id }}">Карточка кавалера</a>

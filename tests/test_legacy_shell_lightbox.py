@@ -2,11 +2,55 @@ from pathlib import Path
 import re
 import unittest
 
+from jinja2 import Environment
+
+from backend.app.services.display import dash_if_empty, format_birth_year
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class LegacyShellLightboxTests(unittest.TestCase):
+    def _render_legacy_person_heading(self, *, rank_name: str = "", birthday: str = "") -> str:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        heading = legacy_template.split('<div class="legacy-person-heading">', 1)[1].split(
+            '<div class="legacy-actions">', 1
+        )[0]
+        environment = Environment(autoescape=True)
+        environment.filters["dash"] = dash_if_empty
+        environment.filters["format_birth_year"] = format_birth_year
+        return environment.from_string(heading).render(
+            selected_person={
+                "id": 115,
+                "fio": "Бондарев Вячеслав Александрович",
+                "rank_name": rank_name,
+                "birthday": birthday,
+            }
+        )
+
+    def test_legacy_selected_person_metadata_omits_technical_id_and_empty_separators(self) -> None:
+        cases = [
+            ("гражданский", "1945-05-09", "гражданский · 1945"),
+            ("", "1945-05-09", "1945"),
+            ("", "", None),
+        ]
+
+        for rank_name, birthday, expected in cases:
+            with self.subTest(rank_name=rank_name, birthday=birthday):
+                rendered = self._render_legacy_person_heading(rank_name=rank_name, birthday=birthday)
+                self.assertNotIn("ID 115", rendered)
+                self.assertNotRegex(rendered, r"\bID\s+\d+\b")
+                match = re.search(r'<p class="secondary legacy-person-meta wrap-text">(.*?)</p>', rendered, re.S)
+                if expected is None:
+                    self.assertIsNone(match)
+                    continue
+                self.assertIsNotNone(match)
+                metadata = re.sub(r"\s+", " ", match.group(1)).strip()
+                self.assertEqual(metadata, expected)
+                self.assertFalse(metadata.startswith("·"))
+                self.assertFalse(metadata.endswith("·"))
+                self.assertNotIn("· ·", metadata)
+
     def test_legacy_template_uses_dedicated_shell(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()

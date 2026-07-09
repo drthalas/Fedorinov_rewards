@@ -2,11 +2,14 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import asyncio
 import os
+import re
 import sqlite3
 import unittest
 from datetime import date
 from urllib.parse import urlencode
 from unittest.mock import patch
+
+from jinja2 import Environment
 
 from backend.app.routers import guides as guides_router
 from backend.app.routers import marks as marks_router
@@ -227,6 +230,22 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
         self.assertIn("Вставить из буфера", photo_template)
         self.assertIn("photo-upload-form", photo_template)
+
+    def test_person_edit_heading_omits_technical_id(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_form.html").read_text(
+            encoding="utf-8"
+        )
+        heading = re.search(r"<h1>.*?</h1>", template, re.S)
+        self.assertIsNotNone(heading)
+
+        rendered = Environment(autoescape=True).from_string(heading.group(0)).render(mode="edit", person={"id": 115})
+        self.assertEqual(rendered, "<h1>Изменить награжденного</h1>")
+        self.assertNotIn("#115", rendered)
+        self.assertNotIn("115", rendered)
+        self.assertNotIn("#{{ person.id }}", template)
+
+        create_heading = Environment(autoescape=True).from_string(heading.group(0)).render(mode="create", person={})
+        self.assertEqual(create_heading, "<h1>Добавить награжденного</h1>")
 
     def test_person_form_guide_links_preserve_return_to(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_form.html").read_text(
