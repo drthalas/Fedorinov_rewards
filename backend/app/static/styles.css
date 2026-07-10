@@ -1553,6 +1553,14 @@ th {
   overflow-wrap: anywhere;
 }
 
+.guide-node-focus > .tree-leaf,
+.guide-node-focus > details > summary {
+  outline: 2px solid #c58a00;
+  outline-offset: 3px;
+  border-radius: 3px;
+  background: #fff8dc;
+}
+
 .guide-item-extra {
   display: flex;
   align-items: center;

@@ -6,7 +6,14 @@ from fastapi.responses import RedirectResponse
 from starlette.datastructures import UploadFile
 
 from ..config import get_settings
-from ..repositories.guides import get_guide_level_item, get_rank_guide_item, guide_tree, list_guide_level, list_rank_guide
+from ..repositories.guides import (
+    get_guide_level_item,
+    get_rank_guide_item,
+    guide_level_item_lineage,
+    guide_tree,
+    list_guide_level,
+    list_rank_guide,
+)
 from ..repositories.guides_write import (
     GuideDeleteBlockedError,
     GuideValidationError,
@@ -25,6 +32,11 @@ from ..services.guide_images import (
     GuideImageValidationError,
     delete_guide_image_file,
     save_guide_image,
+)
+from ..services.guide_tree_state import (
+    apply_guide_tree_state,
+    guide_node_key,
+    guide_tree_return_url,
 )
 from ..services.navigation import safe_return_to, with_status
 from ..services.write_guard import WriteBlockedError
@@ -53,6 +65,15 @@ LEVEL_LABELS = {
     2: "Подкатегория",
     3: "Наименование",
     4: "Ссылка / дополнительный уровень",
+}
+
+GUIDE_BRANCH_TYPE_LABELS = {
+    "ордена": "Орден",
+    "орден": "Орден",
+    "медали": "Медаль",
+    "медаль": "Медаль",
+    "знаки": "Знак",
+    "знак": "Знак",
 }
 
 
@@ -101,9 +122,34 @@ def _delete_validation_error(exc: GuideValidationError) -> HTTPException:
     return HTTPException(status_code=status_code, detail=str(exc))
 
 
-def _context(settings, request: Request, return_to: str = "", status: str = "", error: str | None = None, section: str = ""):
+def _guide_item_display_title(settings, level: int, item: dict[str, object]) -> str:
+    name = str(item.get("name") or "").strip()
+    if not name:
+        return "Изменить элемент справочника"
+    lineage = guide_level_item_lineage(settings.rewards_db_path, level, int(item.get("id") or 0))
+    for ancestor in reversed(lineage[:-1]):
+        branch_name = str(ancestor.get("name") or "").strip().casefold().replace("ё", "е")
+        type_label = GUIDE_BRANCH_TYPE_LABELS.get(branch_name)
+        if type_label:
+            type_prefix = type_label.casefold().replace("ё", "е") + " "
+            display_name = name[len(type_prefix):] if name.casefold().replace("ё", "е").startswith(type_prefix) else name
+            return f"{type_label}: {display_name}"
+    return name
+
+
+def _context(
+    settings,
+    request: Request,
+    return_to: str = "",
+    status: str = "",
+    error: str | None = None,
+    section: str = "",
+    open_nodes: str = "",
+    focus: str = "",
+):
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     tree = guide_tree(settings.rewards_db_path) if settings.db_exists else []
+    safe_open, safe_focus = apply_guide_tree_state(tree, open_nodes, focus)
     safe_return = safe_return_to(return_to)
     safe_section = section if section in {"ranks", "tree"} else ""
     guides_self = "/guides"
@@ -112,6 +158,10 @@ def _context(settings, request: Request, return_to: str = "", status: str = "", 
         query["section"] = safe_section
     if safe_return:
         query["return_to"] = safe_return
+    if safe_open:
+        query["open"] = ",".join(safe_open)
+    if safe_focus:
+        query["focus"] = safe_focus
     if query:
         guides_self += "?" + urlencode(query)
     return {
@@ -121,6 +171,8 @@ def _context(settings, request: Request, return_to: str = "", status: str = "", 
         "return_to": safe_return,
         "section": safe_section,
         "guides_self": guides_self,
+        "guide_open": safe_open,
+        "guide_focus": safe_focus,
         "status_message": STATUS_MESSAGES.get(status),
         "error": error,
     }
@@ -133,9 +185,20 @@ def _parent_options(settings, level: int) -> list[dict[str, object]]:
 
 
 @router.get("/guides")
-def guides_index(request: Request, return_to: str = "", status: str = "", section: str = ""):
+def guides_index(
+    request: Request,
+    return_to: str = "",
+    status: str = "",
+    section: str = "",
+    open: str = "",
+    focus: str = "",
+):
     settings = get_settings()
-    return templates.TemplateResponse(request, "guides.html", _context(settings, request, return_to, status, section=section))
+    return templates.TemplateResponse(
+        request,
+        "guides.html",
+        _context(settings, request, return_to, status, section=section, open_nodes=open, focus=focus),
+    )
 
 
 @router.get("/guides/ranks/new")
@@ -258,7 +321,7 @@ async def guide_level_create(request: Request, level: int):
         image_path = await _save_uploaded_guide_image(settings, upload)
         if image_path:
             data = replace(data, image_path=image_path)
-        create_guide_level_item(settings, data)
+        created_item_id = create_guide_level_item(settings, data)
     except WriteBlockedError as exc:
         _delete_guide_image_safely(settings, image_path)
         raise _write_error(exc) from exc
@@ -282,7 +345,16 @@ async def guide_level_create(request: Request, level: int):
     finally:
         if upload is not None:
             await upload.close()
-    target = with_status(return_to, "guide_created") if return_to else "/guides?status=guide_created"
+    if return_to:
+        parent_key = guide_node_key(level - 1, data.parent_id) if level > 0 else ""
+        target = guide_tree_return_url(
+            return_to,
+            focus_key=guide_node_key(level, created_item_id),
+            add_open_keys=(parent_key,) if parent_key else (),
+        )
+        target = with_status(target, "guide_created")
+    else:
+        target = "/guides?status=guide_created"
     return RedirectResponse(target, status_code=303)
 
 
@@ -305,6 +377,7 @@ def guide_level_edit(request: Request, level: int, item_id: int, return_to: str 
             "item": item,
             "level": level,
             "level_label": LEVEL_LABELS[level],
+            "display_title": _guide_item_display_title(settings, level, item),
             "parent_options": _parent_options(settings, level),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -341,6 +414,7 @@ async def guide_level_update(request: Request, level: int, item_id: int):
                 "item": {**current_item, "id": item_id, "level": level, **form_values},
                 "level": level,
                 "level_label": LEVEL_LABELS.get(level, "Элемент справочника"),
+                "display_title": _guide_item_display_title(settings, level, current_item),
                 "parent_options": _parent_options(settings, level),
                 "return_to": return_to,
                 "error": str(exc),
@@ -352,7 +426,11 @@ async def guide_level_update(request: Request, level: int, item_id: int):
             await upload.close()
     if new_image_path and old_image_path and old_image_path != new_image_path:
         _delete_guide_image_safely(settings, old_image_path)
-    target = with_status(return_to, "guide_updated") if return_to else "/guides?status=guide_updated"
+    if return_to:
+        target = guide_tree_return_url(return_to, focus_key=guide_node_key(level, item_id))
+        target = with_status(target, "guide_updated")
+    else:
+        target = "/guides?status=guide_updated"
     return RedirectResponse(target, status_code=303)
 
 

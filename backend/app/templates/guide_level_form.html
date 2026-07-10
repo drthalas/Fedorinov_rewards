@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}{{ item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
+{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
+<h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
 <p class="secondary">{{ level_label }}</p>
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}

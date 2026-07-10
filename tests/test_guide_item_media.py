@@ -29,6 +29,11 @@ from backend.app.services.guide_images import (
     normalize_guide_image_path,
     save_guide_image,
 )
+from backend.app.services.guide_tree_state import (
+    apply_guide_tree_state,
+    guide_tree_return_url,
+    parse_guide_node_keys,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -274,7 +279,7 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn("Изображение не загружено", guides)
         self.assertIn("guide-tree-image", guides)
         self.assertIn("node.rating_rank or node.image_path", guides)
-        self.assertIn("<details>", guides)
+        self.assertIn("<details ", guides)
         self.assertIn("<summary>", guides)
         self.assertIn("Добавить дочерний", guides)
         self.assertIn(">Изменить</a>", guides)
@@ -289,6 +294,99 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn("object-fit: contain", styles)
         self.assertIn("width: 72px", styles)
         self.assertIn("width: 120px", styles)
+
+    def test_edit_title_uses_award_type_from_guide_branch(self) -> None:
+        order = get_guide_level_item(self.db_path, 3, 1)
+        with patch.object(guides_router, "get_settings", return_value=self.settings()):
+            order_title = guides_router._guide_item_display_title(self.settings(), 3, order)
+        self.assertEqual(order_title, "Орден: тестовый")
+        self.assertNotIn("#1", order_title)
+
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("insert into guide_lev_1 (id, idl, name) values (2, 1, 'Медали')")
+            connection.execute("insert into guide_lev_2 (id, idl, name) values (2, 2, 'Юбилейные')")
+            connection.execute("insert into guide_lev_3 (id, idl, name) values (2, 2, 'За отвагу')")
+        medal = get_guide_level_item(self.db_path, 3, 2)
+        self.assertEqual(guides_router._guide_item_display_title(self.settings(), 3, medal), "Медаль: За отвагу")
+
+    def test_edit_title_falls_back_to_name_when_branch_type_is_unknown(self) -> None:
+        root = get_guide_level_item(self.db_path, 0, 1)
+        self.assertEqual(guides_router._guide_item_display_title(self.settings(), 0, root), "СССР")
+
+    def test_guide_tree_state_sanitizes_and_marks_open_focus_nodes(self) -> None:
+        tree = guide_tree(self.db_path)
+        safe_open, safe_focus = apply_guide_tree_state(tree, "0-1,1-1,2-1,9-9,bad", "3-1")
+        self.assertEqual(safe_open, ("0-1", "1-1", "2-1"))
+        self.assertEqual(safe_focus, "3-1")
+        self.assertTrue(tree[0]["is_open"])
+        leaf = tree[0]["children"][0]["children"][0]["children"][0]
+        self.assertTrue(leaf["is_focus"])
+
+        focus_only_tree = guide_tree(self.db_path)
+        focus_open, focus_key = apply_guide_tree_state(focus_only_tree, "", "3-1")
+        self.assertEqual(focus_open, ("0-1", "1-1", "2-1"))
+        self.assertEqual(focus_key, "3-1")
+        self.assertTrue(focus_only_tree[0]["is_open"])
+
+        self.assertEqual(parse_guide_node_keys("bad,5-1,0-0,0-1,0-1"), ("0-1",))
+
+    def test_guide_tree_return_url_preserves_only_safe_internal_state(self) -> None:
+        url = guide_tree_return_url(
+            "/guides?return_to=%2Flegacy%3Ftab%3Drewards&open=0-1,1-1&status=old",
+            focus_key="3-1",
+            add_open_keys=("2-1", "bad"),
+        )
+        self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards", url)
+        self.assertIn("open=0-1%2C1-1%2C2-1", url)
+        self.assertIn("focus=3-1", url)
+        self.assertNotIn("status=", url)
+        self.assertEqual(guide_tree_return_url("https://evil.example", focus_key="3-1"), "/guides?focus=3-1")
+        self.assertEqual(guide_tree_return_url("/legacy?tab=rewards", focus_key="3-1"), "/legacy?tab=rewards")
+
+    def test_create_and_update_redirects_restore_tree_state(self) -> None:
+        create_request = FakeMultipartRequest(
+            [
+                ("parent_id", "1"),
+                ("name", "Новый орден"),
+                ("rating_rank", ""),
+                ("return_to", "/guides?open=0-1,1-1,2-1&focus=2-1"),
+            ]
+        )
+        with patch.object(guides_router, "get_settings", return_value=self.settings()):
+            created_response = asyncio.run(guides_router.guide_level_create(create_request, 3))
+        created = next(item for item in list_guide_level(self.db_path, 3) if item["name"] == "Новый орден")
+        created_location = created_response.headers["location"]
+        self.assertIn(f"focus=3-{created['id']}", created_location)
+        self.assertIn("open=0-1%2C1-1%2C2-1", created_location)
+
+        update_request = FakeMultipartRequest(
+            [
+                ("parent_id", "1"),
+                ("name", "Новый орден"),
+                ("rating_rank", "9"),
+                ("return_to", "/guides?open=0-1,1-1,2-1"),
+            ]
+        )
+        with patch.object(guides_router, "get_settings", return_value=self.settings()):
+            updated_response = asyncio.run(
+                guides_router.guide_level_update(update_request, 3, int(created["id"]))
+            )
+        self.assertIn(f"focus=3-{created['id']}", updated_response.headers["location"])
+
+    def test_tree_template_and_javascript_preserve_manual_state(self) -> None:
+        guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text(encoding="utf-8")
+        form = (ROOT / "backend" / "app" / "templates" / "guide_level_form.html").read_text(encoding="utf-8")
+        script = (ROOT / "backend" / "app" / "static" / "guide_tree_state.js").read_text(encoding="utf-8")
+        base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text(encoding="utf-8")
+
+        self.assertIn('data-guide-key="{{ node.guide_key }}"', guides)
+        self.assertIn("{% if node.is_open %} open{% endif %}", guides)
+        self.assertIn("guide-node-focus", guides)
+        self.assertIn("data-guide-action", guides)
+        self.assertIn("display_title", form)
+        self.assertIn("history.replaceState", script)
+        self.assertIn('searchParams.set("return_to"', script)
+        self.assertIn("guide_tree_state.js", base)
 
 
 if __name__ == "__main__":

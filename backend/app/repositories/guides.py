@@ -39,6 +39,25 @@ def get_guide_level_item(db_path: Path, level: int, item_id: int) -> dict[str, o
     return fetch_one(db_path, _guide_level_select(db_path, level) + " where id = ?", (item_id,))
 
 
+def guide_level_item_lineage(db_path: Path, level: int, item_id: int) -> list[dict[str, object]]:
+    if level not in {0, 1, 2, 3, 4}:
+        raise ValueError("guide level must be between 0 and 4")
+    lineage: list[dict[str, object]] = []
+    current_level = level
+    current_id = item_id
+    while current_level >= 0:
+        item = get_guide_level_item(db_path, current_level, current_id)
+        if item is None:
+            return []
+        lineage.append({**item, "level": current_level})
+        if current_level == 0:
+            break
+        current_id = int(item.get("idl") or 0)
+        current_level -= 1
+    lineage.reverse()
+    return lineage
+
+
 def guide_cascade_data(db_path: Path) -> dict[str, list[dict[str, object]]]:
     return {
         "countries": list_guide_level(db_path, 0),
@@ -69,18 +88,21 @@ def guide_tree(db_path: Path) -> list[dict[str, object]]:
         for level in range(5)
     }
 
-    def children(level: int, parent_id: int) -> list[dict[str, object]]:
+    def children(level: int, parent_id: int, ancestor_keys: tuple[str, ...] = ()) -> list[dict[str, object]]:
         nodes: list[dict[str, object]] = []
         for row in levels[level]:
             if row.get("idl") != parent_id:
                 continue
+            guide_key = f"{level}-{row.get('id')}"
             node = {
                 "id": row.get("id"),
                 "name": row.get("name"),
                 "level": level,
+                "guide_key": guide_key,
+                "ancestor_keys": ancestor_keys,
                 "rating_rank": row.get("rating_rank"),
                 "image_path": row.get("image_path"),
-                "children": children(level + 1, int(row["id"])) if level < 4 else [],
+                "children": children(level + 1, int(row["id"]), (*ancestor_keys, guide_key)) if level < 4 else [],
             }
             nodes.append(node)
         return nodes
