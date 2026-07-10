@@ -1,27 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Справочник{% endblock %}
-{% macro render_node_content(node) %}
-<span class="guide-node-content">
-  <span class="guide-node-title"><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></span>
-  {% if node.rating_rank or node.image_path %}
-  <span class="guide-item-extra">
+{% macro render_node_title(node) %}
+<span class="guide-node-title"><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></span>
+{% endmacro %}
+{% macro render_node_extra(node) %}
+{% if node.rating_rank or node.image_path %}
+<span class="guide-item-extra">
     {% if node.image_path %}
     <span class="guide-tree-image-frame"><img class="guide-tree-image" src="{{ media_url(node.image_path) }}" alt="{{ node.name|dash }}" loading="lazy"></span>
     {% else %}
     <span class="guide-tree-image-placeholder">Изображение не загружено</span>
     {% endif %}
     <span class="guide-rating">{% if node.rating_rank %}Рейтинг: {{ node.rating_rank }}{% else %}Рейтинг не задан{% endif %}</span>
-  </span>
-  {% endif %}
 </span>
+{% endif %}
 {% endmacro %}
 {% macro render_nodes(nodes) %}
 <ul class="tree-list">
   {% for node in nodes %}
-  <li id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}"{% if node.is_focus %} class="guide-node-focus"{% endif %}>
+  <li id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
     {% if node.children %}
     <details data-guide-key="{{ node.guide_key }}"{% if node.is_open %} open{% endif %}>
-      <summary>{{ render_node_content(node) }}</summary>
+      <summary><span class="guide-node-content">{{ render_node_title(node) }}</span></summary>
+      {{ render_node_extra(node) }}
       {% if settings.write_mode %}
       <div class="tree-actions">
         {% if node.level < 4 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
@@ -37,7 +38,7 @@
     </details>
     {% else %}
     <div class="tree-leaf">
-      {{ render_node_content(node) }}
+      <span class="guide-node-content">{{ render_node_title(node) }}{{ render_node_extra(node) }}</span>
       {% if settings.write_mode %}
       <span class="tree-actions">
         {% if node.level < 4 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}

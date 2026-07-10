@@ -28,14 +28,14 @@
   </label>
   <section class="guide-image-editor" aria-label="Изображение элемента справочника">
     <h2>Изображение</h2>
-    {% if item.image_path %}
-    <div class="guide-image-preview-frame"><img class="guide-image-preview" src="{{ media_url(item.image_path) }}" alt="{{ item.name or 'Изображение элемента справочника' }}"></div>
-    {% else %}
-    <div class="guide-image-preview-placeholder">Изображение не загружено</div>
-    {% endif %}
+    <div class="guide-image-preview-frame" data-guide-image-preview data-current-src="{% if item.image_path %}{{ media_url(item.image_path) }}{% endif %}">
+      <img class="guide-image-preview" data-guide-image-preview-image {% if item.image_path %}src="{{ media_url(item.image_path) }}"{% else %}hidden{% endif %} alt="{{ item.name or 'Изображение элемента справочника' }}">
+      <span class="guide-image-preview-placeholder" data-guide-image-preview-placeholder {% if item.image_path %}hidden{% endif %}>Изображение не загружено</span>
+    </div>
+    <p class="notice notice-error guide-image-preview-error" data-guide-image-preview-error hidden></p>
     <label>
       <span>{% if item.image_path %}Заменить изображение{% else %}Загрузить изображение{% endif %}</span>
-      <input type="file" name="image_file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+      <input type="file" name="image_file" data-guide-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
     </label>
     <small class="secondary">JPG, JPEG, PNG или WebP, не более 5 MB.</small>
   </section>

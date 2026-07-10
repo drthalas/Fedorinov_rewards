@@ -30,7 +30,7 @@
 
     detailsNodes.forEach((details) => {
       details.addEventListener("toggle", () => {
-        window.history.replaceState(null, "", stateUrl());
+        window.history.replaceState(null, "", stateUrl(""));
       });
     });
 
@@ -49,7 +49,7 @@
       if (returnInput) returnInput.value = stateUrl(form.dataset.guideFocus || "");
     }, true);
 
-    const focused = tree.querySelector(".guide-node-focus");
+    const focused = tree.querySelector("[data-guide-focus-target]");
     if (focused) {
       window.requestAnimationFrame(() => focused.scrollIntoView({ block: "center" }));
     }

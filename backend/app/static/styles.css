@@ -1553,14 +1553,6 @@ th {
   overflow-wrap: anywhere;
 }
 
-.guide-node-focus > .tree-leaf,
-.guide-node-focus > details > summary {
-  outline: 2px solid #c58a00;
-  outline-offset: 3px;
-  border-radius: 3px;
-  background: #fff8dc;
-}
-
 .guide-item-extra {
   display: flex;
   align-items: center;
@@ -1655,6 +1647,18 @@ th {
   font-size: 12px;
   line-height: 1.3;
   text-align: center;
+}
+
+.guide-image-preview[hidden],
+.guide-image-preview-placeholder[hidden],
+.guide-image-preview-error[hidden] {
+  display: none;
+}
+
+.guide-image-preview-error {
+  width: fit-content;
+  max-width: 520px;
+  margin: 0;
 }
 
 .guide-image-delete-form {
