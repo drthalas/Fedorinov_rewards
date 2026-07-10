@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
+from ..services.guide_images import normalize_guide_image_path
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -34,6 +35,8 @@ class GuideLevelData:
     level: int
     name: str
     parent_id: int
+    rating_rank: int | None = None
+    image_path: str | None = None
 
 
 def _name_from_mapping(values: dict[str, object]) -> str:
@@ -63,6 +66,19 @@ def _optional_int(value: object, default: int | None = None) -> int | None:
         raise GuideValidationError("Некорректный родительский элемент.") from exc
 
 
+def _rating_rank_from_mapping(value: object) -> int | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        rating_rank = int(text)
+    except ValueError as exc:
+        raise GuideValidationError("Рейтинг должен быть положительным целым числом.") from exc
+    if rating_rank <= 0:
+        raise GuideValidationError("Рейтинг должен быть положительным целым числом.")
+    return rating_rank
+
+
 def guide_level_data_from_mapping(level: int, values: dict[str, object]) -> GuideLevelData:
     safe_level = _validate_level(level)
     name = _name_from_mapping(values)
@@ -72,7 +88,47 @@ def guide_level_data_from_mapping(level: int, values: dict[str, object]) -> Guid
         parent_id = _optional_int(values.get("parent_id"))
         if parent_id is None:
             raise GuideValidationError("Выберите родительский элемент.")
-    return GuideLevelData(level=safe_level, name=name, parent_id=parent_id)
+    return GuideLevelData(
+        level=safe_level,
+        name=name,
+        parent_id=parent_id,
+        rating_rank=_rating_rank_from_mapping(values.get("rating_rank")),
+    )
+
+
+def _guide_level_columns(connection, level: int) -> set[str]:
+    return {row["name"] for row in connection.execute(f"pragma table_info(guide_lev_{level})").fetchall()}
+
+
+def _ensure_guide_metadata_columns(connection, level: int) -> None:
+    columns = _guide_level_columns(connection, level)
+    if "rating_rank" not in columns:
+        connection.execute(f"alter table guide_lev_{level} add column rating_rank integer")
+    if "image_path" not in columns:
+        connection.execute(f"alter table guide_lev_{level} add column image_path text")
+
+
+def _validated_image_path(value: object) -> str | None:
+    if value is None or value == "":
+        return None
+    try:
+        return normalize_guide_image_path(value)
+    except ValueError as exc:
+        raise GuideValidationError(str(exc)) from exc
+
+
+def _validated_rating_rank(value: object) -> int | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bool):
+        raise GuideValidationError("Рейтинг должен быть положительным целым числом.")
+    try:
+        rating_rank = int(value)
+    except (TypeError, ValueError) as exc:
+        raise GuideValidationError("Рейтинг должен быть положительным целым числом.") from exc
+    if str(value).strip() != str(rating_rank) or rating_rank <= 0:
+        raise GuideValidationError("Рейтинг должен быть положительным целым числом.")
+    return rating_rank
 
 
 def _rank_exists(connection, rank_id: int) -> bool:
@@ -133,13 +189,26 @@ def create_guide_level_item(settings: Settings, data: GuideLevelData) -> int:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         _validate_parent(connection, data)
+        _ensure_guide_metadata_columns(connection, data.level)
+        rating_rank = _validated_rating_rank(data.rating_rank)
+        image_path = _validated_image_path(data.image_path)
         cursor = connection.execute(
-            f"insert into guide_lev_{data.level} (idl, name) values (?, ?)",
-            (data.parent_id, data.name),
+            f"insert into guide_lev_{data.level} (idl, name, rating_rank, image_path) values (?, ?, ?, ?)",
+            (data.parent_id, data.name, rating_rank, image_path),
         )
         item_id = int(cursor.lastrowid)
         connection.commit()
-    log_action("create", f"guide_lev_{data.level}", item_id, {"level": data.level, "parent_id": data.parent_id})
+    log_action(
+        "create",
+        f"guide_lev_{data.level}",
+        item_id,
+        {
+            "level": data.level,
+            "parent_id": data.parent_id,
+            "fields": ["idl", "name", "rating_rank", "image_path"],
+            "has_image": bool(image_path),
+        },
+    )
     return item_id
 
 
@@ -150,14 +219,37 @@ def update_guide_level_item(settings: Settings, level: int, item_id: int, data: 
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         _validate_parent(connection, data)
+        _ensure_guide_metadata_columns(connection, safe_level)
+        rating_rank = _validated_rating_rank(data.rating_rank)
+        image_path = _validated_image_path(data.image_path)
         cursor = connection.execute(
-            f"update guide_lev_{safe_level} set idl = ?, name = ? where id = ?",
-            (data.parent_id, data.name, item_id),
+            f"update guide_lev_{safe_level} set idl = ?, name = ?, rating_rank = ?, image_path = ? where id = ?",
+            (data.parent_id, data.name, rating_rank, image_path, item_id),
         )
         if cursor.rowcount == 0:
             raise GuideValidationError("Элемент справочника не найден.")
         connection.commit()
-    log_action("update", f"guide_lev_{safe_level}", item_id, {"level": safe_level, "fields": ["idl", "name"]})
+    log_action(
+        "update",
+        f"guide_lev_{safe_level}",
+        item_id,
+        {"level": safe_level, "fields": ["idl", "name", "rating_rank", "image_path"]},
+    )
+
+
+def clear_guide_level_image(settings: Settings, level: int, item_id: int) -> str | None:
+    safe_level = _validate_level(level)
+    ensure_write_allowed(settings)
+    with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        if not _guide_item_exists(connection, safe_level, item_id):
+            raise GuideValidationError("Элемент справочника не найден.")
+        _ensure_guide_metadata_columns(connection, safe_level)
+        row = connection.execute(f"select image_path from guide_lev_{safe_level} where id = ?", (item_id,)).fetchone()
+        image_path = str(row["image_path"] or "") if row is not None else ""
+        connection.execute(f"update guide_lev_{safe_level} set image_path = null where id = ?", (item_id,))
+        connection.commit()
+    log_action("guide_image_cleared", f"guide_lev_{safe_level}", item_id, {"image_path_cleared": True})
+    return image_path or None
 
 
 def _usage_count(connection, level: int, item_id: int) -> int:

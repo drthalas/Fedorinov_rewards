@@ -5,7 +5,7 @@ from urllib.parse import unquote
 from ..config import Settings
 
 
-ALLOWED_ROOTS = ("Source", "SourceMark", "default")
+ALLOWED_ROOTS = ("Source", "SourceMark", "default", "GuideImages")
 
 
 @dataclass

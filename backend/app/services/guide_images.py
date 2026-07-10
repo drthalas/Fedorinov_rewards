@@ -1,0 +1,90 @@
+from pathlib import Path, PureWindowsPath
+from urllib.parse import unquote
+from uuid import uuid4
+
+from ..config import Settings
+from .write_guard import ensure_write_allowed
+
+
+MAX_GUIDE_IMAGE_BYTES = 5 * 1024 * 1024
+ALLOWED_GUIDE_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
+GUIDE_IMAGE_ROOT = "GuideImages"
+
+
+class GuideImageValidationError(ValueError):
+    pass
+
+
+def normalize_guide_image_path(raw_path: object) -> str:
+    if not isinstance(raw_path, str):
+        raise GuideImageValidationError("Некорректный путь изображения.")
+    value = unquote(raw_path).strip().replace("\\", "/")
+    if not value:
+        raise GuideImageValidationError("Некорректный путь изображения.")
+    candidate = Path(value)
+    if candidate.is_absolute() or PureWindowsPath(value).drive:
+        raise GuideImageValidationError("Изображение должно находиться внутри каталога справочника.")
+    if any(part in {"", ".", ".."} for part in candidate.parts):
+        raise GuideImageValidationError("Недопустимый путь изображения.")
+    if len(candidate.parts) != 2 or candidate.parts[0] != GUIDE_IMAGE_ROOT:
+        raise GuideImageValidationError("Изображение должно находиться внутри каталога справочника.")
+    if candidate.suffix.lower() not in ALLOWED_GUIDE_IMAGE_EXTENSIONS:
+        raise GuideImageValidationError("Разрешены только .jpg, .jpeg, .png, .webp")
+    return candidate.as_posix()
+
+
+def _validated_extension(filename: str) -> str:
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_GUIDE_IMAGE_EXTENSIONS:
+        raise GuideImageValidationError("Разрешены только .jpg, .jpeg, .png, .webp")
+    return suffix
+
+
+def _matches_image_signature(extension: str, content: bytes) -> bool:
+    if extension in {".jpg", ".jpeg"}:
+        return content.startswith(b"\xff\xd8\xff")
+    if extension == ".png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if extension == ".webp":
+        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
+    return False
+
+
+def save_guide_image(settings: Settings, filename: str, content: bytes) -> str:
+    ensure_write_allowed(settings)
+    extension = _validated_extension(filename)
+    if not content:
+        raise GuideImageValidationError("Файл изображения пустой.")
+    if len(content) > MAX_GUIDE_IMAGE_BYTES:
+        raise GuideImageValidationError("Файл изображения больше 5 MB.")
+    if not _matches_image_signature(extension, content):
+        raise GuideImageValidationError("Файл не является корректным изображением выбранного типа.")
+
+    root = settings.guide_images_dir.resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    target = (root / f"guide_{uuid4().hex}{extension}").resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise GuideImageValidationError("Недопустимый путь изображения.") from exc
+    target.write_bytes(content)
+    return normalize_guide_image_path(f"{GUIDE_IMAGE_ROOT}/{target.name}")
+
+
+def delete_guide_image_file(settings: Settings, raw_path: object) -> bool:
+    ensure_write_allowed(settings)
+    if raw_path is None or raw_path == "":
+        return False
+    relative_path = normalize_guide_image_path(raw_path)
+    root = settings.guide_images_dir.resolve()
+    target = (settings.rewards_data_dir / relative_path).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError as exc:
+        raise GuideImageValidationError("Недопустимый путь изображения.") from exc
+    if not target.exists():
+        return False
+    if not target.is_file():
+        raise GuideImageValidationError("Путь изображения не является файлом.")
+    target.unlink()
+    return True

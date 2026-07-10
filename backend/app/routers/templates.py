@@ -19,7 +19,7 @@ from ..services.media import resolve_media_path
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260708-cavaliers-owner-qa"
+STATIC_ASSET_VERSION = "20260710-guide-rating-images"
 
 
 def static_url(path: str) -> str:

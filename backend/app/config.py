@@ -58,6 +58,10 @@ class Settings(BaseModel):
         return self.rewards_data_dir / "default"
 
     @property
+    def guide_images_dir(self) -> Path:
+        return self.rewards_data_dir / "GuideImages"
+
+    @property
     def nofoto_path(self) -> Path:
         return self.default_dir / "nofoto.jpg"
 

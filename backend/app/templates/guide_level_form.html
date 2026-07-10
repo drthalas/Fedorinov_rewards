@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}Изменить элемент справочника #{{ item.id }}{% endif %}{% endblock %}
+{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}{{ item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if mode == "create" %}Добавить: {{ level_label }}{% else %}Изменить: {{ level_label }} #{{ item.id }}{% endif %}</h1>
+<h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
+<p class="secondary">{{ level_label }}</p>
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<form class="edit-form" method="post" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
+<form class="edit-form guide-item-form" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   {% if level > 0 %}
   <label>
@@ -21,9 +22,34 @@
     <span>Название</span>
     <input name="name" value="{{ item.name or '' }}" required>
   </label>
+  <label>
+    <span>Рейтинг</span>
+    <input type="number" name="rating_rank" value="{{ item.rating_rank or '' }}" min="1" step="1" inputmode="numeric" placeholder="Положительное целое число">
+  </label>
+  <section class="guide-image-editor" aria-label="Изображение элемента справочника">
+    <h2>Изображение</h2>
+    {% if item.image_path %}
+    <div class="guide-image-preview-frame"><img class="guide-image-preview" src="{{ media_url(item.image_path) }}" alt="{{ item.name or 'Изображение элемента справочника' }}"></div>
+    {% else %}
+    <div class="guide-image-preview-placeholder">Изображение не загружено</div>
+    {% endif %}
+    <label>
+      <span>{% if item.image_path %}Заменить изображение{% else %}Загрузить изображение{% endif %}</span>
+      <input type="file" name="image_file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+    </label>
+    <small class="secondary">JPG, JPEG, PNG или WebP, не более 5 MB.</small>
+  </section>
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
     <a data-escape-back href="{{ return_to or '/guides' }}">Отмена</a>
   </div>
 </form>
+{% if mode == "edit" and item.image_path %}
+{% set image_delete_return = '/guides/levels/' ~ level ~ '/' ~ item.id ~ '/edit' ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
+<form class="guide-image-delete-form" method="post" action="/guides/levels/{{ level }}/{{ item.id }}/image/delete" data-confirm-submit="guide-image-delete" data-confirm-message="Удалить изображение элемента справочника?">
+  <input type="hidden" name="confirm" value="">
+  <input type="hidden" name="return_to" value="{{ image_delete_return }}">
+  <button class="danger" type="submit">Удалить изображение</button>
+</form>
+{% endif %}
 {% endblock %}

@@ -1,13 +1,16 @@
+from dataclasses import replace
 from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from starlette.datastructures import UploadFile
 
 from ..config import get_settings
 from ..repositories.guides import get_guide_level_item, get_rank_guide_item, guide_tree, list_guide_level, list_rank_guide
 from ..repositories.guides_write import (
     GuideDeleteBlockedError,
     GuideValidationError,
+    clear_guide_level_image,
     create_guide_level_item,
     create_rank,
     delete_guide_level_item,
@@ -16,6 +19,12 @@ from ..repositories.guides_write import (
     rank_data_from_mapping,
     update_guide_level_item,
     update_rank,
+)
+from ..services.guide_images import (
+    MAX_GUIDE_IMAGE_BYTES,
+    GuideImageValidationError,
+    delete_guide_image_file,
+    save_guide_image,
 )
 from ..services.navigation import safe_return_to, with_status
 from ..services.write_guard import WriteBlockedError
@@ -31,6 +40,7 @@ STATUS_MESSAGES = {
     "guide_created": "Элемент справочника добавлен.",
     "guide_updated": "Элемент справочника сохранён.",
     "guide_deleted": "Элемент справочника удалён.",
+    "guide_image_deleted": "Изображение элемента справочника удалено.",
     "delete_blocked": "Удаление заблокировано: значение используется или имеет дочерние записи.",
     "rank_delete_used": "Нельзя удалить: это звание используется в карточках награждённых.",
     "guide_delete_children": "Нельзя удалить: у этого раздела есть дочерние записи.",
@@ -50,6 +60,36 @@ async def _read_form(request: Request) -> dict[str, object]:
     body = (await request.body()).decode("utf-8")
     parsed = parse_qs(body, keep_blank_values=True)
     return {key: values[-1] if values else "" for key, values in parsed.items()}
+
+
+async def _read_guide_level_form(request: Request) -> tuple[dict[str, object], UploadFile | None]:
+    try:
+        form = await request.form()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Для формы требуется multipart/form-data.") from exc
+    values = {
+        key: value
+        for key, value in form.multi_items()
+        if not isinstance(value, UploadFile)
+    }
+    upload = form.get("image_file")
+    return values, upload if isinstance(upload, UploadFile) else None
+
+
+async def _save_uploaded_guide_image(settings, upload: UploadFile | None) -> str | None:
+    if upload is None or not (upload.filename or "").strip():
+        return None
+    content = await upload.read(MAX_GUIDE_IMAGE_BYTES + 1)
+    return save_guide_image(settings, upload.filename or "", content)
+
+
+def _delete_guide_image_safely(settings, image_path: object) -> None:
+    if image_path is None or image_path == "":
+        return
+    try:
+        delete_guide_image_file(settings, image_path)
+    except (GuideImageValidationError, OSError):
+        return
 
 
 def _write_error(exc: WriteBlockedError) -> HTTPException:
@@ -210,14 +250,20 @@ def guide_level_new(request: Request, level: int, parent_id: int | None = None, 
 @router.post("/guides/levels/{level}/new")
 async def guide_level_create(request: Request, level: int):
     settings = get_settings()
-    form_values = await _read_form(request)
+    form_values, upload = await _read_guide_level_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    image_path: str | None = None
     try:
         data = guide_level_data_from_mapping(level, form_values)
+        image_path = await _save_uploaded_guide_image(settings, upload)
+        if image_path:
+            data = replace(data, image_path=image_path)
         create_guide_level_item(settings, data)
     except WriteBlockedError as exc:
+        _delete_guide_image_safely(settings, image_path)
         raise _write_error(exc) from exc
-    except GuideValidationError as exc:
+    except (GuideValidationError, GuideImageValidationError) as exc:
+        _delete_guide_image_safely(settings, image_path)
         return templates.TemplateResponse(
             request,
             "guide_level_form.html",
@@ -233,6 +279,9 @@ async def guide_level_create(request: Request, level: int):
             },
             status_code=400,
         )
+    finally:
+        if upload is not None:
+            await upload.close()
     target = with_status(return_to, "guide_created") if return_to else "/guides?status=guide_created"
     return RedirectResponse(target, status_code=303)
 
@@ -266,21 +315,30 @@ def guide_level_edit(request: Request, level: int, item_id: int, return_to: str 
 @router.post("/guides/levels/{level}/{item_id}/edit")
 async def guide_level_update(request: Request, level: int, item_id: int):
     settings = get_settings()
-    form_values = await _read_form(request)
+    current_item = get_guide_level_item(settings.rewards_db_path, level, item_id) if settings.db_exists else None
+    if current_item is None:
+        raise HTTPException(status_code=404, detail="Элемент справочника не найден.")
+    form_values, upload = await _read_guide_level_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    old_image_path = current_item.get("image_path")
+    new_image_path: str | None = None
     try:
         data = guide_level_data_from_mapping(level, form_values)
+        new_image_path = await _save_uploaded_guide_image(settings, upload)
+        data = replace(data, image_path=new_image_path or old_image_path)
         update_guide_level_item(settings, level, item_id, data)
     except WriteBlockedError as exc:
+        _delete_guide_image_safely(settings, new_image_path)
         raise _write_error(exc) from exc
-    except GuideValidationError as exc:
+    except (GuideValidationError, GuideImageValidationError) as exc:
+        _delete_guide_image_safely(settings, new_image_path)
         return templates.TemplateResponse(
             request,
             "guide_level_form.html",
             {
                 "settings": settings,
                 "mode": "edit",
-                "item": {"id": item_id, "level": level, **form_values},
+                "item": {**current_item, "id": item_id, "level": level, **form_values},
                 "level": level,
                 "level_label": LEVEL_LABELS.get(level, "Элемент справочника"),
                 "parent_options": _parent_options(settings, level),
@@ -289,7 +347,30 @@ async def guide_level_update(request: Request, level: int, item_id: int):
             },
             status_code=400,
         )
+    finally:
+        if upload is not None:
+            await upload.close()
+    if new_image_path and old_image_path and old_image_path != new_image_path:
+        _delete_guide_image_safely(settings, old_image_path)
     target = with_status(return_to, "guide_updated") if return_to else "/guides?status=guide_updated"
+    return RedirectResponse(target, status_code=303)
+
+
+@router.post("/guides/levels/{level}/{item_id}/image/delete")
+async def guide_level_image_delete(request: Request, level: int, item_id: int):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("confirm") != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
+    try:
+        image_path = clear_guide_level_image(settings, level, item_id)
+        _delete_guide_image_safely(settings, image_path)
+    except WriteBlockedError as exc:
+        raise _write_error(exc) from exc
+    except GuideValidationError as exc:
+        raise _delete_validation_error(exc) from exc
+    target = with_status(return_to, "guide_image_deleted") if return_to else "/guides?status=guide_image_deleted"
     return RedirectResponse(target, status_code=303)
 
 
@@ -298,6 +379,7 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    item = get_guide_level_item(settings.rewards_db_path, level, item_id) if settings.db_exists else None
     try:
         delete_guide_level_item(settings, level, item_id, confirm=form_values.get("confirm") == "true")
     except WriteBlockedError as exc:
@@ -308,5 +390,7 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
         raise _delete_validation_error(exc) from exc
+    if item is not None:
+        _delete_guide_image_safely(settings, item.get("image_path"))
     target = with_status(return_to, "guide_deleted") if return_to else "/guides?status=guide_deleted"
     return RedirectResponse(target, status_code=303)

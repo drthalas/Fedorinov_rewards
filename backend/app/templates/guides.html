@@ -1,12 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Справочник{% endblock %}
+{% macro render_node_content(node) %}
+<span class="guide-node-content">
+  <span class="guide-node-title"><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></span>
+  {% if node.rating_rank or node.image_path %}
+  <span class="guide-item-extra">
+    {% if node.image_path %}
+    <span class="guide-tree-image-frame"><img class="guide-tree-image" src="{{ media_url(node.image_path) }}" alt="{{ node.name|dash }}" loading="lazy"></span>
+    {% else %}
+    <span class="guide-tree-image-placeholder">Изображение не загружено</span>
+    {% endif %}
+    <span class="guide-rating">{% if node.rating_rank %}Рейтинг: {{ node.rating_rank }}{% else %}Рейтинг не задан{% endif %}</span>
+  </span>
+  {% endif %}
+</span>
+{% endmacro %}
 {% macro render_nodes(nodes) %}
 <ul class="tree-list">
   {% for node in nodes %}
   <li>
     {% if node.children %}
     <details>
-      <summary><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></summary>
+      <summary>{{ render_node_content(node) }}</summary>
       {% if settings.write_mode %}
       <div class="tree-actions">
         {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
@@ -22,7 +37,7 @@
     </details>
     {% else %}
     <div class="tree-leaf">
-      <span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span>
+      {{ render_node_content(node) }}
       {% if settings.write_mode %}
       <span class="tree-actions">
         {% if node.level < 4 %}<a href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
