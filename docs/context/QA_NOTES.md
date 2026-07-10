@@ -115,6 +115,15 @@ APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false
 - Автоматический restart после update отложен.
 - Read-only/write-mode как пользовательские режимы позже нужно убрать из интерфейса.
 
+## v0.1.14 QA
+
+- Owner manual QA: PASS.
+- Unit tests: 346 PASS.
+- Data baseline: person 108, rewards 350, mark 146.
+- Media audit на release preflight: total 960, existing 950, missing 10. Две дополнительные отсутствующие ссылки справочника уже были в real DB; релизный проход их не создавал и данные не менял.
+- Browser smoke на read-only real DB: PASS; write-smoke выполнялся только на temp DB в ALE-245.
+- Реальные данные и фото не менялись.
+
 ## v0.1.13 QA
 
 - Owner manual QA перед релизом: PASS ("протестировал, всё хорошо").
