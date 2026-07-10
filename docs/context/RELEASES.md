@@ -93,9 +93,9 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 ## v0.1.13
 
-Статус: не опубликован; заменён v0.1.14.
+Статус: выпущено.
 
-Дата релиза: 2026-07-08.
+Дата релиза: 2026-07-09.
 
 Тип: patch release.
 
