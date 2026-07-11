@@ -1,10 +1,14 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность #{{ rank.id }}{% endif %}{% endblock %}
+{% block title %}{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность{% endif %}{% endblock %}
+{% block body_class %}guide-theme guide-form-theme{% endblock %}
 {% block content %}
-<h1>{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность #{{ rank.id }}{% endif %}</h1>
+<section class="guide-page guide-form-page">
+<header class="guide-page-heading guide-form-heading">
+<h1>{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность{% endif %}</h1>
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
+</header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<form class="edit-form" method="post" action="{% if mode == 'create' %}/guides/ranks/new{% else %}/guides/ranks/{{ rank.id }}/edit{% endif %}">
+<form class="edit-form guide-form-card" method="post" action="{% if mode == 'create' %}/guides/ranks/new{% else %}/guides/ranks/{{ rank.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <label>
     <span>Название</span>
@@ -15,4 +19,5 @@
     <a data-escape-back href="{{ return_to or '/guides' }}">Отмена</a>
   </div>
 </form>
+</section>
 {% endblock %}

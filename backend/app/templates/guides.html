@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Справочник{% endblock %}
+{% block body_class %}guide-theme{% endblock %}
 {% macro render_node_title(node) %}
-<span class="guide-node-title"><span class="tree-meta">Уровень {{ node.level }} · #{{ node.id }}</span> <span class="tree-name">{{ node.name|dash }}</span></span>
+<span class="guide-node-title"><span class="guide-node-icon" aria-hidden="true"></span><span class="tree-name">{{ node.name|dash }}</span></span>
 {% endmacro %}
 {% macro render_node_extra(node) %}
 {% if node.rating_rank or node.image_path %}
@@ -18,7 +19,7 @@
 {% macro render_nodes(nodes) %}
 <ul class="tree-list">
   {% for node in nodes %}
-  <li id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
+  <li class="guide-tree-node guide-tree-level-{{ node.level }}" id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}" data-guide-level="{{ node.level }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
     {% if node.children %}
     <details data-guide-key="{{ node.guide_key }}"{% if node.is_open %} open{% endif %}>
       <summary><span class="guide-node-content">{{ render_node_title(node) }}</span></summary>
@@ -57,24 +58,28 @@
 </ul>
 {% endmacro %}
 {% block content %}
-<h1>Справочник</h1>
-{% if return_to %}<p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to }}">← Назад</a></p>{% endif %}
-{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-{% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<section class="grid" data-guide-state-root>
-  <div class="panel" id="ranks">
+<section class="guide-page">
+  <header class="guide-page-heading">
+    <h1>Справочник</h1>
+    <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/legacy?tab=rewards' }}">← Назад</a></p>
+  </header>
+  {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
+  {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
+<section class="guide-directory-grid" data-guide-state-root>
+  <div class="panel guide-directory-panel guide-ranks-panel" id="ranks">
     <div class="legacy-block-head">
-      <h2>Звания/специальности</h2>
+      <h2><span class="guide-section-icon" aria-hidden="true">▧</span>Звания / специальности</h2>
       {% if settings.write_mode %}
-      <a class="tool-button" data-guide-action href="/guides/ranks/new?return_to={{ guides_self|urlencode }}">Добавить</a>
+      <a class="tool-button" data-guide-action href="/guides/ranks/new?return_to={{ guides_self|urlencode }}">＋ Добавить</a>
       {% else %}
       <span class="tool-button disabled">Добавить</span>
       {% endif %}
     </div>
-    <ul class="guide-list">
+    <div class="guide-ranks-scroll">
+    <ul class="guide-list" aria-label="Звания и специальности">
       {% for rank in ranks %}
       <li>
-        <span>#{{ rank.id }} · {{ rank.name }}</span>
+        <span class="guide-rank-name"><span class="guide-rank-icon" aria-hidden="true">⌃</span>{{ rank.name }}</span>
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
@@ -88,17 +93,22 @@
       </li>
       {% endfor %}
     </ul>
+    </div>
+    <footer class="guide-panel-footer">Всего записей: {{ ranks|length }}</footer>
   </div>
-  <div class="panel tree" id="guide-tree" data-guide-tree>
+  <div class="panel tree guide-directory-panel guide-tree-panel" id="guide-tree" data-guide-tree>
     <div class="legacy-block-head">
-      <h2>Дерево наград и знаков</h2>
+      <h2><span class="guide-section-icon" aria-hidden="true">♜</span>Дерево наград и знаков</h2>
       {% if settings.write_mode %}
-      <a class="tool-button" data-guide-action href="/guides/levels/0/new?return_to={{ guides_self|urlencode }}">Добавить государство</a>
+      <a class="tool-button" data-guide-action href="/guides/levels/0/new?return_to={{ guides_self|urlencode }}">＋ Добавить государство</a>
       {% else %}
       <span class="tool-button disabled">Добавить</span>
       {% endif %}
     </div>
+    <div class="guide-tree-scroll">
     {{ render_nodes(tree) }}
+    </div>
   </div>
+</section>
 </section>
 {% endblock %}

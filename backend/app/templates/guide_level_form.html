@@ -1,19 +1,23 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
+{% block body_class %}guide-theme guide-form-theme{% endblock %}
 {% block content %}
-<h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
-<p class="secondary">{{ level_label }}</p>
-<p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
+<section class="guide-page guide-form-page">
+<header class="guide-page-heading guide-form-heading">
+  <h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
+  <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
+</header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<form class="edit-form guide-item-form" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
+<form class="edit-form guide-item-form guide-form-card" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
+  <p class="guide-form-kicker">{{ level_label }}</p>
   {% if level > 0 %}
   <label>
     <span>Родительский элемент</span>
     <select name="parent_id" required>
       <option value="">—</option>
       {% for parent in parent_options %}
-      <option value="{{ parent.id }}" {% if parent.id|string == item.idl|string or parent.id|string == item.parent_id|string %}selected{% endif %}>#{{ parent.id }} · {{ parent.name }}</option>
+      <option value="{{ parent.id }}" {% if parent.id|string == item.idl|string or parent.id|string == item.parent_id|string %}selected{% endif %}>{{ parent.name }}</option>
       {% endfor %}
     </select>
   </label>
@@ -33,7 +37,7 @@
       <span class="guide-image-preview-placeholder" data-guide-image-preview-placeholder {% if item.image_path %}hidden{% endif %}>Изображение не загружено</span>
     </div>
     <p class="notice notice-error guide-image-preview-error" data-guide-image-preview-error hidden></p>
-    <label>
+    <label class="guide-upload-control">
       <span>{% if item.image_path %}Заменить изображение{% else %}Загрузить изображение{% endif %}</span>
       <input type="file" name="image_file" data-guide-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
     </label>
@@ -52,4 +56,5 @@
   <button class="danger" type="submit">Удалить изображение</button>
 </form>
 {% endif %}
+</section>
 {% endblock %}

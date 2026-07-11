@@ -6,7 +6,7 @@
     <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
     <link rel="stylesheet" href="{{ static_url('styles.css') }}">
   </head>
-  <body class="legacy-body">
+  <body class="legacy-body {% block body_class %}{% endblock %}">
     {% include "_user_nav.html" %}
     <main class="page">
       {% block content %}{% endblock %}
