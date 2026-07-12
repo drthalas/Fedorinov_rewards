@@ -6505,3 +6505,48 @@ body.legacy-rewards-theme::after {
   border-color: #71866b;
   background: linear-gradient(180deg, #3e563b, #30472f);
 }
+
+/* ALE-249: standalone cavalier pages scroll inside the fixed archive shell. */
+@media (min-width: 1181px) {
+  body.guide-theme.cavalier-page-theme .page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: #705b3d #11120f;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+  }
+}
+
+.cavalier-page-theme .person-links-panel .details.person-detail-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.cavalier-page-theme .person-links-panel .details.person-detail-list dt,
+.cavalier-page-theme .person-links-panel .details.person-detail-list dd,
+.cavalier-page-theme .compact-link-value,
+.cavalier-page-theme .compact-external-link,
+.cavalier-page-theme .compact-link-text {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+}
+
+.cavalier-page-theme .compact-external-link,
+.cavalier-page-theme .compact-link-text,
+.cavalier-page-theme .person-detail-photo-section .person-detail-section-head > a {
+  color: #d8d0c3;
+}
+
+.cavalier-page-theme .person-links-panel .details.person-detail-list dt {
+  color: #b9aa94;
+}
+
+.cavalier-page-theme .compact-external-link:hover,
+.cavalier-page-theme .compact-external-link:focus-visible,
+.cavalier-page-theme .person-detail-photo-section .person-detail-section-head > a:hover,
+.cavalier-page-theme .person-detail-photo-section .person-detail-section-head > a:focus-visible {
+  color: #f0ddba;
+}
