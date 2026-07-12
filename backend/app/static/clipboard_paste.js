@@ -82,22 +82,6 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll("[data-photo-file-trigger]").forEach(function (button) {
-      var form = button.closest(".photo-upload-form");
-      var input = form ? form.querySelector("[data-photo-file-input]") : null;
-      if (!input) {
-        return;
-      }
-      button.addEventListener("click", function () {
-        input.click();
-      });
-      input.addEventListener("change", function () {
-        if (input.files && input.files.length) {
-          form.submit();
-        }
-      });
-    });
-
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       button.addEventListener("click", async function () {
         var originalText = button.textContent;

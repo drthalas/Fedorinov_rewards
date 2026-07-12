@@ -25,7 +25,7 @@ from ..services.person_files import (
     person_folder_image_items,
     person_folder_status,
 )
-from ..services.photos import person_photo_controls
+from ..services.photos import photo_items
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -183,9 +183,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     safe_back = _person_detail_return_to(person_id, return_to)
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
-    person_media = person_photo_controls(settings.rewards_db_path, person)
     photos = person_photo_items(person, rewards)
-    photos.extend(item for item in person_media if item.get("is_dynamic"))
     additional_photos = person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos])
     return templates.TemplateResponse(
         request,
@@ -295,7 +293,7 @@ def person_edit(request: Request, person_id: int, return_to: str = "", created: 
             "mode": "edit",
             "person": person,
             "ranks": ranks,
-            "photo_controls": person_photo_controls(settings.rewards_db_path, person),
+            "photo_controls": photo_items("person", person),
             "return_to": safe_return_to(return_to),
             "error": None,
             "created_message": STATUS_MESSAGES["created_next"] if created == "1" else "",
@@ -324,7 +322,7 @@ async def person_update(request: Request, person_id: int):
                 "mode": "edit",
                 "person": person,
                 "ranks": ranks,
-                "photo_controls": person_photo_controls(settings.rewards_db_path, person),
+                "photo_controls": photo_items("person", person),
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",
@@ -417,9 +415,7 @@ def person_photos(request: Request, person_id: int, index: int | None = None, re
     if person is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
-    person_media = person_photo_controls(settings.rewards_db_path, person)
     photos = person_photo_items(person, rewards)
-    photos.extend(item for item in person_media if item.get("is_dynamic"))
     photos.extend(person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos]))
     available_photos = [photo for photo in photos if photo.get("path")]
     safe_back = safe_return_to(return_to)

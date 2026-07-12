@@ -229,9 +229,11 @@ class FormPolishTests(unittest.TestCase):
         self.assertNotIn("ДД.ММ.ГГГГ", template)
         self.assertNotIn("Вернуться к карточке", template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
-        self.assertIn("Вставить изображение из буфера", photo_template)
-        self.assertIn("Добавить фото или документ", photo_template)
-        self.assertIn("Изменить описание", photo_template)
+        self.assertIn('for="{{ file_input_id }}"', photo_template)
+        self.assertIn('>+</label>', photo_template)
+        self.assertIn('>×</button>', photo_template)
+        self.assertNotIn("Добавить фото или документ", photo_template)
+        self.assertNotIn("Изменить описание", photo_template)
         self.assertIn("photo-upload-form", photo_template)
 
     def test_person_edit_heading_omits_technical_id(self) -> None:

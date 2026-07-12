@@ -81,9 +81,6 @@ def person_folder_image_items(
     for path in sorted(folder.rglob("*"), key=lambda item: item.as_posix().casefold()):
         if not path.is_file() or not _allowed_person_folder_image(path, folder):
             continue
-        relative_to_person = path.relative_to(folder)
-        if relative_to_person.parts and relative_to_person.parts[0].casefold() == "materials":
-            continue
         resolved = path.resolve()
         if resolved in seen:
             continue

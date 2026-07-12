@@ -3,133 +3,66 @@
 {% set photo_return_url = current_form_url ~ '#' ~ photo_entity_type ~ '-photo-management' %}
 <section class="photo-manage-section{% if photo_manage_compact %} photo-manage-section-compact{% endif %}" id="{{ photo_entity_type }}-photo-management">
   <h2>Фотографии</h2>
-  <p class="muted">Файлы, фотографии и сканы документов редактируются прямо в карточках.</p>
   <div class="photo-manage-grid">
     {% for photo in photo_controls %}
-    {% set upload_entity_type = 'person_media' if photo.is_dynamic else photo_entity_type %}
-    {% set upload_entity_id = photo.id if photo.is_dynamic else photo_entity_id %}
-    <article
-      class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}{% if photo.is_dynamic %} dynamic-media-card{% endif %}"
-      data-photo-card
-      data-person-id="{{ photo_entity_id if photo_entity_type == 'person' else '' }}"
-      {% if photo.is_dynamic %}data-media-id="{{ photo.id }}"{% else %}data-photo-field="{{ photo.field }}"{% endif %}
-    >
+    {% set file_input_id = 'photo-file-' ~ photo_entity_type ~ '-' ~ photo_entity_id ~ '-' ~ photo.field %}
+    <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}" data-photo-field="{{ photo.field }}">
       <div class="photo-frame">
       {% if has_media_path(photo.path) %}
       <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, photo_return_url) }}">
         <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
       {% else %}
-      <div class="photo photo-placeholder">Файл не добавлен</div>
+      <div class="photo photo-placeholder">Нет фото</div>
       {% endif %}
       </div>
-
-      <div class="photo-manage-copy">
-        <h3 class="photo-manage-label">{{ photo.label }}</h3>
-        {% if photo.description %}<p class="photo-manage-description">{{ photo.description }}</p>{% endif %}
-      </div>
-
+      <p class="photo-manage-label">{{ photo.label }}</p>
       <div class="photo-manage-actions">
         <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data">
-          <input type="hidden" name="entity_type" value="{{ upload_entity_type }}">
-          <input type="hidden" name="entity_id" value="{{ upload_entity_id }}">
+          <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
+          <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
           <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-          <button
-            class="mini-button material-action-button"
-            type="button"
-            data-photo-file-trigger
-            title="{% if has_media_path(photo.path) %}Заменить файл{% else %}Добавить файл{% endif %}"
-            aria-label="{% if has_media_path(photo.path) %}Заменить файл: {{ photo.label }}{% else %}Добавить файл: {{ photo.label }}{% endif %}"
-          ><span aria-hidden="true">+</span> {% if has_media_path(photo.path) %}Заменить файл{% else %}Добавить файл{% endif %}</button>
+          <label
+            class="mini-button photo-icon-button"
+            for="{{ file_input_id }}"
+            title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
+            aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
+          >+</label>
           <input
+            id="{{ file_input_id }}"
             class="sr-only-file"
-            data-photo-file-input
             name="file"
             type="file"
             accept=".jpg,.jpeg,.png,.webp,image/*"
+            onchange="if (this.files.length) this.form.submit()"
           >
         </form>
-
         {% if has_media_path(photo.path) %}
-        <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить файл из этой карточки? Файл на диске не будет удалён.');">
-          <input type="hidden" name="entity_type" value="{{ upload_entity_type }}">
-          <input type="hidden" name="entity_id" value="{{ upload_entity_id }}">
+        <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота? Файл на диске не будет удалён.');">
+          <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
+          <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
           <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-          <button class="mini-button danger material-action-button" type="submit" title="Удалить файл" aria-label="Удалить файл: {{ photo.label }}">Удалить файл</button>
+          <button class="mini-button danger photo-icon-button" type="submit" title="Удалить фотографию" aria-label="Удалить фотографию: {{ photo.label }}">×</button>
         </form>
         {% endif %}
-
-        {% if photo_entity_type == 'person' %}
-        <details class="photo-metadata-editor">
-          <summary class="mini-button secondary-button material-action-button" title="Изменить название и описание">Изменить описание</summary>
-          <form method="post" action="/persons/{{ photo_entity_id }}/media/update">
-            <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-            {% if photo.is_dynamic %}
-            <input type="hidden" name="media_id" value="{{ photo.id }}">
-            {% else %}
-            <input type="hidden" name="photo_field" value="{{ photo.field }}">
-            {% endif %}
-            <label>
-              <span>Название</span>
-              <input name="title" value="{{ photo.label }}" maxlength="160" required>
-            </label>
-            <label>
-              <span>Описание</span>
-              <textarea name="description" rows="2" maxlength="1000">{{ photo.description or '' }}</textarea>
-            </label>
-            <button type="submit">Сохранить описание</button>
-          </form>
-        </details>
-        {% endif %}
-
+        {% if photo_entity_type != 'person' %}
         <button
-          class="mini-button secondary-button clipboard-paste-button material-action-button"
+          class="mini-button clipboard-paste-button"
           type="button"
           data-clipboard-paste
-          data-entity-type="{{ upload_entity_type }}"
-          data-entity-id="{{ upload_entity_id }}"
+          data-entity-type="{{ photo_entity_type }}"
+          data-entity-id="{{ photo_entity_id }}"
           data-photo-field="{{ photo.field }}"
           data-return-url="{{ photo_return_url }}"
-          title="Вставить изображение из буфера"
-        >Вставить изображение из буфера</button>
+          title="Вставить изображение из буфера обмена"
+        >Вставить из буфера</button>
         <span class="clipboard-paste-status" aria-live="polite"></span>
-
-        {% if photo_entity_type == 'person' and photo.is_dynamic %}
-        <form
-          class="photo-card-delete-form"
-          method="post"
-          action="/persons/{{ photo_entity_id }}/media/{{ photo.id }}/delete"
-          onsubmit="return confirm('Удалить карточку материала? Файл на диске не будет удалён.');"
-        >
-          <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-          <input type="hidden" name="confirm" value="true">
-          <button class="mini-button danger material-action-button" type="submit" title="Удалить карточку">Удалить карточку</button>
-        </form>
         {% endif %}
       </div>
-    </article>
+    </div>
     {% endfor %}
   </div>
-
-  {% if photo_entity_type == 'person' %}
-  <details class="person-media-create">
-    <summary class="button">Добавить фото или документ</summary>
-    <form method="post" action="/persons/{{ photo_entity_id }}/media/create">
-      <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-      <label>
-        <span>Название карточки</span>
-        <input name="title" maxlength="160" placeholder="Например: Архивная справка" required>
-      </label>
-      <label>
-        <span>Описание</span>
-        <textarea name="description" rows="2" maxlength="1000" placeholder="Необязательная подпись или пояснение"></textarea>
-      </label>
-      <p class="muted">После создания карточки добавьте файл кнопкой «Добавить файл».</p>
-      <button type="submit">Создать карточку</button>
-    </form>
-  </details>
-  {% endif %}
 </section>
 {% endif %}

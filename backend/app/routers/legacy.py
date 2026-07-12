@@ -33,7 +33,6 @@ from ..services.display import has_media_path
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.person_files import person_archive_filename, person_folder_image_items
-from ..services.photos import person_photo_controls
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
 from ..version import APP_NAME, APP_VERSION, APP_VERSION_DATE
@@ -74,14 +73,8 @@ def _photo_path_key(path: object) -> str:
     return path.strip().replace("\\", "/").casefold()
 
 
-def _legacy_person_photo_items(
-    person: dict[str, object],
-    rewards: list[dict[str, object]],
-    db_path: Path | None = None,
-) -> list[dict[str, object]]:
+def _legacy_person_photo_items(person: dict[str, object], rewards: list[dict[str, object]]) -> list[dict[str, object]]:
     items = person_photo_items(person, rewards)
-    if db_path is not None:
-        items.extend(item for item in person_photo_controls(db_path, person) if item.get("is_dynamic"))
     for item in items:
         label = LEGACY_PERSON_PHOTO_LABELS.get(str(item.get("label") or ""))
         if label:
@@ -572,11 +565,7 @@ def legacy_index(
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
         if selected_person is not None:
             context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
-            selected_person_photos = _legacy_person_photo_items(
-                selected_person,
-                selected_person_rewards,
-                settings.rewards_db_path,
-            )
+            selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
             selected_person_additional_photos = person_folder_image_items(
                 settings,
                 selected_person_id,
