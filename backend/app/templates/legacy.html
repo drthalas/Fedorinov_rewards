@@ -18,13 +18,13 @@
   {% elif tab == "rewards" %}
     <div class="legacy-layout" data-legacy-rewards-layout>
       <aside class="legacy-sidebar">
-        <div class="legacy-panel-title">ФИО награждённых ({{ persons_total or persons|length }})</div>
+        <div class="legacy-panel-title legacy-filter-title"><span class="legacy-panel-heading-icon" aria-hidden="true"></span>Фильтры</div>
         <form class="legacy-rewards-filters guide-cascade" method="get" action="/legacy">
           <script type="application/json" data-guide-cascade-options>{{ rewards_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="rewards">
           <label>
             <span>Звание / специальность</span>
-            <select name="rank_id">
+            <select name="rank_id" data-styled-select>
               <option value="">Все</option>
               {% for item in rewards_filter_options.ranks %}
                 <option value="{{ item.id }}" {% if rewards_filters.rank_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
@@ -33,7 +33,7 @@
           </label>
           <label>
             <span>Страна награды</span>
-            <select name="country_id" data-guide-role="country">
+            <select name="country_id" data-guide-role="country" data-styled-select>
               <option value="">Все</option>
               {% for item in rewards_filter_options.countries %}
                 <option value="{{ item.id }}" {% if rewards_filters.country_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
@@ -42,7 +42,7 @@
           </label>
           <label>
             <span>Категория</span>
-            <select name="category_id" data-guide-role="category">
+            <select name="category_id" data-guide-role="category" data-styled-select>
               <option value="">Все</option>
               {% for item in rewards_filter_options.categories %}
                 <option value="{{ item.id }}" {% if rewards_filters.category_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
@@ -51,7 +51,7 @@
           </label>
           <label>
             <span>Подкатегория</span>
-            <select name="subcategory_id" data-guide-role="subcategory">
+            <select name="subcategory_id" data-guide-role="subcategory" data-styled-select>
               <option value="">Все</option>
               {% for item in rewards_filter_options.subcategories %}
                 <option value="{{ item.id }}" {% if rewards_filters.subcategory_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
@@ -60,7 +60,7 @@
           </label>
           <label>
             <span>Наименование</span>
-            <select name="name_id" data-guide-role="name">
+            <select name="name_id" data-guide-role="name" data-styled-select>
               <option value="">Все</option>
               {% for item in rewards_filter_options.names %}
                 <option value="{{ item.id }}" {% if rewards_filters.name_id == item.id %}selected{% endif %}>{{ item.name|dash }}</option>
@@ -74,20 +74,23 @@
         </form>
         <div class="legacy-toolbar">
           {% if settings.write_mode %}
-            <a class="tool-button" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">➕ Добавить</a>
+            <a class="tool-button legacy-action-add" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">Добавить</a>
             {% if selected_person %}
-              <a class="tool-button" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">✏️ Изменить</a>
+              <a class="tool-button legacy-action-edit" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">Изменить</a>
               <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-message="Вы точно хотите удалить кавалера? Это действие нельзя отменить.">
                 <input type="hidden" name="confirm" value="">
                 <input type="hidden" name="delete_person_confirm" value="">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
-                <button class="tool-button danger" type="submit">❌ Удалить</button>
+                <button class="tool-button danger legacy-action-delete" type="submit">Удалить</button>
               </form>
+            {% else %}
+              <span class="tool-button disabled legacy-action-edit">Изменить</span>
+              <span class="tool-button disabled legacy-action-delete">Удалить</span>
             {% endif %}
           {% else %}
-            <span class="tool-button disabled">➕ Добавить</span>
-            <span class="tool-button disabled">✏️ Изменить</span>
-            <span class="tool-button disabled">❌ Удалить</span>
+            <span class="tool-button disabled legacy-action-add">Добавить</span>
+            <span class="tool-button disabled legacy-action-edit">Изменить</span>
+            <span class="tool-button disabled legacy-action-delete">Удалить</span>
           {% endif %}
         </div>
         <div class="legacy-person-search">
@@ -95,21 +98,23 @@
           <input id="legacy-person-search-input" type="search" placeholder="Введите первые буквы ФИО" autocomplete="off" aria-label="Быстрый поиск по ФИО кавалера" data-person-quick-search data-person-search-primary>
           <div class="legacy-person-search-hint">Enter открывает первое совпадение.</div>
         </div>
+        <div class="legacy-person-list-title"><strong>Список кавалеров</strong><span>{{ persons_total or persons|length }} записей</span></div>
         <div class="legacy-list" tabindex="0" role="listbox" aria-label="Список кавалеров" data-person-list>
           {% for person in persons %}
-            <button class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" type="button" role="option" aria-selected="{{ 'true' if selected_person and person.id == selected_person.id else 'false' }}" data-person-name="{{ person.fio|dash }}" data-select-url="{{ person.legacy_url }}" data-detail-url="{{ person.detail_url }}"{% if selected_person and person.id == selected_person.id %} data-selected-person-row{% endif %}>
+            <button class="legacy-list-row {% if selected_person and person.id == selected_person.id %}selected-row{% endif %}" type="button" role="option" aria-selected="{{ 'true' if selected_person and person.id == selected_person.id else 'false' }}" data-person-name="{{ person.fio|dash }}" data-select-url="{{ person.legacy_url }}" data-deselect-url="{{ rewards_tab_return }}" data-detail-url="{{ person.detail_url }}"{% if selected_person and person.id == selected_person.id %} data-selected-person-row{% endif %}>
               <span>{{ person.fio|dash }}</span>
-              <small>{{ person.rewards_count }} нагр.</small>
+              <small class="legacy-list-meta" title="Год рождения: {{ person.birthday|format_birth_year if person.birthday else 'не указан' }}; наград: {{ person.rewards_count }}">{{ person.birthday|format_birth_year if person.birthday else '—' }} г.р. · {{ person.rewards_count }} нагр.</small>
             </button>
           {% else %}
             <div class="legacy-empty">Нет записей.</div>
           {% endfor %}
           <div class="legacy-empty" data-person-empty hidden>Ничего не найдено.</div>
         </div>
+        <div class="legacy-person-list-hint">Прокрутка колесом или клавишами ↑ ↓</div>
       </aside>
 
-      <section class="legacy-main">
-        <div class="legacy-person-workspace" data-legacy-person-workspace aria-live="polite" aria-busy="false">
+      <section class="legacy-main{% if selected_person %} legacy-main-selected{% else %} legacy-main-empty{% endif %}">
+        <div class="legacy-person-workspace{% if selected_person %} legacy-person-workspace-selected{% else %} legacy-person-workspace-empty{% endif %}" data-legacy-person-workspace aria-live="polite" aria-busy="false">
         {% if selected_person %}
           {% set legacy_person_lightbox_group = 'legacy-person-' ~ selected_person.id ~ '-all' %}
           <div class="legacy-split-header">
@@ -162,7 +167,7 @@
           </section>
 
           <div class="legacy-bottom-grid">
-            <section class="legacy-block">
+            <section class="legacy-block legacy-links-block">
               <h2>Ссылки</h2>
               <dl class="legacy-links">
                 <dt>Ссылка на сайт "Память народа"</dt>
@@ -195,7 +200,7 @@
               <p class="secondary">Откроется предпросмотр буклета с печатью и скачиванием PDF.</p>
             </section>
 
-            <section class="legacy-block">
+            <section class="legacy-block legacy-media-block">
               <h2>Фото</h2>
               <div class="legacy-photo-strip">
                 {% for label, path in [
@@ -257,7 +262,13 @@
             </section>
           </div>
         {% else %}
-          <div class="notice">Выберите награжденного.</div>
+          <section class="legacy-cavalier-empty-state" data-cavalier-empty-state>
+            <div class="legacy-empty-state-copy">
+              <span class="legacy-empty-state-star" aria-hidden="true"></span>
+              <h1>Выберите кавалера из списка слева</h1>
+              <p>После выбора откроется карточка с полными данными,<br>награждениями и документами.</p>
+            </div>
+          </section>
         {% endif %}
         </div>
         <section class="legacy-totals-panel legacy-totals-footer" aria-label="Итоги">
@@ -272,7 +283,7 @@
       </section>
     </div>
   {% elif tab == "search" %}
-    <section class="legacy-tab-panel">
+    <section class="legacy-tab-panel legacy-archive-tab legacy-search-tab">
       {% macro search_sort_th(key, label) -%}
       <th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
       {%- endmacro %}
@@ -319,7 +330,7 @@
         <input type="hidden" name="tab" value="search">
         <label class="search-scope-control">
           <span>Категория поиска</span>
-          <select name="scope" title="Категория поиска">
+          <select name="scope" title="Категория поиска" data-styled-select>
             <option value="all" title="Везде" {% if scope == "all" %}selected{% endif %}>Везде</option>
             <option value="persons" title="Награждённые" {% if scope == "persons" %}selected{% endif %}>Награждённые</option>
             <option value="rewards" title="Наименование награды" {% if scope == "rewards" %}selected{% endif %}>Наименование награды</option>
@@ -329,7 +340,7 @@
         </label>
         <label>
           <span>Условие поиска</span>
-          <select name="mode">
+          <select name="mode" data-styled-select>
             <option value="contains" {% if mode == "contains" %}selected{% endif %}>содержит</option>
             <option value="starts" {% if mode == "starts" %}selected{% endif %}>начинается с</option>
             <option value="exact" {% if mode == "exact" %}selected{% endif %}>точное совпадение</option>
@@ -498,26 +509,26 @@
       {% endif %}
     </section>
   {% elif tab == "marks" %}
-    <div class="legacy-layout legacy-layout-marks">
+    <div class="legacy-layout legacy-layout-marks legacy-marks-tab">
       <aside class="legacy-sidebar">
-        <div class="legacy-panel-title">Знаки ({{ marks_total or marks|length }})</div>
+        <div class="legacy-panel-title"><span class="legacy-panel-mark-icon" aria-hidden="true"></span>Знаки <span class="legacy-panel-count">{{ marks_total or marks|length }}</span></div>
         <div class="legacy-toolbar">
           {% set marks_tab_return = "/legacy?tab=marks" %}
           {% if settings.write_mode %}
-            <a class="tool-button" href="/marks/new?return_to={{ marks_tab_return|urlencode }}">➕ Добавить знак</a>
+            <a class="tool-button legacy-action-add" href="/marks/new?return_to={{ marks_tab_return|urlencode }}">Добавить знак</a>
             {% if selected_mark %}
               {% set selected_mark_return = "/legacy?tab=marks&mark_id=" ~ selected_mark.id %}
-              <a class="tool-button" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">✏️ Изменить</a>
+              <a class="tool-button legacy-action-edit" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">Изменить</a>
               <form method="post" action="/marks/{{ selected_mark.id }}/delete" onsubmit="return confirm('Подтвердите удаление знака')">
                 <input type="hidden" name="confirm" value="true">
                 <input type="hidden" name="return_to" value="{{ marks_tab_return }}">
-                <button class="tool-button danger" type="submit">❌ Удалить</button>
+                <button class="tool-button danger legacy-action-delete" type="submit">Удалить</button>
               </form>
             {% endif %}
           {% else %}
-            <span class="tool-button disabled">➕ Добавить знак</span>
-            <span class="tool-button disabled">✏️ Изменить</span>
-            <span class="tool-button disabled">❌ Удалить</span>
+            <span class="tool-button disabled legacy-action-add">Добавить знак</span>
+            <span class="tool-button disabled legacy-action-edit">Изменить</span>
+            <span class="tool-button disabled legacy-action-delete">Удалить</span>
           {% endif %}
         </div>
         <div class="legacy-list">
@@ -536,7 +547,7 @@
           <div class="legacy-split-header">
             <div>
               <h1>{{ selected_mark.name|dash }}</h1>
-              <p class="secondary">ID {{ selected_mark.id }} · № {{ selected_mark.number|dash }}</p>
+              <p class="secondary">№ {{ selected_mark.number|dash }}</p>
             </div>
             <a class="button" href="/marks/{{ selected_mark.id }}">Карточка</a>
           </div>
@@ -581,7 +592,7 @@
       </section>
     </div>
   {% elif tab == "summary" %}
-    <section class="legacy-tab-panel">
+    <section class="legacy-tab-panel legacy-archive-tab legacy-summary-tab">
       <h1>Свод.таблица</h1>
       {% if summary %}
         <form class="summary-filter-form guide-cascade" method="get" action="/legacy">
@@ -592,12 +603,12 @@
           <input type="hidden" name="matrix_sort" value="{{ matrix_sort }}">
           <input type="hidden" name="matrix_dir" value="{{ matrix_dir }}">
           <div class="summary-mode-switch" aria-label="Режим сводной таблицы">
-            <a class="button {{ 'active-button' if summary_mode == 'matrix' else 'secondary-button' }}" href="{{ summary_matrix_mode_url }}">Шахматка по кавалерам</a>
-            <a class="button {{ 'active-button' if summary_mode == 'aggregate' else 'secondary-button' }}" href="{{ summary_aggregate_mode_url }}">Свод по наградам</a>
+            <a class="button summary-mode-option {{ 'active-button' if summary_mode == 'matrix' else 'secondary-button' }}" href="{{ summary_matrix_mode_url }}">Шахматка по кавалерам</a>
+            <a class="button summary-mode-option {{ 'active-button' if summary_mode == 'aggregate' else 'secondary-button' }}" href="{{ summary_aggregate_mode_url }}">Свод по наградам</a>
           </div>
           <label>
             <span>Страна</span>
-            <select name="country_id" data-guide-role="country">
+            <select name="country_id" data-guide-role="country" data-styled-select>
               <option value="">Все</option>
               {% for item in summary_options.countries %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.country_id %}selected{% endif %}>{{ item.name }}</option>
@@ -606,7 +617,7 @@
           </label>
           <label>
             <span>Категория</span>
-            <select name="category_id" data-guide-role="category">
+            <select name="category_id" data-guide-role="category" data-styled-select>
               <option value="">Все</option>
               {% for item in summary_options.categories %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.category_id %}selected{% endif %}>{{ item.name }}</option>
@@ -615,7 +626,7 @@
           </label>
           <label>
             <span>Подкатегория</span>
-            <select name="subcategory_id" data-guide-role="subcategory">
+            <select name="subcategory_id" data-guide-role="subcategory" data-styled-select>
               <option value="">Все</option>
               {% for item in summary_options.subcategories %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.subcategory_id %}selected{% endif %}>{{ item.name }}</option>
@@ -624,7 +635,7 @@
           </label>
           <label>
             <span>Наименование</span>
-            <select name="name_id" data-guide-role="name">
+            <select name="name_id" data-guide-role="name" data-styled-select>
               <option value="">Все</option>
               {% for item in summary_options.names %}
               <option value="{{ item.id }}" {% if item.id == summary_filters.name_id %}selected{% endif %}>{{ item.name }}</option>
@@ -633,7 +644,7 @@
           </label>
           <label>
             <span>Дополнительно</span>
-            <select name="extra">
+            <select name="extra" data-styled-select>
               <option value="">Все</option>
               {% for item in summary_options.extras %}
               <option value="{{ item.id }}" {% if item.id|string == summary_filters.extra|string %}selected{% endif %}>{{ item.name }}</option>
@@ -645,12 +656,12 @@
             <span>Знаки</span>
           </label>
           <div class="summary-filter-actions">
-            <button type="submit">Показать</button>
-            <a class="button secondary-button" href="{{ summary_reset_url }}">Сброс</a>
+            <button class="summary-primary-action" type="submit">Показать</button>
+            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}">Сброс</a>
             {% if summary_has_result %}
-            <button class="button secondary-button" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
-            <button class="button secondary-button" type="submit" form="summary-save-form">CSV свод</button>
-            <button class="button secondary-button" type="submit" form="summary-pdf-save-form">PDF</button>
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">CSV свод</button>
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form">PDF</button>
             {% endif %}
           </div>
         </form>
@@ -802,7 +813,7 @@
       {% endif %}
     </section>
   {% elif tab == "about" %}
-    <section class="legacy-tab-panel">
+    <section class="legacy-tab-panel legacy-archive-tab legacy-about-tab">
       <h1>О программе</h1>
       <dl class="details">
         <dt>Название</dt>

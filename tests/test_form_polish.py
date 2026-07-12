@@ -401,7 +401,7 @@ class FormPolishTests(unittest.TestCase):
             response = rewards_router.reward_detail(object(), 99)
 
         self.assertEqual(response["context"]["reward_name"], "")
-        self.assertEqual(response["context"]["reward_heading"], "Награда #99")
+        self.assertEqual(response["context"]["reward_heading"], "Награда")
         self.assertEqual(response["context"]["reward_back_url"], "/legacy?tab=rewards&person_id=1")
 
     def test_reward_detail_rejects_external_return_to(self) -> None:

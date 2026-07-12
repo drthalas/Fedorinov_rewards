@@ -1,17 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Награжденный #{{ person.id }}{% endblock %}
+{% block title %}{{ person.fio }}{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-person-theme{% endblock %}
 {% block content %}
 {% set person_lightbox_group = 'person-' ~ person.id ~ '-all' %}
 {% set person_back_url = return_to or '/legacy?tab=rewards&person_id=' ~ person.id %}
 {% set person_card_return = '/persons/' ~ person.id ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
-<section class="person-detail-page compact-person-detail">
+<section class="person-detail-page compact-person-detail cavalier-standalone-page cavalier-person-detail">
 <section class="person-detail-hero panel compact-person-detail-hero">
   <h1 class="person-title wrap-text">{{ person.fio }}</h1>
   <dl class="person-summary-strip">
-    <div>
-      <dt>ID</dt>
-      <dd>{{ person.id }}</dd>
-    </div>
     <div>
       <dt>Звание / специальность</dt>
       <dd class="wrap-text">{{ person.rank_name|dash }}</dd>
@@ -38,7 +35,7 @@
 </div>
 {% endif %}
 
-<section class="grid person-detail-grid compact-person-detail-grid">
+<section class="grid person-detail-grid compact-person-detail-grid cavalier-profile-grid">
   <div class="panel person-main-photo-panel compact-main-photo-panel">
     <h2>Главное фото</h2>
     <div class="photo-frame">
@@ -72,7 +69,7 @@
   </div>
 </section>
 
-<section class="panel person-detail-rewards-section">
+<section class="panel person-detail-rewards-section cavalier-rewards-panel">
 <div class="person-detail-section-head">
   <h2 class="compact-section-title">Награды</h2>
   {% if settings.write_mode %}
@@ -82,12 +79,11 @@
 <div class="table-wrap person-detail-rewards-wrap">
   <table>
     <thead>
-      <tr><th>ID</th><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
+      <tr><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
     </thead>
     <tbody>
       {% for reward in rewards %}
       <tr>
-        <td>{{ reward.id }}</td>
         <td>{{ reward.gos|dash }}</td>
         <td>{{ reward.category|dash }}</td>
         <td>{{ reward.subcategory|dash }}</td>
@@ -98,14 +94,14 @@
         <td>{{ reward.price_purchase|format_money }}</td>
         <td>{{ reward.price_now|format_money }}</td>
         <td class="compact-actions reward-icon-actions">
-          <a class="reward-icon-action" href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}" title="Открыть награду" aria-label="Открыть награду">👁️</a>
+          <a class="reward-icon-action reward-view-icon" href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}" title="Открыть награду" aria-label="Открыть награду"><span class="visually-hidden">Открыть</span></a>
           {% if settings.write_mode %}
-          <a class="reward-icon-action" href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}" title="Изменить награду" aria-label="Изменить награду">✏️</a>
+          <a class="reward-icon-action reward-edit-icon" href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}" title="Изменить награду" aria-label="Изменить награду"><span class="visually-hidden">Изменить</span></a>
           <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
             <input type="hidden" name="return_to" value="{{ person_card_return }}">
-            <button type="submit" class="link-button reward-icon-action reward-icon-danger" title="Удалить награду" aria-label="Удалить награду">❌</button>
+            <button type="submit" class="link-button reward-icon-action reward-delete-icon reward-icon-danger" title="Удалить награду" aria-label="Удалить награду"><span class="visually-hidden">Удалить</span></button>
           </form>
           {% endif %}
         </td>

@@ -142,7 +142,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260711-guide-design-polish-1"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -215,6 +215,19 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("legacy-totals-panel", legacy_template)
         self.assertIn("data-detail-url", legacy_template)
         self.assertIn("dblclick", script)
+
+    def test_legacy_rewards_has_owner_empty_state_and_scoped_theme(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        legacy_base = (ROOT / "backend" / "app" / "templates" / "legacy_base.html").read_text()
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
+
+        self.assertIn("legacy-rewards-theme", legacy_base)
+        self.assertIn("data-cavalier-empty-state", legacy_template)
+        self.assertIn("Выберите кавалера из списка слева", legacy_template)
+        self.assertIn("После выбора откроется карточка с полными данными", legacy_template)
+        self.assertIn("legacy-person-list-title", legacy_template)
+        self.assertIn("format_birth_year", legacy_template)
+        self.assertIn("/static/assets/cavaliers/empty-hero.jpg", styles)
 
     def test_legacy_rewards_has_quick_person_search(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -322,9 +335,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("scrollSelectedPersonIntoList", script)
         self.assertIn("personList.scrollTop", script)
         self.assertIn("personList.getBoundingClientRect()", script)
-        self.assertIn("selectedPersonRow.getBoundingClientRect()", script)
-        self.assertIn("scrollRowIntoList(row)", script)
-        self.assertIn("the visible search field is the primary quick-search path", script)
+        self.assertIn("ensureRowVisible(row)", script)
+        self.assertIn("ensureRowVisible(selectedPersonRow)", script)
         self.assertNotIn("document.activeElement === document.body", script)
         self.assertNotIn("selectedPersonRow.scrollIntoView", script)
 

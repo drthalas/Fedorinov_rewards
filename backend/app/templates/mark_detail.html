@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Знак #{{ mark.id }}{% endblock %}
+{% block title %}Знак: {{ mark.name|dash }}{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-reward-theme cavalier-mark-theme{% endblock %}
 {% block content %}
-<h1>Знак #{{ mark.id }}</h1>
+<section class="cavalier-standalone-page cavalier-reward-detail cavalier-mark-detail">
+<h1 class="wrap-text">Знак: {{ mark.name|dash }}</h1>
 {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/marks' }}">← Назад</a></p>
 {% if settings.write_mode %}
@@ -14,9 +16,8 @@
   </form>
 </div>
 {% endif %}
-<section class="panel">
-  <dl class="details">
-    <dt>ID</dt><dd>{{ mark.id }}</dd>
+<section class="panel cavalier-reward-summary">
+  <dl class="details cavalier-reward-details">
     <dt>Государство</dt><dd>{{ mark.gos|dash }}</dd>
     <dt>Категория</dt><dd>{{ mark.category|dash }}</dd>
     <dt>Подкатегория</dt><dd>{{ mark.subcategory|dash }}</dd>
@@ -33,8 +34,8 @@
     <dt>Текущая цена</dt><dd>{{ mark.price_now|format_money }}</dd>
   </dl>
 </section>
-<h2>Фото</h2>
-<div class="photo-grid">
+<h2 class="cavalier-section-title">Фото</h2>
+<div class="photo-grid cavalier-reward-photo-grid">
   {% for photo in photos %}
   <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
     <div class="photo-frame">
@@ -50,4 +51,5 @@
   </div>
   {% endfor %}
 </div>
+</section>
 {% endblock %}

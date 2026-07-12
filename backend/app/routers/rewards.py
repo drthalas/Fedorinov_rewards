@@ -86,7 +86,7 @@ def _reward_display_name(reward: dict[str, object]) -> str:
 
 def _reward_heading(reward: dict[str, object]) -> str:
     reward_name = _reward_display_name(reward)
-    return f"Награда: {reward_name}" if reward_name else f"Награда #{reward.get('id')}"
+    return f"Награда: {reward_name}" if reward_name else "Награда"
 
 
 def _reward_legacy_back_url(reward: dict[str, object]) -> str:

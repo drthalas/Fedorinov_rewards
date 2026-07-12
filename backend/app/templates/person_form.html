@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
+<section class="cavalier-standalone-page cavalier-form-page cavalier-person-form-page">
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}</h1>
 <p class="local-back-nav compact-actions">
   <a class="button secondary-button" data-escape-back href="{{ return_to or ('/legacy?tab=rewards&person_id=' ~ person.id if mode == 'edit' else '/legacy?tab=rewards') }}">← Назад</a>
@@ -21,7 +23,7 @@
   <div class="person-edit-main">
 {% endif %}
 
-<form class="edit-form legacy-edit-form person-edit-form compact-person-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
@@ -38,7 +40,7 @@
     </div>
     <label>
       <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a> · <a href="/guides/ranks/new?return_to={{ form_return_path|urlencode }}">Добавить звание</a></span>
-      <select name="id_rank" required>
+      <select name="id_rank" data-styled-select required>
         <option value="">—</option>
         {% for rank in ranks %}
         <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>
@@ -104,4 +106,5 @@
   </div>
 </div>
 {% endif %}
+</section>
 {% endblock %}
