@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
+{% block title %}{% if mode == "create" %}{{ form_title or 'Добавить элемент справочника' }}{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}{% endblock %}
 {% block body_class %}guide-theme guide-form-theme{% endblock %}
 {% block content %}
 <section class="guide-page guide-form-page">
 <header class="guide-page-heading guide-form-heading">
-  <h1>{% if mode == "create" %}Добавить элемент справочника{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
+  <h1>{% if mode == "create" %}{{ form_title or 'Добавить элемент справочника' }}{% else %}{{ display_title or item.name or 'Изменить элемент справочника' }}{% endif %}</h1>
   <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 </header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
@@ -26,6 +26,7 @@
     <span>Название</span>
     <input name="name" value="{{ item.name or '' }}" required>
   </label>
+  {% if supports_award_media %}
   <label>
     <span>Рейтинг</span>
     <input type="number" name="rating_rank" value="{{ item.rating_rank or '' }}" min="1" step="1" inputmode="numeric" placeholder="Положительное целое число">
@@ -39,16 +40,22 @@
     <p class="notice notice-error guide-image-preview-error" data-guide-image-preview-error hidden></p>
     <label class="guide-upload-control">
       <span>{% if item.image_path %}Заменить изображение{% else %}Загрузить изображение{% endif %}</span>
-      <input type="file" name="image_file" data-guide-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+      <span class="guide-upload-dropzone">
+        <span class="guide-upload-icon" aria-hidden="true">⇧</span>
+        <span class="guide-upload-copy" data-guide-upload-name>Выберите файл или перетащите его сюда</span>
+        <span class="guide-upload-button" aria-hidden="true">Выбрать файл</span>
+        <input type="file" name="image_file" data-guide-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+      </span>
     </label>
     <small class="secondary">JPG, JPEG, PNG или WebP, не более 5 MB.</small>
   </section>
+  {% endif %}
   <div class="actions">
-    <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
-    <a data-escape-back href="{{ return_to or '/guides' }}">Отмена</a>
+    <button class="guide-primary-action guide-primary-action-{{ mode }}" type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
+    <a class="guide-cancel-action" data-escape-back href="{{ return_to or '/guides' }}">Отмена</a>
   </div>
 </form>
-{% if mode == "edit" and item.image_path %}
+{% if supports_award_media and mode == "edit" and item.image_path %}
 {% set image_delete_return = '/guides/levels/' ~ level ~ '/' ~ item.id ~ '/edit' ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 <form class="guide-image-delete-form" method="post" action="/guides/levels/{{ level }}/{{ item.id }}/image/delete" data-confirm-submit="guide-image-delete" data-confirm-message="Удалить изображение элемента справочника?">
   <input type="hidden" name="confirm" value="">

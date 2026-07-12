@@ -67,6 +67,14 @@ LEVEL_LABELS = {
     4: "Ссылка / дополнительный уровень",
 }
 
+CREATE_TITLES = {
+    0: "Добавить государство",
+    1: "Добавить категорию",
+    2: "Добавить подкатегорию",
+    3: "Добавить награду или знак",
+    4: "Добавить ссылку",
+}
+
 GUIDE_BRANCH_TYPE_LABELS = {
     "ордена": "Орден",
     "орден": "Орден",
@@ -126,6 +134,8 @@ def _guide_item_display_title(settings, level: int, item: dict[str, object]) -> 
     name = str(item.get("name") or "").strip()
     if not name:
         return "Изменить элемент справочника"
+    if level != 3:
+        return name
     lineage = guide_level_item_lineage(settings.rewards_db_path, level, int(item.get("id") or 0))
     for ancestor in reversed(lineage[:-1]):
         branch_name = str(ancestor.get("name") or "").strip().casefold().replace("ё", "е")
@@ -135,6 +145,10 @@ def _guide_item_display_title(settings, level: int, item: dict[str, object]) -> 
             display_name = name[len(type_prefix):] if name.casefold().replace("ё", "е").startswith(type_prefix) else name
             return f"{type_label}: {display_name}"
     return name
+
+
+def _supports_award_media(level: int) -> bool:
+    return level == 3
 
 
 def _context(
@@ -303,6 +317,8 @@ def guide_level_new(request: Request, level: int, parent_id: int | None = None, 
             "item": item,
             "level": level,
             "level_label": LEVEL_LABELS[level],
+            "form_title": CREATE_TITLES[level],
+            "supports_award_media": _supports_award_media(level),
             "parent_options": _parent_options(settings, level),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -316,9 +332,12 @@ async def guide_level_create(request: Request, level: int):
     form_values, upload = await _read_guide_level_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     image_path: str | None = None
+    supports_award_media = _supports_award_media(level)
     try:
+        if not supports_award_media:
+            form_values["rating_rank"] = ""
         data = guide_level_data_from_mapping(level, form_values)
-        image_path = await _save_uploaded_guide_image(settings, upload)
+        image_path = await _save_uploaded_guide_image(settings, upload) if supports_award_media else None
         if image_path:
             data = replace(data, image_path=image_path)
         created_item_id = create_guide_level_item(settings, data)
@@ -336,6 +355,8 @@ async def guide_level_create(request: Request, level: int):
                 "item": {"level": level, **form_values},
                 "level": level,
                 "level_label": LEVEL_LABELS.get(level, "Элемент справочника"),
+                "form_title": CREATE_TITLES.get(level, "Добавить элемент справочника"),
+                "supports_award_media": supports_award_media,
                 "parent_options": _parent_options(settings, level),
                 "return_to": return_to,
                 "error": str(exc),
@@ -378,6 +399,7 @@ def guide_level_edit(request: Request, level: int, item_id: int, return_to: str 
             "level": level,
             "level_label": LEVEL_LABELS[level],
             "display_title": _guide_item_display_title(settings, level, item),
+            "supports_award_media": _supports_award_media(level),
             "parent_options": _parent_options(settings, level),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -395,10 +417,20 @@ async def guide_level_update(request: Request, level: int, item_id: int):
     return_to = safe_return_to(form_values.get("return_to"))
     old_image_path = current_item.get("image_path")
     new_image_path: str | None = None
+    supports_award_media = _supports_award_media(level)
     try:
+        if not supports_award_media:
+            form_values["rating_rank"] = ""
         data = guide_level_data_from_mapping(level, form_values)
-        new_image_path = await _save_uploaded_guide_image(settings, upload)
-        data = replace(data, image_path=new_image_path or old_image_path)
+        new_image_path = await _save_uploaded_guide_image(settings, upload) if supports_award_media else None
+        if supports_award_media:
+            data = replace(data, image_path=new_image_path or old_image_path)
+        else:
+            data = replace(
+                data,
+                rating_rank=current_item.get("rating_rank"),
+                image_path=old_image_path,
+            )
         update_guide_level_item(settings, level, item_id, data)
     except WriteBlockedError as exc:
         _delete_guide_image_safely(settings, new_image_path)
@@ -415,6 +447,7 @@ async def guide_level_update(request: Request, level: int, item_id: int):
                 "level": level,
                 "level_label": LEVEL_LABELS.get(level, "Элемент справочника"),
                 "display_title": _guide_item_display_title(settings, level, current_item),
+                "supports_award_media": supports_award_media,
                 "parent_options": _parent_options(settings, level),
                 "return_to": return_to,
                 "error": str(exc),

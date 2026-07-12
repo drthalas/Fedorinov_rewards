@@ -201,25 +201,37 @@ class GuideItemMediaTests(unittest.TestCase):
     def test_router_add_replace_and_delete_image_on_temp_database(self) -> None:
         create_upload = UploadFile(file=BytesIO(PNG_BYTES), filename="award.png")
         create_request = FakeMultipartRequest(
-            [("name", "Новая награда"), ("rating_rank", "9"), ("return_to", "/guides"), ("image_file", create_upload)]
+            [
+                ("parent_id", "1"),
+                ("name", "Новая награда"),
+                ("rating_rank", "9"),
+                ("return_to", "/guides"),
+                ("image_file", create_upload),
+            ]
         )
         with patch.object(guides_router, "get_settings", return_value=self.settings()):
-            response = asyncio.run(guides_router.guide_level_create(create_request, 0))
+            response = asyncio.run(guides_router.guide_level_create(create_request, 3))
         self.assertEqual(response.status_code, 303)
 
-        created = next(item for item in list_guide_level(self.db_path, 0) if item["name"] == "Новая награда")
+        created = next(item for item in list_guide_level(self.db_path, 3) if item["name"] == "Новая награда")
         first_path = str(created["image_path"])
         self.assertEqual(created["rating_rank"], 9)
         self.assertTrue((self.root / first_path).is_file())
 
         replace_upload = UploadFile(file=BytesIO(WEBP_BYTES), filename="award.webp")
         update_request = FakeMultipartRequest(
-            [("name", "Новая награда"), ("rating_rank", "10"), ("return_to", "/guides"), ("image_file", replace_upload)]
+            [
+                ("parent_id", "1"),
+                ("name", "Новая награда"),
+                ("rating_rank", "10"),
+                ("return_to", "/guides"),
+                ("image_file", replace_upload),
+            ]
         )
         with patch.object(guides_router, "get_settings", return_value=self.settings()):
-            response = asyncio.run(guides_router.guide_level_update(update_request, 0, int(created["id"])))
+            response = asyncio.run(guides_router.guide_level_update(update_request, 3, int(created["id"])))
         self.assertEqual(response.status_code, 303)
-        updated = get_guide_level_item(self.db_path, 0, int(created["id"]))
+        updated = get_guide_level_item(self.db_path, 3, int(created["id"]))
         second_path = str(updated["image_path"])
         self.assertEqual(updated["rating_rank"], 10)
         self.assertNotEqual(second_path, first_path)
@@ -228,9 +240,9 @@ class GuideItemMediaTests(unittest.TestCase):
 
         delete_request = FakeUrlencodedRequest({"confirm": "true", "return_to": "/guides"})
         with patch.object(guides_router, "get_settings", return_value=self.settings()):
-            response = asyncio.run(guides_router.guide_level_image_delete(delete_request, 0, int(created["id"])))
+            response = asyncio.run(guides_router.guide_level_image_delete(delete_request, 3, int(created["id"])))
         self.assertEqual(response.status_code, 303)
-        self.assertIsNone(get_guide_level_item(self.db_path, 0, int(created["id"]))["image_path"])
+        self.assertIsNone(get_guide_level_item(self.db_path, 3, int(created["id"]))["image_path"])
         self.assertFalse((self.root / second_path).exists())
 
     def test_router_add_without_rating_or_image_remains_supported(self) -> None:
@@ -246,28 +258,46 @@ class GuideItemMediaTests(unittest.TestCase):
         image_path = save_guide_image(self.settings(), "award.png", PNG_BYTES)
         item_id = create_guide_level_item(
             self.settings(),
-            GuideLevelData(level=0, name="Защищённое изображение", parent_id=-1, image_path=image_path),
+            GuideLevelData(level=3, name="Защищённое изображение", parent_id=1, image_path=image_path),
         )
         request = FakeUrlencodedRequest({"confirm": "", "return_to": "/guides"})
         with patch.object(guides_router, "get_settings", return_value=self.settings()):
             with self.assertRaises(HTTPException) as exc:
-                asyncio.run(guides_router.guide_level_image_delete(request, 0, item_id))
+                asyncio.run(guides_router.guide_level_image_delete(request, 3, item_id))
         self.assertEqual(exc.exception.status_code, 400)
-        self.assertEqual(get_guide_level_item(self.db_path, 0, item_id)["image_path"], image_path)
+        self.assertEqual(get_guide_level_item(self.db_path, 3, item_id)["image_path"], image_path)
         self.assertTrue((self.root / image_path).is_file())
 
     def test_router_item_delete_removes_owned_image_file(self) -> None:
         image_path = save_guide_image(self.settings(), "award.png", PNG_BYTES)
         item_id = create_guide_level_item(
             self.settings(),
-            GuideLevelData(level=0, name="Удаляемый элемент", parent_id=-1, image_path=image_path),
+            GuideLevelData(level=3, name="Удаляемый элемент", parent_id=1, image_path=image_path),
         )
         request = FakeUrlencodedRequest({"confirm": "true", "return_to": "/guides"})
         with patch.object(guides_router, "get_settings", return_value=self.settings()):
-            response = asyncio.run(guides_router.guide_level_delete(request, 0, item_id))
+            response = asyncio.run(guides_router.guide_level_delete(request, 3, item_id))
         self.assertEqual(response.status_code, 303)
-        self.assertIsNone(get_guide_level_item(self.db_path, 0, item_id))
+        self.assertIsNone(get_guide_level_item(self.db_path, 3, item_id))
         self.assertFalse((self.root / image_path).exists())
+
+    def test_non_award_routes_ignore_rating_and_image_upload(self) -> None:
+        upload = UploadFile(file=BytesIO(PNG_BYTES), filename="country.png")
+        request = FakeMultipartRequest(
+            [
+                ("name", "Новое государство"),
+                ("rating_rank", "4"),
+                ("return_to", "/guides"),
+                ("image_file", upload),
+            ]
+        )
+        with patch.object(guides_router, "get_settings", return_value=self.settings()):
+            response = asyncio.run(guides_router.guide_level_create(request, 0))
+        self.assertEqual(response.status_code, 303)
+        created = next(item for item in list_guide_level(self.db_path, 0) if item["name"] == "Новое государство")
+        self.assertIsNone(created["rating_rank"])
+        self.assertIsNone(created["image_path"])
+        self.assertEqual(list((self.root / "GuideImages").glob("*")) if (self.root / "GuideImages").exists() else [], [])
 
     def test_guides_templates_expose_compact_rating_and_image_controls(self) -> None:
         guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text(encoding="utf-8")
@@ -278,7 +308,7 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn("Рейтинг не задан", guides)
         self.assertIn("Изображение не загружено", guides)
         self.assertIn("guide-tree-image", guides)
-        self.assertIn("node.rating_rank or node.image_path", guides)
+        self.assertIn("node.level == 3 and (node.rating_rank or node.image_path)", guides)
         self.assertIn("<details ", guides)
         self.assertIn("<summary>", guides)
         self.assertIn("Добавить дочерний", guides)
@@ -292,6 +322,7 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertNotIn("#{{ rank.id }}", guides)
         self.assertIn('name="rating_rank"', form)
         self.assertIn('name="image_file"', form)
+        self.assertIn("{% if supports_award_media %}", form)
         self.assertIn('enctype="multipart/form-data"', form)
         self.assertIn("Удалить изображение", form)
         self.assertIn("Изображение не загружено", form)
@@ -304,6 +335,38 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn(".guide-theme", styles)
         self.assertIn("--guide-gold", styles)
         self.assertIn(".guide-theme .tree summary::before", styles)
+        self.assertIn(".guide-theme details[data-guide-active] > .tree-actions", styles)
+        self.assertNotIn(".guide-theme details > .tree-actions:hover", styles)
+        self.assertNotIn(".guide-theme details:hover > .tree-actions", styles)
+        self.assertIn("min-width: 194px", styles)
+
+    def test_guide_visual_package_assets_are_used(self) -> None:
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+        assets = ROOT / "backend" / "app" / "static" / "assets" / "guides"
+
+        expected = {
+            "left-rail.png": '/static/assets/guides/left-rail.png',
+            "top-right-emblem.png": '/static/assets/guides/top-right-emblem.png',
+            "archive-header-bg.png": '/static/assets/guides/archive-header-bg.png',
+        }
+        for filename, static_path in expected.items():
+            with self.subTest(filename=filename):
+                self.assertTrue((assets / filename).is_file())
+                self.assertIn(static_path, styles)
+
+    def test_tree_actions_follow_active_node_and_leaf_type(self) -> None:
+        guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text(encoding="utf-8")
+        tree_script = (ROOT / "backend" / "app" / "static" / "guide_tree_state.js").read_text(encoding="utf-8")
+        styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("guide-leaf-details", guides)
+        self.assertIn("{% if node.level < 3 %}", guides)
+        self.assertNotIn("{% if node.level < 4 %}", guides)
+        self.assertIn('setAttribute("data-guide-active", "")', tree_script)
+        self.assertIn('removeAttribute("data-guide-active")', tree_script)
+        self.assertIn("if (details.open) setActiveDetails(details)", tree_script)
+        self.assertIn("details[data-guide-active] > .tree-actions", styles)
+        self.assertNotIn("summary:hover ~ .tree-actions", styles)
 
     def test_edit_title_uses_award_type_from_guide_branch(self) -> None:
         order = get_guide_level_item(self.db_path, 3, 1)
@@ -322,6 +385,26 @@ class GuideItemMediaTests(unittest.TestCase):
     def test_edit_title_falls_back_to_name_when_branch_type_is_unknown(self) -> None:
         root = get_guide_level_item(self.db_path, 0, 1)
         self.assertEqual(guides_router._guide_item_display_title(self.settings(), 0, root), "СССР")
+
+    def test_link_title_and_form_context_do_not_expose_award_media(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("insert into guide_lev_4 (id, idl, name) values (1, 1, 'https://example.test')")
+        link = get_guide_level_item(self.db_path, 4, 1)
+        self.assertEqual(guides_router._guide_item_display_title(self.settings(), 4, link), "https://example.test")
+
+        render = lambda request, name, context, **kwargs: {"template": name, **context}
+        with (
+            patch.object(guides_router, "get_settings", return_value=self.settings()),
+            patch.object(guides_router.templates, "TemplateResponse", side_effect=render),
+        ):
+            country_context = guides_router.guide_level_new(None, 0)
+            link_context = guides_router.guide_level_edit(None, 4, 1)
+            award_context = guides_router.guide_level_edit(None, 3, 1)
+
+        self.assertEqual(country_context["form_title"], "Добавить государство")
+        self.assertFalse(country_context["supports_award_media"])
+        self.assertFalse(link_context["supports_award_media"])
+        self.assertTrue(award_context["supports_award_media"])
 
     def test_guide_tree_state_sanitizes_and_marks_open_focus_nodes(self) -> None:
         tree = guide_tree(self.db_path)
@@ -408,11 +491,14 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn("data-guide-image-input", form)
         self.assertIn("data-guide-image-preview-image", form)
         self.assertIn("data-guide-image-preview-placeholder", form)
+        self.assertIn("data-guide-upload-name", form)
+        self.assertIn("Выберите файл или перетащите его сюда", form)
         self.assertIn("URL.createObjectURL", preview_script)
         self.assertIn("URL.revokeObjectURL", preview_script)
         self.assertIn("allowedExtensions", preview_script)
         self.assertIn("allowedTypes", preview_script)
         self.assertIn("setCustomValidity", preview_script)
+        self.assertIn("file.name", preview_script)
         self.assertIn("guide_tree_state.js", base)
         self.assertIn("guide_image_preview.js", base)
 

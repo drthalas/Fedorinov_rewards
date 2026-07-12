@@ -5,7 +5,7 @@
 <span class="guide-node-title"><span class="guide-node-icon" aria-hidden="true"></span><span class="tree-name">{{ node.name|dash }}</span></span>
 {% endmacro %}
 {% macro render_node_extra(node) %}
-{% if node.rating_rank or node.image_path %}
+{% if node.level == 3 and (node.rating_rank or node.image_path) %}
 <span class="guide-item-extra">
     {% if node.image_path %}
     <span class="guide-tree-image-frame"><img class="guide-tree-image" src="{{ media_url(node.image_path) }}" alt="{{ node.name|dash }}" loading="lazy"></span>
@@ -20,13 +20,12 @@
 <ul class="tree-list">
   {% for node in nodes %}
   <li class="guide-tree-node guide-tree-level-{{ node.level }}" id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}" data-guide-level="{{ node.level }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
-    {% if node.children %}
-    <details data-guide-key="{{ node.guide_key }}"{% if node.is_open %} open{% endif %}>
+    <details class="guide-node-details{% if not node.children %} guide-leaf-details{% endif %}" data-guide-key="{{ node.guide_key }}"{% if node.is_open %} open{% endif %}>
       <summary><span class="guide-node-content">{{ render_node_title(node) }}</span></summary>
       {{ render_node_extra(node) }}
       {% if settings.write_mode %}
       <div class="tree-actions">
-        {% if node.level < 4 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
+        {% if node.level < 3 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
           <input type="hidden" name="confirm" value="true">
@@ -35,24 +34,8 @@
         </form>
       </div>
       {% endif %}
-      {{ render_nodes(node.children) }}
+      {% if node.children %}{{ render_nodes(node.children) }}{% endif %}
     </details>
-    {% else %}
-    <div class="tree-leaf">
-      <span class="guide-node-content">{{ render_node_title(node) }}{{ render_node_extra(node) }}</span>
-      {% if settings.write_mode %}
-      <span class="tree-actions">
-        {% if node.level < 4 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
-        <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
-          <input type="hidden" name="confirm" value="true">
-          <input type="hidden" name="return_to" value="{{ guides_self }}">
-          <button class="link-button" type="submit">Удалить</button>
-        </form>
-      </span>
-      {% endif %}
-    </div>
-    {% endif %}
   </li>
   {% endfor %}
 </ul>
@@ -68,7 +51,7 @@
 <section class="guide-directory-grid" data-guide-state-root>
   <div class="panel guide-directory-panel guide-ranks-panel" id="ranks">
     <div class="legacy-block-head">
-      <h2><span class="guide-section-icon" aria-hidden="true">▧</span>Звания / специальности</h2>
+      <h2><span class="guide-section-icon guide-section-icon-ranks" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3.5h12v12.2c0 2.6-2.3 4.3-6 5.3-3.7-1-6-2.7-6-5.3V3.5Z"/><path d="m9 8 3-1.8L15 8v3.2L12 13l-3-1.8V8Z"/><path d="M9.5 15.7h5"/></svg></span>Звания / специальности</h2>
       {% if settings.write_mode %}
       <a class="tool-button" data-guide-action href="/guides/ranks/new?return_to={{ guides_self|urlencode }}">＋ Добавить</a>
       {% else %}
@@ -76,10 +59,14 @@
       {% endif %}
     </div>
     <div class="guide-ranks-scroll">
+    <label class="guide-rank-search">
+      <span class="visually-hidden">Поиск по званиям и специальностям</span>
+      <input type="search" data-guide-rank-filter placeholder="Поиск по званиям и специальностям…" autocomplete="off">
+    </label>
     <ul class="guide-list" aria-label="Звания и специальности">
       {% for rank in ranks %}
-      <li>
-        <span class="guide-rank-name"><span class="guide-rank-icon" aria-hidden="true">⌃</span>{{ rank.name }}</span>
+      <li data-guide-rank-row data-guide-rank-name="{{ rank.name|lower }}">
+        <span class="guide-rank-name"><span class="guide-rank-icon" aria-hidden="true"></span>{{ rank.name }}</span>
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
@@ -98,7 +85,7 @@
   </div>
   <div class="panel tree guide-directory-panel guide-tree-panel" id="guide-tree" data-guide-tree>
     <div class="legacy-block-head">
-      <h2><span class="guide-section-icon" aria-hidden="true">♜</span>Дерево наград и знаков</h2>
+      <h2><span class="guide-section-icon guide-section-icon-tree" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3v18M12 7 7.5 11M12 7l4.5 4M12 12l-6 5M12 12l6 5"/><circle cx="12" cy="3" r="1.5"/><circle cx="7.5" cy="11" r="1.5"/><circle cx="16.5" cy="11" r="1.5"/><circle cx="6" cy="17" r="1.5"/><circle cx="18" cy="17" r="1.5"/></svg></span>Дерево наград и знаков</h2>
       {% if settings.write_mode %}
       <a class="tool-button" data-guide-action href="/guides/levels/0/new?return_to={{ guides_self|urlencode }}">＋ Добавить государство</a>
       {% else %}

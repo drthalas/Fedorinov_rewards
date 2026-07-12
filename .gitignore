@@ -8,6 +8,9 @@ __pycache__/
 *.jpg
 *.jpeg
 *.png
+!backend/app/static/assets/guides/left-rail.png
+!backend/app/static/assets/guides/top-right-emblem.png
+!backend/app/static/assets/guides/archive-header-bg.png
 *.pdf
 *.exe
 *.dll
