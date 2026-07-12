@@ -34,6 +34,14 @@ FORBIDDEN_PATTERNS = [
     "*.dll",
     "*.zip",
 ]
+ALLOWED_UI_ASSETS = {
+    ("backend", "app", "static", "assets", "cavaliers", "empty-hero.jpg"),
+    ("backend", "app", "static", "assets", "cavaliers", "left-rail.png"),
+    ("backend", "app", "static", "assets", "cavaliers", "top-right-emblem.png"),
+    ("backend", "app", "static", "assets", "guides", "archive-header-bg.png"),
+    ("backend", "app", "static", "assets", "guides", "left-rail.png"),
+    ("backend", "app", "static", "assets", "guides", "top-right-emblem.png"),
+}
 
 
 def _normalize_member(path: str) -> tuple[str, ...]:
@@ -50,6 +58,8 @@ def _is_forbidden(path: str) -> str | None:
     raw_parts = _normalize_member(path)
     parts = _strip_package_root(raw_parts)
     if not parts:
+        return None
+    if parts in ALLOWED_UI_ASSETS:
         return None
 
     name = parts[-1]

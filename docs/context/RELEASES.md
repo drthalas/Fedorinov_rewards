@@ -68,6 +68,32 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.0
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-12.
+
+Тип: major release.
+
+Состав:
+
+- Полный визуальный редизайн приложения в тёмном архивно-военном стиле.
+- Новый главный экран «Кавалеры» и полностью переработанный «Справочник».
+- Обновлённые карточки кавалеров и наград, формы и управление фотографиями.
+- Единый shell/header и обновлённые «Поиск», «Знаки», «Сводная таблица» и «О программе».
+- Исправления clipping, scroll, ссылок, подписей, dropdown/list UX и состояний дерева.
+
+Проверки:
+
+- Owner/manual QA: PASS.
+- Unit tests: 377 PASS.
+- Browser smoke и temp write-smoke: PASS.
+- Data baseline: person 108, rewards 351, mark 146, guide 18.
+- Media baseline: total 961, existing 950, missing 11.
+- Real DB/media SHA и fingerprint до/после релизной процедуры совпадают.
+- Public `latest.json` проверяется до Telegram notification.
+
 ## v0.1.14
 
 Статус: выпущено.

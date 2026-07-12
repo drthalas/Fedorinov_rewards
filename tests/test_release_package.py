@@ -5,7 +5,7 @@ from zipfile import ZipFile
 import json
 import unittest
 
-from scripts import build_release_package, publish_github_release
+from scripts import build_release_package, build_windows_preview_package, check_package_safety, publish_github_release
 from backend.app.version import APP_VERSION
 
 
@@ -13,6 +13,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleasePackageTests(unittest.TestCase):
+    def test_visual_assets_are_the_only_allowed_packaged_images(self) -> None:
+        for relative in build_windows_preview_package.ALLOWED_UI_ASSETS:
+            self.assertFalse(build_windows_preview_package._is_excluded(ROOT / relative))
+            packaged = Path("FedorinovRewards_WebPreview") / relative
+            self.assertIsNone(check_package_safety._is_forbidden(str(packaged)))
+
+        self.assertTrue(build_windows_preview_package._is_excluded(ROOT / "Source" / "77" / "photo.jpg"))
+        self.assertIsNotNone(
+            check_package_safety._is_forbidden("FedorinovRewards_WebPreview/Source/77/photo.jpg")
+        )
+
     def test_build_release_package_creates_versioned_zip_and_manifest(self) -> None:
         with TemporaryDirectory() as tmpdir:
             tmp = Path(tmpdir)

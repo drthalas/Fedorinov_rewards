@@ -115,6 +115,17 @@ APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false
 - Автоматический restart после update отложен.
 - Read-only/write-mode как пользовательские режимы позже нужно убрать из интерфейса.
 
+## v2.0.0 QA
+
+- Owner manual QA нового visual redesign на `main`: PASS.
+- Unit tests: 377 PASS.
+- Browser smoke: PASS на 1366×768, 1440×900 и 1920×1080.
+- Temp-only photo upload/replace/clear для persons 77 и 106: PASS.
+- Data baseline: person 108, rewards 351, mark 146, guide 18; levels 4/11/20/280/143.
+- Media baseline: total 961, existing 950, missing 11.
+- Две ранее существовавшие `person_media` записи person 50 ссылаются на существующего person и не изменялись.
+- Реальные DB, фотографии и документы не менялись.
+
 ## v0.1.14 QA
 
 - Owner manual QA: PASS.

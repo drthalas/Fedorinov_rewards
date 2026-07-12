@@ -41,6 +41,14 @@ EXCLUDED_PATTERNS = [
     "*.exe",
     "*.dll",
 ]
+ALLOWED_UI_ASSETS = {
+    Path("backend/app/static/assets/cavaliers/empty-hero.jpg"),
+    Path("backend/app/static/assets/cavaliers/left-rail.png"),
+    Path("backend/app/static/assets/cavaliers/top-right-emblem.png"),
+    Path("backend/app/static/assets/guides/archive-header-bg.png"),
+    Path("backend/app/static/assets/guides/left-rail.png"),
+    Path("backend/app/static/assets/guides/top-right-emblem.png"),
+}
 
 DIRECTORIES_TO_COPY = [
     "backend",
@@ -68,6 +76,8 @@ FILES_TO_COPY = [
 
 def _is_excluded(path: Path) -> bool:
     relative = path.relative_to(PROJECT_ROOT)
+    if relative in ALLOWED_UI_ASSETS:
+        return False
     if any(relative == excluded or relative.is_relative_to(excluded) for excluded in EXCLUDED_PATHS):
         return True
     if path.name in EXCLUDED_NAMES:
