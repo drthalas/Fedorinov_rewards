@@ -1,0 +1,17 @@
+@media (min-width: 1181px) {
+  /* Keep the archive shell fixed while long guide forms scroll within its content area. */
+  body.guide-form-theme .page {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  body.guide-form-theme .guide-form-page {
+    box-sizing: border-box;
+    height: auto;
+    min-height: 100%;
+    padding-bottom: 40px;
+    overflow: visible;
+  }
+}

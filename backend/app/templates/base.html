@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
     <link rel="stylesheet" href="{{ static_url('styles.css') }}">
+    {% block extra_head %}{% endblock %}
   </head>
   <body class="legacy-body {% block body_class %}{% endblock %}">
     {% include "_user_nav.html" %}

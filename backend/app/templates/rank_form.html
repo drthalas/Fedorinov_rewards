@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить звание/специальность{% else %}Изменить звание/специальность{% endif %}{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ static_url('guide_form_scroll.css') }}">{% endblock %}
 {% block body_class %}guide-theme guide-form-theme{% endblock %}
 {% block content %}
 <section class="guide-page guide-form-page">
