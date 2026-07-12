@@ -1,6 +1,6 @@
 {% if mode == "edit" and settings.write_mode and photo_controls %}
 {% set current_form_url = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
-<section class="photo-manage-section{% if photo_manage_compact %} photo-manage-section-compact{% endif %}" id="{{ photo_entity_type }}-photo-management">
+<section class="photo-manage-section{% if photo_manage_compact %} photo-manage-section-compact{% endif %}" id="{{ photo_entity_type }}-photo-management" tabindex="-1">
   <h2>Фотографии</h2>
   <p class="muted">Кнопка “+” добавляет или заменяет привязку фото. Кнопка “×” убирает привязку в базе; файл на диске не удаляется.</p>
   <div class="photo-manage-grid">

@@ -262,13 +262,7 @@
             </section>
           </div>
         {% else %}
-          <section class="legacy-cavalier-empty-state" data-cavalier-empty-state>
-            <div class="legacy-empty-state-copy">
-              <span class="legacy-empty-state-star" aria-hidden="true"></span>
-              <h1>Выберите кавалера из списка слева</h1>
-              <p>После выбора откроется карточка с полными данными,<br>награждениями и документами.</p>
-            </div>
-          </section>
+          <section class="legacy-cavalier-empty-state" data-cavalier-empty-state aria-label="Кавалеры"></section>
         {% endif %}
         </div>
         <section class="legacy-totals-panel legacy-totals-footer" aria-label="Итоги">
@@ -535,7 +529,7 @@
           {% for mark in marks %}
             <a class="legacy-list-row {% if selected_mark and mark.id == selected_mark.id %}selected-row{% endif %}" href="/legacy?tab=marks&mark_id={{ mark.id }}">
               <span>{{ mark.name|dash }}</span>
-              <small>№ {{ mark.number|dash }}</small>
+              {% if mark.number %}<small>№ {{ mark.number }}</small>{% endif %}
             </a>
           {% else %}
             <div class="legacy-empty">Нет знаков.</div>
@@ -547,7 +541,7 @@
           <div class="legacy-split-header">
             <div>
               <h1>{{ selected_mark.name|dash }}</h1>
-              <p class="secondary">№ {{ selected_mark.number|dash }}</p>
+              {% if selected_mark.number %}<p class="secondary">№ {{ selected_mark.number }}</p>{% endif %}
             </div>
             <a class="button" href="/marks/{{ selected_mark.id }}">Карточка</a>
           </div>
@@ -559,7 +553,7 @@
                 <dt>Категория</dt><dd>{{ selected_mark.category|dash }}</dd>
                 <dt>Подкатегория</dt><dd>{{ selected_mark.subcategory|dash }}</dd>
                 <dt>Наименование</dt><dd>{{ selected_mark.name|dash }}</dd>
-                <dt>Номер</dt><dd>{{ selected_mark.number|dash }}</dd>
+                {% if selected_mark.number %}<dt>Номер</dt><dd>{{ selected_mark.number }}</dd>{% endif %}
                 <dt>Наличие</dt><dd><span class="badge badge-{{ selected_mark.instock|bool_class }}">{{ selected_mark.instock|format_bool }}</span></dd>
                 <dt>Дата покупки</dt><dd>{{ selected_mark.date_purchase|format_date }}</dd>
                 <dt>Цена покупки</dt><dd>{{ selected_mark.price_purchase|format_money }}</dd>
@@ -593,7 +587,7 @@
     </div>
   {% elif tab == "summary" %}
     <section class="legacy-tab-panel legacy-archive-tab legacy-summary-tab">
-      <h1>Свод.таблица</h1>
+      <h1>Сводная таблица</h1>
       {% if summary %}
         <form class="summary-filter-form guide-cascade" method="get" action="/legacy">
           <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>

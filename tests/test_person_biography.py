@@ -122,8 +122,8 @@ class PersonBiographyTests(unittest.TestCase):
         mark_form = (ROOT / "backend" / "app" / "templates" / "mark_form.html").read_text(encoding="utf-8")
         guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text(encoding="utf-8")
 
-        self.assertIn("section=ranks", person_form)
-        self.assertIn("#ranks", person_form)
+        self.assertNotIn("section=ranks", person_form)
+        self.assertNotIn("Добавить звание", person_form)
         self.assertIn("section=tree", reward_form)
         self.assertIn("#guide-tree", reward_form)
         self.assertIn("Открыть справочник знаков", mark_form)

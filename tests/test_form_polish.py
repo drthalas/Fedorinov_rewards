@@ -247,12 +247,13 @@ class FormPolishTests(unittest.TestCase):
         create_heading = Environment(autoescape=True).from_string(heading.group(0)).render(mode="create", person={})
         self.assertEqual(create_heading, "<h1>Добавить награжденного</h1>")
 
-    def test_person_form_guide_links_preserve_return_to(self) -> None:
+    def test_person_form_omits_rank_guide_helpers(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_form.html").read_text(
             encoding="utf-8"
         )
-        self.assertIn("/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks", template)
-        self.assertIn("/guides/ranks/new?return_to={{ form_return_path|urlencode }}", template)
+        self.assertNotIn("/guides?section=ranks", template)
+        self.assertNotIn("/guides/ranks/new", template)
+        self.assertIn('select name="id_rank" data-styled-select required', template)
 
     def test_reward_form_preserves_cascading_guides_after_validation_error(self) -> None:
         request = FakeRequest(

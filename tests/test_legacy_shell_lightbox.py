@@ -223,8 +223,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
         self.assertIn("legacy-rewards-theme", legacy_base)
         self.assertIn("data-cavalier-empty-state", legacy_template)
-        self.assertIn("Выберите кавалера из списка слева", legacy_template)
-        self.assertIn("После выбора откроется карточка с полными данными", legacy_template)
+        self.assertNotIn("Выберите кавалера из списка слева", legacy_template)
+        self.assertNotIn("После выбора откроется карточка с полными данными", legacy_template)
+        self.assertNotIn("legacy-empty-state-copy", legacy_template)
         self.assertIn("legacy-person-list-title", legacy_template)
         self.assertIn("format_birth_year", legacy_template)
         self.assertIn("/static/assets/cavaliers/empty-hero.jpg", styles)

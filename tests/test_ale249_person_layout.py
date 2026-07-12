@@ -34,7 +34,8 @@ class Ale249PersonLayoutTests(unittest.TestCase):
     def test_add_person_hides_rank_guide_helpers_but_keeps_rank_field(self) -> None:
         template = self.read("backend/app/templates/person_form.html")
 
-        self.assertIn('{% if mode == "edit" %} · <a href="/guides?section=ranks', template)
+        self.assertNotIn("Открыть справочник", template)
+        self.assertNotIn("Добавить звание", template)
         self.assertIn('select name="id_rank"', template)
         self.assertIn("data-styled-select", template)
         self.assertIn("required", template)

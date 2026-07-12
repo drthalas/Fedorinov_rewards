@@ -6550,3 +6550,29 @@ body.legacy-rewards-theme::after {
 .cavalier-page-theme .person-detail-photo-section .person-detail-section-head > a:focus-visible {
   color: #f0ddba;
 }
+
+/* ALE-250: scoped polish for Summary and person edit actions. */
+.legacy-summary-tab > h1 {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.legacy-summary-tab > h1::after {
+  content: none;
+}
+
+.cavalier-page-theme .cavalier-form-card .styled-select-value {
+  margin: 0;
+  color: #d2cabd;
+  font-weight: 400;
+}
+
+.cavalier-page-theme .photo-manage-section:target {
+  scroll-margin-top: 88px;
+  border-color: #987547;
+  box-shadow: inset 0 0 28px rgb(152 117 71 / 10%), 0 0 0 2px rgb(180 134 73 / 18%), 0 10px 24px rgb(0 0 0 / 24%);
+}
+
+.cavalier-page-theme .photo-manage-section:target:focus {
+  outline: 0;
+}

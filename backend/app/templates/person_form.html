@@ -35,11 +35,10 @@
       <label>
         <span>Год рождения</span>
         <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" maxlength="4">
-        {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_birth_year }}</small>{% endif %}
       </label>
     </div>
     <label>
-      <span>Звание / специальность{% if mode == "edit" %} · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a> · <a href="/guides/ranks/new?return_to={{ form_return_path|urlencode }}">Добавить звание</a>{% endif %}</span>
+      <span>Звание / специальность</span>
       <select name="id_rank" data-styled-select required>
         <option value="">—</option>
         {% for rank in ranks %}
@@ -86,7 +85,7 @@
 <section class="form-section next-action-panel" aria-label="Следующие действия">
   <h2>Следующие действия</h2>
   <div class="actions">
-    <a class="button secondary-button" href="#person-photo-management">Добавить фото и документы</a>
+    <a class="button secondary-button" href="{{ form_return_path }}#person-photo-management">Добавить фото и документы</a>
     <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ form_return_path|urlencode }}">Добавить награду</a>
   </div>
 </section>
