@@ -8,7 +8,25 @@
     const tree = document.querySelector("[data-guide-tree]");
     if (!stateRoot || !tree || window.location.pathname !== guidesPath) return;
 
+    const rankFilter = stateRoot.querySelector("[data-guide-rank-filter]");
+    const rankRows = Array.from(stateRoot.querySelectorAll("[data-guide-rank-row]"));
+    if (rankFilter) {
+      rankFilter.addEventListener("input", () => {
+        const query = rankFilter.value.trim().toLocaleLowerCase("ru");
+        rankRows.forEach((row) => {
+          row.hidden = Boolean(query) && !String(row.dataset.guideRankName || "").includes(query);
+        });
+      });
+    }
+
     const detailsNodes = Array.from(tree.querySelectorAll("details[data-guide-key]"));
+
+    function setActiveDetails(details) {
+      detailsNodes.forEach((candidate) => {
+        if (candidate === details) candidate.setAttribute("data-guide-active", "");
+        else candidate.removeAttribute("data-guide-active");
+      });
+    }
 
     function stateUrl(focusOverride) {
       const url = new URL(window.location.href);
@@ -30,6 +48,8 @@
 
     detailsNodes.forEach((details) => {
       details.addEventListener("toggle", () => {
+        if (details.open) setActiveDetails(details);
+        else if (details.hasAttribute("data-guide-active")) setActiveDetails(null);
         window.history.replaceState(null, "", stateUrl(""));
       });
     });
@@ -51,6 +71,7 @@
 
     const focused = tree.querySelector("[data-guide-focus-target]");
     if (focused) {
+      setActiveDetails(focused.querySelector(":scope > details[data-guide-key]"));
       window.requestAnimationFrame(() => focused.scrollIntoView({ block: "center" }));
     }
   }

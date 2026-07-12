@@ -11,6 +11,7 @@
     const image = form.querySelector("[data-guide-image-preview-image]");
     const placeholder = form.querySelector("[data-guide-image-preview-placeholder]");
     const error = form.querySelector("[data-guide-image-preview-error]");
+    const uploadName = form.querySelector("[data-guide-upload-name]");
     if (!input || !preview || !image || !placeholder || !error) return;
 
     const currentSrc = preview.dataset.currentSrc || "";
@@ -51,16 +52,19 @@
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
       if (!file) {
+        if (uploadName) uploadName.textContent = "Выберите файл или перетащите его сюда";
         resetPreview();
         return;
       }
 
       const extension = file.name.includes(".") ? file.name.split(".").pop().toLowerCase() : "";
       if (!allowedExtensions.has(extension) || (file.type && !allowedTypes.has(file.type))) {
+        if (uploadName) uploadName.textContent = "Выберите поддерживаемое изображение";
         showError("Выберите изображение JPG, JPEG, PNG или WebP.");
         return;
       }
       if (file.size > maxBytes) {
+        if (uploadName) uploadName.textContent = "Файл превышает допустимый размер";
         showError("Размер изображения не должен превышать 5 MB.");
         return;
       }
@@ -69,6 +73,7 @@
       input.setCustomValidity("");
       error.textContent = "";
       error.hidden = true;
+      if (uploadName) uploadName.textContent = file.name;
       objectUrl = URL.createObjectURL(file);
       image.onload = () => {
         image.hidden = false;

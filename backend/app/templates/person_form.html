@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
+<section class="cavalier-standalone-page cavalier-form-page cavalier-person-form-page">
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}</h1>
 <p class="local-back-nav compact-actions">
   <a class="button secondary-button" data-escape-back href="{{ return_to or ('/legacy?tab=rewards&person_id=' ~ person.id if mode == 'edit' else '/legacy?tab=rewards') }}">← Назад</a>
@@ -14,14 +16,12 @@
 <section class="notice notice-success">{{ created_message }}</section>
 {% endif %}
 
-{% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
-
 {% if mode == "edit" and settings.write_mode %}
 <div class="person-edit-workspace">
   <div class="person-edit-main">
 {% endif %}
 
-<form class="edit-form legacy-edit-form person-edit-form compact-person-form" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
@@ -33,12 +33,11 @@
       <label>
         <span>Год рождения</span>
         <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" maxlength="4">
-        {% if person.birthday %}<small class="secondary">Текущее значение: {{ person.birthday|format_birth_year }}</small>{% endif %}
       </label>
     </div>
     <label>
-      <span>Звание / специальность · <a href="/guides?section=ranks&return_to={{ form_return_path|urlencode }}#ranks">Открыть справочник</a> · <a href="/guides/ranks/new?return_to={{ form_return_path|urlencode }}">Добавить звание</a></span>
-      <select name="id_rank" required>
+      <span>Звание / специальность</span>
+      <select name="id_rank" data-styled-select required>
         <option value="">—</option>
         {% for rank in ranks %}
         <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>
@@ -80,15 +79,6 @@
     <a data-escape-back href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
   </div>
 </form>
-{% if mode == "edit" and settings.write_mode %}
-<section class="form-section next-action-panel" aria-label="Следующие действия">
-  <h2>Следующие действия</h2>
-  <div class="actions">
-    <a class="button secondary-button" href="#person-photo-management">Добавить фото и документы</a>
-    <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ form_return_path|urlencode }}">Добавить награду</a>
-  </div>
-</section>
-{% endif %}
 
 {% if mode == "edit" and settings.write_mode %}
   </div>
@@ -104,4 +94,5 @@
   </div>
 </div>
 {% endif %}
+</section>
 {% endblock %}

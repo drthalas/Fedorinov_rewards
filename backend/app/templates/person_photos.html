@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Фото награжденного #{{ person.id }}{% endblock %}
+{% block title %}Фото: {{ person.fio }}{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-photos-theme{% endblock %}
 {% block content %}
+<section class="cavalier-standalone-page cavalier-photos-page">
 <h1>Фото: {{ person.fio }}</h1>
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">← Назад</a></p>
 {% if current_photo %}
@@ -32,4 +34,5 @@
   </div>
   {% endfor %}
 </div>
+</section>
 {% endblock %}

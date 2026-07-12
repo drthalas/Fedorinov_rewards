@@ -146,8 +146,8 @@ class PersonDetailReturnTests(unittest.TestCase):
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "person_detail.html").read_text(encoding="utf-8")
 
         self.assertIn("person-summary-strip", template)
-        self.assertIn("<dt>ID</dt>", template)
-        self.assertIn("{{ person.id }}", template)
+        self.assertNotIn("<dt>ID</dt>", template)
+        self.assertNotIn("Награжденный #", template)
         self.assertIn("Краткая биография", template)
         self.assertNotIn("person-card-panel", template)
         self.assertNotIn("<h2>Карточка</h2>", template)

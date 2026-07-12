@@ -6,7 +6,7 @@
     <title>{% block title %}Fedorinov Rewards{% endblock %}</title>
     <link rel="stylesheet" href="{{ static_url('styles.css') }}">
   </head>
-  <body class="legacy-body">
+  <body class="legacy-body legacy-rewards-theme legacy-{{ tab|default('rewards', true) }}-theme">
     {% include "_user_nav.html" %}
     <main class="legacy-shell">
       {% block content %}{% endblock %}
@@ -18,6 +18,7 @@
     <script src="{{ static_url('save_as.js') }}" defer></script>
     <script src="{{ static_url('clipboard_paste.js') }}" defer></script>
     <script src="{{ static_url('confirm_submit.js') }}" defer></script>
+    <script src="{{ static_url('custom_select.js') }}" defer></script>
     <script src="{{ static_url('escape_back.js') }}" defer></script>
     <script src="{{ static_url('legacy_rewards.js') }}" defer></script>
     <script src="{{ static_url('update_progress.js') }}" defer></script>

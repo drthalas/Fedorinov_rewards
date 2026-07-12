@@ -4,6 +4,7 @@
   const TYPEAHEAD_RESET_MS = 3200;
   const TYPEAHEAD_NAVIGATION_DELAY_MS = 2600;
   const CLICK_NAVIGATION_DELAY_MS = 160;
+  const KEYBOARD_NAVIGATION_DELAY_MS = 320;
   const LOADING_TEXT = "Загрузка карточки кавалера…";
   const ERROR_TEXT = "Не удалось загрузить карточку кавалера. Попробуйте выбрать кавалера ещё раз.";
 
@@ -36,7 +37,7 @@
   const showLoadingState = () => showWorkspaceState("legacy-loading-state", LOADING_TEXT, "status");
   const showErrorState = () => showWorkspaceState("legacy-error-state", ERROR_TEXT, "alert");
 
-  const replaceRewardsLayout = (html, focusList) => {
+  const replaceRewardsLayout = (html, focusList, listScrollTop) => {
     const parser = new DOMParser();
     const nextDocument = parser.parseFromString(html, "text/html");
     const nextLayout = nextDocument.querySelector("[data-legacy-rewards-layout]");
@@ -46,9 +47,13 @@
     }
     currentLayout.replaceWith(nextLayout);
     document.dispatchEvent(new CustomEvent("legacy:content-updated", { detail: { root: nextLayout } }));
+    const nextList = nextLayout.querySelector("[data-person-list]");
+    if (nextList && Number.isFinite(listScrollTop)) {
+      nextList.scrollTop = Math.max(0, listScrollTop);
+      nextList.dataset.scrollRestored = "true";
+    }
     initLegacyRewards(nextLayout);
     if (focusList) {
-      const nextList = nextLayout.querySelector("[data-person-list]");
       if (nextList) {
         nextList.focus({ preventScroll: true });
       }
@@ -70,6 +75,10 @@
     }
     const controller = new AbortController();
     activeFetchController = controller;
+    const currentList = document.querySelector("[data-person-list]");
+    const listScrollTop = Number.isFinite(settings.listScrollTop)
+      ? settings.listScrollTop
+      : currentList ? currentList.scrollTop : 0;
     showLoadingState();
 
     window.fetch(url, {
@@ -81,7 +90,7 @@
       }
       return response.text();
     }).then((html) => {
-      replaceRewardsLayout(html, Boolean(settings.focusList));
+      replaceRewardsLayout(html, Boolean(settings.focusList), listScrollTop);
       if (settings.updateHistory !== false) {
         window.history.pushState({ legacyRewardsUrl: url }, "", url);
       }
@@ -108,10 +117,11 @@
     let typeaheadBuffer = "";
     let typeaheadTimer = null;
     let typeaheadNavigateTimer = null;
+    let keyboardNavigateTimer = null;
 
     const visiblePersonRows = () => personRows.filter((row) => !row.hidden);
 
-    const scrollRowIntoList = (row) => {
+    const ensureRowVisible = (row) => {
       if (!row || !personList) {
         return;
       }
@@ -119,15 +129,13 @@
       const containerRect = personList.getBoundingClientRect();
       const rowRect = row.getBoundingClientRect();
       const margin = 8;
-      const fullyVisible = rowRect.top >= containerRect.top + margin
-        && rowRect.bottom <= containerRect.bottom - margin;
+      const visibleTop = containerRect.top + margin;
+      const visibleBottom = containerRect.bottom - margin;
 
-      if (!fullyVisible) {
-        const targetTop = personList.scrollTop
-          + rowRect.top
-          - containerRect.top
-          - ((personList.clientHeight - row.offsetHeight) / 2);
-        personList.scrollTop = Math.max(0, targetTop);
+      if (rowRect.top < visibleTop) {
+        personList.scrollTop -= visibleTop - rowRect.top;
+      } else if (rowRect.bottom > visibleBottom) {
+        personList.scrollTop += rowRect.bottom - visibleBottom;
       }
     };
 
@@ -152,7 +160,7 @@
       }
       if (query && firstMatch) {
         firstMatch.classList.add("quick-search-match-row");
-        scrollRowIntoList(firstMatch);
+        ensureRowVisible(firstMatch);
       }
       return firstMatch;
     };
@@ -164,7 +172,7 @@
         personRow.classList.toggle("selected-row", personRow === row);
         personRow.setAttribute("aria-selected", personRow === row ? "true" : "false");
       });
-      scrollRowIntoList(row);
+      ensureRowVisible(row);
     };
 
     const navigateToPersonRow = (row, options) => {
@@ -173,6 +181,23 @@
       }
       markPendingSelection(row);
       navigateToUrl(row.dataset.selectUrl, options);
+    };
+
+    const scheduleKeyboardNavigation = (row) => {
+      if (!row || !row.dataset.selectUrl) {
+        return;
+      }
+      markPendingSelection(row);
+      if (keyboardNavigateTimer) {
+        window.clearTimeout(keyboardNavigateTimer);
+      }
+      keyboardNavigateTimer = window.setTimeout(() => {
+        keyboardNavigateTimer = null;
+        navigateToUrl(row.dataset.selectUrl, {
+          focusList: true,
+          listScrollTop: personList ? personList.scrollTop : 0,
+        });
+      }, KEYBOARD_NAVIGATION_DELAY_MS);
     };
 
     const clearTypeahead = () => {
@@ -184,6 +209,10 @@
       if (typeaheadNavigateTimer) {
         window.clearTimeout(typeaheadNavigateTimer);
         typeaheadNavigateTimer = null;
+      }
+      if (keyboardNavigateTimer) {
+        window.clearTimeout(keyboardNavigateTimer);
+        keyboardNavigateTimer = null;
       }
     };
 
@@ -241,7 +270,7 @@
       const currentIndex = rows.indexOf(current);
       const startIndex = currentIndex >= 0 ? currentIndex : (offset < 0 ? rows.length : -1);
       const nextIndex = Math.min(rows.length - 1, Math.max(0, startIndex + offset));
-      navigateToPersonRow(rows[nextIndex], { focusList: true });
+      scheduleKeyboardNavigation(rows[nextIndex]);
     };
 
     const navigateToEdge = (edge) => {
@@ -250,7 +279,7 @@
         return;
       }
       clearTypeahead();
-      navigateToPersonRow(edge === "end" ? rows[rows.length - 1] : rows[0], { focusList: true });
+      scheduleKeyboardNavigation(edge === "end" ? rows[rows.length - 1] : rows[0]);
     };
 
     const handleTypeahead = (event) => {
@@ -302,6 +331,16 @@
       } else if (event.key === "End") {
         event.preventDefault();
         navigateToEdge("end");
+      } else if (event.key === "Enter") {
+        const current = currentPersonRow();
+        if (current && current.dataset.selectUrl) {
+          event.preventDefault();
+          if (keyboardNavigateTimer) {
+            window.clearTimeout(keyboardNavigateTimer);
+            keyboardNavigateTimer = null;
+          }
+          navigateToPersonRow(current, { focusList: true, listScrollTop: personList ? personList.scrollTop : 0 });
+        }
       } else if (handleTypeahead(event)) {
         event.preventDefault();
       }
@@ -312,34 +351,14 @@
         return;
       }
 
+      if (personList.dataset.scrollRestored === "true") {
+        delete personList.dataset.scrollRestored;
+        ensureRowVisible(selectedPersonRow);
+        return;
+      }
+
       window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => {
-          const containerRect = personList.getBoundingClientRect();
-          const rowRect = selectedPersonRow.getBoundingClientRect();
-          const margin = 8;
-          const fullyVisible = rowRect.top >= containerRect.top + margin
-            && rowRect.bottom <= containerRect.bottom - margin;
-
-          if (!fullyVisible) {
-            const targetTop = personList.scrollTop
-              + rowRect.top
-              - containerRect.top
-              - ((personList.clientHeight - selectedPersonRow.offsetHeight) / 2);
-            personList.scrollTop = Math.max(0, targetTop);
-          }
-
-          window.requestAnimationFrame(() => {
-            const adjustedContainerRect = personList.getBoundingClientRect();
-            const adjustedRowRect = selectedPersonRow.getBoundingClientRect();
-            if (adjustedRowRect.top < adjustedContainerRect.top + margin) {
-              personList.scrollTop -= (adjustedContainerRect.top + margin) - adjustedRowRect.top;
-            } else if (adjustedRowRect.bottom > adjustedContainerRect.bottom - margin) {
-              personList.scrollTop += adjustedRowRect.bottom - (adjustedContainerRect.bottom - margin);
-            }
-          });
-
-          // Do not auto-focus the list after page load: the visible search field is the primary quick-search path.
-        });
+        ensureRowVisible(selectedPersonRow);
       });
     };
 
@@ -367,11 +386,26 @@
       row.dataset.legacyRewardsBound = "true";
       row.addEventListener("click", (event) => {
         event.preventDefault();
+        if (keyboardNavigateTimer) {
+          window.clearTimeout(keyboardNavigateTimer);
+          keyboardNavigateTimer = null;
+        }
         if (clickTimer) {
           window.clearTimeout(clickTimer);
         }
         clickTimer = window.setTimeout(() => {
-          navigateToPersonRow(row, { focusList: true });
+          clickTimer = null;
+          if (row.getAttribute("aria-selected") === "true" && row.dataset.deselectUrl) {
+            navigateToUrl(row.dataset.deselectUrl, {
+              focusList: true,
+              listScrollTop: personList ? personList.scrollTop : 0,
+            });
+            return;
+          }
+          navigateToPersonRow(row, {
+            focusList: true,
+            listScrollTop: personList ? personList.scrollTop : 0,
+          });
         }, CLICK_NAVIGATION_DELAY_MS);
       });
 

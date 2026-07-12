@@ -556,7 +556,7 @@ def legacy_index(
     context["marks_total"] = marks_total
 
     person_ids = {int(row["id"]) for row in persons}
-    selected_person_id = person_id if person_id in person_ids else (int(persons[0]["id"]) if persons else None)
+    selected_person_id = person_id if person_id in person_ids else None
     if selected_person_id is not None:
         selected_person = get_person(settings.rewards_db_path, selected_person_id)
         context["selected_person"] = selected_person

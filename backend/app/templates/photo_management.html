@@ -1,14 +1,15 @@
 {% if mode == "edit" and settings.write_mode and photo_controls %}
 {% set current_form_url = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
+{% set photo_return_url = current_form_url ~ '#' ~ photo_entity_type ~ '-photo-management' %}
 <section class="photo-manage-section{% if photo_manage_compact %} photo-manage-section-compact{% endif %}" id="{{ photo_entity_type }}-photo-management">
   <h2>Фотографии</h2>
-  <p class="muted">Кнопка “+” добавляет или заменяет привязку фото. Кнопка “×” убирает привязку в базе; файл на диске не удаляется.</p>
   <div class="photo-manage-grid">
     {% for photo in photo_controls %}
-    <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+    {% set file_input_id = 'photo-file-' ~ photo_entity_type ~ '-' ~ photo_entity_id ~ '-' ~ photo.field %}
+    <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}" data-photo-field="{{ photo.field }}">
       <div class="photo-frame">
       {% if has_media_path(photo.path) %}
-      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, current_form_url) }}">
+      <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, photo_return_url) }}">
         <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
       {% else %}
@@ -21,19 +22,32 @@
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
-          <input type="hidden" name="return_url" value="{{ current_form_url }}">
-          <label class="mini-button" title="Добавить или заменить">
-            +
-            <input class="sr-only-file" name="file" type="file" accept=".jpg,.jpeg,.png,.webp,image/*" onchange="this.form.submit()">
-          </label>
+          <input type="hidden" name="return_url" value="{{ photo_return_url }}">
+          <label
+            class="mini-button photo-icon-button"
+            for="{{ file_input_id }}"
+            title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
+            aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
+          >+</label>
+          <input
+            id="{{ file_input_id }}"
+            class="sr-only-file"
+            name="file"
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp,image/*"
+            onchange="if (this.files.length) this.form.submit()"
+          >
         </form>
-        <form method="post" action="/photos/clear" onsubmit="return confirm('Убрать привязку фото? Файл на диске не будет удалён.');">
+        {% if has_media_path(photo.path) %}
+        <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота? Файл на диске не будет удалён.');">
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
-          <input type="hidden" name="return_url" value="{{ current_form_url }}">
-          <button class="mini-button danger" type="submit" title="Убрать привязку">×</button>
+          <input type="hidden" name="return_url" value="{{ photo_return_url }}">
+          <button class="mini-button danger photo-icon-button" type="submit" title="Удалить фотографию" aria-label="Удалить фотографию: {{ photo.label }}">×</button>
         </form>
+        {% endif %}
+        {% if photo_entity_type != 'person' %}
         <button
           class="mini-button clipboard-paste-button"
           type="button"
@@ -41,10 +55,11 @@
           data-entity-type="{{ photo_entity_type }}"
           data-entity-id="{{ photo_entity_id }}"
           data-photo-field="{{ photo.field }}"
-          data-return-url="{{ current_form_url }}"
+          data-return-url="{{ photo_return_url }}"
           title="Вставить изображение из буфера обмена"
         >Вставить из буфера</button>
         <span class="clipboard-paste-status" aria-live="polite"></span>
+        {% endif %}
       </div>
     </div>
     {% endfor %}

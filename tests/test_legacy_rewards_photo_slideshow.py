@@ -181,6 +181,18 @@ class LegacyRewardsPhotoSlideshowTests(unittest.TestCase):
         self.assertNotIn(str(self.root), rendered)
         self.assertIn("/persons/77/photos?return_to=/legacy%3Ftab%3Drewards%26person_id%3D77", rendered)
 
+    def test_legacy_rewards_initial_state_does_not_auto_select_first_person(self) -> None:
+        with patch.object(legacy_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
+            context = legacy_router.legacy_index(FakeRequest(), tab="rewards")
+        rendered = templates.env.get_template("legacy.html").render(request=FakeRequest(), **context)
+
+        self.assertEqual(len(context["persons"]), 1)
+        self.assertIsNone(context["selected_person"])
+        self.assertEqual(context["person_rewards"], [])
+        self.assertIn("data-cavalier-empty-state", rendered)
+        self.assertIn("Вукалович Семен Петрович", rendered)
+        self.assertNotIn("data-selected-person-row", rendered)
+
     def test_legacy_rewards_photo_block_shows_key_document_slots(self) -> None:
         with patch.object(legacy_router.templates, "TemplateResponse", side_effect=lambda request, name, context: context):
             context = legacy_router.legacy_index(FakeRequest(), tab="rewards", person_id=77)

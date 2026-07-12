@@ -114,7 +114,7 @@ class PersonBiographyTests(unittest.TestCase):
         self.assertIn("Ссылка / дополнительное поле", mark_form)
         self.assertIn("/photos/upload", photo_management)
         self.assertIn("/photos/clear", photo_management)
-        self.assertIn("Вставить из буфера", photo_management)
+        self.assertIn("Вставить изображение из буфера", photo_management)
 
     def test_form_guide_links_target_contextual_blocks(self) -> None:
         person_form = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")
@@ -122,8 +122,8 @@ class PersonBiographyTests(unittest.TestCase):
         mark_form = (ROOT / "backend" / "app" / "templates" / "mark_form.html").read_text(encoding="utf-8")
         guides = (ROOT / "backend" / "app" / "templates" / "guides.html").read_text(encoding="utf-8")
 
-        self.assertIn("section=ranks", person_form)
-        self.assertIn("#ranks", person_form)
+        self.assertNotIn("section=ranks", person_form)
+        self.assertNotIn("Добавить звание", person_form)
         self.assertIn("section=tree", reward_form)
         self.assertIn("#guide-tree", reward_form)
         self.assertIn("Открыть справочник знаков", mark_form)

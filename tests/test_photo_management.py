@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 import os
 import sqlite3
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 from backend.app.config import Settings
@@ -13,7 +14,7 @@ from backend.app.services.person_files import (
     person_folder_image_items,
     safe_person_folder,
 )
-from backend.app.services.photos import PhotoValidationError, clear_photo, save_photo
+from backend.app.services.photos import PhotoValidationError, clear_photo, photo_items, save_photo
 from backend.app.services.write_guard import WriteBlockedError
 
 
@@ -109,6 +110,30 @@ class PhotoManagementTests(unittest.TestCase):
         target = self.root / path
         self.assertTrue(target.exists())
         self.assertEqual(target.read_bytes(), b"jpeg-bytes")
+
+    def test_person_fixed_slot_upload_replace_and_clear_do_not_change_neighbor(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("update person set main_foto = ? where id = 1", ("Source/1/neighbor.jpg",))
+
+        with patch("backend.app.services.photos._timestamp", side_effect=["20260712_120000", "20260712_120001"]):
+            first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", b"first-image")
+            replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.png", b"second-image")
+
+        self.assertNotEqual(first, replacement)
+        self.assertEqual(self.fetch_value("person", 1, "person_foto"), replacement)
+        self.assertEqual(self.fetch_value("person", 1, "main_foto"), "Source/1/neighbor.jpg")
+        self.assertTrue((self.root / first).exists())
+        self.assertEqual((self.root / replacement).read_bytes(), b"second-image")
+
+        row = {"person_foto": replacement, "main_foto": "Source/1/neighbor.jpg"}
+        controls = photo_items("person", row)
+        self.assertEqual(controls[0]["label"], "Фото кавалера")
+        self.assertEqual(controls[1]["label"], "Главное фото")
+
+        clear_photo(self.settings(), "person", 1, "person_foto")
+        self.assertIsNone(self.fetch_value("person", 1, "person_foto"))
+        self.assertEqual(self.fetch_value("person", 1, "main_foto"), "Source/1/neighbor.jpg")
+        self.assertTrue((self.root / replacement).exists())
 
     def test_reward_photo_upload_uses_person_reward_folder(self) -> None:
         path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", b"png-bytes")
