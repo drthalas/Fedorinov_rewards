@@ -13,7 +13,15 @@ from backend.app.services.person_files import (
     person_folder_image_items,
     safe_person_folder,
 )
-from backend.app.services.photos import PhotoValidationError, clear_photo, save_photo
+from backend.app.services.photos import (
+    PhotoValidationError,
+    clear_photo,
+    create_person_media,
+    delete_person_media,
+    person_photo_controls,
+    save_photo,
+    update_person_media,
+)
 from backend.app.services.write_guard import WriteBlockedError
 
 
@@ -110,6 +118,65 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertTrue(target.exists())
         self.assertEqual(target.read_bytes(), b"jpeg-bytes")
 
+    def test_person_media_crud_uses_temp_database_and_media(self) -> None:
+        person = {"id": 1, "person_foto": None, "main_foto": None}
+        controls_before = person_photo_controls(self.db_path, person)
+        self.assertEqual(len(controls_before), 7)
+        self.assertFalse(any(item["is_dynamic"] for item in controls_before))
+
+        media_id = create_person_media(self.settings(), 1, "Архивная справка", "Первое описание")
+        controls_created = person_photo_controls(self.db_path, person)
+        dynamic = next(item for item in controls_created if item["is_dynamic"])
+        self.assertEqual(dynamic["id"], media_id)
+        self.assertEqual(dynamic["label"], "Архивная справка")
+        self.assertEqual(dynamic["description"], "Первое описание")
+        self.assertIsNone(dynamic["path"])
+
+        path = save_photo(self.settings(), "person_media", media_id, "file_path", "scan.png", b"first-image")
+        self.assertTrue(path.startswith("Source/1/Materials/Material"))
+        self.assertTrue((self.root / path).exists())
+
+        update_person_media(
+            self.settings(),
+            1,
+            "Архивная справка — обновлено",
+            "Описание сохранено",
+            media_id=media_id,
+        )
+        replacement = save_photo(
+            self.settings(), "person_media", media_id, "file_path", "replacement.webp", b"second-image"
+        )
+        updated = next(item for item in person_photo_controls(self.db_path, person) if item["is_dynamic"])
+        self.assertEqual(updated["label"], "Архивная справка — обновлено")
+        self.assertEqual(updated["description"], "Описание сохранено")
+        self.assertEqual(updated["path"], replacement)
+        self.assertEqual((self.root / replacement).read_bytes(), b"second-image")
+
+        clear_photo(self.settings(), "person_media", media_id, "file_path")
+        cleared = next(item for item in person_photo_controls(self.db_path, person) if item["is_dynamic"])
+        self.assertIsNone(cleared["path"])
+        self.assertEqual(cleared["description"], "Описание сохранено")
+        self.assertTrue((self.root / replacement).exists())
+
+        delete_person_media(self.settings(), 1, media_id)
+        self.assertFalse(any(item["is_dynamic"] for item in person_photo_controls(self.db_path, person)))
+        self.assertTrue((self.root / replacement).exists())
+
+    def test_fixed_person_photo_metadata_can_be_renamed_without_changing_path(self) -> None:
+        person = {"id": 1, "person_foto": "Source/1/existing.jpg"}
+        update_person_media(
+            self.settings(),
+            1,
+            "Портрет из архива",
+            "Подпись владельца",
+            photo_field="person_foto",
+        )
+        control = next(item for item in person_photo_controls(self.db_path, person) if item["field"] == "person_foto")
+        self.assertFalse(control["is_dynamic"])
+        self.assertEqual(control["label"], "Портрет из архива")
+        self.assertEqual(control["description"], "Подпись владельца")
+        self.assertEqual(control["path"], "Source/1/existing.jpg")
+
     def test_reward_photo_upload_uses_person_reward_folder(self) -> None:
         path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", b"png-bytes")
         self.assertTrue(path.startswith("Source/1/10/FotoFront_"))
@@ -194,6 +261,9 @@ class PhotoManagementTests(unittest.TestCase):
         (folder / "person.jpg").write_bytes(b"known")
         (folder / "extra.jpg").write_bytes(b"extra")
         (folder / "scan.png").write_bytes(b"scan")
+        materials = folder / "Materials"
+        materials.mkdir()
+        (materials / "managed.jpg").write_bytes(b"managed")
         (folder / "document.pdf").write_bytes(b"pdf")
         (folder / "program.exe").write_bytes(b"exe")
         (folder / ".hidden.jpg").write_bytes(b"hidden")
@@ -203,6 +273,7 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertEqual([item["path"] for item in items], ["Source/1/extra.jpg", "Source/1/scan.png"])
         self.assertEqual([item["label"] for item in items], ["Дополнительное фото: extra.jpg", "Дополнительное фото: scan.png"])
         self.assertNotIn(str(folder), str(items))
+        self.assertNotIn("managed.jpg", str(items))
 
 
 if __name__ == "__main__":

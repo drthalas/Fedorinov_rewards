@@ -6,7 +6,15 @@ from starlette.datastructures import UploadFile
 
 from ..config import get_settings
 from ..services.navigation import safe_return_to
-from ..services.photos import MAX_PHOTO_BYTES, PhotoValidationError, clear_photo, save_photo
+from ..services.photos import (
+    MAX_PHOTO_BYTES,
+    PhotoValidationError,
+    clear_photo,
+    create_person_media,
+    delete_person_media,
+    save_photo,
+    update_person_media,
+)
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -88,4 +96,64 @@ async def photo_clear(request: Request):
     except PhotoValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    return RedirectResponse(return_url, status_code=303)
+
+
+def _person_media_return_url(person_id: int, value: object) -> str:
+    return safe_return_to(value, f"/persons/{person_id}/edit")
+
+
+@router.post("/persons/{person_id}/media/create")
+async def person_media_create(request: Request, person_id: int):
+    settings = get_settings()
+    form = await _read_urlencoded(request)
+    return_url = _person_media_return_url(person_id, form.get("return_url"))
+    try:
+        create_person_media(settings, person_id, form.get("title"), form.get("description"))
+    except WriteBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PhotoValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RedirectResponse(return_url, status_code=303)
+
+
+@router.post("/persons/{person_id}/media/update")
+async def person_media_update(request: Request, person_id: int):
+    settings = get_settings()
+    form = await _read_urlencoded(request)
+    return_url = _person_media_return_url(person_id, form.get("return_url"))
+    raw_media_id = str(form.get("media_id") or "").strip()
+    try:
+        media_id = int(raw_media_id) if raw_media_id else None
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid media_id") from exc
+    try:
+        update_person_media(
+            settings,
+            person_id,
+            form.get("title"),
+            form.get("description"),
+            media_id=media_id,
+            photo_field=str(form.get("photo_field") or ""),
+        )
+    except WriteBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PhotoValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RedirectResponse(return_url, status_code=303)
+
+
+@router.post("/persons/{person_id}/media/{media_id}/delete")
+async def person_media_delete(request: Request, person_id: int, media_id: int):
+    settings = get_settings()
+    form = await _read_urlencoded(request)
+    return_url = _person_media_return_url(person_id, form.get("return_url"))
+    if str(form.get("confirm") or "").lower() != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
+    try:
+        delete_person_media(settings, person_id, media_id)
+    except WriteBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PhotoValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return RedirectResponse(return_url, status_code=303)

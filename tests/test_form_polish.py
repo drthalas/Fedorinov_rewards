@@ -201,7 +201,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertEqual(context["created_message"], "Кавалер создан. Теперь можно добавить фотографии и документы.")
         self.assertEqual(context["return_to"], "/legacy?tab=rewards")
 
-    def test_person_edit_contains_photo_controls_and_next_actions(self) -> None:
+    def test_person_edit_contains_inline_photo_controls_without_next_actions(self) -> None:
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
             response = persons_router.person_edit(object(), 1, return_to="/persons")
         context = response["context"]
@@ -218,8 +218,9 @@ class FormPolishTests(unittest.TestCase):
         photo_template = (
             Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "photo_management.html"
         ).read_text(encoding="utf-8")
-        self.assertIn("Добавить фото и документы", template)
-        self.assertIn("Добавить награду", template)
+        self.assertNotIn("Следующие действия", template)
+        self.assertNotIn("Добавить фото и документы", template)
+        self.assertNotIn("Добавить награду", template)
         self.assertIn("Год рождения", template)
         self.assertIn("format_birth_year_input", template)
         self.assertIn('placeholder="ГГГГ"', template)
@@ -228,7 +229,9 @@ class FormPolishTests(unittest.TestCase):
         self.assertNotIn("ДД.ММ.ГГГГ", template)
         self.assertNotIn("Вернуться к карточке", template)
         self.assertIn("id=\"{{ photo_entity_type }}-photo-management\"", photo_template)
-        self.assertIn("Вставить из буфера", photo_template)
+        self.assertIn("Вставить изображение из буфера", photo_template)
+        self.assertIn("Добавить фото или документ", photo_template)
+        self.assertIn("Изменить описание", photo_template)
         self.assertIn("photo-upload-form", photo_template)
 
     def test_person_edit_heading_omits_technical_id(self) -> None:

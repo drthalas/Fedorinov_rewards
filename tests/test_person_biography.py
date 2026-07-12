@@ -114,7 +114,7 @@ class PersonBiographyTests(unittest.TestCase):
         self.assertIn("Ссылка / дополнительное поле", mark_form)
         self.assertIn("/photos/upload", photo_management)
         self.assertIn("/photos/clear", photo_management)
-        self.assertIn("Вставить из буфера", photo_management)
+        self.assertIn("Вставить изображение из буфера", photo_management)
 
     def test_form_guide_links_target_contextual_blocks(self) -> None:
         person_form = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")

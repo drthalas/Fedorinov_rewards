@@ -6576,3 +6576,154 @@ body.legacy-rewards-theme::after {
 .cavalier-page-theme .photo-manage-section:target:focus {
   outline: 0;
 }
+
+/* ALE-250 corrective pass: inline person media editor. */
+.cavalier-page-theme .person-edit-photos .photo-manage-section {
+  margin-top: 0;
+}
+
+.cavalier-page-theme .person-edit-photos {
+  align-self: start;
+}
+
+.cavalier-page-theme .person-edit-photos .photo-manage-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.cavalier-page-theme .photo-manage-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 7px;
+}
+
+.cavalier-page-theme .photo-manage-copy {
+  min-width: 0;
+}
+
+.cavalier-page-theme .photo-manage-label {
+  margin: 0;
+  color: #d4c9b8;
+  line-height: 1.3;
+}
+
+.cavalier-page-theme .photo-manage-description {
+  margin: 4px 0 0;
+  color: #9f9789;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.cavalier-page-theme .photo-manage-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.cavalier-page-theme .photo-manage-actions > form,
+.cavalier-page-theme .photo-manage-actions > details,
+.cavalier-page-theme .photo-manage-actions .material-action-button {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.cavalier-page-theme .material-action-button {
+  min-height: 30px;
+  padding: 5px 7px;
+  justify-content: flex-start;
+  gap: 5px;
+  text-align: left;
+  white-space: normal;
+}
+
+.cavalier-page-theme .photo-metadata-editor > summary,
+.cavalier-page-theme .person-media-create > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.cavalier-page-theme .photo-metadata-editor > summary::-webkit-details-marker,
+.cavalier-page-theme .person-media-create > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cavalier-page-theme .photo-metadata-editor[open] > summary,
+.cavalier-page-theme .person-media-create[open] > summary {
+  color: #f0ddba;
+  border-color: #90724a;
+}
+
+.cavalier-page-theme .photo-metadata-editor form,
+.cavalier-page-theme .person-media-create form {
+  display: grid;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 9px;
+  border: 1px solid #484137;
+  background: #11120f;
+}
+
+.cavalier-page-theme .photo-metadata-editor label,
+.cavalier-page-theme .person-media-create label {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: #b9aa94;
+  font-size: 12px;
+}
+
+.cavalier-page-theme .photo-metadata-editor input,
+.cavalier-page-theme .photo-metadata-editor textarea,
+.cavalier-page-theme .person-media-create input,
+.cavalier-page-theme .person-media-create textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 8px;
+  color: #ddd5c7;
+  border: 1px solid #514b40;
+  border-radius: 2px;
+  background: #0f110f;
+}
+
+.cavalier-page-theme .photo-metadata-editor textarea,
+.cavalier-page-theme .person-media-create textarea {
+  resize: vertical;
+}
+
+.cavalier-page-theme .person-media-create {
+  margin: 14px;
+}
+
+.cavalier-page-theme .person-media-create > summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cavalier-page-theme .person-media-create > form {
+  margin-top: 10px;
+}
+
+.cavalier-page-theme .clipboard-paste-status:not(:empty) {
+  display: block;
+  padding: 6px 8px;
+  color: #d0c6b7;
+  border-left: 2px solid #927145;
+  background: #11120f;
+}
+
+@media (max-width: 1180px) {
+  .cavalier-page-theme .person-edit-photos .photo-manage-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .cavalier-page-theme .person-edit-photos .photo-manage-grid {
+    grid-template-columns: 1fr;
+  }
+}

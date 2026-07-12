@@ -673,6 +673,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
         self.assertIn("clipboard_paste.js", base)
         self.assertIn("data-clipboard-paste", photo_management)
+        self.assertIn("Вставить изображение из буфера", photo_management)
         self.assertIn("navigator.clipboard.read", script)
         self.assertIn("/photos/upload", script)
         self.assertIn("canvas.toBlob", script)
