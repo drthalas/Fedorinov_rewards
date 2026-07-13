@@ -115,6 +115,21 @@ APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false
 - Автоматический restart после update отложен.
 - Read-only/write-mode как пользовательские режимы позже нужно убрать из интерфейса.
 
+## v2.0.1 QA
+
+- Legacy compatibility baseline: public tag `v0.1.14`, commit `53bb35579aeb8a0c26a38c04019de7f7df36645a`.
+- Public v2.0.0 ZIP under the legacy updater: expected `forbidden file type` before backup/install.
+- Candidate v2.0.1 ZIP: 107 entries, 0 binary image entries, 6 byte-identical UI-assets embedded in packaged CSS.
+- Legacy retry E2E on temp install/data/media: v2.0.0 failure -> fresh v2.0.1 metadata/download -> backup -> install -> restarted-process version check -> rollback: PASS.
+- Temp DB/photos/documents SHA before/after: unchanged.
+- Focused tests: 56 PASS.
+- Full suite: 390 PASS; only pre-existing ResourceWarning diagnostics were emitted.
+- Package safety, compileall and `git diff --check`: PASS.
+- Packaged browser smoke: PASS at 1366x768, 1440x900 and 1920x1080; 6 embedded assets rendered, no HTTP/console errors or horizontal overflow.
+- Data baseline: person 108, rewards 351, mark 146, guide 18; levels 4/11/20/280/143.
+- Media baseline: total 961, existing 950, missing 11.
+- Real DB/media SHA and fingerprint are checked before and after publication; release workflow does not write to real data.
+
 ## v2.0.0 QA
 
 - Owner manual QA нового visual redesign на `main`: PASS.

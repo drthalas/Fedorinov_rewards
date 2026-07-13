@@ -68,6 +68,28 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.1
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-12.
+
+Тип: updater compatibility hotfix.
+
+Состав:
+
+- Совместимый one-click upgrade path из публичной v0.1.14 в полный v2-дизайн.
+- Системные bitmap-assets встроены в packaged CSS и не являются запрещёнными ZIP entries для старого updater.
+- Новый updater использует общий producer/consumer archive policy и сохраняет точечную защиту системных UI-assets.
+- Повтор после ошибки v2.0.0 использует новую metadata, versioned URL, checksum и отдельное имя ZIP.
+
+Проверки:
+
+- Фактический updater-код tag v0.1.14 принимает v2.0.1 package: PASS.
+- Temp E2E backup/install/restart-check/rollback: PASS.
+- Full suite, package safety, browser smoke и public assets проверяются до Telegram notification.
+- Real DB/media SHA и fingerprint до/после релизной процедуры должны совпадать.
+
 ## v2.0.0
 
 Статус: выпущено.
