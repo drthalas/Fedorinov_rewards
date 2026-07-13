@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from html import escape
+from io import BytesIO
 from pathlib import Path
 import re
 
@@ -22,6 +23,119 @@ class BookletError(ValueError):
 class BookletPDFResult:
     path: Path
     filename: str
+
+
+def person_archive_profile_data(
+    settings: Settings,
+    person_id: int,
+    generated_at: datetime | None = None,
+) -> dict[str, object]:
+    person = get_person(settings.rewards_db_path, person_id)
+    if person is None:
+        raise BookletError("Награжденный не найден.")
+    rewards = list_person_rewards(settings.rewards_db_path, person_id)
+    generated_at = generated_at or datetime.now()
+
+    person_rows = _visible_rows(
+        [
+            ("ФИО", person.get("fio")),
+            ("Год рождения", _formatted_if_present(person.get("birthday"), format_birth_year)),
+            ("Звание / специальность", person.get("rank_name")),
+            ("Дата формирования", generated_at.strftime("%d.%m.%Y")),
+        ]
+    )
+    reward_entries = []
+    for reward in rewards:
+        reward_entries.append(
+            {
+                "title": _visible_text(reward.get("name")) or "Награда",
+                "rows": _visible_rows(
+                    [
+                        ("Государство", reward.get("gos")),
+                        ("Категория", reward.get("category")),
+                        ("Подкатегория", reward.get("subcategory")),
+                        ("Наименование", reward.get("name")),
+                        ("Номер", reward.get("number")),
+                        ("Наличие", _formatted_if_present(reward.get("instock"), format_bool, "В наличии", "Нет")),
+                        ("Дата покупки", _formatted_if_present(reward.get("date_purchase"), format_date)),
+                        ("Цена покупки", _formatted_if_present(reward.get("price_purchase"), format_money)),
+                        ("Текущая цена", _formatted_if_present(reward.get("price_now"), format_money)),
+                    ]
+                ),
+            }
+        )
+
+    links = [
+        ("Память народа", _visible_text(person.get("link1"))),
+        ("Форум коллекционеров", _visible_text(person.get("link2"))),
+    ]
+    return {
+        "person": person,
+        "person_rows": person_rows,
+        "biography": _visible_text(person.get("biography")),
+        "comment": _visible_text(person.get("comment")),
+        "links": [(label, value) for label, value in links if value],
+        "rewards": reward_entries,
+    }
+
+
+def generate_person_archive_profile_pdf(settings: Settings, person_id: int) -> bytes:
+    profile = person_archive_profile_data(settings, person_id)
+    person = profile["person"]
+
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError as exc:
+        raise BookletError("PDF-библиотека reportlab не установлена.") from exc
+
+    buffer = BytesIO()
+    font_name = _register_pdf_font(pdfmetrics, TTFont)
+    styles = getSampleStyleSheet()
+    for style in styles.byName.values():
+        style.fontName = font_name
+    styles.add(ParagraphStyle(name="ProfileTitle", parent=styles["Title"], fontName=font_name, fontSize=20, leading=24))
+    styles.add(ParagraphStyle(name="ProfileHeading", parent=styles["Heading2"], fontName=font_name, fontSize=13, leading=16))
+    styles.add(ParagraphStyle(name="ProfileBody", parent=styles["BodyText"], fontName=font_name, fontSize=9, leading=12))
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=14 * mm,
+        leftMargin=14 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+        title=f"Профиль кавалера - {person.get('fio') or person_id}",
+    )
+    story: list[object] = [
+        Paragraph("Профиль кавалера", styles["ProfileTitle"]),
+        Paragraph(_p(person.get("fio")), styles["Heading1"]),
+        _profile_table(profile["person_rows"], Paragraph, Table, TableStyle, colors, styles),
+    ]
+    _add_profile_text_block(story, styles, Paragraph, "Краткая биография", profile["biography"])
+    _add_profile_text_block(story, styles, Paragraph, "Комментарий / заметки", profile["comment"])
+    if profile["links"]:
+        story.append(Paragraph("Ссылки", styles["ProfileHeading"]))
+        for label, value in profile["links"]:
+            story.append(Paragraph(f"{_p(label)}: {_p(value)}", styles["ProfileBody"]))
+
+    rewards = profile["rewards"]
+    if rewards:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("Награды", styles["Heading1"]))
+        for index, reward in enumerate(rewards, start=1):
+            story.append(Paragraph(f"{index}. {_p(reward['title'])}", styles["ProfileHeading"]))
+            if reward["rows"]:
+                story.append(_profile_table(reward["rows"], Paragraph, Table, TableStyle, colors, styles))
+            story.append(Spacer(1, 6))
+
+    doc.build(story)
+    return buffer.getvalue()
 
 
 def person_booklet_context(settings: Settings, person_id: int, return_to: str = "") -> dict[str, object]:
@@ -230,6 +344,13 @@ def _add_text_block(story: list[object], styles, Paragraph, title: str, value: o
             story.append(Paragraph(_p(paragraph).replace("\n", "<br/>"), styles["BookletBody"]))
 
 
+def _add_profile_text_block(story: list[object], styles, Paragraph, title: str, value: object) -> None:
+    if isinstance(value, str) and value.strip():
+        story.append(Paragraph(title, styles["ProfileHeading"]))
+        for paragraph in re.split(r"\n{2,}", value.strip()):
+            story.append(Paragraph(_p(paragraph).replace("\n", "<br/>"), styles["ProfileBody"]))
+
+
 def _add_links(story: list[object], styles, Paragraph, links: object) -> None:
     visible = [link for link in links if link.get("value")]
     if not visible:
@@ -273,6 +394,45 @@ def _key_value_table(rows, Paragraph, Table, TableStyle, colors, styles):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     return table
+
+
+def _profile_table(rows, Paragraph, Table, TableStyle, colors, styles):
+    table = Table(
+        [[Paragraph(_p(label), styles["ProfileBody"]), Paragraph(_p(value), styles["ProfileBody"])] for label, value in rows],
+        colWidths=[150, 360],
+    )
+    table.setStyle(TableStyle([
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.lightgrey),
+        ("BACKGROUND", (0, 0), (0, -1), colors.whitesmoke),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    return table
+
+
+def _visible_text(value: object) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    return "" if not text or text == "—" or text.lower() == "none" else text
+
+
+def _visible_rows(rows: list[tuple[str, object]]) -> list[tuple[str, str]]:
+    visible = []
+    for label, value in rows:
+        text = _visible_text(value)
+        if text:
+            visible.append((label, text))
+    return visible
+
+
+def _formatted_if_present(value: object, formatter, *args) -> str:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return ""
+    return _visible_text(formatter(value, *args))
 
 
 def _p(value: object) -> str:

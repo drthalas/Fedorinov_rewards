@@ -30,8 +30,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
     def test_legacy_selected_person_metadata_omits_technical_id_and_empty_separators(self) -> None:
         cases = [
-            ("гражданский", "1945-05-09", "гражданский · 1945"),
-            ("", "1945-05-09", "1945"),
+            ("гражданский", "1945-05-09", "ГР · 1945"),
+            ("", "1945-05-09", "ГР · 1945"),
             ("", "", None),
         ]
 
@@ -50,6 +50,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
                 self.assertFalse(metadata.startswith("·"))
                 self.assertFalse(metadata.endswith("·"))
                 self.assertNotIn("· ·", metadata)
+                if rank_name:
+                    self.assertNotIn(rank_name, metadata)
 
     def test_legacy_template_uses_dedicated_shell(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()

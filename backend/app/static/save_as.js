@@ -57,12 +57,27 @@
 
   function setMessage(form, message, kind) {
     const target = saveStatusTarget(form);
+    if (target._saveAsTimer) {
+      window.clearTimeout(target._saveAsTimer);
+      target._saveAsTimer = null;
+    }
     target.textContent = message || "";
+    target.hidden = !message;
     target.classList.remove("notice-success", "notice-error");
     if (kind === "success") {
       target.classList.add("notice-success");
     } else if (kind === "error") {
       target.classList.add("notice-error");
+    }
+    if (kind === "cancel") {
+      const timeout = Number(form.getAttribute("data-save-as-cancel-timeout") || 0);
+      if (timeout > 0) {
+        target._saveAsTimer = window.setTimeout(function () {
+          target.textContent = "";
+          target.hidden = true;
+          target._saveAsTimer = null;
+        }, timeout);
+      }
     }
   }
 
@@ -274,7 +289,7 @@
     } catch (error) {
       const message = saveDialogErrorMessage(error) || "Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.";
       if (error && error.name === "AbortError") {
-        setMessage(form, message, "");
+        setMessage(form, message, "cancel");
       } else {
         setMessage(form, message, "error");
         try {
@@ -297,7 +312,7 @@
     } catch (error) {
       const message = saveDialogErrorMessage(error);
       if (message === "Сохранение отменено.") {
-        setMessage(form, message, "");
+        setMessage(form, message, "cancel");
       } else {
         setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), "error");
       }
