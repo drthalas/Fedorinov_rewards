@@ -3,11 +3,12 @@ import json
 import unittest
 from unittest.mock import patch
 import urllib.error
+import urllib.request
 
 from backend.app.config import Settings
 from backend.app.main import app
 from backend.app.routers import updates
-from backend.app.services.update_checker import check_for_updates, is_newer_version, parse_semver
+from backend.app.services.update_checker import check_for_updates, fetch_manifest, is_newer_version, parse_semver
 from backend.app.version import APP_NAME, APP_VERSION
 
 
@@ -71,7 +72,7 @@ class UpdateCheckerTests(unittest.TestCase):
             self.assertEqual(timeout, 10)
             return _manifest_bytes(
                 {
-                    "version": "2.0.1",
+                    "version": "2.0.2",
                     "released_at": "2026-06-04",
                     "download_url": "https://example.test/app.zip",
                     "sha256": "abc",
@@ -81,7 +82,7 @@ class UpdateCheckerTests(unittest.TestCase):
 
         result = check_for_updates(_settings(), fetcher=fetcher)
         self.assertTrue(result["update_available"])
-        self.assertEqual(result["latest_version"], "2.0.1")
+        self.assertEqual(result["latest_version"], "2.0.2")
         self.assertEqual(result["notes"], ["Новая версия"])
 
     def test_update_checker_returns_no_update_for_same_version(self) -> None:
@@ -101,6 +102,23 @@ class UpdateCheckerTests(unittest.TestCase):
         result = check_for_updates(_settings(), fetcher=fetcher)
         self.assertFalse(result["update_available"])
         self.assertIn("Не удалось проверить обновления", str(result["error"]))
+
+    def test_manifest_request_disables_intermediate_caches(self) -> None:
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return None
+
+            def read(self):
+                return b"{}"
+
+        with patch.object(urllib.request, "urlopen", return_value=Response()) as urlopen:
+            self.assertEqual(fetch_manifest("https://example.test/latest.json", 10), b"{}")
+        request = urlopen.call_args.args[0]
+        self.assertEqual(request.get_header("Cache-control"), "no-cache, no-store")
+        self.assertEqual(request.get_header("Pragma"), "no-cache")
 
     def test_updates_check_route_returns_json_dict(self) -> None:
         with patch.object(updates, "get_settings", return_value=_settings(update_check_enabled=False)):

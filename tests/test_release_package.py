@@ -2,9 +2,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from zipfile import ZipFile
+import base64
 import json
+import re
 import unittest
 
+from backend.app.services.update_archive_policy import SYSTEM_UI_ASSET_PATHS, forbidden_relative_reason
 from scripts import build_release_package, build_windows_preview_package, check_package_safety, publish_github_release
 from backend.app.version import APP_VERSION
 
@@ -13,16 +16,36 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleasePackageTests(unittest.TestCase):
-    def test_visual_assets_are_the_only_allowed_packaged_images(self) -> None:
-        for relative in build_windows_preview_package.ALLOWED_UI_ASSETS:
-            self.assertFalse(build_windows_preview_package._is_excluded(ROOT / relative))
-            packaged = Path("FedorinovRewards_WebPreview") / relative
-            self.assertIsNone(check_package_safety._is_forbidden(str(packaged)))
+    def test_visual_assets_are_embedded_for_legacy_updater_compatibility(self) -> None:
+        for parts in SYSTEM_UI_ASSET_PATHS:
+            relative = Path(*parts)
+            self.assertTrue(build_windows_preview_package._is_excluded(ROOT / relative))
+            self.assertIsNone(forbidden_relative_reason(relative))
 
         self.assertTrue(build_windows_preview_package._is_excluded(ROOT / "Source" / "77" / "photo.jpg"))
         self.assertIsNotNone(
             check_package_safety._is_forbidden("FedorinovRewards_WebPreview/Source/77/photo.jpg")
         )
+
+    def test_packaged_css_contains_all_visual_assets_as_data_uris(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            package_root = Path(tmpdir) / "FedorinovRewards_WebPreview"
+            styles_path = package_root / "backend/app/static/styles.css"
+            styles_path.parent.mkdir(parents=True)
+            styles_path.write_text((ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8"), encoding="utf-8")
+
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                build_windows_preview_package._embed_ui_assets()
+
+            packaged = styles_path.read_text(encoding="utf-8")
+            for parts in SYSTEM_UI_ASSET_PATHS:
+                relative = Path(*parts)
+                self.assertNotIn(build_windows_preview_package._asset_web_path(relative), packaged)
+                variable = build_windows_preview_package._asset_variable(relative)
+                match = re.search(rf"{re.escape(variable)}: url\(\"data:[^;]+;base64,([^\"]+)\"\)", packaged)
+                self.assertIsNotNone(match)
+                self.assertEqual(base64.b64decode(match.group(1)), (ROOT / relative).read_bytes())
+            self.assertEqual(packaged.count(";base64,"), len(SYSTEM_UI_ASSET_PATHS))
 
     def test_build_release_package_creates_versioned_zip_and_manifest(self) -> None:
         with TemporaryDirectory() as tmpdir:

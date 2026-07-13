@@ -4,10 +4,17 @@ from __future__ import annotations
 from pathlib import Path
 from shutil import copy2, copytree, rmtree
 from zipfile import ZIP_DEFLATED, ZipFile
+import base64
 import fnmatch
+import sys
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from backend.app.services.update_archive_policy import SYSTEM_UI_ASSET_PATHS  # noqa: E402
+
+
 DIST_ROOT = PROJECT_ROOT / "dist"
 PACKAGE_NAME = "FedorinovRewards_WebPreview"
 PACKAGE_ROOT = DIST_ROOT / PACKAGE_NAME
@@ -41,14 +48,7 @@ EXCLUDED_PATTERNS = [
     "*.exe",
     "*.dll",
 ]
-ALLOWED_UI_ASSETS = {
-    Path("backend/app/static/assets/cavaliers/empty-hero.jpg"),
-    Path("backend/app/static/assets/cavaliers/left-rail.png"),
-    Path("backend/app/static/assets/cavaliers/top-right-emblem.png"),
-    Path("backend/app/static/assets/guides/archive-header-bg.png"),
-    Path("backend/app/static/assets/guides/left-rail.png"),
-    Path("backend/app/static/assets/guides/top-right-emblem.png"),
-}
+EMBEDDED_UI_ASSETS = {Path(*parts) for parts in SYSTEM_UI_ASSET_PATHS}
 
 DIRECTORIES_TO_COPY = [
     "backend",
@@ -76,8 +76,6 @@ FILES_TO_COPY = [
 
 def _is_excluded(path: Path) -> bool:
     relative = path.relative_to(PROJECT_ROOT)
-    if relative in ALLOWED_UI_ASSETS:
-        return False
     if any(relative == excluded or relative.is_relative_to(excluded) for excluded in EXCLUDED_PATHS):
         return True
     if path.name in EXCLUDED_NAMES:
@@ -112,6 +110,40 @@ def _copy_required_files() -> None:
         copy2(source, destination)
 
 
+def _asset_variable(relative: Path) -> str:
+    return "--fr-asset-" + "-".join(relative.with_suffix("").parts[4:])
+
+
+def _asset_web_path(relative: Path) -> str:
+    return "/static/" + "/".join(relative.parts[3:])
+
+
+def _asset_mime_type(relative: Path) -> str:
+    suffix = relative.suffix.casefold()
+    if suffix in {".jpg", ".jpeg"}:
+        return "image/jpeg"
+    if suffix == ".png":
+        return "image/png"
+    raise ValueError(f"unsupported embedded UI asset type: {relative}")
+
+
+def _embed_ui_assets() -> None:
+    styles_path = PACKAGE_ROOT / "backend/app/static/styles.css"
+    styles = styles_path.read_text(encoding="utf-8")
+    declarations: list[str] = []
+    for relative in sorted(EMBEDDED_UI_ASSETS):
+        source = PROJECT_ROOT / relative
+        web_path = _asset_web_path(relative)
+        variable = _asset_variable(relative)
+        marker = f'url("{web_path}")'
+        if marker not in styles:
+            raise RuntimeError(f"UI asset is not referenced by packaged CSS: {relative}")
+        encoded = base64.b64encode(source.read_bytes()).decode("ascii")
+        declarations.append(f'  {variable}: url("data:{_asset_mime_type(relative)};base64,{encoded}");')
+        styles = styles.replace(marker, f"var({variable})")
+    styles_path.write_text(":root {\n" + "\n".join(declarations) + "\n}\n" + styles, encoding="utf-8")
+
+
 def _make_zip() -> int:
     file_count = 0
     if ZIP_PATH.exists():
@@ -130,6 +162,7 @@ def main() -> int:
     PACKAGE_ROOT.mkdir(parents=True)
 
     _copy_required_files()
+    _embed_ui_assets()
     file_count = _make_zip()
     size = ZIP_PATH.stat().st_size
 

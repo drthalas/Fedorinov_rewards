@@ -3,77 +3,33 @@ from __future__ import annotations
 
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
-import fnmatch
 import sys
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
-FORBIDDEN_EXACT_NAMES = {
-    ".env",
-    ".venv",
-}
-FORBIDDEN_DIR_PARTS = {
-    ".venv",
-    "database",
-    "Source",
-    "SourceMark",
-    "backups",
-    "updates",
-}
-FORBIDDEN_PATH_PREFIXES = [
-    ("legacy", "_external"),
-    ("docs", "reports"),
-]
-FORBIDDEN_PATTERNS = [
-    "*.sqlite",
-    "*.db",
-    "*.jpg",
-    "*.jpeg",
-    "*.png",
-    "*.pdf",
-    "*.exe",
-    "*.dll",
-    "*.zip",
-]
-ALLOWED_UI_ASSETS = {
-    ("backend", "app", "static", "assets", "cavaliers", "empty-hero.jpg"),
-    ("backend", "app", "static", "assets", "cavaliers", "left-rail.png"),
-    ("backend", "app", "static", "assets", "cavaliers", "top-right-emblem.png"),
-    ("backend", "app", "static", "assets", "guides", "archive-header-bg.png"),
-    ("backend", "app", "static", "assets", "guides", "left-rail.png"),
-    ("backend", "app", "static", "assets", "guides", "top-right-emblem.png"),
-}
+from backend.app.services.update_archive_policy import (  # noqa: E402
+    ArchivePolicyError,
+    forbidden_relative_reason,
+    normalize_archive_path,
+    strip_package_root,
+    validate_zip_members,
+)
 
 
 def _normalize_member(path: str) -> tuple[str, ...]:
-    return tuple(part for part in Path(path).parts if part not in ("", "."))
+    try:
+        return normalize_archive_path(path)
+    except ArchivePolicyError:
+        return ()
 
 
 def _strip_package_root(parts: tuple[str, ...]) -> tuple[str, ...]:
-    if parts and parts[0] == "FedorinovRewards_WebPreview":
-        return parts[1:]
-    return parts
+    return strip_package_root(parts)
 
 
 def _is_forbidden(path: str) -> str | None:
-    raw_parts = _normalize_member(path)
-    parts = _strip_package_root(raw_parts)
-    if not parts:
-        return None
-    if parts in ALLOWED_UI_ASSETS:
-        return None
-
-    name = parts[-1]
-    if name in FORBIDDEN_EXACT_NAMES:
-        return f"forbidden exact file name: {name}"
-    if any(part in FORBIDDEN_DIR_PARTS for part in parts):
-        return "forbidden directory path"
-    for prefix in FORBIDDEN_PATH_PREFIXES:
-        if len(parts) >= len(prefix) and parts[: len(prefix)] == prefix:
-            return f"forbidden path prefix: {'/'.join(prefix)}"
-    for pattern in FORBIDDEN_PATTERNS:
-        if fnmatch.fnmatch(name, pattern):
-            return f"forbidden pattern: {pattern}"
-    return None
+    return forbidden_relative_reason(path)
 
 
 def _iter_folder_members(path: Path):
@@ -84,6 +40,7 @@ def _iter_folder_members(path: Path):
 
 def _iter_zip_members(path: Path):
     with ZipFile(path) as archive:
+        validate_zip_members(archive)
         bad_file = archive.testzip()
         if bad_file:
             raise RuntimeError(f"zip has corrupt member: {bad_file}")
@@ -118,6 +75,9 @@ def main(argv: list[str]) -> int:
         print(f"package is not a readable zip: {exc}", file=sys.stderr)
         return 1
     except RuntimeError as exc:
+        print(f"package safety check failed: {exc}", file=sys.stderr)
+        return 1
+    except ArchivePolicyError as exc:
         print(f"package safety check failed: {exc}", file=sys.stderr)
         return 1
 

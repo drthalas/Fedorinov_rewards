@@ -86,6 +86,50 @@ class UpdaterTests(unittest.TestCase):
             with self.assertRaises(updater.UpdateError):
                 updater.extract_update_zip(zip_path, tmp / "extract")
 
+    def test_corrupt_zip_aborts(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            zip_path = tmp / "corrupt.zip"
+            zip_path.write_bytes(b"not a zip")
+            with self.assertRaisesRegex(updater.UpdateError, "ZIP не читается"):
+                updater.extract_update_zip(zip_path, tmp / "extract")
+
+    def test_retry_after_validation_error_uses_fresh_manifest_and_versioned_zip(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            settings = self._settings(root)
+            self._write_current_app(settings.app_install_dir)
+            failed_zip = root / "v2.0.0.zip"
+            failed_sha = self._make_update_zip(
+                failed_zip,
+                {"FedorinovRewards_WebPreview/backend/app/static/arbitrary.jpg": "forbidden"},
+            )
+            fixed_zip = root / "v2.0.1.zip"
+            fixed_sha = self._make_update_zip(fixed_zip)
+            manifests = [
+                {**self._manifest(failed_zip, failed_sha, version="2.0.0"), "download_url": "https://example.test/v2.0.0.zip"},
+                {**self._manifest(fixed_zip, fixed_sha, version="2.0.1"), "download_url": "https://example.test/v2.0.1.zip"},
+            ]
+            downloaded: list[str] = []
+
+            def downloader(url: str, destination: Path, timeout: int) -> Path:
+                downloaded.append(destination.name)
+                source = failed_zip if "2.0.0" in url else fixed_zip
+                destination.write_bytes(source.read_bytes())
+                return destination
+
+            with patch.object(updater, "check_for_updates", side_effect=manifests):
+                with self.assertRaisesRegex(updater.UpdateError, "forbidden file type"):
+                    updater.apply_update(settings, current_version="0.1.14", zip_downloader=downloader)
+                result = updater.apply_update(settings, current_version="0.1.14", zip_downloader=downloader)
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(
+                downloaded,
+                ["FedorinovRewards_WebPreview_v2.0.0.zip", "FedorinovRewards_WebPreview_v2.0.1.zip"],
+            )
+            self.assertEqual((settings.app_install_dir / "backend/app/main.py").read_text(), "new")
+
     def test_dry_run_does_not_change_files(self) -> None:
         with TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

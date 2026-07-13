@@ -36,7 +36,11 @@ def is_newer_version(latest_version: object, current_version: object = APP_VERSI
 def fetch_manifest(url: str, timeout_seconds: int) -> bytes:
     request = urllib.request.Request(
         url,
-        headers={"User-Agent": "FedorinovRewardsUpdateChecker/0.1"},
+        headers={
+            "User-Agent": "FedorinovRewardsUpdateChecker/0.1",
+            "Cache-Control": "no-cache, no-store",
+            "Pragma": "no-cache",
+        },
         method="GET",
     )
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import fnmatch
 import json
 from pathlib import Path
 from shutil import copy2, rmtree
@@ -14,42 +13,18 @@ from zipfile import BadZipFile, ZipFile, ZIP_DEFLATED
 from ..config import Settings
 from ..version import APP_VERSION
 from .update_checker import check_for_updates
-
-
-PACKAGE_ROOT_NAME = "FedorinovRewards_WebPreview"
-ALLOWED_TOP_LEVEL = {
-    ".env.example",
-    ".env.windows.example",
-    "HELP_RU.md",
-    "README.md",
-    "backend",
-    "deploy",
-    "docs",
-    "release_notes",
-    "scripts",
-    "start_windows.bat",
-    "start_windows.ps1",
-}
-FORBIDDEN_EXACT = {".env", ".env.daily-report"}
-FORBIDDEN_DIRS = {
-    ".git",
-    ".venv",
-    "__pycache__",
-    "backups",
-    "data",
-    "database",
-    "default",
-    "dist",
-    "logs",
-    "Source",
-    "SourceMark",
-    "updates",
-}
-FORBIDDEN_PREFIXES = {
-    ("docs", "reports"),
-    ("legacy", "_external"),
-}
-FORBIDDEN_PATTERNS = ("*.sqlite", "*.db", "*.jpg", "*.jpeg", "*.png", "*.pdf", "*.exe", "*.dll", "*.zip")
+from .update_archive_policy import (
+    ALLOWED_TOP_LEVEL,
+    ArchivePolicyError,
+    FORBIDDEN_DIRS,
+    FORBIDDEN_EXACT,
+    FORBIDDEN_PATTERNS,
+    FORBIDDEN_PREFIXES,
+    PACKAGE_ROOT_NAME,
+    forbidden_relative_reason,
+    normalize_archive_path,
+    validate_zip_members,
+)
 
 
 class UpdateError(RuntimeError):
@@ -147,25 +122,14 @@ def sha256_file(path: Path) -> str:
 
 
 def _parts(path: Path | str) -> tuple[str, ...]:
-    return tuple(part for part in Path(path).parts if part not in ("", "."))
+    try:
+        return normalize_archive_path(path)
+    except ArchivePolicyError:
+        return ()
 
 
 def _is_forbidden_relative(relative: Path) -> str | None:
-    parts = _parts(relative)
-    if not parts:
-        return None
-    if parts[-1] in FORBIDDEN_EXACT:
-        return f"forbidden file: {parts[-1]}"
-    if any(part in FORBIDDEN_DIRS for part in parts):
-        return "forbidden directory"
-    for prefix in FORBIDDEN_PREFIXES:
-        if len(parts) >= len(prefix) and parts[: len(prefix)] == prefix:
-            return f"forbidden path: {'/'.join(prefix)}"
-    if any(fnmatch.fnmatch(parts[-1], pattern) for pattern in FORBIDDEN_PATTERNS):
-        return "forbidden file type"
-    if parts[0] not in ALLOWED_TOP_LEVEL:
-        return f"not an application path: {parts[0]}"
-    return None
+    return forbidden_relative_reason(relative)
 
 
 def validate_package_root(package_root: Path) -> None:
@@ -188,7 +152,15 @@ def find_package_root(extract_dir: Path) -> Path:
 
 def download_file(url: str, destination: Path, timeout_seconds: int) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    request = urllib.request.Request(url, headers={"User-Agent": "FedorinovRewardsUpdater/0.1"}, method="GET")
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "FedorinovRewardsUpdater/0.1",
+            "Cache-Control": "no-cache, no-store",
+            "Pragma": "no-cache",
+        },
+        method="GET",
+    )
     try:
         with urllib.request.urlopen(request, timeout=max(1, timeout_seconds)) as response, destination.open("wb") as output:
             while True:
@@ -214,16 +186,23 @@ def extract_update_zip(zip_path: Path, extract_dir: Path) -> Path:
     extract_dir.mkdir(parents=True, exist_ok=True)
     try:
         with ZipFile(zip_path) as archive:
+            validated = validate_zip_members(archive)
             bad_file = archive.testzip()
             if bad_file:
                 raise UpdateError(f"Некорректный архив обновления: повреждён файл {bad_file}.")
-            for member in archive.infolist():
-                member_path = Path(member.filename)
-                if member_path.is_absolute() or ".." in member_path.parts:
-                    raise UpdateError(f"Некорректный архив обновления: небезопасный путь {member.filename}.")
-            archive.extractall(extract_dir)
+            for member, relative in validated:
+                destination = extract_dir / PACKAGE_ROOT_NAME / Path(*relative)
+                if member.is_dir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with archive.open(member) as source, destination.open("wb") as output:
+                    while chunk := source.read(1024 * 1024):
+                        output.write(chunk)
     except BadZipFile as exc:
         raise UpdateError("Некорректный архив обновления: ZIP не читается.") from exc
+    except ArchivePolicyError as exc:
+        raise UpdateError(f"Некорректный архив обновления: {exc}.") from exc
     return find_package_root(extract_dir)
 
 
