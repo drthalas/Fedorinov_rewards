@@ -30,8 +30,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
     def test_legacy_selected_person_metadata_omits_technical_id_and_empty_separators(self) -> None:
         cases = [
-            ("гражданский", "1945-05-09", "гражданский · 1945"),
-            ("", "1945-05-09", "1945"),
+            ("гражданский", "1945-05-09", "Гражданский · 1945 г.р."),
+            ("гражданский", "", "Гражданский"),
+            ("", "1945-05-09", "1945 г.р."),
             ("", "", None),
         ]
 
@@ -50,6 +51,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
                 self.assertFalse(metadata.startswith("·"))
                 self.assertFalse(metadata.endswith("·"))
                 self.assertNotIn("· ·", metadata)
+                if rank_name:
+                    self.assertIn(rank_name[0].upper() + rank_name[1:], metadata)
 
     def test_legacy_template_uses_dedicated_shell(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -142,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-final-1"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)

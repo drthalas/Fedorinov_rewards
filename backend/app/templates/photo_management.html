@@ -23,18 +23,37 @@
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
           <input type="hidden" name="return_url" value="{{ photo_return_url }}">
+          {% if photo_entity_type == 'person' %}
+          <button
+            class="mini-button photo-icon-button"
+            type="button"
+            data-person-photo-trigger
+            data-file-input-id="{{ file_input_id }}"
+            data-entity-type="{{ photo_entity_type }}"
+            data-entity-id="{{ photo_entity_id }}"
+            data-photo-field="{{ photo.field }}"
+            data-return-url="{{ photo_return_url }}"
+            title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
+            aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
+          >+</button>
+          {% else %}
           <label
             class="mini-button photo-icon-button"
             for="{{ file_input_id }}"
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</label>
+          {% endif %}
           <input
             id="{{ file_input_id }}"
             class="sr-only-file"
             name="file"
             type="file"
+            {% if photo_entity_type == 'person' %}
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            {% else %}
             accept=".jpg,.jpeg,.png,.webp,image/*"
+            {% endif %}
             onchange="if (this.files.length) this.form.submit()"
           >
         </form>
@@ -58,8 +77,8 @@
           data-return-url="{{ photo_return_url }}"
           title="Вставить изображение из буфера обмена"
         >Вставить из буфера</button>
-        <span class="clipboard-paste-status" aria-live="polite"></span>
         {% endif %}
+        <span class="clipboard-paste-status" aria-live="polite"></span>
       </div>
     </div>
     {% endfor %}

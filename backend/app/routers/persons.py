@@ -18,13 +18,12 @@ from ..services.booklets import BookletError, generate_person_booklet_pdf, perso
 from ..services.navigation import safe_return_to, with_status
 from ..services.person_files import (
     PersonFilesError,
-    archive_person_folder,
-    archive_person_folder_bytes,
     open_person_folder,
     person_archive_filename,
     person_folder_image_items,
     person_folder_status,
 )
+from ..services.person_archive import PersonArchiveError, build_person_archive, save_person_archive
 from ..services.photos import photo_items
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
@@ -45,7 +44,7 @@ STATUS_MESSAGES = {
     "folder_opened": "Каталог кавалера открыт.",
     "folder_missing": "Каталог кавалера не найден.",
     "archive_empty": "В каталоге кавалера нет файлов для архивации.",
-    "archive_cancelled": "Сохранение архива отменено.",
+    "archive_cancelled": "Сохранение отменено.",
     "save_dialog_unavailable": "Системный диалог сохранения недоступен.",
 }
 
@@ -384,11 +383,12 @@ async def person_archive_folder(request: Request, person_id: int):
     except SaveDialogError:
         return RedirectResponse(with_status(return_to, "save_dialog_unavailable"), status_code=303)
     try:
-        result = archive_person_folder(settings, person_id, str(person.get("fio") or "person"), target_path=target_path)
-    except PersonFilesError as exc:
-        status = "archive_empty" if "нет файлов" in str(exc) else "folder_missing"
-        return RedirectResponse(with_status(return_to, status), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"Архив создан: {result.path}"), status_code=303)
+        save_person_archive(settings, person_id, target_path)
+    except PersonArchiveError as exc:
+        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
+    except OSError as exc:
+        return RedirectResponse(_with_message(return_to, f"Не удалось записать архив: {exc}"), status_code=303)
+    return RedirectResponse(_with_message(return_to, f"Архив создан: {target_path}"), status_code=303)
 
 
 @router.post("/persons/{person_id}/archive-folder.zip")
@@ -398,8 +398,8 @@ async def person_archive_folder_zip(person_id: int):
     if person is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     try:
-        result = archive_person_folder_bytes(settings, person_id, str(person.get("fio") or "person"))
-    except PersonFilesError as exc:
+        result = build_person_archive(settings, person_id)
+    except PersonArchiveError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return Response(
         content=result.content,

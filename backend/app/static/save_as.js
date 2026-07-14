@@ -57,12 +57,28 @@
 
   function setMessage(form, message, kind) {
     const target = saveStatusTarget(form);
+    if (target._saveAsTimer) {
+      window.clearTimeout(target._saveAsTimer);
+      target._saveAsTimer = null;
+    }
     target.textContent = message || "";
+    target.hidden = !message;
     target.classList.remove("notice-success", "notice-error");
     if (kind === "success") {
       target.classList.add("notice-success");
     } else if (kind === "error") {
       target.classList.add("notice-error");
+    }
+    if (kind === "cancel" || kind === "success" || kind === "error") {
+      const timeoutAttribute = kind === "cancel" ? "data-save-as-cancel-timeout" : "data-save-as-message-timeout";
+      const timeout = Number(form.getAttribute(timeoutAttribute) || 0);
+      if (timeout > 0) {
+        target._saveAsTimer = window.setTimeout(function () {
+          target.textContent = "";
+          target.hidden = true;
+          target._saveAsTimer = null;
+        }, timeout);
+      }
     }
   }
 
@@ -101,6 +117,11 @@
   }
 
   function showSavedMessage(form, blob, filename, mode) {
+    const customMessage = form.getAttribute("data-save-as-success-message");
+    if (customMessage) {
+      setMessage(form, customMessage, "success");
+      return;
+    }
     if (mode === "fallback") {
       setMessage(
         form,
@@ -122,6 +143,47 @@
       suggestedName: filename || "download",
       types: pickerTypes(filename, mimeType),
     });
+  }
+
+  function observePickerInteraction() {
+    const startedAt = performance.now();
+    let browserLostFocus = false;
+    let pageWasHidden = document.visibilityState === "hidden";
+    const onBlur = function () {
+      browserLostFocus = true;
+    };
+    const onVisibilityChange = function () {
+      if (document.visibilityState === "hidden") {
+        pageWasHidden = true;
+      }
+    };
+    window.addEventListener("blur", onBlur, true);
+    document.addEventListener("visibilitychange", onVisibilityChange, true);
+    return {
+      finish: function () {
+        window.removeEventListener("blur", onBlur, true);
+        document.removeEventListener("visibilitychange", onVisibilityChange, true);
+        return {
+          elapsedMs: performance.now() - startedAt,
+          browserLostFocus,
+          pageWasHidden,
+        };
+      },
+    };
+  }
+
+  function pickerAbortWasExplicitCancel(error, observation) {
+    if (!error || error.name !== "AbortError") {
+      return false;
+    }
+    return Boolean(
+      observation &&
+      (
+        observation.browserLostFocus ||
+        observation.pageWasHidden ||
+        observation.elapsedMs >= 500
+      )
+    );
   }
 
   async function writeFileHandle(handle, blob) {
@@ -222,10 +284,19 @@
     return { blob, filename };
   }
 
+  function fallbackFileLabel(filename) {
+    return extensionFromFilename(filename) === ".zip" ? "ZIP" : "Файл";
+  }
+
+  async function downloadAfterPickerFailure(form, request, fallbackFilename) {
+    const label = fallbackFileLabel(fallbackFilename);
+    setMessage(form, `Не удалось открыть окно сохранения. ${label} будет скачан обычным способом.`, "");
+    const result = await downloadWithFallback(form, request, fallbackFilename);
+    showSavedMessage(form, result.blob, result.filename, "fallback");
+    return result;
+  }
+
   function saveDialogErrorMessage(error) {
-    if (error && error.name === "AbortError") {
-      return "Сохранение отменено.";
-    }
     if (
       error &&
       (
@@ -269,23 +340,41 @@
 
     const pickerMimeType = form.getAttribute("data-save-as-mime") || mimeTypeForFilename(pickerFilename);
     let fileHandle;
+    const pickerInteraction = observePickerInteraction();
+    let pickerObservation;
     try {
       fileHandle = await openSaveFilePicker(pickerFilename, pickerMimeType);
     } catch (error) {
-      const message = saveDialogErrorMessage(error) || "Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.";
-      if (error && error.name === "AbortError") {
-        setMessage(form, message, "");
-      } else {
-        setMessage(form, message, "error");
-        try {
-          const result = await downloadWithFallback(form, request, pickerFilename);
-          showSavedMessage(form, result.blob, result.filename, "fallback");
-        } catch (fallbackError) {
-          setMessage(form, fallbackError && fallbackError.message ? fallbackError.message : "Не удалось скачать файл.", "error");
+      pickerObservation = pickerInteraction.finish();
+      if (pickerAbortWasExplicitCancel(error, pickerObservation)) {
+        setMessage(form, "Сохранение отменено.", "cancel");
+        if (submitter) {
+          submitter.disabled = false;
         }
+        return;
+      }
+      console.warn("Save As file picker did not open", error);
+      try {
+        await downloadAfterPickerFailure(form, request, pickerFilename);
+      } catch (fallbackError) {
+        setMessage(form, fallbackError && fallbackError.message ? fallbackError.message : "Не удалось скачать файл.", "error");
       }
       if (submitter) {
         submitter.disabled = false;
+      }
+      return;
+    }
+    pickerInteraction.finish();
+
+    if (!fileHandle || typeof fileHandle.createWritable !== "function") {
+      try {
+        await downloadAfterPickerFailure(form, request, pickerFilename);
+      } catch (fallbackError) {
+        setMessage(form, fallbackError && fallbackError.message ? fallbackError.message : "Не удалось скачать файл.", "error");
+      } finally {
+        if (submitter) {
+          submitter.disabled = false;
+        }
       }
       return;
     }
@@ -296,11 +385,7 @@
       showSavedMessage(form, result.blob, result.filename, "picker");
     } catch (error) {
       const message = saveDialogErrorMessage(error);
-      if (message === "Сохранение отменено.") {
-        setMessage(form, message, "");
-      } else {
-        setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), "error");
-      }
+      setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), "error");
     } finally {
       if (submitter) {
         submitter.disabled = false;
@@ -313,6 +398,8 @@
     filenameFromContentDisposition,
     filenameFromRequest,
     downloadWithFallback,
+    downloadAfterPickerFailure,
     mimeTypeForFilename,
+    pickerAbortWasExplicitCancel,
   };
 })();

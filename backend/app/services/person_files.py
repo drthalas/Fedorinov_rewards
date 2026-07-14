@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
 from io import BytesIO
 import os
 from pathlib import Path
@@ -153,7 +152,10 @@ def archive_person_folder_bytes(settings: Settings, person_id: int, fio: str) ->
 
 
 def person_archive_filename(fio: str, person_id: int) -> str:
-    return f"{_safe_filename(fio)}_{person_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    display_name = _safe_windows_filename(fio)
+    if not display_name:
+        display_name = f"Кавалер {person_id}"
+    return f"{display_name}.zip"
 
 
 def _default_opener(path: Path) -> None:
@@ -215,8 +217,25 @@ def _safe_filename(value: str) -> str:
     return text[:80] or "person"
 
 
+def _safe_windows_filename(value: str) -> str:
+    text = re.sub(r"\s+", " ", str(value or "").strip())
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", text).strip(" .")
+    if text.upper() in {
+        "CON", "PRN", "AUX", "NUL",
+        *(f"COM{index}" for index in range(1, 10)),
+        *(f"LPT{index}" for index in range(1, 10)),
+    }:
+        text = f"_{text}"
+    return text[:120].rstrip(" .")
+
+
 def _allowed_archive_member(path: Path, folder: Path) -> bool:
-    relative = path.relative_to(folder)
+    if path.is_symlink():
+        return False
+    try:
+        relative = path.resolve().relative_to(folder.resolve())
+    except ValueError:
+        return False
     parts = set(relative.parts)
     if parts.intersection(FORBIDDEN_ARCHIVE_PARTS):
         return False

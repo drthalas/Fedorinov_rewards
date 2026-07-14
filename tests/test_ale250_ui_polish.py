@@ -98,7 +98,7 @@ class Ale250UiPolishTests(unittest.TestCase):
         self.assertIn(".cavalier-page-theme .person-edit-photos .photo-manage-section", styles)
         self.assertIn("margin-top: 0", styles.split("ALE-250 corrective pass", 1)[1])
 
-    def test_person_photo_editor_render_hides_clipboard_and_empty_slot_delete(self) -> None:
+    def test_person_photo_editor_uses_one_clipboard_first_trigger_and_hides_empty_slot_delete(self) -> None:
         template = Environment(autoescape=True).from_string(
             self.read("backend/app/templates/photo_management.html")
         )
@@ -129,7 +129,9 @@ class Ale250UiPolishTests(unittest.TestCase):
         self.assertIn("Фото кавалера", rendered)
         self.assertIn("Главное фото", rendered)
         self.assertNotIn("Вставить", rendered)
-        self.assertNotIn("clipboard", rendered)
+        self.assertEqual(rendered.count("data-person-photo-trigger"), 2)
+        self.assertIn('data-file-input-id="photo-file-person-77-person_foto"', rendered)
+        self.assertIn('data-file-input-id="photo-file-person-77-main_foto"', rendered)
         self.assertNotIn("Добавить фото или документ", rendered)
 
 

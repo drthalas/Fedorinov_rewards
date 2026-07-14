@@ -81,6 +81,78 @@
     throw new Error("В буфере обмена нет изображения.");
   }
 
+  function imageBlobFromClipboardWithTimeout(timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var timeout = window.setTimeout(function () {
+        reject(new Error("Буфер обмена не ответил вовремя."));
+      }, timeoutMs);
+      imageBlobFromClipboard().then(function (image) {
+        window.clearTimeout(timeout);
+        resolve(image);
+      }, function (error) {
+        window.clearTimeout(timeout);
+        reject(error);
+      });
+    });
+  }
+
+  async function uploadClipboardImage(button, image, reloadSamePage) {
+    var form = new FormData();
+    var returnUrl = button.getAttribute("data-return-url") || window.location.pathname;
+    form.append("entity_type", button.getAttribute("data-entity-type") || "");
+    form.append("entity_id", button.getAttribute("data-entity-id") || "");
+    form.append("photo_field", button.getAttribute("data-photo-field") || "");
+    form.append("return_url", returnUrl);
+    form.append("file", image.blob, "clipboard.jpg");
+    var response = await fetch("/photos/upload", {
+      method: "POST",
+      body: form,
+      credentials: "same-origin"
+    });
+    if (!response.ok) {
+      var text = await response.text();
+      throw new Error(text || "Не удалось сохранить фото из буфера.");
+    }
+    var target = new URL(returnUrl, window.location.href);
+    if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
+      window.history.replaceState(null, "", target.pathname + target.search + target.hash);
+      window.location.reload();
+      return;
+    }
+    window.location.href = returnUrl;
+  }
+
+  function openPersonFilePicker(button) {
+    var inputId = button.getAttribute("data-file-input-id") || "";
+    var input = inputId ? document.getElementById(inputId) : null;
+    button.disabled = false;
+    if (!(input instanceof HTMLInputElement)) {
+      setStatus(button, "Не удалось открыть выбор файла.");
+      return false;
+    }
+    setStatus(button, "Выберите файл...");
+    input.addEventListener("cancel", function onCancel() {
+      setStatus(button, "");
+    }, { once: true });
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
+      }
+      return true;
+    } catch (error) {
+      try {
+        input.click();
+        return true;
+      } catch (fallbackError) {
+        console.warn("Photo file picker did not open", fallbackError || error);
+        setStatus(button, "Не удалось открыть выбор файла.");
+        return false;
+      }
+    }
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       button.addEventListener("click", async function () {
@@ -89,24 +161,8 @@
         setStatus(button, "Читаем буфер обмена...");
         try {
           var image = await imageBlobFromClipboard();
-          var form = new FormData();
-          var returnUrl = button.getAttribute("data-return-url") || window.location.pathname;
-          form.append("entity_type", button.getAttribute("data-entity-type") || "");
-          form.append("entity_id", button.getAttribute("data-entity-id") || "");
-          form.append("photo_field", button.getAttribute("data-photo-field") || "");
-          form.append("return_url", returnUrl);
-          form.append("file", image.blob, "clipboard.jpg");
           setStatus(button, "Сохраняем фото...");
-          var response = await fetch("/photos/upload", {
-            method: "POST",
-            body: form,
-            credentials: "same-origin"
-          });
-          if (!response.ok) {
-            var text = await response.text();
-            throw new Error(text || "Не удалось сохранить фото из буфера.");
-          }
-          window.location.href = returnUrl;
+          await uploadClipboardImage(button, image, false);
         } catch (error) {
           setStatus(button, error && error.message ? error.message : "Не удалось вставить фото из буфера.");
           button.disabled = false;
@@ -114,5 +170,27 @@
         }
       });
     });
+
+    document.querySelectorAll("[data-person-photo-trigger]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        button.disabled = true;
+        setStatus(button, "Проверяем буфер обмена...");
+        var image;
+        try {
+          image = await imageBlobFromClipboardWithTimeout(2000);
+        } catch (error) {
+          openPersonFilePicker(button);
+          return;
+        }
+        try {
+          setStatus(button, "Сохраняем фото...");
+          await uploadClipboardImage(button, image, true);
+        } catch (error) {
+          setStatus(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
+          button.disabled = false;
+        }
+      });
+    });
   });
+
 })();
