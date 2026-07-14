@@ -66,15 +66,30 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("fallbackDownload(blob, filename)", source)
         self.assertNotIn("window.alert", unsupported_branch)
 
-    def test_picker_error_falls_back_but_cancel_does_not(self) -> None:
+    def test_picker_abort_is_cancel_only_after_observable_dialog_interaction(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
         submit_handler = source.split('document.addEventListener("submit"', 1)[1]
-        picker_error_branch = submit_handler.split("fileHandle = await openSaveFilePicker", 1)[1].split("setMessage(form, \"Подготовка файла", 1)[0]
-        cancel_branch = picker_error_branch.split("} else {", 1)[0]
-        error_branch = picker_error_branch.split("} else {", 1)[1]
-        self.assertIn('error.name === "AbortError"', cancel_branch)
-        self.assertNotIn("downloadWithFallback", cancel_branch)
-        self.assertIn("await downloadWithFallback(form, request, pickerFilename)", error_branch)
+        classifier = source.split("function pickerAbortWasExplicitCancel", 1)[1].split(
+            "async function writeFileHandle", 1
+        )[0]
+        self.assertIn('error.name !== "AbortError"', classifier)
+        self.assertIn("observation.browserLostFocus", classifier)
+        self.assertIn("observation.pageWasHidden", classifier)
+        self.assertIn("observation.elapsedMs >= 500", classifier)
+        self.assertIn("pickerAbortWasExplicitCancel(error, pickerObservation)", submit_handler)
+        self.assertIn('setMessage(form, "Сохранение отменено.", "cancel")', submit_handler)
+        self.assertIn("await downloadWithFallback(form, request, pickerFilename)", submit_handler)
+        self.assertIn("await downloadAfterPickerFailure(form, request, pickerFilename)", submit_handler)
+        self.assertIn('return extensionFromFilename(filename) === ".zip" ? "ZIP" : "Файл"', source)
+
+    def test_invalid_picker_handle_falls_back_without_reporting_cancel(self) -> None:
+        source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
+        submit_handler = source.split('document.addEventListener("submit"', 1)[1]
+        invalid_handle_branch = submit_handler.split(
+            'if (!fileHandle || typeof fileHandle.createWritable !== "function")', 1
+        )[1].split('setMessage(form, "Подготовка файла', 1)[0]
+        self.assertIn("await downloadAfterPickerFailure(form, request, pickerFilename)", invalid_handle_branch)
+        self.assertNotIn("Сохранение отменено.", invalid_handle_branch)
 
     def test_save_as_js_is_loaded_in_base_and_legacy_layouts(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text(encoding="utf-8")

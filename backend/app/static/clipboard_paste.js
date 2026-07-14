@@ -81,6 +81,21 @@
     throw new Error("В буфере обмена нет изображения.");
   }
 
+  function imageBlobFromClipboardWithTimeout(timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var timeout = window.setTimeout(function () {
+        reject(new Error("Буфер обмена не ответил вовремя."));
+      }, timeoutMs);
+      imageBlobFromClipboard().then(function (image) {
+        window.clearTimeout(timeout);
+        resolve(image);
+      }, function (error) {
+        window.clearTimeout(timeout);
+        reject(error);
+      });
+    });
+  }
+
   async function uploadClipboardImage(button, image, reloadSamePage) {
     var form = new FormData();
     var returnUrl = button.getAttribute("data-return-url") || window.location.pathname;
@@ -111,9 +126,30 @@
     var inputId = button.getAttribute("data-file-input-id") || "";
     var input = inputId ? document.getElementById(inputId) : null;
     button.disabled = false;
-    setStatus(button, "");
-    if (input instanceof HTMLInputElement) {
-      input.click();
+    if (!(input instanceof HTMLInputElement)) {
+      setStatus(button, "Не удалось открыть выбор файла.");
+      return false;
+    }
+    setStatus(button, "Выберите файл...");
+    input.addEventListener("cancel", function onCancel() {
+      setStatus(button, "");
+    }, { once: true });
+    try {
+      if (typeof input.showPicker === "function") {
+        input.showPicker();
+      } else {
+        input.click();
+      }
+      return true;
+    } catch (error) {
+      try {
+        input.click();
+        return true;
+      } catch (fallbackError) {
+        console.warn("Photo file picker did not open", fallbackError || error);
+        setStatus(button, "Не удалось открыть выбор файла.");
+        return false;
+      }
     }
   }
 
@@ -141,7 +177,7 @@
         setStatus(button, "Проверяем буфер обмена...");
         var image;
         try {
-          image = await imageBlobFromClipboard();
+          image = await imageBlobFromClipboardWithTimeout(2000);
         } catch (error) {
           openPersonFilePicker(button);
           return;
@@ -156,4 +192,5 @@
       });
     });
   });
+
 })();

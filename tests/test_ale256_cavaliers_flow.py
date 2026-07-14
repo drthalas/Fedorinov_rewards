@@ -185,13 +185,14 @@ class Ale256UiContractTests(unittest.TestCase):
     def read(self, relative: str) -> str:
         return (ROOT / relative).read_text(encoding="utf-8")
 
-    def test_selected_person_meta_uses_birth_year_label_only(self) -> None:
+    def test_selected_person_meta_keeps_rank_and_puts_birth_year_label_last(self) -> None:
         template = self.read("backend/app/templates/legacy.html")
         heading = template.split('<div class="legacy-person-heading">', 1)[1].split(
             '<div class="legacy-actions">', 1
         )[0]
-        self.assertIn("ГР · {{ selected_person_birth_year }}", heading)
-        self.assertNotIn("selected_person_rank", heading)
+        self.assertIn("selected_person_rank", heading)
+        self.assertIn("{{ selected_person_birth_year }} ГР", heading)
+        self.assertNotIn("ГР · {{ selected_person_birth_year }}", heading)
         self.assertIn("selected_person_birth_year != '—'", heading)
 
     def test_archive_cancel_status_is_transient_and_outside_layout(self) -> None:
@@ -201,7 +202,7 @@ class Ale256UiContractTests(unittest.TestCase):
         self.assertIn('data-save-as-cancel-timeout="4000"', template)
         self.assertIn('id="person-archive-status"', template)
         self.assertNotIn("Откроется предпросмотр буклета", template)
-        self.assertIn('setMessage(form, message, "cancel")', script)
+        self.assertIn('setMessage(form, "Сохранение отменено.", "cancel")', script)
         self.assertIn("target.hidden = true", script)
         self.assertIn(".archive-save-status", styles)
         self.assertIn("position: fixed", styles.split(".archive-save-status", 1)[1].split("}", 1)[0])
@@ -222,13 +223,23 @@ class Ale256UiContractTests(unittest.TestCase):
         self.assertIn('type="file"', template)
         self.assertIn("navigator.clipboard.read", script)
         person_handler = script.split('document.querySelectorAll("[data-person-photo-trigger]")', 1)[1]
-        self.assertLess(person_handler.index("await imageBlobFromClipboard()"), person_handler.index("await uploadClipboardImage"))
+        self.assertLess(
+            person_handler.index("await imageBlobFromClipboardWithTimeout(2000)"),
+            person_handler.index("await uploadClipboardImage"),
+        )
         self.assertIn("openPersonFilePicker(button)", person_handler)
         self.assertIn("input.click()", script)
+        self.assertIn("input.showPicker()", script)
+        self.assertIn("imageBlobFromClipboardWithTimeout(2000)", person_handler)
         self.assertIn("window.location.reload()", script)
         self.assertIn('form.append("entity_id", button.getAttribute("data-entity-id")', script)
         self.assertIn('form.append("photo_field", button.getAttribute("data-photo-field")', script)
         self.assertNotIn("Вставить изображение из буфера", template.split("{% if photo_entity_type == 'person' %}", 1)[1].split("{% else %}", 1)[0])
+
+    def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
+        templates = self.read("backend/app/routers/templates.py")
+        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-corrective-1"', templates)
+        self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 
 if __name__ == "__main__":
