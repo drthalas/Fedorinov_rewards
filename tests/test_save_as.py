@@ -15,8 +15,7 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("Файл сохранён.", source)
         self.assertIn("fetch(url, options)", source)
         self.assertIn("Не удалось открыть окно сохранения. Попробуйте обычную загрузку файла или другой браузер.", source)
-        self.assertIn("Файл скачан. Браузер не передаёт приложению путь папки загрузок", source)
-        self.assertIn("Файл сохранён. Браузер не передаёт приложению путь выбранной папки", source)
+        self.assertIn('form.getAttribute("data-save-as-success-message")', source)
         self.assertIn("Открыть копию файла", source)
 
     def test_file_picker_is_opened_before_fetch_to_keep_user_gesture(self) -> None:
@@ -45,17 +44,18 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("link.click()", fallback)
         self.assertIn("URL.revokeObjectURL(url)", fallback)
 
-    def test_save_as_success_offers_open_copy_link_without_promising_folder_open(self) -> None:
+    def test_save_as_success_is_compact_and_does_not_offer_a_second_download(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
-        self.assertIn("function appendOpenCopyLink", source)
-        self.assertIn("save-as-open-copy-link", source)
-        self.assertIn('link.target = "_blank"', source)
-        self.assertIn("showSavedMessage(form, result.blob, result.filename, \"picker\")", source)
-        self.assertIn("Браузер не передаёт приложению путь выбранной папки", source)
-        self.assertIn("не разрешает открыть её автоматически", source)
-        self.assertIn("откройте файл из выбранной папки вручную или используйте ссылку “Открыть копию файла”", source)
+        legacy = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        self.assertIn("function showSavedMessage(form, blob, filename, mode)", source)
+        self.assertIn('data-save-as-success-message="Архив сохранён."', legacy)
+        custom_branch = source.split('const customMessage = form.getAttribute("data-save-as-success-message")', 1)[1]
+        custom_branch = custom_branch.split('if (mode === "fallback")', 1)[0]
+        self.assertIn('setMessage(form, customMessage, "success")', custom_branch)
+        self.assertIn("return;", custom_branch)
+        self.assertNotIn("appendOpenCopyLink", custom_branch)
         self.assertNotIn("Открыть папку", source)
-        self.assertNotIn("Папка открыта", source)
+        self.assertEqual(source.count("link.click()"), 1)
 
     def test_missing_file_system_access_api_starts_blob_download(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")

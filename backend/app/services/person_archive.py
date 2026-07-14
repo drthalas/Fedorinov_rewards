@@ -20,6 +20,9 @@ from .person_files import (
 
 
 PROFILE_ARCHIVE_NAME = "Профиль кавалера.pdf"
+PHOTO_ARCHIVE_DIR = "Фотографии"
+DOCUMENT_ARCHIVE_DIR = "Документы"
+IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp"})
 
 
 class PersonArchiveError(ValueError):
@@ -49,6 +52,8 @@ def build_person_archive(settings: Settings, person_id: int) -> PersonArchiveRes
 
     buffer = BytesIO()
     with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr(f"{PHOTO_ARCHIVE_DIR}/", b"")
+        archive.writestr(f"{DOCUMENT_ARCHIVE_DIR}/", b"")
         for archive_name, path in material_entries:
             archive.write(path, archive_name)
         archive.writestr(PROFILE_ARCHIVE_NAME, profile_pdf)
@@ -115,11 +120,38 @@ def _person_material_entries(
         relative = resolved.relative_to(data_root).as_posix()
         entries_by_path[resolved] = f"Связанные материалы/{relative}"
 
-    entries = sorted(
-        ((archive_name, path) for path, archive_name in entries_by_path.items()),
-        key=lambda item: item[0].casefold(),
+    source_entries = sorted(
+        ((source_name, path) for path, source_name in entries_by_path.items()),
+        key=lambda item: (item[0].casefold(), item[0]),
     )
+    entries = _flatten_material_entries(source_entries)
     return entries, missing_media
+
+
+def _flatten_material_entries(source_entries: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+    used_names: dict[str, set[str]] = {
+        PHOTO_ARCHIVE_DIR: set(),
+        DOCUMENT_ARCHIVE_DIR: set(),
+    }
+    entries = []
+    for _, path in source_entries:
+        archive_dir = PHOTO_ARCHIVE_DIR if path.suffix.lower() in IMAGE_SUFFIXES else DOCUMENT_ARCHIVE_DIR
+        filename = _unique_archive_filename(path.name, used_names[archive_dir])
+        entries.append((f"{archive_dir}/{filename}", path))
+    return entries
+
+
+def _unique_archive_filename(filename: str, used_names: set[str]) -> str:
+    path = Path(filename)
+    stem = path.stem or "Материал"
+    suffix = path.suffix
+    candidate = filename
+    duplicate_index = 2
+    while candidate.casefold() in used_names:
+        candidate = f"{stem} ({duplicate_index}){suffix}"
+        duplicate_index += 1
+    used_names.add(candidate.casefold())
+    return candidate
 
 
 def _safe_material_file(path: Path, folder: Path) -> bool:

@@ -15,7 +15,13 @@ from fastapi import HTTPException
 from backend.app.config import Settings
 from backend.app.routers import persons as persons_router
 from backend.app.services.booklets import person_archive_profile_data
-from backend.app.services.person_archive import PROFILE_ARCHIVE_NAME, PersonArchiveError, build_person_archive
+from backend.app.services.person_archive import (
+    DOCUMENT_ARCHIVE_DIR,
+    PHOTO_ARCHIVE_DIR,
+    PROFILE_ARCHIVE_NAME,
+    PersonArchiveError,
+    build_person_archive,
+)
 from backend.app.services.person_files import person_archive_filename
 
 
@@ -108,10 +114,13 @@ class Ale256ArchiveTests(unittest.TestCase):
         person_dir = self.root / "Source" / "1"
         (person_dir / "10").mkdir(parents=True)
         (person_dir / "docs").mkdir()
+        (person_dir / "duplicate").mkdir()
         (self.root / "Source" / "2").mkdir(parents=True)
         (person_dir / "person.jpg").write_bytes(b"person-image")
         (person_dir / "10" / "front.png").write_bytes(b"reward-image")
+        (person_dir / "duplicate" / "front.png").write_bytes(b"person-image-with-duplicate-name")
         (person_dir / "docs" / "record.pdf").write_bytes(b"document")
+        (person_dir / "docs" / "notes.txt").write_text("notes", encoding="utf-8")
         (person_dir / "extra.webp").write_bytes(b"extra-image")
         (person_dir / "unsafe.zip").write_bytes(b"nested archive")
         (self.root / "Source" / "2" / "other.jpg").write_bytes(b"other-person")
@@ -124,17 +133,35 @@ class Ale256ArchiveTests(unittest.TestCase):
         self.assertEqual(result.filename, "Иванов Иван Иванович.zip")
         self.assertEqual(before_db, after_db)
         with ZipFile(BytesIO(result.content)) as archive:
-            names = set(archive.namelist())
+            names = archive.namelist()
             profile_pdf = archive.read(PROFILE_ARCHIVE_NAME)
         self.assertEqual(
-            names,
-            {"10/front.png", "docs/record.pdf", "extra.webp", "person.jpg", PROFILE_ARCHIVE_NAME},
+            set(names),
+            {
+                f"{PHOTO_ARCHIVE_DIR}/",
+                f"{DOCUMENT_ARCHIVE_DIR}/",
+                f"{PHOTO_ARCHIVE_DIR}/extra.webp",
+                f"{PHOTO_ARCHIVE_DIR}/front.png",
+                f"{PHOTO_ARCHIVE_DIR}/front (2).png",
+                f"{PHOTO_ARCHIVE_DIR}/person.jpg",
+                f"{DOCUMENT_ARCHIVE_DIR}/notes.txt",
+                f"{DOCUMENT_ARCHIVE_DIR}/record.pdf",
+                PROFILE_ARCHIVE_NAME,
+            },
         )
-        self.assertEqual(result.files_count, len(names))
+        self.assertEqual(result.files_count, len(names) - 2)
         self.assertTrue(profile_pdf.startswith(b"%PDF"))
         self.assertIn("Source/1/missing.jpg", result.missing_media)
-        self.assertNotIn("unsafe.zip", names)
-        self.assertNotIn("other.jpg", names)
+        self.assertFalse(any(name.endswith("unsafe.zip") for name in names))
+        self.assertFalse(any(name.endswith("other.jpg") for name in names))
+        self.assertTrue(all(name == PROFILE_ARCHIVE_NAME or name.count("/") == 1 for name in names))
+
+    def test_duplicate_material_names_get_stable_readable_suffixes(self) -> None:
+        first = build_person_archive(self.settings, 1)
+        second = build_person_archive(self.settings, 1)
+        self.assertEqual(first.entries, second.entries)
+        self.assertIn(f"{PHOTO_ARCHIVE_DIR}/front.png", first.entries)
+        self.assertIn(f"{PHOTO_ARCHIVE_DIR}/front (2).png", first.entries)
 
     def test_profile_data_contains_available_fields_and_no_empty_placeholders(self) -> None:
         profile = person_archive_profile_data(self.settings, 1)
@@ -191,8 +218,8 @@ class Ale256UiContractTests(unittest.TestCase):
             '<div class="legacy-actions">', 1
         )[0]
         self.assertIn("selected_person_rank", heading)
-        self.assertIn("{{ selected_person_birth_year }} ГР", heading)
-        self.assertNotIn("ГР · {{ selected_person_birth_year }}", heading)
+        self.assertIn("{{ selected_person_birth_year }} г.р.", heading)
+        self.assertNotIn("{{ selected_person_birth_year }} ГР", heading)
         self.assertIn("selected_person_birth_year != '—'", heading)
 
     def test_archive_cancel_status_is_transient_and_outside_layout(self) -> None:
@@ -200,6 +227,7 @@ class Ale256UiContractTests(unittest.TestCase):
         script = self.read("backend/app/static/save_as.js")
         styles = self.read("backend/app/static/styles.css")
         self.assertIn('data-save-as-cancel-timeout="4000"', template)
+        self.assertIn('data-save-as-success-message="Архив сохранён."', template)
         self.assertIn('id="person-archive-status"', template)
         self.assertNotIn("Откроется предпросмотр буклета", template)
         self.assertIn('setMessage(form, "Сохранение отменено.", "cancel")', script)
@@ -238,7 +266,7 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-corrective-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-final-1"', templates)
         self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 

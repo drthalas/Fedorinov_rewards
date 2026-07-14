@@ -117,6 +117,11 @@
   }
 
   function showSavedMessage(form, blob, filename, mode) {
+    const customMessage = form.getAttribute("data-save-as-success-message");
+    if (customMessage) {
+      setMessage(form, customMessage, "success");
+      return;
+    }
     if (mode === "fallback") {
       setMessage(
         form,
@@ -285,10 +290,10 @@
 
   async function downloadAfterPickerFailure(form, request, fallbackFilename) {
     const label = fallbackFileLabel(fallbackFilename);
-    setMessage(form, `Не удалось открыть окно сохранения. ${label} будет скачан обычным способом.`, "error");
+    setMessage(form, `Не удалось открыть окно сохранения. ${label} будет скачан обычным способом.`, "");
     const result = await downloadWithFallback(form, request, fallbackFilename);
-    setMessage(form, `Не удалось открыть окно сохранения. ${label} скачан обычным способом.`, "success");
-    appendOpenCopyLink(form, result.blob, result.filename);
+    showSavedMessage(form, result.blob, result.filename, "fallback");
+    return result;
   }
 
   function saveDialogErrorMessage(error) {

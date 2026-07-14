@@ -262,8 +262,10 @@ class PersonBookletTests(unittest.TestCase):
         self.assertIn("Content-Disposition", response.headers)
         with ZipFile(BytesIO(response.body)) as archive:
             names = set(archive.namelist())
-        self.assertIn("FotoPerson.jpg", names)
-        self.assertIn("document.txt", names)
+        self.assertIn("Фотографии/", names)
+        self.assertIn("Документы/", names)
+        self.assertIn("Фотографии/FotoPerson.jpg", names)
+        self.assertIn("Документы/document.txt", names)
 
     def test_archive_blob_route_skips_forbidden_members(self) -> None:
         (self.root / "Source" / "1" / "photo.jpg").write_bytes(b"image")
@@ -272,9 +274,9 @@ class PersonBookletTests(unittest.TestCase):
         response = asyncio.run(persons_router.person_archive_folder_zip(1))
         with ZipFile(BytesIO(response.body)) as archive:
             names = set(archive.namelist())
-        self.assertIn("photo.jpg", names)
-        self.assertNotIn(".env", names)
-        self.assertNotIn("nested.zip", names)
+        self.assertIn("Фотографии/photo.jpg", names)
+        self.assertFalse(any(name.endswith(".env") for name in names))
+        self.assertFalse(any(name.endswith("nested.zip") for name in names))
 
     def test_generate_person_booklet_pdf_creates_pdf_when_reportlab_available(self) -> None:
         try:

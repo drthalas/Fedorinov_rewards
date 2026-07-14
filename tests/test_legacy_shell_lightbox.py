@@ -30,9 +30,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
     def test_legacy_selected_person_metadata_omits_technical_id_and_empty_separators(self) -> None:
         cases = [
-            ("гражданский", "1945-05-09", "Гражданский · 1945 ГР"),
+            ("гражданский", "1945-05-09", "Гражданский · 1945 г.р."),
             ("гражданский", "", "Гражданский"),
-            ("", "1945-05-09", "1945 ГР"),
+            ("", "1945-05-09", "1945 г.р."),
             ("", "", None),
         ]
 
@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-corrective-1"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-final-1"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)

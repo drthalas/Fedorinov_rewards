@@ -124,7 +124,7 @@
               {% set selected_person_rank_display = (selected_person_rank[0]|upper ~ selected_person_rank[1:]) if selected_person_rank else '' %}
               {% set selected_person_birth_year = selected_person.birthday|format_birth_year if selected_person.birthday else '' %}
               {% if selected_person_rank_display or (selected_person_birth_year and selected_person_birth_year != '—') %}
-              <p class="secondary legacy-person-meta wrap-text">{% if selected_person_rank_display %}{{ selected_person_rank_display }}{% endif %}{% if selected_person_rank_display and selected_person_birth_year and selected_person_birth_year != '—' %} · {% endif %}{% if selected_person_birth_year and selected_person_birth_year != '—' %}{{ selected_person_birth_year }} ГР{% endif %}</p>
+              <p class="secondary legacy-person-meta wrap-text">{% if selected_person_rank_display %}{{ selected_person_rank_display }}{% endif %}{% if selected_person_rank_display and selected_person_birth_year and selected_person_birth_year != '—' %} · {% endif %}{% if selected_person_birth_year and selected_person_birth_year != '—' %}{{ selected_person_birth_year }} г.р.{% endif %}</p>
               {% endif %}
             </div>
             <div class="legacy-actions">
@@ -193,7 +193,7 @@
                   <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                   <button class="button secondary-button" type="submit">Открыть каталог</button>
                 </form>
-                <form method="post" action="/persons/{{ selected_person.id }}/archive-folder.zip" data-save-as-form data-save-as-filename="{{ selected_person_archive_filename }}" data-save-as-mime="application/zip" data-save-as-status="#person-archive-status" data-save-as-cancel-timeout="4000" data-save-as-message-timeout="8000">
+                <form method="post" action="/persons/{{ selected_person.id }}/archive-folder.zip" data-save-as-form data-save-as-filename="{{ selected_person_archive_filename }}" data-save-as-mime="application/zip" data-save-as-status="#person-archive-status" data-save-as-success-message="Архив сохранён." data-save-as-cancel-timeout="4000" data-save-as-message-timeout="8000">
                   <button class="button secondary-button" type="submit">Архивировать</button>
                 </form>
                 <a class="button" href="/persons/{{ selected_person.id }}/booklet?return_to={{ selected_person_return|urlencode }}">Сформировать буклет</a>
