@@ -332,7 +332,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("Фото книжки, сторона 2", labels)
         self.assertIn("Наградной лист", labels)
 
-    def test_reward_edit_contains_next_actions(self) -> None:
+    def test_reward_edit_omits_next_actions(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "reward_form.html").read_text(
             encoding="utf-8"
         )
@@ -352,8 +352,9 @@ class FormPolishTests(unittest.TestCase):
         self.assertNotIn("Изменить награду #", template)
         self.assertIn("← Назад", template)
         self.assertIn("data-escape-back", template)
-        self.assertIn("Редактировать фото и документы", template)
-        self.assertIn("Добавить ещё награду", template)
+        self.assertNotIn("Следующие действия", template)
+        self.assertNotIn("Редактировать фото и документы", template)
+        self.assertNotIn("Добавить ещё награду", template)
         self.assertNotIn("К карточке кавалера", template)
         self.assertNotIn("К списку наград", template)
         self.assertIn("/legacy?tab=rewards", template)

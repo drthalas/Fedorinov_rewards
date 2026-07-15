@@ -1,6 +1,8 @@
 (function () {
   "use strict";
 
+  var PHOTO_INTERACTION_STORAGE_KEY = "fedorinov-photo-interaction";
+
   function setStatus(button, text) {
     var container = button.closest(".photo-manage-actions");
     var status = container ? container.querySelector(".clipboard-paste-status") : null;
@@ -96,6 +98,91 @@
     });
   }
 
+  function photoPageScroller() {
+    return document.querySelector("main.page");
+  }
+
+  function rememberPhotoInteraction(button) {
+    var page = photoPageScroller();
+    var state = {
+      pathname: window.location.pathname,
+      search: window.location.search,
+      entityType: button.getAttribute("data-entity-type") || "",
+      entityId: button.getAttribute("data-entity-id") || "",
+      photoField: button.getAttribute("data-photo-field") || "",
+      windowScrollY: window.scrollY,
+      pageScrollTop: page ? page.scrollTop : 0,
+      savedAt: Date.now()
+    };
+    try {
+      window.sessionStorage.setItem(PHOTO_INTERACTION_STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      // Scroll restoration is a progressive enhancement; upload still works without storage.
+    }
+  }
+
+  function savedPhotoTrigger(state) {
+    var triggers = document.querySelectorAll("[data-file-input-id][data-entity-type][data-entity-id][data-photo-field]");
+    for (var i = 0; i < triggers.length; i += 1) {
+      var trigger = triggers[i];
+      if (
+        trigger.getAttribute("data-entity-type") === state.entityType &&
+        trigger.getAttribute("data-entity-id") === state.entityId &&
+        trigger.getAttribute("data-photo-field") === state.photoField
+      ) {
+        return trigger;
+      }
+    }
+    return null;
+  }
+
+  function takePhotoInteraction() {
+    var raw;
+    try {
+      raw = window.sessionStorage.getItem(PHOTO_INTERACTION_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      window.sessionStorage.removeItem(PHOTO_INTERACTION_STORAGE_KEY);
+      var state = JSON.parse(raw);
+      if (
+        state.pathname !== window.location.pathname ||
+        state.search !== window.location.search ||
+        Date.now() - Number(state.savedAt || 0) > 30000
+      ) {
+        return null;
+      }
+      return state;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function restorePhotoInteraction() {
+    var state = takePhotoInteraction();
+    if (!state) {
+      return;
+    }
+    var trigger = savedPhotoTrigger(state);
+    if (!trigger) {
+      return;
+    }
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        var page = photoPageScroller();
+        if (page) {
+          page.scrollTop = Number(state.pageScrollTop || 0);
+        }
+        window.scrollTo(0, Number(state.windowScrollY || 0));
+        try {
+          trigger.focus({ preventScroll: true });
+        } catch (error) {
+          trigger.focus();
+        }
+      });
+    });
+  }
+
   async function uploadClipboardImage(button, image, reloadSamePage) {
     var form = new FormData();
     var returnUrl = button.getAttribute("data-return-url") || window.location.pathname;
@@ -133,6 +220,16 @@
     setStatus(button, "Выберите файл...");
     input.addEventListener("cancel", function onCancel() {
       setStatus(button, "");
+      restorePhotoInteraction();
+    }, { once: true });
+    input.addEventListener("change", function onChange() {
+      if (input.files && input.files.length) {
+        rememberPhotoInteraction(button);
+        setStatus(button, "Загружаем фотографию...");
+      } else {
+        setStatus(button, "");
+        restorePhotoInteraction();
+      }
     }, { once: true });
     try {
       if (typeof input.showPicker === "function") {
@@ -153,6 +250,30 @@
     }
   }
 
+  function bindInlinePhotoTrigger(button) {
+    button.addEventListener("click", async function (event) {
+      event.preventDefault();
+      rememberPhotoInteraction(button);
+      button.disabled = true;
+      setStatus(button, "Проверяем буфер обмена...");
+      var image;
+      try {
+        image = await imageBlobFromClipboardWithTimeout(2000);
+      } catch (error) {
+        openPersonFilePicker(button);
+        return;
+      }
+      try {
+        setStatus(button, "Сохраняем фото...");
+        await uploadClipboardImage(button, image, true);
+      } catch (error) {
+        setStatus(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
+        button.disabled = false;
+        restorePhotoInteraction();
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       button.addEventListener("click", async function () {
@@ -171,26 +292,10 @@
       });
     });
 
-    document.querySelectorAll("[data-person-photo-trigger]").forEach(function (button) {
-      button.addEventListener("click", async function () {
-        button.disabled = true;
-        setStatus(button, "Проверяем буфер обмена...");
-        var image;
-        try {
-          image = await imageBlobFromClipboardWithTimeout(2000);
-        } catch (error) {
-          openPersonFilePicker(button);
-          return;
-        }
-        try {
-          setStatus(button, "Сохраняем фото...");
-          await uploadClipboardImage(button, image, true);
-        } catch (error) {
-          setStatus(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
-          button.disabled = false;
-        }
-      });
-    });
+    document.querySelectorAll("[data-person-photo-trigger]").forEach(bindInlinePhotoTrigger);
+    document.querySelectorAll("[data-reward-photo-trigger]").forEach(bindInlinePhotoTrigger);
+
+    restorePhotoInteraction();
   });
 
 })();

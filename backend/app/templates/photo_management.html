@@ -36,6 +36,19 @@
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</button>
+          {% elif photo_entity_type == 'reward' %}
+          <button
+            class="mini-button photo-icon-button"
+            type="button"
+            data-reward-photo-trigger
+            data-file-input-id="{{ file_input_id }}"
+            data-entity-type="{{ photo_entity_type }}"
+            data-entity-id="{{ photo_entity_id }}"
+            data-photo-field="{{ photo.field }}"
+            data-return-url="{{ photo_return_url }}"
+            title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
+            aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
+          >+</button>
           {% else %}
           <label
             class="mini-button photo-icon-button"
@@ -49,7 +62,7 @@
             class="sr-only-file"
             name="file"
             type="file"
-            {% if photo_entity_type == 'person' %}
+            {% if photo_entity_type in ('person', 'reward') %}
             accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
             {% else %}
             accept=".jpg,.jpeg,.png,.webp,image/*"
@@ -66,7 +79,7 @@
           <button class="mini-button danger photo-icon-button" type="submit" title="Удалить фотографию" aria-label="Удалить фотографию: {{ photo.label }}">×</button>
         </form>
         {% endif %}
-        {% if photo_entity_type != 'person' %}
+        {% if photo_entity_type not in ('person', 'reward') %}
         <button
           class="mini-button clipboard-paste-button"
           type="button"

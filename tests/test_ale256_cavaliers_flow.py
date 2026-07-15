@@ -250,7 +250,9 @@ class Ale256UiContractTests(unittest.TestCase):
         self.assertIn('data-file-input-id="{{ file_input_id }}"', template)
         self.assertIn('type="file"', template)
         self.assertIn("navigator.clipboard.read", script)
-        person_handler = script.split('document.querySelectorAll("[data-person-photo-trigger]")', 1)[1]
+        person_handler = script.split("function bindInlinePhotoTrigger(button)", 1)[1].split(
+            'document.addEventListener("DOMContentLoaded"', 1
+        )[0]
         self.assertLess(
             person_handler.index("await imageBlobFromClipboardWithTimeout(2000)"),
             person_handler.index("await uploadClipboardImage"),
@@ -266,7 +268,7 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260714-ale256-final-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260715-ale262-reward-photo-1"', templates)
         self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 

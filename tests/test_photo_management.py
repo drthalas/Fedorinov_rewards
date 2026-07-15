@@ -142,6 +142,25 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), path)
         self.assertTrue((self.root / path).exists())
 
+    def test_reward_fixed_slot_replace_and_clear_preserve_neighbor(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("update rewards set back_foto = ? where id = 10", ("Source/1/10/neighbor.jpg",))
+
+        with patch("backend.app.services.photos._timestamp", side_effect=["20260715_120000", "20260715_120001"]):
+            first = save_photo(self.settings(), "reward", 10, "front_foto", "front.jpg", b"first-image")
+            replacement = save_photo(self.settings(), "reward", 10, "front_foto", "replacement.webp", b"second-image")
+
+        self.assertNotEqual(first, replacement)
+        self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), replacement)
+        self.assertEqual(self.fetch_value("rewards", 10, "back_foto"), "Source/1/10/neighbor.jpg")
+        self.assertTrue((self.root / first).exists())
+        self.assertEqual((self.root / replacement).read_bytes(), b"second-image")
+
+        clear_photo(self.settings(), "reward", 10, "front_foto")
+        self.assertIsNone(self.fetch_value("rewards", 10, "front_foto"))
+        self.assertEqual(self.fetch_value("rewards", 10, "back_foto"), "Source/1/10/neighbor.jpg")
+        self.assertTrue((self.root / replacement).exists())
+
     def test_mark_photo_upload_uses_source_mark_folder(self) -> None:
         path = save_photo(self.settings(), "mark", 20, "back_foto", "back.webp", b"webp-bytes")
         self.assertTrue(path.startswith("SourceMark/20/FotoBack_"))
