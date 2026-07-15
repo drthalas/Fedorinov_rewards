@@ -28,6 +28,7 @@ class GuideDeleteBlockedError(RuntimeError):
 @dataclass(frozen=True)
 class RankGuideData:
     name: str
+    image_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +136,12 @@ def _rank_exists(connection, rank_id: int) -> bool:
     return connection.execute("select 1 from guide where id = ?", (rank_id,)).fetchone() is not None
 
 
+def _ensure_rank_image_column(connection) -> None:
+    columns = {row["name"] for row in connection.execute("pragma table_info(guide)").fetchall()}
+    if "image_path" not in columns:
+        connection.execute("alter table guide add column image_path text")
+
+
 def _guide_item_exists(connection, level: int, item_id: int) -> bool:
     _validate_level(level)
     return connection.execute(f"select 1 from guide_lev_{level} where id = ?", (item_id,)).fetchone() is not None
@@ -150,21 +157,28 @@ def _validate_parent(connection, data: GuideLevelData) -> None:
 def create_rank(settings: Settings, data: RankGuideData) -> int:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        cursor = connection.execute("insert into guide (name) values (?)", (data.name,))
+        _ensure_rank_image_column(connection)
+        image_path = _validated_image_path(data.image_path)
+        cursor = connection.execute("insert into guide (name, image_path) values (?, ?)", (data.name, image_path))
         rank_id = int(cursor.lastrowid)
         connection.commit()
-    log_action("create", "guide_rank", rank_id, {"fields": ["name"]})
+    log_action("create", "guide_rank", rank_id, {"fields": ["name", "image_path"], "has_image": bool(image_path)})
     return rank_id
 
 
 def update_rank(settings: Settings, rank_id: int, data: RankGuideData) -> None:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        cursor = connection.execute("update guide set name = ? where id = ?", (data.name, rank_id))
+        _ensure_rank_image_column(connection)
+        image_path = _validated_image_path(data.image_path)
+        cursor = connection.execute(
+            "update guide set name = ?, image_path = ? where id = ?",
+            (data.name, image_path, rank_id),
+        )
         if cursor.rowcount == 0:
             raise GuideValidationError("Звание/специальность не найдены.")
         connection.commit()
-    log_action("update", "guide_rank", rank_id, {"fields": ["name"]})
+    log_action("update", "guide_rank", rank_id, {"fields": ["name", "image_path"], "has_image": bool(image_path)})
 
 
 CONFIRM_REQUIRED_MESSAGE = "Действие требует подтверждения."

@@ -274,6 +274,10 @@
     });
   }
 
+  window.FedorinovClipboardImages = Object.freeze({
+    readWithTimeout: imageBlobFromClipboardWithTimeout
+  });
+
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       button.addEventListener("click", async function () {

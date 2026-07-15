@@ -10,6 +10,7 @@ from urllib.parse import urlencode
 from unittest.mock import patch
 
 from jinja2 import Environment
+from starlette.datastructures import FormData
 
 from backend.app.routers import guides as guides_router
 from backend.app.routers import marks as marks_router
@@ -20,10 +21,14 @@ from backend.app.repositories.guides_write import GuideValidationError, rank_dat
 
 class FakeRequest:
     def __init__(self, values: dict[str, object]):
+        self._values = values
         self._body = urlencode(values).encode("utf-8")
 
     async def body(self) -> bytes:
         return self._body
+
+    async def form(self) -> FormData:
+        return FormData(self._values)
 
 
 def _template_result(_request, name: str, context: dict[str, object], **kwargs):

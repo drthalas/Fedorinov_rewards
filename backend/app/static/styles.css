@@ -6673,3 +6673,213 @@ body.legacy-rewards-theme::after {
   font-size: 17px;
   line-height: 1;
 }
+
+/* ALE-263: searchable reward tree and compact rank insignia treatment. */
+.guide-theme .guide-tree-search {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.guide-theme .guide-tree-search input {
+  padding-right: 42px;
+}
+
+.guide-theme .guide-tree-search [data-guide-tree-filter-clear] {
+  position: absolute;
+  top: 17px;
+  right: 20px;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  color: #cfc5b5;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.guide-theme .guide-tree-search [data-guide-tree-filter-clear][hidden] {
+  display: none;
+}
+
+.guide-theme .guide-tree-empty {
+  margin: 0;
+  padding: 28px 16px;
+  color: #9f978a;
+  text-align: center;
+}
+
+.guide-theme [data-guide-tree-node][hidden] {
+  display: none;
+}
+
+.guide-theme .guide-ranks-panel .guide-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, auto);
+  gap: 12px;
+  padding-right: 12px;
+}
+
+.guide-theme .guide-ranks-panel .guide-list li.has-rank-insignia {
+  grid-template-columns: minmax(0, 1fr) 48px minmax(140px, auto);
+}
+
+.guide-theme .guide-ranks-panel [data-guide-rank-row][hidden] {
+  display: none;
+}
+
+.guide-theme .guide-ranks-panel .guide-list li::after {
+  content: none;
+}
+
+.guide-theme .guide-ranks-panel .guide-list li > .tree-actions {
+  position: static;
+  min-width: 140px;
+  grid-column: -2 / -1;
+}
+
+.guide-theme .guide-ranks-panel .guide-rank-insignia-frame {
+  grid-column: 2;
+}
+
+.guide-rank-insignia-frame,
+.legacy-rank-insignia-frame {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid #554a3a;
+  background: #11120f;
+}
+
+.guide-rank-insignia-frame {
+  width: 48px;
+  height: 30px;
+}
+
+.guide-rank-insignia,
+.legacy-rank-insignia {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.legacy-rewards-theme .legacy-person-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legacy-rank-insignia-frame {
+  width: 34px;
+  height: 24px;
+  flex: 0 0 34px;
+}
+
+.guide-theme .rank-guide-form {
+  width: min(100%, 680px);
+}
+
+.guide-theme .rank-insignia-editor {
+  display: grid;
+  gap: 9px;
+}
+
+.guide-theme .rank-insignia-editor h2 {
+  margin: 0;
+  color: #c29a60;
+  font-size: 17px;
+}
+
+.guide-theme .rank-insignia-preview-frame {
+  position: relative;
+  display: grid;
+  width: min(100%, 320px);
+  height: 150px;
+  overflow: hidden;
+  place-items: center;
+  color: #8f887d;
+  border: 1px solid #62543e;
+  background: linear-gradient(180deg, #0f110f, #0c0e0c);
+  box-shadow: inset 0 0 18px rgb(0 0 0 / 40%);
+}
+
+.guide-theme .rank-insignia-preview {
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  object-fit: contain;
+}
+
+.guide-theme .rank-insignia-controls {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+}
+
+.guide-theme .rank-insignia-control {
+  display: inline-grid;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  place-items: center;
+  color: #eee4d4;
+  border: 1px solid #786342;
+  border-radius: 2px;
+  background: #2c2b23;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.guide-theme .rank-insignia-control[hidden] {
+  display: none;
+}
+
+.guide-theme .rank-insignia-file-input {
+  position: absolute;
+  width: 1px;
+  min-width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.guide-theme .rank-insignia-remove {
+  color: #e3c7bd;
+  border-color: #735047;
+  background: #33211e;
+}
+
+.guide-theme .rank-insignia-status,
+.guide-theme .rank-insignia-error {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .guide-theme .guide-ranks-panel .guide-list li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .guide-theme .guide-ranks-panel .guide-list li.has-rank-insignia {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+
+  .guide-theme .guide-ranks-panel .guide-list li > .tree-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    opacity: 1;
+  }
+}

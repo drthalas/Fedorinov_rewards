@@ -3,13 +3,19 @@ from pathlib import Path
 from .common import fetch_all, fetch_one
 
 
+def _rank_guide_select(db_path: Path) -> str:
+    columns = {row["name"] for row in fetch_all(db_path, "pragma table_info(guide)")}
+    image_path = "image_path" if "image_path" in columns else "null"
+    return f"select id, name, {image_path} as image_path from guide"
+
+
 def list_rank_guide(db_path: Path) -> list[dict[str, object]]:
-    rows = fetch_all(db_path, "select id, name from guide order by id")
+    rows = fetch_all(db_path, _rank_guide_select(db_path) + " order by id")
     return sorted(rows, key=lambda row: (str(row.get("name") or "").casefold().replace("ё", "е"), int(row.get("id") or 0)))
 
 
 def get_rank_guide_item(db_path: Path, rank_id: int) -> dict[str, object] | None:
-    return fetch_one(db_path, "select id, name from guide where id = ?", (rank_id,))
+    return fetch_one(db_path, _rank_guide_select(db_path) + " where id = ?", (rank_id,))
 
 
 def _guide_level_select(db_path: Path, level: int) -> str:

@@ -12,6 +12,12 @@ def person_has_biography(db_path: Path) -> bool:
     return "biography" in columns
 
 
+def rank_guide_has_image(db_path: Path) -> bool:
+    with closing(open_readonly_connection(db_path)) as connection:
+        columns = {row["name"] for row in connection.execute("pragma table_info(guide)").fetchall()}
+    return "image_path" in columns
+
+
 def count_persons(db_path: Path) -> int:
     row = fetch_one(db_path, "select count(*) as count from person")
     return int(row["count"]) if row else 0
@@ -43,6 +49,7 @@ def list_persons(db_path: Path, limit: int = 25, offset: int = 0) -> list[dict[s
 
 def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
     biography_expr = "p.biography" if person_has_biography(db_path) else "null"
+    rank_image_expr = "g.image_path" if rank_guide_has_image(db_path) else "null"
     return fetch_one(
         db_path,
         f"""
@@ -52,6 +59,7 @@ def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
             p.birthday,
             p.id_rank,
             g.name as rank_name,
+            {rank_image_expr} as rank_image_path,
             p.person_foto,
             p.main_foto,
             p.rewards_foto,

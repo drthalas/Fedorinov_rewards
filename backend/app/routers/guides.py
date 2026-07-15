@@ -105,6 +105,10 @@ async def _read_guide_level_form(request: Request) -> tuple[dict[str, object], U
     return values, upload if isinstance(upload, UploadFile) else None
 
 
+async def _read_rank_form(request: Request) -> tuple[dict[str, object], UploadFile | None]:
+    return await _read_guide_level_form(request)
+
+
 async def _save_uploaded_guide_image(settings, upload: UploadFile | None) -> str | None:
     if upload is None or not (upload.filename or "").strip():
         return None
@@ -230,19 +234,29 @@ def rank_new(request: Request, return_to: str = ""):
 @router.post("/guides/ranks/new")
 async def rank_create(request: Request):
     settings = get_settings()
-    form_values = await _read_form(request)
+    form_values, upload = await _read_rank_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    image_path: str | None = None
     try:
-        create_rank(settings, rank_data_from_mapping(form_values))
+        data = rank_data_from_mapping(form_values)
+        image_path = await _save_uploaded_guide_image(settings, upload)
+        if image_path:
+            data = replace(data, image_path=image_path)
+        create_rank(settings, data)
     except WriteBlockedError as exc:
+        _delete_guide_image_safely(settings, image_path)
         raise _write_error(exc) from exc
-    except GuideValidationError as exc:
+    except (GuideValidationError, GuideImageValidationError) as exc:
+        _delete_guide_image_safely(settings, image_path)
         return templates.TemplateResponse(
             request,
             "rank_form.html",
             {"settings": settings, "mode": "create", "rank": form_values, "return_to": return_to, "error": str(exc)},
             status_code=400,
         )
+    finally:
+        if upload is not None:
+            await upload.close()
     target = with_status(return_to, "rank_created") if return_to else "/guides?status=rank_created"
     return RedirectResponse(target, status_code=303)
 
@@ -265,19 +279,43 @@ def rank_edit(request: Request, rank_id: int, return_to: str = ""):
 @router.post("/guides/ranks/{rank_id}/edit")
 async def rank_update(request: Request, rank_id: int):
     settings = get_settings()
-    form_values = await _read_form(request)
+    current_rank = get_rank_guide_item(settings.rewards_db_path, rank_id) if settings.db_exists else None
+    if current_rank is None:
+        raise HTTPException(status_code=404, detail="Звание/специальность не найдены.")
+    form_values, upload = await _read_rank_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    old_image_path = current_rank.get("image_path")
+    new_image_path: str | None = None
     try:
-        update_rank(settings, rank_id, rank_data_from_mapping(form_values))
+        data = rank_data_from_mapping(form_values)
+        new_image_path = await _save_uploaded_guide_image(settings, upload)
+        if new_image_path:
+            image_path = new_image_path
+        elif form_values.get("clear_image") == "true":
+            image_path = None
+        else:
+            image_path = old_image_path
+        update_rank(settings, rank_id, replace(data, image_path=image_path))
     except WriteBlockedError as exc:
+        _delete_guide_image_safely(settings, new_image_path)
         raise _write_error(exc) from exc
-    except GuideValidationError as exc:
+    except (GuideValidationError, GuideImageValidationError) as exc:
+        _delete_guide_image_safely(settings, new_image_path)
         return templates.TemplateResponse(
             request,
             "rank_form.html",
-            {"settings": settings, "mode": "edit", "rank": {"id": rank_id, **form_values}, "return_to": return_to, "error": str(exc)},
+            {
+                "settings": settings,
+                "mode": "edit",
+                "rank": {**current_rank, "id": rank_id, **form_values, "image_path": old_image_path},
+                "return_to": return_to,
+                "error": str(exc),
+            },
             status_code=400,
         )
+    finally:
+        if upload is not None:
+            await upload.close()
     target = with_status(return_to, "rank_updated") if return_to else "/guides?status=rank_updated"
     return RedirectResponse(target, status_code=303)
 

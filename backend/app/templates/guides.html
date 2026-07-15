@@ -19,7 +19,7 @@
 {% macro render_nodes(nodes) %}
 <ul class="tree-list">
   {% for node in nodes %}
-  <li class="guide-tree-node guide-tree-level-{{ node.level }}" id="guide-node-{{ node.guide_key }}" data-guide-key="{{ node.guide_key }}" data-guide-level="{{ node.level }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
+  <li class="guide-tree-node guide-tree-level-{{ node.level }}" id="guide-node-{{ node.guide_key }}" data-guide-tree-node data-guide-search-name="{{ node.name|lower }}" data-guide-key="{{ node.guide_key }}" data-guide-level="{{ node.level }}"{% if node.is_focus %} data-guide-focus-target{% endif %}>
     <details class="guide-node-details{% if not node.children %} guide-leaf-details{% endif %}" data-guide-key="{{ node.guide_key }}"{% if node.is_open %} open{% endif %}>
       <summary><span class="guide-node-content">{{ render_node_title(node) }}</span></summary>
       {{ render_node_extra(node) }}
@@ -61,12 +61,16 @@
     <div class="guide-ranks-scroll">
     <label class="guide-rank-search">
       <span class="visually-hidden">Поиск по званиям и специальностям</span>
-      <input type="search" data-guide-rank-filter placeholder="Поиск по званиям и специальностям…" autocomplete="off">
+      <input type="search" data-guide-rank-filter aria-label="Поиск по званиям и специальностям" placeholder="Поиск по званиям и специальностям…" autocomplete="off">
     </label>
     <ul class="guide-list" aria-label="Звания и специальности">
       {% for rank in ranks %}
-      <li data-guide-rank-row data-guide-rank-name="{{ rank.name|lower }}">
+      {% set rank_image_available = rank.image_path and media_exists(rank.image_path) %}
+      <li class="guide-rank-row{% if rank_image_available %} has-rank-insignia{% endif %}" data-guide-rank-row data-guide-rank-name="{{ rank.name|lower }}">
         <span class="guide-rank-name"><span class="guide-rank-icon" aria-hidden="true"></span>{{ rank.name }}</span>
+        {% if rank_image_available %}
+        <span class="guide-rank-insignia-frame"><img class="guide-rank-insignia" src="{{ media_url(rank.image_path) }}" alt="Погон: {{ rank.name }}" loading="lazy"></span>
+        {% endif %}
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
@@ -92,8 +96,14 @@
       <span class="tool-button disabled">Добавить</span>
       {% endif %}
     </div>
+    <label class="guide-rank-search guide-tree-search">
+      <span class="visually-hidden">Поиск по дереву наград и знаков</span>
+      <input type="search" data-guide-tree-filter aria-label="Поиск по дереву наград и знаков" placeholder="Поиск по дереву наград…" autocomplete="off">
+      <button type="button" data-guide-tree-filter-clear aria-label="Очистить поиск по дереву" title="Очистить поиск" hidden>×</button>
+    </label>
     <div class="guide-tree-scroll">
     {{ render_nodes(tree) }}
+    <p class="guide-tree-empty" data-guide-tree-empty hidden>Ничего не найдено.</p>
     </div>
   </div>
 </section>
