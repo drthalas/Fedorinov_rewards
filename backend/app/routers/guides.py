@@ -33,6 +33,11 @@ from ..services.guide_images import (
     delete_guide_image_file,
     save_guide_image,
 )
+from ..services.media_lifecycle import (
+    MediaCleanupResult,
+    cleanup_unreferenced_image,
+    discard_uncommitted_image,
+)
 from ..services.guide_tree_state import (
     apply_guide_tree_state,
     guide_node_key,
@@ -57,13 +62,17 @@ STATUS_MESSAGES = {
     "rank_delete_used": "Нельзя удалить: это звание используется в карточках награждённых.",
     "guide_delete_children": "Нельзя удалить: у этого раздела есть дочерние записи.",
     "guide_delete_used": "Нельзя удалить: это значение используется в наградах или знаках.",
+    "media_cleanup_failed": "Изменения сохранены, но старый файл не удалось удалить. Проверьте журнал приложения.",
 }
 ERROR_STATUS_CODES = {
     "delete_blocked",
     "rank_delete_used",
     "guide_delete_children",
     "guide_delete_used",
+    "media_cleanup_failed",
 }
+
+GUIDE_IMAGE_ROOTS = frozenset({"GuideImages"})
 
 LEVEL_LABELS = {
     0: "Государство",
@@ -129,6 +138,18 @@ def _delete_guide_image_safely(settings, image_path: object) -> None:
         delete_guide_image_file(settings, image_path)
     except (GuideImageValidationError, OSError):
         return
+
+
+def _discard_guide_image_candidate(settings, image_path: object) -> MediaCleanupResult:
+    return discard_uncommitted_image(settings, image_path, allowed_roots=GUIDE_IMAGE_ROOTS)
+
+
+def _cleanup_replaced_guide_image(settings, image_path: object) -> MediaCleanupResult:
+    return cleanup_unreferenced_image(settings, image_path, allowed_roots=GUIDE_IMAGE_ROOTS)
+
+
+def _media_status(default_status: str, cleanup: MediaCleanupResult | None) -> str:
+    return "media_cleanup_failed" if cleanup is not None and cleanup.warning_required else default_status
 
 
 def _write_error(exc: WriteBlockedError) -> HTTPException:
@@ -254,16 +275,19 @@ async def rank_create(request: Request):
             data = replace(data, image_path=image_path)
         create_rank(settings, data)
     except WriteBlockedError as exc:
-        _delete_guide_image_safely(settings, image_path)
+        _discard_guide_image_candidate(settings, image_path)
         raise _write_error(exc) from exc
     except (GuideValidationError, GuideImageValidationError) as exc:
-        _delete_guide_image_safely(settings, image_path)
+        _discard_guide_image_candidate(settings, image_path)
         return templates.TemplateResponse(
             request,
             "rank_form.html",
             {"settings": settings, "mode": "create", "rank": form_values, "return_to": return_to, "error": str(exc)},
             status_code=400,
         )
+    except Exception:
+        _discard_guide_image_candidate(settings, image_path)
+        raise
     finally:
         if upload is not None:
             await upload.close()
@@ -296,6 +320,7 @@ async def rank_update(request: Request, rank_id: int):
     return_to = safe_return_to(form_values.get("return_to"))
     old_image_path = current_rank.get("image_path")
     new_image_path: str | None = None
+    resulting_image_path: object = old_image_path
     try:
         data = rank_data_from_mapping(form_values)
         new_image_path = await _save_uploaded_guide_image(settings, upload)
@@ -305,12 +330,13 @@ async def rank_update(request: Request, rank_id: int):
             image_path = None
         else:
             image_path = old_image_path
+        resulting_image_path = image_path
         update_rank(settings, rank_id, replace(data, image_path=image_path))
     except WriteBlockedError as exc:
-        _delete_guide_image_safely(settings, new_image_path)
+        _discard_guide_image_candidate(settings, new_image_path)
         raise _write_error(exc) from exc
     except (GuideValidationError, GuideImageValidationError) as exc:
-        _delete_guide_image_safely(settings, new_image_path)
+        _discard_guide_image_candidate(settings, new_image_path)
         return templates.TemplateResponse(
             request,
             "rank_form.html",
@@ -323,10 +349,17 @@ async def rank_update(request: Request, rank_id: int):
             },
             status_code=400,
         )
+    except Exception:
+        _discard_guide_image_candidate(settings, new_image_path)
+        raise
     finally:
         if upload is not None:
             await upload.close()
-    target = with_status(return_to, "rank_updated") if return_to else "/guides?status=rank_updated"
+    cleanup = None
+    if old_image_path and old_image_path != resulting_image_path:
+        cleanup = _cleanup_replaced_guide_image(settings, old_image_path)
+    status_code = _media_status("rank_updated", cleanup)
+    target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
     return RedirectResponse(target, status_code=303)
 
 
@@ -390,10 +423,10 @@ async def guide_level_create(request: Request, level: int):
             data = replace(data, image_path=image_path)
         created_item_id = create_guide_level_item(settings, data)
     except WriteBlockedError as exc:
-        _delete_guide_image_safely(settings, image_path)
+        _discard_guide_image_candidate(settings, image_path)
         raise _write_error(exc) from exc
     except (GuideValidationError, GuideImageValidationError) as exc:
-        _delete_guide_image_safely(settings, image_path)
+        _discard_guide_image_candidate(settings, image_path)
         return templates.TemplateResponse(
             request,
             "guide_level_form.html",
@@ -411,6 +444,9 @@ async def guide_level_create(request: Request, level: int):
             },
             status_code=400,
         )
+    except Exception:
+        _discard_guide_image_candidate(settings, image_path)
+        raise
     finally:
         if upload is not None:
             await upload.close()
@@ -481,10 +517,10 @@ async def guide_level_update(request: Request, level: int, item_id: int):
             )
         update_guide_level_item(settings, level, item_id, data)
     except WriteBlockedError as exc:
-        _delete_guide_image_safely(settings, new_image_path)
+        _discard_guide_image_candidate(settings, new_image_path)
         raise _write_error(exc) from exc
     except (GuideValidationError, GuideImageValidationError) as exc:
-        _delete_guide_image_safely(settings, new_image_path)
+        _discard_guide_image_candidate(settings, new_image_path)
         return templates.TemplateResponse(
             request,
             "guide_level_form.html",
@@ -502,16 +538,21 @@ async def guide_level_update(request: Request, level: int, item_id: int):
             },
             status_code=400,
         )
+    except Exception:
+        _discard_guide_image_candidate(settings, new_image_path)
+        raise
     finally:
         if upload is not None:
             await upload.close()
+    cleanup = None
     if new_image_path and old_image_path and old_image_path != new_image_path:
-        _delete_guide_image_safely(settings, old_image_path)
+        cleanup = _cleanup_replaced_guide_image(settings, old_image_path)
+    status_code = _media_status("guide_updated", cleanup)
     if return_to:
         target = guide_tree_return_url(return_to, focus_key=guide_node_key(level, item_id))
-        target = with_status(target, "guide_updated")
+        target = with_status(target, status_code)
     else:
-        target = "/guides?status=guide_updated"
+        target = f"/guides?status={status_code}"
     return RedirectResponse(target, status_code=303)
 
 
@@ -524,12 +565,13 @@ async def guide_level_image_delete(request: Request, level: int, item_id: int):
         raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
         image_path = clear_guide_level_image(settings, level, item_id)
-        _delete_guide_image_safely(settings, image_path)
+        cleanup = _cleanup_replaced_guide_image(settings, image_path)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except GuideValidationError as exc:
         raise _delete_validation_error(exc) from exc
-    target = with_status(return_to, "guide_image_deleted") if return_to else "/guides?status=guide_image_deleted"
+    status_code = _media_status("guide_image_deleted", cleanup)
+    target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
     return RedirectResponse(target, status_code=303)
 
 

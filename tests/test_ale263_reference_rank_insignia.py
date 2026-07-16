@@ -94,7 +94,7 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIsNone(get_person(self.db_path, 77)["rank_image_path"])
         self.assertNotIn("image_path", self._columns())
 
-    def test_rank_router_create_replace_and_clear_uses_temp_media_without_physical_delete(self) -> None:
+    def test_rank_router_create_replace_and_clear_removes_unreferenced_media(self) -> None:
         create_upload = UploadFile(file=BytesIO(PNG_BYTES), filename="insignia.png")
         create_request = FakeMultipartRequest(
             [("name", "Гвардии капитан"), ("return_to", "/guides"), ("image_file", create_upload)]
@@ -117,7 +117,7 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         second_path = str(get_rank_guide_item(self.db_path, rank_id)["image_path"])
         self.assertNotEqual(first_path, second_path)
-        self.assertTrue((self.root / first_path).is_file())
+        self.assertFalse((self.root / first_path).exists())
         self.assertTrue((self.root / second_path).is_file())
 
         clear_request = FakeMultipartRequest(
@@ -127,7 +127,7 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
             response = asyncio.run(guides_router.rank_update(clear_request, rank_id))
         self.assertEqual(response.status_code, 303)
         self.assertIsNone(get_rank_guide_item(self.db_path, rank_id)["image_path"])
-        self.assertTrue((self.root / second_path).is_file())
+        self.assertFalse((self.root / second_path).exists())
 
     def test_rank_image_path_validation_and_person_join(self) -> None:
         with self.assertRaises(GuideValidationError):

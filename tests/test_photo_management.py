@@ -18,6 +18,11 @@ from backend.app.services.photos import PhotoValidationError, clear_photo, photo
 from backend.app.services.write_guard import WriteBlockedError
 
 
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"jpeg-image"
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"png-image"
+WEBP_BYTES = b"RIFF" + (10).to_bytes(4, "little") + b"WEBP" + b"webp-image"
+
+
 class PhotoManagementTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = TemporaryDirectory()
@@ -92,7 +97,7 @@ class PhotoManagementTests(unittest.TestCase):
             return row[0] if row else None
 
     def test_person_photo_upload_and_clear(self) -> None:
-        path = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", b"jpeg-bytes")
+        path = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
         self.assertTrue(path.startswith("Source/1/FotoPerson_"))
         self.assertTrue(path.endswith(".jpg"))
         self.assertEqual(self.fetch_value("person", 1, "person_foto"), path)
@@ -101,29 +106,29 @@ class PhotoManagementTests(unittest.TestCase):
 
         clear_photo(self.settings(), "person", 1, "person_foto")
         self.assertIsNone(self.fetch_value("person", 1, "person_foto"))
-        self.assertTrue(target.exists())
+        self.assertFalse(target.exists())
 
     def test_clipboard_jpeg_upload_saves_jpg_path(self) -> None:
-        path = save_photo(self.settings(), "person", 1, "person_foto", "clipboard.jpg", b"jpeg-bytes")
+        path = save_photo(self.settings(), "person", 1, "person_foto", "clipboard.jpg", JPEG_BYTES)
         self.assertTrue(path.startswith("Source/1/FotoPerson_"))
         self.assertTrue(path.endswith(".jpg"))
         target = self.root / path
         self.assertTrue(target.exists())
-        self.assertEqual(target.read_bytes(), b"jpeg-bytes")
+        self.assertEqual(target.read_bytes(), JPEG_BYTES)
 
     def test_person_fixed_slot_upload_replace_and_clear_do_not_change_neighbor(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("update person set main_foto = ? where id = 1", ("Source/1/neighbor.jpg",))
 
         with patch("backend.app.services.photos._timestamp", side_effect=["20260712_120000", "20260712_120001"]):
-            first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", b"first-image")
-            replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.png", b"second-image")
+            first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
+            replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.png", PNG_BYTES)
 
         self.assertNotEqual(first, replacement)
         self.assertEqual(self.fetch_value("person", 1, "person_foto"), replacement)
         self.assertEqual(self.fetch_value("person", 1, "main_foto"), "Source/1/neighbor.jpg")
-        self.assertTrue((self.root / first).exists())
-        self.assertEqual((self.root / replacement).read_bytes(), b"second-image")
+        self.assertFalse((self.root / first).exists())
+        self.assertEqual((self.root / replacement).read_bytes(), PNG_BYTES)
 
         row = {"person_foto": replacement, "main_foto": "Source/1/neighbor.jpg"}
         controls = photo_items("person", row)
@@ -133,10 +138,10 @@ class PhotoManagementTests(unittest.TestCase):
         clear_photo(self.settings(), "person", 1, "person_foto")
         self.assertIsNone(self.fetch_value("person", 1, "person_foto"))
         self.assertEqual(self.fetch_value("person", 1, "main_foto"), "Source/1/neighbor.jpg")
-        self.assertTrue((self.root / replacement).exists())
+        self.assertFalse((self.root / replacement).exists())
 
     def test_reward_photo_upload_uses_person_reward_folder(self) -> None:
-        path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", b"png-bytes")
+        path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", PNG_BYTES)
         self.assertTrue(path.startswith("Source/1/10/FotoFront_"))
         self.assertTrue(path.endswith(".png"))
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), path)
@@ -147,22 +152,22 @@ class PhotoManagementTests(unittest.TestCase):
             connection.execute("update rewards set back_foto = ? where id = 10", ("Source/1/10/neighbor.jpg",))
 
         with patch("backend.app.services.photos._timestamp", side_effect=["20260715_120000", "20260715_120001"]):
-            first = save_photo(self.settings(), "reward", 10, "front_foto", "front.jpg", b"first-image")
-            replacement = save_photo(self.settings(), "reward", 10, "front_foto", "replacement.webp", b"second-image")
+            first = save_photo(self.settings(), "reward", 10, "front_foto", "front.jpg", JPEG_BYTES)
+            replacement = save_photo(self.settings(), "reward", 10, "front_foto", "replacement.webp", WEBP_BYTES)
 
         self.assertNotEqual(first, replacement)
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), replacement)
         self.assertEqual(self.fetch_value("rewards", 10, "back_foto"), "Source/1/10/neighbor.jpg")
-        self.assertTrue((self.root / first).exists())
-        self.assertEqual((self.root / replacement).read_bytes(), b"second-image")
+        self.assertFalse((self.root / first).exists())
+        self.assertEqual((self.root / replacement).read_bytes(), WEBP_BYTES)
 
         clear_photo(self.settings(), "reward", 10, "front_foto")
         self.assertIsNone(self.fetch_value("rewards", 10, "front_foto"))
         self.assertEqual(self.fetch_value("rewards", 10, "back_foto"), "Source/1/10/neighbor.jpg")
-        self.assertTrue((self.root / replacement).exists())
+        self.assertFalse((self.root / replacement).exists())
 
     def test_mark_photo_upload_uses_source_mark_folder(self) -> None:
-        path = save_photo(self.settings(), "mark", 20, "back_foto", "back.webp", b"webp-bytes")
+        path = save_photo(self.settings(), "mark", 20, "back_foto", "back.webp", WEBP_BYTES)
         self.assertTrue(path.startswith("SourceMark/20/FotoBack_"))
         self.assertEqual(self.fetch_value("mark", 20, "back_foto"), path)
         self.assertTrue((self.root / path).exists())
@@ -171,9 +176,13 @@ class PhotoManagementTests(unittest.TestCase):
         with self.assertRaises(PhotoValidationError):
             save_photo(self.settings(), "person", 1, "person_foto", "portrait.txt", b"text")
 
+    def test_invalid_image_signature_is_blocked(self) -> None:
+        with self.assertRaises(PhotoValidationError):
+            save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", b"not-an-image")
+
     def test_write_mode_disabled_blocks_upload_and_clear(self) -> None:
         with self.assertRaises(WriteBlockedError):
-            save_photo(self.settings(write_mode=False), "person", 1, "person_foto", "portrait.jpg", b"jpeg")
+            save_photo(self.settings(write_mode=False), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
         with self.assertRaises(WriteBlockedError):
             clear_photo(self.settings(write_mode=False), "person", 1, "person_foto")
 

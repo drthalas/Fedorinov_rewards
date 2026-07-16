@@ -4,10 +4,12 @@ from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
 from .audit import log_action
+from .media_lifecycle import MediaCleanupResult, cleanup_unreferenced_image, discard_uncommitted_image
 from .write_guard import ensure_write_allowed
 
 
@@ -24,6 +26,12 @@ class PhotoField:
     field: str
     label: str
     stem: str
+
+
+@dataclass(frozen=True)
+class PhotoMutationResult:
+    path: str | None
+    cleanup: MediaCleanupResult
 
 
 PERSON_PHOTO_FIELDS = (
@@ -84,6 +92,16 @@ def _extension(filename: str) -> str:
     return suffix
 
 
+def _matches_image_signature(extension: str, content: bytes) -> bool:
+    if extension in {".jpg", ".jpeg"}:
+        return content.startswith(b"\xff\xd8\xff")
+    if extension == ".png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if extension == ".webp":
+        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
+    return False
+
+
 def _timestamp() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -118,6 +136,14 @@ def _table_name(entity_type: str) -> str:
     raise PhotoValidationError("Некорректный тип объекта")
 
 
+def _allowed_roots(entity_type: str) -> frozenset[str]:
+    if entity_type in {"person", "reward"}:
+        return frozenset({"Source"})
+    if entity_type == "mark":
+        return frozenset({"SourceMark"})
+    raise PhotoValidationError("Некорректный тип объекта")
+
+
 def save_photo(
     settings: Settings,
     entity_type: str,
@@ -126,6 +152,17 @@ def save_photo(
     filename: str,
     content: bytes,
 ) -> str:
+    return str(save_photo_with_result(settings, entity_type, entity_id, photo_field, filename, content).path)
+
+
+def save_photo_with_result(
+    settings: Settings,
+    entity_type: str,
+    entity_id: int,
+    photo_field: str,
+    filename: str,
+    content: bytes,
+) -> PhotoMutationResult:
     ensure_write_allowed(settings)
     field = _field_config(entity_type, photo_field)
     extension = _extension(filename)
@@ -133,34 +170,76 @@ def save_photo(
         raise PhotoValidationError("Файл пустой")
     if len(content) > MAX_PHOTO_BYTES:
         raise PhotoValidationError("Файл больше 25 MB")
+    if not _matches_image_signature(extension, content):
+        raise PhotoValidationError("Файл не является корректным изображением выбранного типа")
 
+    relative_path: str | None = None
+    old_path: object = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         row = _entity_row(connection, entity_type, entity_id)
         if row is None:
             raise PhotoValidationError("Объект не найден")
+        table = _table_name(entity_type)
+        current = connection.execute(
+            f"select {field.field} as photo_path from {table} where id = ?",
+            (entity_id,),
+        ).fetchone()
+        old_path = current["photo_path"] if current is not None else None
         relative_dir = _relative_dir(entity_type, entity_id, row)
         target_dir = settings.rewards_data_dir / relative_dir
         target_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{field.stem}_{_timestamp()}{extension}"
+        filename = f"{field.stem}_{_timestamp()}_{uuid4().hex}{extension}"
         target_path = target_dir / filename
-        target_path.write_bytes(content)
         relative_path = (relative_dir / filename).as_posix()
-        table = _table_name(entity_type)
-        connection.execute(f"update {table} set {field.field} = ? where id = ?", (relative_path, entity_id))
-        connection.commit()
+        try:
+            target_path.write_bytes(content)
+            connection.execute(f"update {table} set {field.field} = ? where id = ?", (relative_path, entity_id))
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            discard_uncommitted_image(settings, relative_path, allowed_roots=_allowed_roots(entity_type))
+            raise
 
-    log_action("photo_uploaded", entity_type, entity_id, {"field": field.field, "bytes": len(content)})
-    return relative_path
+    cleanup = cleanup_unreferenced_image(settings, old_path, allowed_roots=_allowed_roots(entity_type))
+    log_action(
+        "photo_uploaded",
+        entity_type,
+        entity_id,
+        {"field": field.field, "bytes": len(content), "old_file_cleanup": cleanup.status},
+    )
+    return PhotoMutationResult(relative_path, cleanup)
 
 
 def clear_photo(settings: Settings, entity_type: str, entity_id: int, photo_field: str) -> None:
+    clear_photo_with_result(settings, entity_type, entity_id, photo_field)
+
+
+def clear_photo_with_result(
+    settings: Settings,
+    entity_type: str,
+    entity_id: int,
+    photo_field: str,
+) -> PhotoMutationResult:
     ensure_write_allowed(settings)
     field = _field_config(entity_type, photo_field)
+    old_path: object = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         row = _entity_row(connection, entity_type, entity_id)
         if row is None:
             raise PhotoValidationError("Объект не найден")
         table = _table_name(entity_type)
+        current = connection.execute(
+            f"select {field.field} as photo_path from {table} where id = ?",
+            (entity_id,),
+        ).fetchone()
+        old_path = current["photo_path"] if current is not None else None
         connection.execute(f"update {table} set {field.field} = null where id = ?", (entity_id,))
         connection.commit()
-    log_action("photo_field_cleared", entity_type, entity_id, {"field": field.field, "physical_file_deleted": False})
+    cleanup = cleanup_unreferenced_image(settings, old_path, allowed_roots=_allowed_roots(entity_type))
+    log_action(
+        "photo_field_cleared",
+        entity_type,
+        entity_id,
+        {"field": field.field, "old_file_cleanup": cleanup.status},
+    )
+    return PhotoMutationResult(None, cleanup)

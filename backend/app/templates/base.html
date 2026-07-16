@@ -9,6 +9,14 @@
   </head>
   <body class="legacy-body {% block body_class %}{% endblock %}">
     {% include "_user_nav.html" %}
+    {% if request is defined and request.query_params is defined and request.query_params.get('media_cleanup') == 'failed' %}
+    <div class="guide-toast-region" data-guide-toast-region aria-live="polite" aria-atomic="true">
+      <section class="guide-toast guide-toast-error" data-guide-toast data-guide-toast-timeout="8000" role="alert">
+        <span>Изменения сохранены, но старый файл не удалось удалить. Проверьте журнал приложения.</span>
+        <button type="button" data-guide-toast-close aria-label="Закрыть сообщение" title="Закрыть сообщение">×</button>
+      </section>
+    </div>
+    {% endif %}
     <main class="page">
       {% block content %}{% endblock %}
     </main>

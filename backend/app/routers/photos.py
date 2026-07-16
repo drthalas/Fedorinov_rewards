@@ -5,8 +5,13 @@ from fastapi.responses import RedirectResponse
 from starlette.datastructures import UploadFile
 
 from ..config import get_settings
-from ..services.navigation import safe_return_to
-from ..services.photos import MAX_PHOTO_BYTES, PhotoValidationError, clear_photo, save_photo
+from ..services.navigation import safe_return_to, with_query_value
+from ..services.photos import (
+    MAX_PHOTO_BYTES,
+    PhotoValidationError,
+    clear_photo_with_result,
+    save_photo_with_result,
+)
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -58,7 +63,7 @@ async def photo_upload(request: Request):
     content = await upload.read(MAX_PHOTO_BYTES + 1)
 
     try:
-        save_photo(settings, entity_type, entity_id, photo_field, upload.filename or "", content)
+        result = save_photo_with_result(settings, entity_type, entity_id, photo_field, upload.filename or "", content)
     except WriteBlockedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except PhotoValidationError as exc:
@@ -66,6 +71,8 @@ async def photo_upload(request: Request):
     finally:
         await upload.close()
 
+    if result.cleanup.warning_required:
+        return_url = with_query_value(return_url, "media_cleanup", "failed")
     return RedirectResponse(return_url, status_code=303)
 
 
@@ -82,10 +89,12 @@ async def photo_clear(request: Request):
         raise HTTPException(status_code=400, detail="Invalid entity_id") from exc
 
     try:
-        clear_photo(settings, entity_type, entity_id, photo_field)
+        result = clear_photo_with_result(settings, entity_type, entity_id, photo_field)
     except WriteBlockedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except PhotoValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    if result.cleanup.warning_required:
+        return_url = with_query_value(return_url, "media_cleanup", "failed")
     return RedirectResponse(return_url, status_code=303)
