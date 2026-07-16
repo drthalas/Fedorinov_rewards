@@ -184,8 +184,14 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIn("DataTransfer", preview_script)
         self.assertIn("normalizeRankImage", preview_script)
         self.assertIn("rankContentBounds", preview_script)
-        self.assertIn("let pickerNext = false", preview_script)
-        self.assertIn("if (pickerNext)", preview_script)
+        self.assertNotIn("pickerNext", preview_script)
+        trigger_handler = preview_script.split('trigger.addEventListener("click"', 1)[1].split(
+            'clear.addEventListener("click"', 1
+        )[0]
+        self.assertLess(
+            trigger_handler.index("helper.readWithTimeout"),
+            trigger_handler.index("openFilePicker()"),
+        )
         self.assertIn("input.click();", preview_script)
         self.assertNotIn("showPicker", preview_script)
         self.assertIn('input.addEventListener("cancel"', preview_script)

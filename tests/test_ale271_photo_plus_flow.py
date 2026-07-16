@@ -53,7 +53,7 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
             script,
         )
 
-    def test_managed_flow_opens_picker_synchronously_and_preserves_cancel_retry(self) -> None:
+    def test_managed_flow_rechecks_clipboard_after_picker_cancel(self) -> None:
         script = self.read("backend/app/static/clipboard_paste.js")
         handler = script.split("function bindInlinePhotoTrigger(button)", 1)[1].split(
             'document.addEventListener("DOMContentLoaded"', 1
@@ -62,12 +62,12 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
             "function bindInlinePhotoTrigger(button)", 1
         )[0]
 
-        self.assertIn("shouldOpenFilePicker(button)", handler)
-        self.assertIn("markFilePickerNext(button)", handler)
-        self.assertIn('rememberPhotoInteraction(button, "file-next")', handler)
-        self.assertIn('state.photoPlusMode === "file-next"', script)
-        self.assertIn("resetPhotoPlusMode(button)", handler)
-        self.assertLess(handler.index("shouldOpenFilePicker(button)"), handler.index("imageBlobFromClipboardWithTimeout"))
+        self.assertNotIn("shouldOpenFilePicker", script)
+        self.assertNotIn("markFilePickerNext", script)
+        self.assertNotIn("resetPhotoPlusMode", script)
+        self.assertNotIn("photoPlusMode", script)
+        self.assertNotIn("file-next", script)
+        self.assertLess(handler.index("imageBlobFromClipboardWithTimeout"), handler.index("openPersonFilePicker(button)"))
         self.assertIn("normalizedPageSearch(window.location.search)", script)
         self.assertIn("normalizedPageSearch(state.search)", script)
         self.assertIn("input.click();", picker)
@@ -78,28 +78,27 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
 
         cancel_handler = picker.split("function onCancel()", 1)[1].split("function onChange()", 1)[0]
         self.assertIn("restorePhotoInteraction()", cancel_handler)
-        self.assertNotIn("resetPhotoPlusMode", cancel_handler)
+        self.assertNotIn("photoPlusMode", cancel_handler)
         change_handler = picker.split("function onChange()", 1)[1].split('input.addEventListener("cancel"', 1)[0]
-        self.assertIn("resetPhotoPlusMode(button)", change_handler)
         self.assertIn("input.form.submit()", change_handler)
 
-    def test_rank_uses_local_picker_next_state_and_resets_on_clear(self) -> None:
+    def test_rank_rechecks_clipboard_after_picker_cancel(self) -> None:
         script = self.read("backend/app/static/guide_image_preview.js")
         rank_form = self.read("backend/app/templates/rank_form.html")
         rank_editor = script.split("function initRankImageEditor(editor)", 1)[1]
+        trigger_handler = rank_editor.split('trigger.addEventListener("click"', 1)[1].split(
+            'clear.addEventListener("click"', 1
+        )[0]
 
-        self.assertIn("let pickerNext = false", rank_editor)
-        self.assertIn("if (pickerNext)", rank_editor)
-        self.assertIn("pickerNext = true", rank_editor)
-        self.assertIn("pickerNext = false", rank_editor)
+        self.assertNotIn("pickerNext", rank_editor)
         self.assertIn("input.click();", rank_editor)
         self.assertNotIn("showPicker", rank_editor)
         self.assertLess(
-            rank_editor.index("if (pickerNext)"),
-            rank_editor.index("helper.readWithTimeout"),
+            trigger_handler.index("helper.readWithTimeout"),
+            trigger_handler.index("openFilePicker()"),
         )
         cancel_handler = rank_editor.split('input.addEventListener("cancel"', 1)[1].split("});", 1)[0]
-        self.assertNotIn("pickerNext = false", cancel_handler)
+        self.assertNotIn("pickerNext", cancel_handler)
         self.assertNotIn("data-rank-image-status", rank_form)
 
     def test_obsolete_state_helper_and_visible_technical_statuses_are_removed(self) -> None:

@@ -231,8 +231,6 @@
     if (!input || !trigger || !clear || !clearValue || !preview || !image || !placeholder || !error) return;
 
     let objectUrl = "";
-    let pickerNext = false;
-
     function revokeObjectUrl() {
       if (!objectUrl) return;
       URL.revokeObjectURL(objectUrl);
@@ -293,7 +291,6 @@
 
     function openFilePicker() {
       trigger.disabled = false;
-      pickerNext = true;
       clearError();
       try {
         input.click();
@@ -332,11 +329,6 @@
     });
 
     trigger.addEventListener("click", async () => {
-      if (pickerNext) {
-        openFilePicker();
-        return;
-      }
-      pickerNext = true;
       trigger.disabled = true;
       try {
         const helper = window.FedorinovClipboardImages;
@@ -353,7 +345,6 @@
       revokeObjectUrl();
       input.value = "";
       clearValue.value = "true";
-      pickerNext = false;
       image.hidden = true;
       image.removeAttribute("src");
       placeholder.hidden = false;
@@ -361,11 +352,6 @@
       trigger.setAttribute("aria-label", "Добавить изображение погона");
       trigger.title = "Добавить изображение погона";
       clearError();
-    });
-
-    const form = editor.closest("form");
-    if (form) form.addEventListener("reset", () => {
-      pickerNext = false;
     });
 
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });
