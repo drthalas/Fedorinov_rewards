@@ -21,11 +21,11 @@
     <div class="rank-insignia-preview-frame" data-rank-image-preview data-current-src="{% if has_rank_image %}{{ media_url(rank.image_path) }}{% endif %}">
       <img data-rank-image-preview-image class="rank-insignia-preview" {% if has_rank_image %}src="{{ media_url(rank.image_path) }}"{% else %}hidden{% endif %} alt="Погон: {{ rank.name or 'звание или специальность' }}">
       <span data-rank-image-preview-placeholder class="rank-insignia-preview-placeholder" {% if has_rank_image %}hidden{% endif %}>Изображение не загружено</span>
-      <span class="rank-insignia-controls">
-        <button type="button" class="rank-insignia-control" data-rank-image-trigger aria-label="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}" title="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}">+</button>
-        <button type="button" class="rank-insignia-control rank-insignia-remove" data-rank-image-clear aria-label="Удалить изображение погона" title="Удалить изображение погона"{% if not has_rank_image %} hidden{% endif %}>×</button>
-      </span>
     </div>
+    <span class="rank-insignia-controls">
+      <button type="button" class="rank-insignia-control" data-rank-image-trigger aria-label="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}" title="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}">+</button>
+      <button type="button" class="rank-insignia-control rank-insignia-remove" data-rank-image-clear aria-label="Удалить изображение погона" title="Удалить изображение погона"{% if not has_rank_image %} hidden{% endif %}>×</button>
+    </span>
     <input type="hidden" name="clear_image" value="" data-rank-image-clear-value>
     <input class="rank-insignia-file-input" type="file" name="image_file" data-rank-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
     <p class="rank-insignia-status secondary" data-rank-image-status aria-live="polite"></p>

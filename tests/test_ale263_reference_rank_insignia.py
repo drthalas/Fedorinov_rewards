@@ -167,6 +167,8 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIn("data-guide-tree-filter-clear", guides)
         self.assertIn("data-guide-tree-empty", guides)
         self.assertIn("data-guide-search-name", guides)
+        self.assertEqual(guides.count("window.confirm("), 2)
+        self.assertNotIn("return confirm(", guides)
         self.assertIn("guide-rank-insignia", guides)
         self.assertIn("media_exists(rank.image_path)", guides)
         self.assertIn("normalizeSearchText", tree_script)
@@ -180,6 +182,13 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertNotIn("Вставить изображение из буфера", rank_form)
         self.assertIn("FedorinovClipboardImages", preview_script)
         self.assertIn("DataTransfer", preview_script)
+        self.assertIn("normalizeRankImage", preview_script)
+        self.assertIn("rankContentBounds", preview_script)
+        self.assertIn("let clipboardAttempted = false", preview_script)
+        self.assertIn("if (clipboardAttempted)", preview_script)
+        self.assertIn('input.addEventListener("cancel"', preview_script)
+        preview_frame_end = rank_form.index("</div>", rank_form.index("rank-insignia-preview-frame"))
+        self.assertGreater(rank_form.index('class="rank-insignia-controls"'), preview_frame_end)
 
         self.assertIn("legacy-rank-insignia", legacy)
         self.assertIn("media_exists(selected_person.rank_image_path)", legacy)
@@ -189,6 +198,29 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIn("guide-list li.has-rank-insignia", styles)
         self.assertIn("grid-template-columns: minmax(0, 1fr) 48px minmax(140px, auto)", styles)
         self.assertIn("[data-guide-rank-row][hidden]", styles)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", styles)
+        self.assertIn("object-position: center center", styles)
+        self.assertIn(".guide-toast-region", styles)
+        self.assertIn("position: fixed", styles)
+        self.assertIn("data-guide-toast-timeout=\"{{ status_timeout_ms }}\"", guides)
+        self.assertIn("data-guide-toast-close", guides)
+        self.assertIn("initGuideToasts", tree_script)
+        self.assertIn('cleanUrl.searchParams.delete("status")', tree_script)
+
+    def test_guide_statuses_have_scoped_success_and_error_lifetimes(self) -> None:
+        with (
+            patch.object(guides_router, "list_rank_guide", return_value=[]),
+            patch.object(guides_router, "guide_tree", return_value=[]),
+            patch.object(guides_router, "apply_guide_tree_state", return_value=([], "")),
+        ):
+            success = guides_router._context(self.settings(), object(), status="rank_updated")
+            blocked = guides_router._context(self.settings(), object(), status="rank_delete_used")
+
+        self.assertEqual(success["status_message"], "Звание/специальность сохранены.")
+        self.assertEqual(success["status_kind"], "success")
+        self.assertEqual(success["status_timeout_ms"], 4000)
+        self.assertEqual(blocked["status_kind"], "error")
+        self.assertEqual(blocked["status_timeout_ms"], 8000)
 
     def test_selected_person_heading_renders_available_insignia_before_unchanged_metadata(self) -> None:
         legacy_template = (ROOT / "backend/app/templates/legacy.html").read_text(encoding="utf-8")

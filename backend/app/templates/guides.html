@@ -27,7 +27,7 @@
       <div class="tree-actions">
         {% if node.level < 3 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return confirm('Удалить элемент справочника?');">
+        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return window.confirm('Удалить элемент справочника?');">
           <input type="hidden" name="confirm" value="true">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
@@ -46,8 +46,22 @@
     <h1>Справочник</h1>
     <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/legacy?tab=rewards' }}">← Назад</a></p>
   </header>
-  {% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
-  {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
+  {% if status_message or error %}
+  <div class="guide-toast-region" data-guide-toast-region aria-live="polite" aria-atomic="true">
+    {% if status_message %}
+    <section class="guide-toast guide-toast-{{ status_kind }}" data-guide-toast data-guide-toast-timeout="{{ status_timeout_ms }}" role="{% if status_kind == 'error' %}alert{% else %}status{% endif %}">
+      <span>{{ status_message }}</span>
+      <button type="button" data-guide-toast-close aria-label="Закрыть сообщение" title="Закрыть сообщение">×</button>
+    </section>
+    {% endif %}
+    {% if error %}
+    <section class="guide-toast guide-toast-error" data-guide-toast data-guide-toast-timeout="8000" role="alert">
+      <span>{{ error }}</span>
+      <button type="button" data-guide-toast-close aria-label="Закрыть сообщение" title="Закрыть сообщение">×</button>
+    </section>
+    {% endif %}
+  </div>
+  {% endif %}
 <section class="guide-directory-grid" data-guide-state-root>
   <div class="panel guide-directory-panel guide-ranks-panel" id="ranks">
     <div class="legacy-block-head">
@@ -74,7 +88,7 @@
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" onsubmit="return confirm('Удалить звание/специальность?');">
+          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" onsubmit="return window.confirm('Удалить звание/специальность?');">
             <input type="hidden" name="confirm" value="true">
             <input type="hidden" name="return_to" value="{{ guides_self }}">
             <button class="link-button" type="submit">Удалить</button>

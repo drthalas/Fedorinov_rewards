@@ -18,7 +18,31 @@
     return !/[ivxlcdm]/i.test(nextCharacter);
   }
 
+  function initGuideToasts() {
+    const toasts = Array.from(document.querySelectorAll("[data-guide-toast]"));
+    if (!toasts.length || window.location.pathname !== guidesPath) return;
+
+    const cleanUrl = new URL(window.location.href);
+    cleanUrl.searchParams.delete("status");
+    window.history.replaceState(null, "", `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`);
+
+    toasts.forEach((toast) => {
+      let removed = false;
+      const close = () => {
+        if (removed) return;
+        removed = true;
+        toast.classList.add("is-leaving");
+        window.setTimeout(() => toast.remove(), 180);
+      };
+      const closeButton = toast.querySelector("[data-guide-toast-close]");
+      if (closeButton) closeButton.addEventListener("click", close);
+      const timeout = Number.parseInt(toast.dataset.guideToastTimeout || "4000", 10);
+      window.setTimeout(close, Number.isFinite(timeout) ? timeout : 4000);
+    });
+  }
+
   function init() {
+    initGuideToasts();
     const stateRoot = document.querySelector("[data-guide-state-root]");
     const tree = document.querySelector("[data-guide-tree]");
     if (!stateRoot || !tree || window.location.pathname !== guidesPath) return;

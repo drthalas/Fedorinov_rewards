@@ -58,6 +58,12 @@ STATUS_MESSAGES = {
     "guide_delete_children": "Нельзя удалить: у этого раздела есть дочерние записи.",
     "guide_delete_used": "Нельзя удалить: это значение используется в наградах или знаках.",
 }
+ERROR_STATUS_CODES = {
+    "delete_blocked",
+    "rank_delete_used",
+    "guide_delete_children",
+    "guide_delete_used",
+}
 
 LEVEL_LABELS = {
     0: "Государство",
@@ -182,6 +188,8 @@ def _context(
         query["focus"] = safe_focus
     if query:
         guides_self += "?" + urlencode(query)
+    status_message = STATUS_MESSAGES.get(status)
+    status_kind = "error" if status in ERROR_STATUS_CODES else "success"
     return {
         "settings": settings,
         "ranks": ranks,
@@ -191,7 +199,9 @@ def _context(
         "guides_self": guides_self,
         "guide_open": safe_open,
         "guide_focus": safe_focus,
-        "status_message": STATUS_MESSAGES.get(status),
+        "status_message": status_message,
+        "status_kind": status_kind,
+        "status_timeout_ms": 8000 if status_kind == "error" else 4000,
         "error": error,
     }
 
