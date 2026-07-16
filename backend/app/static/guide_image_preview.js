@@ -232,8 +232,8 @@
     if (!input || !trigger || !clear || !clearValue || !preview || !image || !placeholder || !status || !error) return;
 
     let objectUrl = "";
-    let clipboardAttempted = false;
     let selectedFileName = "";
+    const plusFlow = window.FedorinovPhotoPlusFlow;
 
     function revokeObjectUrl() {
       if (!objectUrl) return;
@@ -341,11 +341,10 @@
     });
 
     trigger.addEventListener("click", async () => {
-      if (clipboardAttempted) {
+      if (plusFlow && plusFlow.shouldOpenFilePicker(trigger)) {
         openFilePicker();
         return;
       }
-      clipboardAttempted = true;
       trigger.disabled = true;
       status.textContent = "Проверяем буфер обмена…";
       try {
@@ -353,6 +352,7 @@
         if (!helper || typeof helper.readWithTimeout !== "function") throw new Error("Clipboard API unavailable");
         const clipboardImage = await helper.readWithTimeout(1200);
         if (!await assignClipboardImage(clipboardImage)) throw new Error("Clipboard assignment unavailable");
+        if (plusFlow) plusFlow.markClipboardSuccess(trigger);
         trigger.disabled = false;
       } catch (error) {
         openFilePicker();
@@ -363,6 +363,7 @@
       revokeObjectUrl();
       input.value = "";
       clearValue.value = "true";
+      if (plusFlow) plusFlow.reset(trigger);
       image.hidden = true;
       image.removeAttribute("src");
       placeholder.hidden = false;
@@ -372,6 +373,11 @@
       trigger.setAttribute("aria-label", "Добавить изображение погона");
       trigger.title = "Добавить изображение погона";
       clearError();
+    });
+
+    const form = editor.closest("form");
+    if (form) form.addEventListener("reset", () => {
+      if (plusFlow) plusFlow.reset(trigger);
     });
 
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });

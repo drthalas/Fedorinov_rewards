@@ -268,7 +268,7 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260715-ale263-rank-corrective-3"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260716-ale271-photo-plus-flow-1"', templates)
         self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 

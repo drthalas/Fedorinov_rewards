@@ -102,7 +102,11 @@
     return document.querySelector("main.page");
   }
 
-  function rememberPhotoInteraction(button) {
+  function photoPlusFlow() {
+    return window.FedorinovPhotoPlusFlow;
+  }
+
+  function rememberPhotoInteraction(button, photoPlusMode) {
     var page = photoPageScroller();
     var state = {
       pathname: window.location.pathname,
@@ -112,7 +116,8 @@
       photoField: button.getAttribute("data-photo-field") || "",
       windowScrollY: window.scrollY,
       pageScrollTop: page ? page.scrollTop : 0,
-      savedAt: Date.now()
+      savedAt: Date.now(),
+      photoPlusMode: photoPlusMode || ""
     };
     try {
       window.sessionStorage.setItem(PHOTO_INTERACTION_STORAGE_KEY, JSON.stringify(state));
@@ -166,6 +171,10 @@
     var trigger = savedPhotoTrigger(state);
     if (!trigger) {
       return;
+    }
+    var flow = photoPlusFlow();
+    if (flow && state.photoPlusMode === "file-next") {
+      flow.markClipboardSuccess(trigger);
     }
     window.requestAnimationFrame(function () {
       window.requestAnimationFrame(function () {
@@ -253,6 +262,12 @@
   function bindInlinePhotoTrigger(button) {
     button.addEventListener("click", async function (event) {
       event.preventDefault();
+      var flow = photoPlusFlow();
+      if (flow && flow.shouldOpenFilePicker(button)) {
+        rememberPhotoInteraction(button);
+        openPersonFilePicker(button);
+        return;
+      }
       rememberPhotoInteraction(button);
       button.disabled = true;
       setStatus(button, "Проверяем буфер обмена...");
@@ -264,9 +279,17 @@
         return;
       }
       try {
+        if (flow) {
+          flow.markClipboardSuccess(button);
+        }
+        rememberPhotoInteraction(button, "file-next");
         setStatus(button, "Сохраняем фото...");
         await uploadClipboardImage(button, image, true);
       } catch (error) {
+        if (flow) {
+          flow.reset(button);
+        }
+        rememberPhotoInteraction(button);
         setStatus(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
         button.disabled = false;
         restorePhotoInteraction();
@@ -296,8 +319,7 @@
       });
     });
 
-    document.querySelectorAll("[data-person-photo-trigger]").forEach(bindInlinePhotoTrigger);
-    document.querySelectorAll("[data-reward-photo-trigger]").forEach(bindInlinePhotoTrigger);
+    document.querySelectorAll("[data-photo-plus-trigger]").forEach(bindInlinePhotoTrigger);
 
     restorePhotoInteraction();
   });

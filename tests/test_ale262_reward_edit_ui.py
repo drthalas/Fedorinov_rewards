@@ -71,8 +71,7 @@ class Ale262RewardEditUiTests(unittest.TestCase):
             handler.index("await uploadClipboardImage"),
         )
         self.assertIn("openPersonFilePicker(button)", handler)
-        self.assertIn('document.querySelectorAll("[data-person-photo-trigger]").forEach(bindInlinePhotoTrigger)', script)
-        self.assertIn('document.querySelectorAll("[data-reward-photo-trigger]").forEach(bindInlinePhotoTrigger)', script)
+        self.assertIn('document.querySelectorAll("[data-photo-plus-trigger]").forEach(bindInlinePhotoTrigger)', script)
         self.assertIn("page.scrollTop = Number(state.pageScrollTop", script)
         self.assertIn("window.scrollTo(0, Number(state.windowScrollY", script)
         self.assertIn("trigger.focus({ preventScroll: true })", script)

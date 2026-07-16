@@ -27,6 +27,7 @@
           <button
             class="mini-button photo-icon-button"
             type="button"
+            data-photo-plus-trigger
             data-person-photo-trigger
             data-file-input-id="{{ file_input_id }}"
             data-entity-type="{{ photo_entity_type }}"
@@ -40,6 +41,7 @@
           <button
             class="mini-button photo-icon-button"
             type="button"
+            data-photo-plus-trigger
             data-reward-photo-trigger
             data-file-input-id="{{ file_input_id }}"
             data-entity-type="{{ photo_entity_type }}"
@@ -50,12 +52,19 @@
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</button>
           {% else %}
-          <label
+          <button
             class="mini-button photo-icon-button"
-            for="{{ file_input_id }}"
+            type="button"
+            data-photo-plus-trigger
+            data-mark-photo-trigger
+            data-file-input-id="{{ file_input_id }}"
+            data-entity-type="{{ photo_entity_type }}"
+            data-entity-id="{{ photo_entity_id }}"
+            data-photo-field="{{ photo.field }}"
+            data-return-url="{{ photo_return_url }}"
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
-          >+</label>
+          >+</button>
           {% endif %}
           <input
             id="{{ file_input_id }}"
