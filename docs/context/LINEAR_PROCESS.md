@@ -1,6 +1,6 @@
 # Linear process
 
-## Проект
+## Проект и язык
 
 Linear project:
 
@@ -8,175 +8,127 @@ Linear project:
 Кавалеры и награды
 ```
 
-Все пользовательские названия задач, описания, чек-листы и комментарии вести на русском языке.
+Все пользовательские titles, descriptions, checklists и comments вести на русском языке. Английский допустим для commit hash, URLs, repository names, branch names и технических идентификаторов.
 
-## Scope и источники evidence
+## Канонический scope и приоритет
 
-- Актуальный Description issue — единственный канонический активный scope.
-- Comments хранят историю, отчёты и evidence и не добавляют новый scope, если Description явно не говорит обратного.
-- `Accepted` / `Frozen` не переделывать; для них выполняются только regression checks.
-- После owner FAIL обновить Description: оставить актуальные дефекты, а принятую часть перенести в `Accepted` / `Frozen`.
-- Несвязанное новое требование оформлять отдельной issue.
+- Repo safety/process rules обязательны.
+- Актуальный Linear Description — единственный канонический active scope.
+- Comments содержат историю, отчёты и evidence и не добавляют новый scope, если Description прямо не говорит обратного.
+- `Accepted` / `Frozen` не переделывать; для них выполнять только требуемые regression checks.
+- После Owner FAIL обновить Description: оставить актуальные дефекты, принятую часть перенести в `Accepted` / `Frozen`, а несвязанное требование оформить отдельной issue.
+- Launch prompt может уточнить или сузить выполнение, но не может расширять scope, противоречить Description или ослаблять repo safety. При конфликте Codex останавливается и сообщает о нём.
 
 ## Роли и запускной prompt
 
 ### Owner
 
-- Вручную выбирает модель и reasoning effort в интерфейсе перед запуском Codex.
-- Репозиторные инструкции, Linear Description и запускные prompt не должны утверждать, что Codex сам переключает модель в UI.
+- Вручную выбирает model и reasoning effort в интерфейсе до запуска Codex.
+- Не должен угадывать runtime, порт или соответствующую commit SHA вкладку во время QA.
 
 ### ChatGPT-координатор
 
-- Перед выдачей каждого запускного prompt сообщает Owner: сложность `XS/S/M/L/XL`, рекомендуемую модель, рекомендуемый reasoning effort, test tier, ожидаемое время и stop condition.
-- Это human-facing рекомендация Owner, а не команда Codex самостоятельно менять модель.
+- Перед каждым запускным prompt сообщает Owner: сложность `XS/S/M/L/XL`, рекомендуемую модель, reasoning effort, test tier, ожидаемое время и stop condition.
+- Это human-facing рекомендация, а не команда Codex самостоятельно менять модель в UI.
 - В обычном чате ChatGPT не читает локальные repo-файлы автоматически: он опирается на согласованный project context и при необходимости отдельно читает или обновляет документы доступными инструментами.
 
 ### Codex
 
-- Выполняет задачу на модели, выбранной Owner, и не пытается менять её в UI.
-- Соблюдает active scope, test tier, time budget, stop condition и safety. Если задача фактически сложнее заявленной, сообщает об этом и останавливается по stop condition, а не расширяет scope бесконтрольно.
+- Выполняет задачу на выбранной Owner модели и не пытается менять model/reasoning effort в UI.
+- Соблюдает active scope, tier, time budget, stop condition и safety. При превышении сложности не расширяет работу бесконтрольно, а возвращает blocker или конкретное объяснение задержки.
 
-Запускной prompt из ChatGPT должен быть конкретным и самодостаточным: branch/base SHA, точные действия, Accepted/Frozen, Out of Scope, required evidence, test tier, time budget и stop condition. Для corrective и сложных UI-багов недостаточно фразы «прочитай Linear и сделай».
+Запускной prompt должен быть конкретным и самодостаточным: branch/base SHA, точные действия, `Accepted` / `Frozen`, Out of Scope, required evidence, test tier, time budget и stop condition. Для corrective и сложных UI-багов недостаточно фразы «прочитай Linear и сделай».
 
-## Соответствие статусов
+## Контекст перед задачей
 
-Если в Linear доступны только системные статусы, использовать ближайшие соответствия:
+Всегда читать:
 
-- Backlog = Бэклог.
-- Todo / Ready for Codex = Готово к работе.
-- In Codex / In Progress = В работе.
-- Needs Review / Needs Test / Ready to Commit = Готово к QA или на тестировании.
-- Needs Fix = QA не пройден.
-- In Review = Проверка владельцем или ревью.
-- Done = Завершено / Выпущено.
-- Blocked = Заблокировано.
+1. `AGENTS.md`;
+2. `docs/context/CODEX_START_HERE.md`;
+3. актуальный Linear Description.
 
-Если в конкретной задаче статус нужен точнее, объяснить это в комментарии.
+Дальше читать только релевантные context-файлы:
 
-## Перед задачей
+- product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
+- release: `RELEASES.md`, `CHANGELOG.md`;
+- process/docs/merge/diagnostic: соответствующие process/release-файлы.
 
-Codex должен:
+Для T0/T1 не перечитывать всю историю проекта без необходимости. Перед изменениями проверить branch, clean working tree, base/head и ограничения задачи.
 
-1. Прочитать `docs/context/CODEX_START_HERE.md`.
-2. Найти существующую issue по названию или смыслу.
-3. Если issue нет, создать новую на русском.
-4. Прочитать актуальный Description, branch/base и ограничения.
-5. Перевести issue в "В работе" или ближайший доступный статус.
-6. Работать только в активном scope этой issue.
+## Test tiers
 
-## Corrective iteration
+### T0 Diagnostic
 
-- Продолжать в той же feature-ветке, если актуальный Description не требует другой ветки.
-- Делать новый commit; не amend-ить опубликованные commits и не переписывать историю.
-- Принятый `Accepted` / `Frozen` scope только проверять на регрессию.
-- Если owner feedback добавляет несвязанную область, сначала создать отдельную issue.
+Только необходимые команды и один smoke. Без product code changes, full suite, compileall, Goal Loop и повторного safety audit. Бюджет: 3–10 минут.
 
-## После commit/push
+### T1 Merge/docs
 
-Codex должен добавить комментарий:
+Ancestry, local/remote parity, clean tree, `git diff --check` и разрешённый список файлов. Product tests не повторять, Goal Loop не использовать. Бюджет: 3–20 минут.
 
-- что сделано;
-- commit hash;
-- какие проверки прошли;
-- какие ограничения остались;
-- что тестировать Hermes.
+### T2 Narrow fix
 
-После этого feature issue перевести в `Needs Test` или ближайший статус QA. Commit/push не является основанием для `Done`: acceptance даёт owner.
+Focused tests и один узкий reproduction, зависящий от поверхности:
 
-Для UI-задачи в комментарии дополнительно зафиксировать реальный browser click-flow, результат после reload, console/network/HTTP checks и screenshots по scope. Unit tests, mocks, source ordering и прямые JavaScript-вызовы не заменяют browser acceptance. File upload/source selection проверять реальными `filechooser`/file input events с temp fixtures. Computer Use — только optional best-effort diagnostic fallback; он не является обязательным QA/release gate или единственным evidence PASS. Если native OS/runtime не проверялся, написать `not tested` / `owner retest required`.
+- UI/browser: browser click-flow;
+- backend-only: focused integration tests.
 
-Перед переводом feature UI-задачи в `Needs Test` обязателен runtime identity gate:
+Full suite — один раз после стабилизации, если он требуется scope/tier. Goal Loop максимум 2 итерации. Бюджет: 20–45 минут.
+
+### T3 Cross-flow UI
+
+Focused tests, browser E2E всех затронутых UI flows, full suite один раз перед final commit, runtime identity и Owner QA handoff для локально запускаемого web UI. Goal Loop максимум 3 итерации. Бюджет: 45–90 минут.
+
+### T4 Data/media
+
+Добавляет data/media safety к релевантному T2 или T3: temp DB/media, destructive/shared-reference tests, failure safety и реальные DB/media hashes при реальном риске или явном требовании. Не требует browser/runtime для чисто non-UI data task. Goal Loop максимум 3 итерации. Бюджет: 60–120+ минут.
+
+Не запускать full suite после каждой Goal Loop iteration: во время разработки использовать focused checks, а full suite запускать один раз после финальной стабилизации, если его требует scope/tier.
+
+## Browser-first UI QA
+
+Для локального web UI основной путь — built-in browser / Playwright headed E2E. UI PASS требует реальный click-flow, фактический результат после reload, console/network/application HTTP checks и screenshots, когда они нужны для visual evidence.
+
+File upload/source selection проверять реальными `filechooser`/file input events с temp fixtures. Unit tests, mocks, source ordering и прямые JavaScript-вызовы не заменяют browser acceptance.
+
+Computer Use — только optional diagnostic fallback: best effort, non-blocking, не обязательный QA/release gate и не единственное evidence PASS. Human-required native шаги нельзя называть автономным PASS.
+
+## Runtime identity и Owner QA handoff
+
+Runtime identity и блок `OWNER QA URL` обязательны только для feature-задачи с локально запускаемым web UI runtime.
+
+Перед переводом такой задачи в `Needs Test`:
 
 1. Зафиксировать branch и полный final SHA.
 2. Запустить свежий QA runtime после checkout этого SHA на отдельном порту.
-3. Указать URL, PID, start time и `TEMP`/`REAL` DB/media.
-4. Подтвердить identity через startup log, cache key, HTML marker или иной воспроизводимый механизм без UI clutter.
+3. Указать exact URL, PID, start time и `TEMP`/`REAL` DB/media.
+4. Подтвердить identity через startup log, cache key, HTML marker или другой воспроизводимый механизм без UI clutter.
 5. Выполнить browser smoke с того же URL, который передаётся Owner.
-6. Явно отделить write QA real-data и temp runtime процессами, портами и safety baseline.
-7. Оставить QA runtime запущенным для Owner.
+6. Не смешивать write QA real-data и temp runtime без явного разделения процессов, портов и safety baseline.
+7. Оставить проверенный QA runtime запущенным для Owner.
 
-Финальный комментарий и отчёт feature UI-задачи обязаны содержать блок `OWNER QA URL`: один точный clickable URL, port, PID, start time, branch, полный SHA, TEMP/REAL DB/media, старые URL/порты, которые нельзя использовать, 3–7 коротких ручных шагов и подтверждение, что runtime оставлен запущенным. Без этого блока UI issue нельзя переводить в `Needs Test`.
+Финальный отчёт и Linear comment должны содержать `OWNER QA URL`: один clickable URL, port, PID, start time, branch, полный SHA, TEMP/REAL DB/media, старые URL/порты, которые нельзя использовать, 3–7 коротких шагов и подтверждение, что runtime оставлен запущенным.
 
-## Test tiers и timing
+Для native, packaged или embedded flow, когда branch runtime нельзя запустить локально, указать `not applicable` или `not tested`, дать точную Owner retest instruction и не заявлять косвенный PASS. Не требовать невозможный localhost URL только для перехода в `Needs Test`.
 
-- `T0 Diagnostic`: необходимые команды и один smoke, без product changes, full suite, compileall, Goal Loop и повторного safety audit; 3–10 минут.
-- `T1 Merge/docs`: ancestry, local/remote parity, clean tree, `git diff --check` и проверка разрешённого списка файлов; product tests не повторять, Goal Loop не использовать; 3–20 минут.
-- `T2 Narrow fix`: focused tests, один узкий browser reproduction, full suite один раз после стабилизации; Goal Loop максимум 2 итерации; 20–45 минут.
-- `T3 Cross-flow UI`: focused tests, browser E2E затронутых flows, full suite один раз перед final commit, runtime identity и Owner QA handoff; Goal Loop максимум 3 итерации; 45–90 минут.
-- `T4 Data/media`: всё из T3, temp DB/media, destructive/shared-reference tests, failure safety и реальные DB/media hashes; Goal Loop максимум 3 итерации; 60–120+ минут.
+## Git, статусы и Owner QA
 
-Full suite нельзя запускать после каждой Goal Loop iteration. Во время разработки использовать focused checks; full suite запускать один раз после финальной стабилизации, если tier его требует.
+- Работать только в ветке из Description. `main` изменять только отдельной явно разрешённой merge/release-задачей.
+- Corrective iteration — отдельный commit в той же feature-ветке; не amend-ить и не переписывать опубликованную историю.
+- Commit/push переводят feature-задачу в `Needs Test`, но не в `Done`.
+- Owner PASS означает, что feature принята и может быть переведена в `Done`, если в ней не осталось feature work. При необходимости после этого создаётся или авторизуется отдельная controlled merge issue.
+- Owner FAIL переводит issue в `Needs Fix`; corrective commit не заменяет acceptance.
+- Не переводить каждую feature автоматически в «Готово к релизу»: merge и release остаются отдельными контролируемыми задачами с явным authorization.
 
-В финальном отчёте Codex указывает длительность применимых этапов: investigation, implementation, focused tests, browser E2E, full suite, safety checks, commit/push и runtime handoff; неприменимое отмечает `not run` или `n/a`. Если работа превышает ожидаемый бюджет более чем в 1.5 раза, не расширять scope и не запускать новые широкие проверки: вернуть blocker или конкретное объяснение задержки.
+После commit/push добавить Linear comment: что сделано, commit hash, проверки, ограничения и Owner QA steps. Для UI включить browser evidence и runtime handoff, если они применимы.
 
-## Hermes QA
+## Релизы и Owner проверка
 
-Hermes после теста:
+Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
-- переводит issue в "Готово к релизу", если PASS;
-- переводит issue в "QA не пройден" или создаёт bug issue, если FAIL;
-- фиксирует конкретный сценарий, фактическое поведение и ожидаемое поведение.
+После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
-После owner FAIL issue переводится в `Needs Fix`, а Description обновляется до актуального defect scope. Corrective commit не заменяет owner acceptance.
+## Timing telemetry
 
-## Bugs
+В финальном отчёте указывать длительность применимых этапов: investigation, implementation, focused tests, browser E2E, full suite, safety checks, commit/push и runtime handoff. Неприменимое отмечать `not run` или `n/a`.
 
-Баги заводить отдельными issue.
-
-Bug issue должна содержать:
-
-- связанный feature/release issue;
-- фактический сценарий;
-- ожидаемое поведение;
-- QA evidence;
-- что нельзя трогать.
-
-## Релизы
-
-Merge и release — отдельные issue. Они выполняются только при явном owner authorization в актуальном Description.
-
-Release issue содержит checklist:
-
-- QA PASS;
-- version bump;
-- release notes;
-- package build;
-- safety check;
-- publish;
-- public latest.json;
-- Telegram notification;
-- owner testing.
-
-Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
-
-После публикации release issue переводить в статус, указанный её Description. Если owner acceptance ещё требуется, использовать `Needs Test`; `Done` ставить только по явному разрешению или подтверждаемому принятому release-процессу.
-
-## Проверка владельцем
-
-После релиза создать или обновить issue:
-
-```text
-Проверка владельцем после vX.Y.Z
-```
-
-Checklist:
-
-- владелец обновился через кнопку;
-- проверил новые функции;
-- проверил рабочую запись;
-- собраны замечания;
-- замечания переведены в Linear issues.
-
-После проверки Сергея связанные задачи можно переводить в "Завершено".
-
-## Правило языка
-
-В Linear писать на русском:
-
-- titles;
-- descriptions;
-- labels;
-- checklist;
-- comments.
-
-Английский допустим только для commit hash, URLs, repository names, branch names и технических идентификаторов.
+Если работа превышает ожидаемый бюджет более чем в 1.5 раза, не расширять scope, не начинать новые широкие проверки и не повторять full suite без причины: вернуть blocker или конкретное объяснение задержки.

@@ -2,53 +2,31 @@
 
 ## Перед началом
 
-1. Всегда сначала прочитать `docs/context/CODEX_START_HERE.md` и указанные там context-файлы.
-2. Проверить текущую ветку, `git status --short` и последние commits.
-3. Открыть текущую Linear issue и работать только в рамках её актуального Description.
+1. Прочитать этот файл, `docs/context/CODEX_START_HERE.md` и актуальный Linear Description.
+2. Проверить branch, `git status --short` и последние commits.
+3. Читать остальные context-файлы только по релевантности задачи; подробная матрица находится в `docs/context/LINEAR_PROCESS.md`.
 
-## Модель, бюджет и test tier
+## Scope и приоритет
 
-- Не пытаться менять модель или reasoning effort в интерфейсе: они выбираются до запуска Owner. Codex выполняет задачу на уже выбранной модели.
-- Выполнять test tier, time budget и stop condition из актуального Description или запускного prompt.
-- Если фактическая сложность выходит за заявленный бюджет или scope, не расширять работу бесконтрольно: зафиксировать причину и остановиться по stop condition.
-- Полные правила постановки задач, test tiers и роли Owner / ChatGPT-координатора / Codex описаны в `docs/context/LINEAR_PROCESS.md`.
+- Repo safety/process rules обязательны.
+- Актуальный Linear Description — единственный канонический active scope; comments остаются историей и evidence.
+- Launch prompt может уточнить или сузить выполнение, но не может расширять scope, противоречить Description или ослаблять safety.
+- При конфликте repo rules, Description и prompt остановиться и сообщить о конфликте.
+- `Accepted` / `Frozen` не переделывать: разрешены только требуемые regression checks. После owner FAIL в Description остаётся только актуальный defect scope.
 
-## Канонический scope
+## Git и safety
 
-- Актуальный Linear Description — единственный канонический активный scope задачи.
-- Linear comments используются как история, отчёты и evidence, если Description явно не говорит обратного.
-- Разделы `Accepted` / `Frozen` не переделывать. Для них разрешены только regression checks.
-- После owner FAIL в Description должен остаться только актуальный defect scope, а принятые части должны быть перенесены в `Accepted` / `Frozen`.
-- Новую несвязанную область оформлять отдельной Linear issue.
-
-## Git и статусы
-
-- Работать только в ветке, указанной в Description. Не изменять `main` напрямую без явной merge/release-задачи.
-- Corrective iteration делать отдельным commit в той же feature-ветке. Не amend-ить и не переписывать опубликованную историю.
-- Commit и push не означают `Done`: feature-задачу оставить в `Needs Test`, owner фиксирует acceptance.
-- Merge и release являются отдельными контролируемыми шагами и требуют явного owner authorization.
-- Не выполнять version bump, tag, release, изменение `latest.json`, package publication или Telegram без отдельного разрешения.
-
-## Проверки и evidence
-
-- Для локального web UI основной путь QA — built-in browser или Playwright headed E2E. UI-задача не считается готовой только по unit tests, mocks, source ordering или прямому вызову JavaScript: нужны реальный click-flow, фактический результат после reload, console/network/HTTP checks и screenshots по scope.
-- File upload и source selection проверять реальными `filechooser`/file input events и temp fixtures. Computer Use допустим только как optional, best-effort diagnostic fallback и не является единственным доказательством PASS.
-- Если native OS или packaged runtime не проверялись, явно написать `not tested` / `owner retest required`; не заявлять `PASS` по косвенным тестам.
-- Destructive/write tests выполнять только на temp DB и temp media. Реальные пользовательские DB, фото и документы не изменять.
-
-## Runtime identity и Owner QA
-
-- Перед переводом feature UI-задачи в `Needs Test` запустить свежий QA runtime после checkout точного final SHA на отдельном порту.
-- Зафиксировать branch, полный SHA, URL, PID, start time, тип DB/media (`TEMP` или `REAL`) и runtime identity через startup log, cache key, HTML marker или другой воспроизводимый механизм без UI clutter.
-- Выполнить browser smoke с того же URL, который передаётся Owner. Не выдавать long-running или старый runtime за текущую feature-версию.
-- Не смешивать write QA real-data и temp runtime без явного разделения процессов, портов и safety baseline. Оставить проверенный QA runtime запущенным для Owner.
-
-## Safety
-
+- Работать только в ветке из Description. `main` изменять только отдельной явно разрешённой merge/release-задачей.
+- Corrective iteration — новый commit в той же feature-ветке; не amend-ить и не переписывать опубликованную историю.
+- Commit/push не являются основанием для `Done`; feature остаётся в `Needs Test` до Owner acceptance.
+- Merge, release, version bump, tag, `latest.json`, package publication и Telegram требуют отдельного явного разрешения.
 - Не коммитить secrets, `.env`, `.venv`, реальные DB/media, `Source`, `SourceMark`, `default`, backups, screenshots, Playwright output, logs, temp archives и generated artifacts.
-- Не запускать real updater apply и не менять пользовательские данные без отдельного разрешения.
-- Не выводить токены и другие credentials в terminal output, документацию или Linear.
+- Write/destructive tests выполнять только на temp DB/media. Не запускать real updater apply и не менять пользовательские данные без отдельного разрешения.
 
-## Итоговый отчёт
+## Проверки и отчёт
 
-Указать branch, initial/final HEAD, commit, push и local/remote parity, tests, browser/runtime evidence, limitations, safety hashes и итоговый `git status`. Для UI-задачи дополнительно обязателен блок `OWNER QA URL` с точным URL, портом, PID, start time, branch, полным SHA, типом DB/media, старыми URL/портами, которые нельзя использовать, 3–7 шагами QA и подтверждением, что runtime оставлен запущенным.
+- Соблюдать test tier, time budget и stop condition. Codex не меняет Owner-selected model/reasoning effort в UI.
+- Для локального web UI browser/Playwright click-flow обязателен по tier; unit tests, mocks и прямые JS-вызовы не заменяют browser acceptance. Computer Use — только optional diagnostic fallback.
+- Runtime identity и `OWNER QA URL` обязательны только для локально запускаемой web UI feature-задачи. Для native/packaged/embedded flow честно указать `not applicable` или `not tested` и дать точную Owner retest instruction.
+- Safety hashes включать в отчёт только при T4, migrations, destructive/write flow, риске real data/media или явном требовании Description.
+- Подробные роли, test tiers, runtime handoff, статусы и timing telemetry определены в `docs/context/LINEAR_PROCESS.md`.
