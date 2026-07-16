@@ -19,7 +19,7 @@ from ..services.media import resolve_media_path
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260716-ale271-photo-plus-flow-1"
+STATIC_ASSET_VERSION = "20260716-ale271-photo-plus-corrective-3"
 
 
 def static_url(path: str) -> str:

@@ -3,12 +3,35 @@
 
   var PHOTO_INTERACTION_STORAGE_KEY = "fedorinov-photo-interaction";
 
-  function setStatus(button, text) {
+  function photoSourceError(button) {
     var container = button.closest(".photo-manage-actions");
-    var status = container ? container.querySelector(".clipboard-paste-status") : null;
-    if (status) {
-      status.textContent = text;
-    }
+    return container ? container.querySelector("[data-photo-source-error]") : null;
+  }
+
+  function clearSourceError(button) {
+    var error = photoSourceError(button);
+    if (!error) return;
+    error.textContent = "";
+    error.hidden = true;
+  }
+
+  function showSourceError(button, text) {
+    var error = photoSourceError(button);
+    if (!error) return;
+    error.textContent = text;
+    error.hidden = false;
+  }
+
+  function shouldOpenFilePicker(button) {
+    return button.dataset.photoPlusMode === "file-next";
+  }
+
+  function markFilePickerNext(button) {
+    button.dataset.photoPlusMode = "file-next";
+  }
+
+  function resetPhotoPlusMode(button) {
+    delete button.dataset.photoPlusMode;
   }
 
   function loadImage(blob) {
@@ -102,15 +125,15 @@
     return document.querySelector("main.page");
   }
 
-  function photoPlusFlow() {
-    return window.FedorinovPhotoPlusFlow;
+  function normalizedPageSearch(search) {
+    return new URLSearchParams(search || "").toString();
   }
 
   function rememberPhotoInteraction(button, photoPlusMode) {
     var page = photoPageScroller();
     var state = {
       pathname: window.location.pathname,
-      search: window.location.search,
+      search: normalizedPageSearch(window.location.search),
       entityType: button.getAttribute("data-entity-type") || "",
       entityId: button.getAttribute("data-entity-id") || "",
       photoField: button.getAttribute("data-photo-field") || "",
@@ -152,7 +175,7 @@
       var state = JSON.parse(raw);
       if (
         state.pathname !== window.location.pathname ||
-        state.search !== window.location.search ||
+        normalizedPageSearch(state.search) !== normalizedPageSearch(window.location.search) ||
         Date.now() - Number(state.savedAt || 0) > 30000
       ) {
         return null;
@@ -172,10 +195,7 @@
     if (!trigger) {
       return;
     }
-    var flow = photoPlusFlow();
-    if (flow && state.photoPlusMode === "file-next") {
-      flow.markClipboardSuccess(trigger);
-    }
+    if (state.photoPlusMode === "file-next") markFilePickerNext(trigger);
     window.requestAnimationFrame(function () {
       window.requestAnimationFrame(function () {
         var page = photoPageScroller();
@@ -223,74 +243,76 @@
     var input = inputId ? document.getElementById(inputId) : null;
     button.disabled = false;
     if (!(input instanceof HTMLInputElement)) {
-      setStatus(button, "Не удалось открыть выбор файла.");
+      showSourceError(button, "Не удалось открыть выбор файла.");
       return false;
     }
-    setStatus(button, "Выберите файл...");
-    input.addEventListener("cancel", function onCancel() {
-      setStatus(button, "");
+    clearSourceError(button);
+    markFilePickerNext(button);
+    rememberPhotoInteraction(button, "file-next");
+
+    function cleanup() {
+      input.removeEventListener("cancel", onCancel);
+      input.removeEventListener("change", onChange);
+    }
+
+    function onCancel() {
+      cleanup();
+      clearSourceError(button);
       restorePhotoInteraction();
-    }, { once: true });
-    input.addEventListener("change", function onChange() {
+    }
+
+    function onChange() {
+      cleanup();
       if (input.files && input.files.length) {
+        resetPhotoPlusMode(button);
         rememberPhotoInteraction(button);
-        setStatus(button, "Загружаем фотографию...");
+        clearSourceError(button);
+        if (input.form) input.form.submit();
       } else {
-        setStatus(button, "");
+        clearSourceError(button);
         restorePhotoInteraction();
       }
-    }, { once: true });
+    }
+
+    input.addEventListener("cancel", onCancel);
+    input.addEventListener("change", onChange);
     try {
-      if (typeof input.showPicker === "function") {
-        input.showPicker();
-      } else {
-        input.click();
-      }
+      input.click();
       return true;
     } catch (error) {
-      try {
-        input.click();
-        return true;
-      } catch (fallbackError) {
-        console.warn("Photo file picker did not open", fallbackError || error);
-        setStatus(button, "Не удалось открыть выбор файла.");
-        return false;
-      }
+      cleanup();
+      console.warn("Photo file picker did not open", error);
+      showSourceError(button, "Не удалось открыть выбор файла.");
+      return false;
     }
   }
 
   function bindInlinePhotoTrigger(button) {
     button.addEventListener("click", async function (event) {
       event.preventDefault();
-      var flow = photoPlusFlow();
-      if (flow && flow.shouldOpenFilePicker(button)) {
-        rememberPhotoInteraction(button);
+      if (shouldOpenFilePicker(button)) {
         openPersonFilePicker(button);
         return;
       }
       rememberPhotoInteraction(button);
       button.disabled = true;
-      setStatus(button, "Проверяем буфер обмена...");
+      clearSourceError(button);
       var image;
       try {
         image = await imageBlobFromClipboardWithTimeout(2000);
       } catch (error) {
+        markFilePickerNext(button);
         openPersonFilePicker(button);
         return;
       }
       try {
-        if (flow) {
-          flow.markClipboardSuccess(button);
-        }
+        markFilePickerNext(button);
         rememberPhotoInteraction(button, "file-next");
-        setStatus(button, "Сохраняем фото...");
         await uploadClipboardImage(button, image, true);
       } catch (error) {
-        if (flow) {
-          flow.reset(button);
-        }
+        resetPhotoPlusMode(button);
         rememberPhotoInteraction(button);
-        setStatus(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
+        showSourceError(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
         button.disabled = false;
         restorePhotoInteraction();
       }
@@ -304,17 +326,14 @@
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       button.addEventListener("click", async function () {
-        var originalText = button.textContent;
         button.disabled = true;
-        setStatus(button, "Читаем буфер обмена...");
+        clearSourceError(button);
         try {
           var image = await imageBlobFromClipboard();
-          setStatus(button, "Сохраняем фото...");
           await uploadClipboardImage(button, image, false);
         } catch (error) {
-          setStatus(button, error && error.message ? error.message : "Не удалось вставить фото из буфера.");
+          showSourceError(button, error && error.message ? error.message : "Не удалось вставить фото из буфера.");
           button.disabled = false;
-          button.textContent = originalText;
         }
       });
     });

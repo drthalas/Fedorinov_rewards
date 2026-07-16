@@ -76,7 +76,6 @@
             {% else %}
             accept=".jpg,.jpeg,.png,.webp,image/*"
             {% endif %}
-            onchange="if (this.files.length) this.form.submit()"
           >
         </form>
         {% if has_media_path(photo.path) %}
@@ -100,7 +99,7 @@
           title="Вставить изображение из буфера обмена"
         >Вставить из буфера</button>
         {% endif %}
-        <span class="clipboard-paste-status" aria-live="polite"></span>
+        <p class="notice notice-error photo-source-error" data-photo-source-error aria-live="polite" hidden></p>
       </div>
     </div>
     {% endfor %}

@@ -227,13 +227,11 @@
     const preview = editor.querySelector("[data-rank-image-preview]");
     const image = editor.querySelector("[data-rank-image-preview-image]");
     const placeholder = editor.querySelector("[data-rank-image-preview-placeholder]");
-    const status = editor.querySelector("[data-rank-image-status]");
     const error = editor.querySelector("[data-rank-image-error]");
-    if (!input || !trigger || !clear || !clearValue || !preview || !image || !placeholder || !status || !error) return;
+    if (!input || !trigger || !clear || !clearValue || !preview || !image || !placeholder || !error) return;
 
     let objectUrl = "";
-    let selectedFileName = "";
-    const plusFlow = window.FedorinovPhotoPlusFlow;
+    let pickerNext = false;
 
     function revokeObjectUrl() {
       if (!objectUrl) return;
@@ -244,7 +242,6 @@
     function showError(message) {
       error.textContent = message;
       error.hidden = false;
-      status.textContent = "";
       input.setCustomValidity(message);
     }
 
@@ -275,8 +272,6 @@
       };
       image.onerror = () => showError("Не удалось прочитать выбранное изображение.");
       image.src = objectUrl;
-      selectedFileName = file.name;
-      status.textContent = file.name;
       trigger.setAttribute("aria-label", "Заменить изображение погона");
       trigger.title = "Заменить изображение погона";
       return true;
@@ -297,17 +292,13 @@
     }
 
     function openFilePicker() {
-      status.textContent = "Выберите изображение…";
       trigger.disabled = false;
+      pickerNext = true;
+      clearError();
       try {
-        if (typeof input.showPicker === "function") input.showPicker();
-        else input.click();
+        input.click();
       } catch (error) {
-        try {
-          input.click();
-        } catch (fallbackError) {
-          showError("Не удалось открыть выбор файла.");
-        }
+        showError("Не удалось открыть выбор файла.");
       }
     }
 
@@ -320,12 +311,8 @@
 
     input.addEventListener("change", async () => {
       const file = input.files && input.files[0];
-      if (!file) {
-        status.textContent = "";
-        return;
-      }
+      if (!file) return;
       trigger.disabled = true;
-      status.textContent = "Подготавливаем изображение…";
       try {
         if (!await useFile(file)) throw new Error("Image assignment unavailable");
       } catch (error) {
@@ -336,23 +323,26 @@
     });
 
     input.addEventListener("cancel", () => {
-      status.textContent = selectedFileName;
       trigger.disabled = false;
+      try {
+        trigger.focus({ preventScroll: true });
+      } catch (error) {
+        trigger.focus();
+      }
     });
 
     trigger.addEventListener("click", async () => {
-      if (plusFlow && plusFlow.shouldOpenFilePicker(trigger)) {
+      if (pickerNext) {
         openFilePicker();
         return;
       }
+      pickerNext = true;
       trigger.disabled = true;
-      status.textContent = "Проверяем буфер обмена…";
       try {
         const helper = window.FedorinovClipboardImages;
         if (!helper || typeof helper.readWithTimeout !== "function") throw new Error("Clipboard API unavailable");
         const clipboardImage = await helper.readWithTimeout(1200);
         if (!await assignClipboardImage(clipboardImage)) throw new Error("Clipboard assignment unavailable");
-        if (plusFlow) plusFlow.markClipboardSuccess(trigger);
         trigger.disabled = false;
       } catch (error) {
         openFilePicker();
@@ -363,13 +353,11 @@
       revokeObjectUrl();
       input.value = "";
       clearValue.value = "true";
-      if (plusFlow) plusFlow.reset(trigger);
+      pickerNext = false;
       image.hidden = true;
       image.removeAttribute("src");
       placeholder.hidden = false;
       clear.hidden = true;
-      selectedFileName = "";
-      status.textContent = "Изображение будет удалено после сохранения.";
       trigger.setAttribute("aria-label", "Добавить изображение погона");
       trigger.title = "Добавить изображение погона";
       clearError();
@@ -377,7 +365,7 @@
 
     const form = editor.closest("form");
     if (form) form.addEventListener("reset", () => {
-      if (plusFlow) plusFlow.reset(trigger);
+      pickerNext = false;
     });
 
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });

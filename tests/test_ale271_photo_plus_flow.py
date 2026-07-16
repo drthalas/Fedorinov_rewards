@@ -1,9 +1,4 @@
-import json
 from pathlib import Path
-import shutil
-import subprocess
-from tempfile import TemporaryDirectory
-import textwrap
 import unittest
 
 from jinja2 import Environment
@@ -37,45 +32,6 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
             media_url=lambda path: "/media",
         )
 
-    def test_state_machine_is_per_control_and_resets_to_clipboard_first(self) -> None:
-        if shutil.which("node") is None:
-            self.skipTest("node is not installed")
-
-        script_path = ROOT / "backend" / "app" / "static" / "photo_plus_flow.js"
-        runner = textwrap.dedent(
-            f"""
-            const fs = require("fs");
-            const vm = require("vm");
-            global.window = {{}};
-            vm.runInThisContext(fs.readFileSync({json.dumps(str(script_path))}, "utf8"));
-            const flow = window.FedorinovPhotoPlusFlow;
-            const current = {{}};
-            const neighbor = {{}};
-            const result = {{ initial: flow.mode(current), neighborInitial: flow.mode(neighbor) }};
-            flow.markClipboardSuccess(current);
-            result.afterClipboard = flow.mode(current);
-            result.shouldPick = flow.shouldOpenFilePicker(current);
-            result.neighborAfterClipboard = flow.mode(neighbor);
-            flow.reset(current);
-            result.afterClear = flow.mode(current);
-            result.shouldPickAfterClear = flow.shouldOpenFilePicker(current);
-            process.stdout.write(JSON.stringify(result));
-            """
-        )
-        with TemporaryDirectory() as tmp:
-            runner_path = Path(tmp) / "photo_plus_flow_runner.js"
-            runner_path.write_text(runner, encoding="utf-8")
-            completed = subprocess.run(["node", str(runner_path)], check=True, capture_output=True, text=True)
-
-        result = json.loads(completed.stdout)
-        self.assertEqual(result["initial"], "clipboard-first")
-        self.assertEqual(result["afterClipboard"], "file-next")
-        self.assertTrue(result["shouldPick"])
-        self.assertEqual(result["neighborInitial"], "clipboard-first")
-        self.assertEqual(result["neighborAfterClipboard"], "clipboard-first")
-        self.assertEqual(result["afterClear"], "clipboard-first")
-        self.assertFalse(result["shouldPickAfterClear"])
-
     def test_person_reward_and_mark_compact_plus_use_shared_handler(self) -> None:
         for entity_type, marker in (
             ("person", "data-person-photo-trigger"),
@@ -87,6 +43,9 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
                 self.assertEqual(rendered.count("data-photo-plus-trigger"), 2)
                 self.assertEqual(rendered.count(marker), 2)
                 self.assertEqual(rendered.count('type="file"'), 2)
+                self.assertEqual(rendered.count("data-photo-source-error"), 2)
+                self.assertNotIn("clipboard-paste-status", rendered)
+                self.assertNotIn("onchange=", rendered)
 
         script = self.read("backend/app/static/clipboard_paste.js")
         self.assertIn(
@@ -94,45 +53,77 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
             script,
         )
 
-    def test_managed_flow_preserves_file_next_for_one_upload_reload(self) -> None:
+    def test_managed_flow_opens_picker_synchronously_and_preserves_cancel_retry(self) -> None:
         script = self.read("backend/app/static/clipboard_paste.js")
         handler = script.split("function bindInlinePhotoTrigger(button)", 1)[1].split(
             'document.addEventListener("DOMContentLoaded"', 1
         )[0]
+        picker = script.split("function openPersonFilePicker(button)", 1)[1].split(
+            "function bindInlinePhotoTrigger(button)", 1
+        )[0]
 
-        self.assertIn("flow.shouldOpenFilePicker(button)", handler)
-        self.assertIn("flow.markClipboardSuccess(button)", handler)
+        self.assertIn("shouldOpenFilePicker(button)", handler)
+        self.assertIn("markFilePickerNext(button)", handler)
         self.assertIn('rememberPhotoInteraction(button, "file-next")', handler)
         self.assertIn('state.photoPlusMode === "file-next"', script)
-        self.assertIn("flow.reset(button)", handler)
-        self.assertIn("flow.reset(button);\n        }\n        rememberPhotoInteraction(button);", handler)
-        self.assertLess(handler.index("flow.shouldOpenFilePicker(button)"), handler.index("imageBlobFromClipboardWithTimeout"))
+        self.assertIn("resetPhotoPlusMode(button)", handler)
+        self.assertLess(handler.index("shouldOpenFilePicker(button)"), handler.index("imageBlobFromClipboardWithTimeout"))
+        self.assertIn("normalizedPageSearch(window.location.search)", script)
+        self.assertIn("normalizedPageSearch(state.search)", script)
+        self.assertIn("input.click();", picker)
+        self.assertNotIn("showPicker", picker)
+        self.assertIn('input.addEventListener("cancel", onCancel)', picker)
+        self.assertIn('input.addEventListener("change", onChange)', picker)
+        self.assertIn("input.removeEventListener", picker)
 
-        cancel_handler = script.split('input.addEventListener("cancel"', 1)[1].split("}, { once: true });", 1)[0]
-        self.assertNotIn("flow.reset", cancel_handler)
+        cancel_handler = picker.split("function onCancel()", 1)[1].split("function onChange()", 1)[0]
+        self.assertIn("restorePhotoInteraction()", cancel_handler)
+        self.assertNotIn("resetPhotoPlusMode", cancel_handler)
+        change_handler = picker.split("function onChange()", 1)[1].split('input.addEventListener("cancel"', 1)[0]
+        self.assertIn("resetPhotoPlusMode(button)", change_handler)
+        self.assertIn("input.form.submit()", change_handler)
 
-    def test_rank_uses_shared_state_only_after_success_and_resets_on_clear(self) -> None:
+    def test_rank_uses_local_picker_next_state_and_resets_on_clear(self) -> None:
         script = self.read("backend/app/static/guide_image_preview.js")
+        rank_form = self.read("backend/app/templates/rank_form.html")
         rank_editor = script.split("function initRankImageEditor(editor)", 1)[1]
 
-        self.assertIn("window.FedorinovPhotoPlusFlow", rank_editor)
-        self.assertIn("plusFlow.shouldOpenFilePicker(trigger)", rank_editor)
-        self.assertIn("plusFlow.markClipboardSuccess(trigger)", rank_editor)
-        self.assertIn("plusFlow.reset(trigger)", rank_editor)
-        self.assertNotIn("clipboardAttempted", rank_editor)
+        self.assertIn("let pickerNext = false", rank_editor)
+        self.assertIn("if (pickerNext)", rank_editor)
+        self.assertIn("pickerNext = true", rank_editor)
+        self.assertIn("pickerNext = false", rank_editor)
+        self.assertIn("input.click();", rank_editor)
+        self.assertNotIn("showPicker", rank_editor)
         self.assertLess(
-            rank_editor.index("assignClipboardImage(clipboardImage)"),
-            rank_editor.index("plusFlow.markClipboardSuccess(trigger)"),
+            rank_editor.index("if (pickerNext)"),
+            rank_editor.index("helper.readWithTimeout"),
         )
         cancel_handler = rank_editor.split('input.addEventListener("cancel"', 1)[1].split("});", 1)[0]
-        self.assertNotIn("plusFlow.reset", cancel_handler)
+        self.assertNotIn("pickerNext = false", cancel_handler)
+        self.assertNotIn("data-rank-image-status", rank_form)
 
-    def test_helper_loads_before_clipboard_and_rank_integrations(self) -> None:
+    def test_obsolete_state_helper_and_visible_technical_statuses_are_removed(self) -> None:
+        clipboard_script = self.read("backend/app/static/clipboard_paste.js")
+        rank_script = self.read("backend/app/static/guide_image_preview.js")
+        photo_template = self.read("backend/app/templates/photo_management.html")
+        rank_template = self.read("backend/app/templates/rank_form.html")
+        self.assertFalse((ROOT / "backend/app/static/photo_plus_flow.js").exists())
         for template_path in ("backend/app/templates/base.html", "backend/app/templates/legacy_base.html"):
             template = self.read(template_path)
-            self.assertLess(template.index("photo_plus_flow.js"), template.index("clipboard_paste.js"))
-        base = self.read("backend/app/templates/base.html")
-        self.assertLess(base.index("photo_plus_flow.js"), base.index("guide_image_preview.js"))
+            self.assertNotIn("photo_plus_flow.js", template)
+
+        for technical_text in (
+            "Выберите файл...",
+            "Выберите изображение…",
+            "Проверяем буфер обмена…",
+            "Подготавливаем изображение…",
+            "Загружаем фотографию...",
+            "Сохраняем фото...",
+        ):
+            self.assertNotIn(technical_text, clipboard_script)
+            self.assertNotIn(technical_text, rank_script)
+        self.assertNotIn("clipboard-paste-status", photo_template)
+        self.assertNotIn("rank-insignia-status", rank_template)
 
 
 if __name__ == "__main__":

@@ -794,9 +794,10 @@ th {
   margin: 0;
 }
 
-.clipboard-paste-status {
+.photo-source-error {
   flex-basis: 100%;
-  color: #475467;
+  margin: 0;
+  padding: 6px 8px;
   font-size: 12px;
 }
 
@@ -6925,7 +6926,6 @@ body.legacy-rewards-theme::after {
   background: #33211e;
 }
 
-.guide-theme .rank-insignia-status,
 .guide-theme .rank-insignia-error {
   margin: 0;
 }
