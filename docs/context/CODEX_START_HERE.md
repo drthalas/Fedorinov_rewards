@@ -38,6 +38,13 @@
 - После owner FAIL Description должен быть переписан так, чтобы содержать только актуальный defect scope; принятые части переносятся в `Accepted` / `Frozen`.
 - Новые несвязанные требования оформляются отдельной Linear issue, а не добавляются в текущую corrective iteration.
 
+## Роли, task envelope и остановка
+
+- Owner вручную выбирает модель и reasoning effort в интерфейсе до запуска Codex. Репозиторные инструкции не дают Codex права самостоятельно менять модель.
+- ChatGPT-координатор до запускного prompt даёт Owner human-facing рекомендацию: сложность, модель, reasoning effort, test tier, ожидаемое время и stop condition. Это не команда Codex на смену модели.
+- Codex выполняет задачу на уже выбранной Owner модели и соблюдает test tier, time budget, stop condition, safety и active scope. Если задача фактически сложнее заявленной, Codex сообщает об этом и останавливается по stop condition.
+- Запускной prompt должен быть самодостаточным: branch и base SHA, точные действия, Accepted/Frozen, Out of Scope, required evidence, test tier, time budget и stop condition. Для corrective и сложных UI-багов фразы «прочитай Linear и сделай» недостаточно.
+
 ## Corrective iteration и история Git
 
 - Продолжать corrective iteration в той же feature-ветке, если Description не предписывает иначе.
@@ -48,10 +55,36 @@
 
 ## UI и runtime evidence
 
-- Unit tests и mocks не доказывают готовность UI-flow сами по себе.
-- Для затронутого UI проверить реальный visible click-flow, фактический результат, reload, возврат/повторное действие и регрессии соседних сценариев.
+- Для локального web UI основной путь — built-in browser / Playwright headed E2E. Unit tests, mocks, source ordering и прямые JavaScript-вызовы не доказывают готовность UI-flow сами по себе.
+- Для затронутого UI проверить реальный click-flow, фактический результат после reload, возврат/повторное действие, console/network и application HTTP errors. Screenshots сохранять там, где они нужны для visual evidence.
+- File upload/source selection проверять через реальные `filechooser`/file input events и temp fixtures.
+- Computer Use — только optional diagnostic fallback: best effort, non-blocking, не единственное доказательство PASS и не QA/release gate.
 - Сохранять screenshots или другое evidence, требуемое Description; generated evidence не коммитить, если это явно не разрешено.
 - Если native OS, packaged app или embedded runtime недоступны, честно указать `not tested` / `owner retest required`. Не заменять фактический runtime PASS программным вызовом JavaScript.
+
+## Runtime identity и Owner handoff
+
+Перед переводом feature UI-задачи в `Needs Test` Codex обязан:
+
+1. Зафиксировать точный branch и полный commit SHA.
+2. Запустить свежий QA runtime после checkout этого SHA на отдельном порту.
+3. Указать PID, start time и использование `TEMP` или `REAL` DB/media.
+4. Подтвердить runtime identity через startup log, cache key, HTML marker или другой воспроизводимый механизм без UI clutter.
+5. Выполнить browser smoke с того же URL, который будет передан Owner.
+6. Явно указать старые URL/порты, которые нельзя использовать, и не смешивать write QA real-data и temp runtime без разделения процессов, портов и safety baseline.
+7. Оставить QA runtime запущенным для Owner.
+
+Финальный отчёт feature UI-задачи обязан содержать блок `OWNER QA URL`: один точный clickable URL, port, PID, start time, branch, полный SHA, TEMP/REAL DB/media, старые URL/порты, 3–7 ручных шагов и подтверждение, что runtime оставлен запущенным. Без этого блока UI-задачу нельзя переводить в `Needs Test`.
+
+## Test tiers и timing
+
+- `T0 Diagnostic`: необходимые команды и один smoke; без product changes, full suite, compileall, Goal Loop и повторного safety audit; 3–10 минут.
+- `T1 Merge/docs`: ancestry/parity/clean tree/`git diff --check` и разрешённый список файлов; product tests не повторять, Goal Loop не использовать; 3–20 минут.
+- `T2 Narrow fix`: focused tests, один узкий browser reproduction и full suite один раз после стабилизации; Goal Loop максимум 2 итерации; 20–45 минут.
+- `T3 Cross-flow UI`: focused tests, browser E2E затронутых flows, full suite один раз перед commit и runtime handoff; Goal Loop максимум 3 итерации; 45–90 минут.
+- `T4 Data/media`: всё из T3, temp DB/media, destructive/shared-reference tests и safety hashes; Goal Loop максимум 3 итерации; 60–120+ минут.
+
+Не запускать full suite после каждой Goal Loop iteration: во время разработки использовать focused checks, а full suite запускать один раз после финальной стабилизации, если его требует tier. В финальном отчёте указывать длительность применимых этапов: investigation, implementation, focused tests, browser E2E, full suite, safety checks, commit/push и runtime handoff; неприменимое отмечать `not run` или `n/a`. При превышении бюджета более чем в 1.5 раза не расширять scope и вернуть blocker либо конкретное объяснение задержки.
 
 ## Перед разработкой
 
