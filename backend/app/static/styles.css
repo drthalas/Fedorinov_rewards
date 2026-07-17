@@ -927,6 +927,10 @@ th {
   background: rgb(0 0 0 / 68%);
 }
 
+.delete-confirmation-dialog [hidden] {
+  display: none !important;
+}
+
 .delete-confirmation-panel {
   padding: 22px;
 }

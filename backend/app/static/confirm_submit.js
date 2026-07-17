@@ -97,6 +97,7 @@ function openDeleteConfirmation(form, submitter) {
   title.textContent = form.dataset.confirmTitle || "Подтверждение удаления";
   message.textContent = form.dataset.confirmMessage || "Подтвердите действие.";
   confirmButton.hidden = blocked;
+  confirmButton.disabled = blocked;
   cancelButton.textContent = blocked ? "Закрыть" : "Отмена";
   dialog.classList.toggle("delete-confirmation-blocked", blocked);
 

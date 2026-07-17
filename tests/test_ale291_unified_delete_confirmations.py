@@ -45,7 +45,10 @@ class Ale291UnifiedDeleteConfirmationTests(unittest.TestCase):
         self.assertIn('disableDeleteSubmitters(form)', script)
         self.assertIn('form.requestSubmit(submitter || undefined)', script)
         self.assertIn('confirmButton.hidden = blocked', script)
+        self.assertIn('confirmButton.disabled = blocked', script)
         self.assertIn('.delete-confirmation-dialog::backdrop', styles)
+        self.assertIn('.delete-confirmation-dialog [hidden]', styles)
+        self.assertIn('display: none !important', styles)
 
     def test_preflight_message_distinguishes_counts_shared_media_and_blocks(self) -> None:
         allowed = confirmation_message(
