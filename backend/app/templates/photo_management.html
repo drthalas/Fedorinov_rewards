@@ -34,6 +34,7 @@
             data-entity-id="{{ photo_entity_id }}"
             data-photo-field="{{ photo.field }}"
             data-return-url="{{ photo_return_url }}"
+            data-image-slot-occupied="{{ 'true' if has_media_path(photo.path) else 'false' }}"
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</button>
@@ -48,6 +49,7 @@
             data-entity-id="{{ photo_entity_id }}"
             data-photo-field="{{ photo.field }}"
             data-return-url="{{ photo_return_url }}"
+            data-image-slot-occupied="{{ 'true' if has_media_path(photo.path) else 'false' }}"
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</button>
@@ -62,6 +64,7 @@
             data-entity-id="{{ photo_entity_id }}"
             data-photo-field="{{ photo.field }}"
             data-return-url="{{ photo_return_url }}"
+            data-image-slot-occupied="{{ 'true' if has_media_path(photo.path) else 'false' }}"
             title="{% if has_media_path(photo.path) %}Заменить фотографию{% else %}Добавить фотографию{% endif %}"
             aria-label="{% if has_media_path(photo.path) %}Заменить фотографию: {{ photo.label }}{% else %}Добавить фотографию: {{ photo.label }}{% endif %}"
           >+</button>
@@ -96,6 +99,7 @@
           data-entity-id="{{ photo_entity_id }}"
           data-photo-field="{{ photo.field }}"
           data-return-url="{{ photo_return_url }}"
+          data-image-slot-occupied="{{ 'true' if has_media_path(photo.path) else 'false' }}"
           title="Вставить изображение из буфера обмена"
         >Вставить из буфера</button>
         {% endif %}

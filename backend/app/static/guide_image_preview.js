@@ -148,6 +148,16 @@
 
     const currentSrc = preview.dataset.currentSrc || "";
     let objectUrl = "";
+    let allowConfirmedPicker = false;
+
+    function setInputOccupied(occupied) {
+      const confirmation = window.FedorinovImageReplacement;
+      if (confirmation && typeof confirmation.setOccupied === "function") {
+        confirmation.setOccupied(input, occupied);
+      } else {
+        input.setAttribute("data-image-slot-occupied", occupied ? "true" : "false");
+      }
+    }
 
     function revokeObjectUrl() {
       if (!objectUrl) return;
@@ -179,7 +189,30 @@
         image.removeAttribute("src");
         placeholder.hidden = false;
       }
+      setInputOccupied(Boolean(currentSrc));
     }
+
+    input.addEventListener("click", (event) => {
+      if (allowConfirmedPicker) {
+        allowConfirmedPicker = false;
+        return;
+      }
+      const confirmation = window.FedorinovImageReplacement;
+      if (!confirmation || typeof confirmation.run !== "function" || !confirmation.isOccupied(input)) return;
+      event.preventDefault();
+      confirmation.run(input, () => {
+        allowConfirmedPicker = true;
+        input.click();
+      });
+    });
+
+    input.addEventListener("cancel", () => {
+      try {
+        input.focus({ preventScroll: true });
+      } catch (error) {
+        input.focus();
+      }
+    });
 
     input.addEventListener("change", () => {
       const file = input.files && input.files[0];
@@ -206,6 +239,7 @@
       error.textContent = "";
       error.hidden = true;
       if (uploadName) uploadName.textContent = file.name;
+      setInputOccupied(true);
       objectUrl = URL.createObjectURL(file);
       image.onload = () => {
         image.hidden = false;
@@ -231,6 +265,14 @@
     if (!input || !trigger || !clear || !clearValue || !preview || !image || !placeholder || !error) return;
 
     let objectUrl = "";
+    function setTriggerOccupied(occupied) {
+      const confirmation = window.FedorinovImageReplacement;
+      if (confirmation && typeof confirmation.setOccupied === "function") {
+        confirmation.setOccupied(trigger, occupied);
+      } else {
+        trigger.setAttribute("data-image-slot-occupied", occupied ? "true" : "false");
+      }
+    }
     function revokeObjectUrl() {
       if (!objectUrl) return;
       URL.revokeObjectURL(objectUrl);
@@ -272,6 +314,7 @@
       image.src = objectUrl;
       trigger.setAttribute("aria-label", "Заменить изображение погона");
       trigger.title = "Заменить изображение погона";
+      setTriggerOccupied(true);
       return true;
     }
 
@@ -328,7 +371,7 @@
       }
     });
 
-    trigger.addEventListener("click", async () => {
+    async function beginRankImageFlow() {
       trigger.disabled = true;
       try {
         const helper = window.FedorinovClipboardImages;
@@ -339,6 +382,15 @@
       } catch (error) {
         openFilePicker();
       }
+    }
+
+    trigger.addEventListener("click", () => {
+      const confirmation = window.FedorinovImageReplacement;
+      if (confirmation && typeof confirmation.run === "function") {
+        confirmation.run(trigger, beginRankImageFlow);
+        return;
+      }
+      beginRankImageFlow();
     });
 
     clear.addEventListener("click", () => {
@@ -351,6 +403,7 @@
       clear.hidden = true;
       trigger.setAttribute("aria-label", "Добавить изображение погона");
       trigger.title = "Добавить изображение погона";
+      setTriggerOccupied(false);
       clearError();
     });
 

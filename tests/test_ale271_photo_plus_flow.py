@@ -86,17 +86,18 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
         script = self.read("backend/app/static/guide_image_preview.js")
         rank_form = self.read("backend/app/templates/rank_form.html")
         rank_editor = script.split("function initRankImageEditor(editor)", 1)[1]
-        trigger_handler = rank_editor.split('trigger.addEventListener("click"', 1)[1].split(
-            'clear.addEventListener("click"', 1
+        rank_flow = rank_editor.split("async function beginRankImageFlow()", 1)[1].split(
+            'trigger.addEventListener("click"', 1
         )[0]
 
         self.assertNotIn("pickerNext", rank_editor)
         self.assertIn("input.click();", rank_editor)
         self.assertNotIn("showPicker", rank_editor)
         self.assertLess(
-            trigger_handler.index("helper.readWithTimeout"),
-            trigger_handler.index("openFilePicker()"),
+            rank_flow.index("helper.readWithTimeout"),
+            rank_flow.index("openFilePicker()"),
         )
+        self.assertIn("confirmation.run(trigger, beginRankImageFlow)", rank_editor)
         cancel_handler = rank_editor.split('input.addEventListener("cancel"', 1)[1].split("});", 1)[0]
         self.assertNotIn("pickerNext", cancel_handler)
         self.assertNotIn("data-rank-image-status", rank_form)

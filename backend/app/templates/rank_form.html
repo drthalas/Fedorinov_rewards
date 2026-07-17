@@ -23,7 +23,7 @@
       <span data-rank-image-preview-placeholder class="rank-insignia-preview-placeholder" {% if has_rank_image %}hidden{% endif %}>Изображение не загружено</span>
     </div>
     <span class="rank-insignia-controls">
-      <button type="button" class="rank-insignia-control" data-rank-image-trigger aria-label="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}" title="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}">+</button>
+      <button type="button" class="rank-insignia-control" data-rank-image-trigger data-image-slot-occupied="{{ 'true' if has_rank_image else 'false' }}" aria-label="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}" title="{% if has_rank_image %}Заменить изображение погона{% else %}Добавить изображение погона{% endif %}">+</button>
       <button type="button" class="rank-insignia-control rank-insignia-remove" data-rank-image-clear aria-label="Удалить изображение погона" title="Удалить изображение погона"{% if not has_rank_image %} hidden{% endif %}>×</button>
     </span>
     <input type="hidden" name="clear_image" value="" data-rank-image-clear-value>

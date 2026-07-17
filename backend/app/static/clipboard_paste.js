@@ -272,8 +272,7 @@
   }
 
   function bindInlinePhotoTrigger(button) {
-    button.addEventListener("click", async function (event) {
-      event.preventDefault();
+    async function beginPhotoFlow() {
       rememberPhotoInteraction(button);
       button.disabled = true;
       clearSourceError(button);
@@ -292,6 +291,16 @@
         button.disabled = false;
         restorePhotoInteraction();
       }
+    }
+
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      var confirmation = window.FedorinovImageReplacement;
+      if (confirmation && typeof confirmation.run === "function") {
+        confirmation.run(button, beginPhotoFlow);
+        return;
+      }
+      beginPhotoFlow();
     });
   }
 
@@ -301,7 +310,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
-      button.addEventListener("click", async function () {
+      async function beginClipboardPaste() {
         button.disabled = true;
         clearSourceError(button);
         try {
@@ -311,6 +320,15 @@
           showSourceError(button, error && error.message ? error.message : "Не удалось вставить фото из буфера.");
           button.disabled = false;
         }
+      }
+
+      button.addEventListener("click", function () {
+        var confirmation = window.FedorinovImageReplacement;
+        if (confirmation && typeof confirmation.run === "function") {
+          confirmation.run(button, beginClipboardPaste);
+          return;
+        }
+        beginClipboardPaste();
       });
     });
 

@@ -45,7 +45,7 @@
         <span class="guide-upload-icon" aria-hidden="true">⇧</span>
         <span class="guide-upload-copy" data-guide-upload-name>Выберите файл или перетащите его сюда</span>
         <span class="guide-upload-button" aria-hidden="true">Выбрать файл</span>
-        <input type="file" name="image_file" data-guide-image-input accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+        <input type="file" name="image_file" data-guide-image-input data-image-slot-occupied="{{ 'true' if item.image_path else 'false' }}" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
       </span>
     </label>
     <small class="secondary">JPG, JPEG, PNG или WebP, не более 5 MB.</small>

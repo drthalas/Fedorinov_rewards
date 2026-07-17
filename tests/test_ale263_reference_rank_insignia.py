@@ -185,13 +185,14 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIn("normalizeRankImage", preview_script)
         self.assertIn("rankContentBounds", preview_script)
         self.assertNotIn("pickerNext", preview_script)
-        trigger_handler = preview_script.split('trigger.addEventListener("click"', 1)[1].split(
-            'clear.addEventListener("click"', 1
+        rank_flow = preview_script.split("async function beginRankImageFlow()", 1)[1].split(
+            'trigger.addEventListener("click"', 1
         )[0]
         self.assertLess(
-            trigger_handler.index("helper.readWithTimeout"),
-            trigger_handler.index("openFilePicker()"),
+            rank_flow.index("helper.readWithTimeout"),
+            rank_flow.index("openFilePicker()"),
         )
+        self.assertIn("confirmation.run(trigger, beginRankImageFlow)", preview_script)
         self.assertIn("input.click();", preview_script)
         self.assertNotIn("showPicker", preview_script)
         self.assertIn('input.addEventListener("cancel"', preview_script)
