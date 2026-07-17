@@ -1,9 +1,24 @@
 from dataclasses import dataclass
 from contextlib import closing
+import os
+from pathlib import Path
+from typing import Callable
+from uuid import uuid4
 
 from ..config import Settings
-from ..db import open_write_connection
+from ..db import open_readonly_connection, open_write_connection
 from ..services.audit import log_action
+from ..services.deletion_lifecycle import (
+    DeletionExecutionResult,
+    DeletionLifecycleError,
+    MediaReferenceExclusion,
+    RowCountExpectation,
+    build_delete_plan,
+    execute_delete_plan,
+    person_owned_directory,
+    recorded_delete_plan,
+    recover_delete_operation,
+)
 from ..services.dates import normalize_birth_year_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
@@ -29,6 +44,61 @@ class PersonWriteData:
     link2: str | None = None
     comment: str | None = None
     biography: str | None = None
+
+
+@dataclass(frozen=True)
+class PersonDeletePreview:
+    reward_count: int
+    person_media_count: int
+    database_media_reference_count: int
+    folder_item_count: int
+
+
+@dataclass(frozen=True)
+class PersonDeleteResult:
+    operation: DeletionExecutionResult
+    preview: PersonDeletePreview | None = None
+
+
+@dataclass(frozen=True)
+class _PersonDeleteSnapshot:
+    person: tuple[tuple[str, object], ...]
+    rewards: tuple[tuple[tuple[str, object], ...], ...]
+    person_media: tuple[tuple[tuple[str, object], ...], ...]
+
+    @property
+    def reward_ids(self) -> tuple[int, ...]:
+        return tuple(int(dict(row)["id"]) for row in self.rewards)
+
+    @property
+    def person_media_ids(self) -> tuple[int, ...]:
+        return tuple(int(dict(row)["id"]) for row in self.person_media)
+
+    @property
+    def reference_paths(self) -> tuple[object, ...]:
+        references: list[object] = []
+        person = dict(self.person)
+        references.extend(person.get(field) for field in PERSON_IMAGE_FIELDS if field in person)
+        for raw_row in self.rewards:
+            row = dict(raw_row)
+            references.extend(row.get(field) for field in REWARD_IMAGE_FIELDS if field in row)
+        for raw_row in self.person_media:
+            row = dict(raw_row)
+            if "file_path" in row:
+                references.append(row.get("file_path"))
+        return tuple(value for value in references if value not in {None, ""})
+
+
+PERSON_IMAGE_FIELDS = (
+    "person_foto",
+    "main_foto",
+    "rewards_foto",
+    "book1_foto",
+    "book2_foto",
+    "card1_foto",
+    "card2_foto",
+)
+REWARD_IMAGE_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")
 
 
 def _empty_to_none(value: object) -> object:
@@ -142,20 +212,169 @@ def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> 
 CONFIRM_REQUIRED_MESSAGE = "Действие требует подтверждения."
 
 
-def delete_person(settings: Settings, person_id: int, confirm: bool = False) -> None:
+def _row_signature(row) -> tuple[tuple[str, object], ...]:
+    return tuple((key, row[key]) for key in row.keys())
+
+
+def _table_exists(connection, table: str) -> bool:
+    return connection.execute(
+        "select 1 from sqlite_master where type = 'table' and name = ?",
+        (table,),
+    ).fetchone() is not None
+
+
+def _person_delete_snapshot(connection, person_id: int) -> _PersonDeleteSnapshot | None:
+    person = connection.execute("select * from person where id = ?", (person_id,)).fetchone()
+    if person is None:
+        return None
+    rewards = connection.execute(
+        "select * from rewards where person_id = ? order by id",
+        (person_id,),
+    ).fetchall()
+    person_media = (
+        connection.execute(
+            "select * from person_media where person_id = ? order by id",
+            (person_id,),
+        ).fetchall()
+        if _table_exists(connection, "person_media")
+        else []
+    )
+    return _PersonDeleteSnapshot(
+        _row_signature(person),
+        tuple(_row_signature(row) for row in rewards),
+        tuple(_row_signature(row) for row in person_media),
+    )
+
+
+def _folder_item_count(folder: Path) -> int:
+    if not folder.exists() or not folder.is_dir():
+        return 0
+    count = 0
+    for _, directories, files in os.walk(folder, followlinks=False):
+        count += len(directories) + len(files)
+    return count
+
+
+def person_delete_preview(settings: Settings, person_id: int) -> PersonDeletePreview:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        snapshot = _person_delete_snapshot(connection, person_id)
+    if snapshot is None:
+        raise PersonValidationError("Награжденный не найден.")
+    return PersonDeletePreview(
+        reward_count=len(snapshot.rewards),
+        person_media_count=len(snapshot.person_media),
+        database_media_reference_count=len(snapshot.reference_paths),
+        folder_item_count=_folder_item_count(settings.rewards_data_dir / "Source" / str(person_id)),
+    )
+
+
+def person_delete_confirmation_message(preview: PersonDeletePreview) -> str:
+    return (
+        "Удалить кавалера и все связанные данные? "
+        f"Наград: {preview.reward_count}; дополнительных материалов: {preview.person_media_count}; "
+        f"ссылок на файлы: {preview.database_media_reference_count}; файлов и папок: {preview.folder_item_count}."
+    )
+
+
+def delete_person_with_result(
+    settings: Settings,
+    person_id: int,
+    confirm: bool = False,
+    *,
+    operation_id: str | None = None,
+    fault_hook: Callable[[str], None] | None = None,
+) -> PersonDeleteResult:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise PersonValidationError(CONFIRM_REQUIRED_MESSAGE)
+    operation_id = str(operation_id or uuid4().hex)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        reward_count = connection.execute(
-            "select count(*) as count from rewards where person_id = ?",
-            (person_id,),
-        ).fetchone()["count"]
-        if int(reward_count) > 0:
-            raise PersonDeleteBlockedError("Нельзя удалить: у награжденного есть награды")
+        snapshot = _person_delete_snapshot(connection, person_id)
+        if snapshot is None:
+            try:
+                recorded = recorded_delete_plan(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise PersonDeleteBlockedError("Некорректный идентификатор операции удаления.") from exc
+            if recorded is None or recorded.entity_type != "person" or recorded.entity_ids != (person_id,):
+                raise PersonValidationError("Награжденный не найден.")
+            try:
+                recovered = recover_delete_operation(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise PersonDeleteBlockedError(
+                    "Не удалось безопасно завершить удаление кавалера. Повторите действие или проверьте журнал."
+                ) from exc
+            return PersonDeleteResult(recovered)
 
+    preview = PersonDeletePreview(
+        reward_count=len(snapshot.rewards),
+        person_media_count=len(snapshot.person_media),
+        database_media_reference_count=len(snapshot.reference_paths),
+        folder_item_count=_folder_item_count(settings.rewards_data_dir / "Source" / str(person_id)),
+    )
+    exclusions = [MediaReferenceExclusion("person", person_id)]
+    exclusions.extend(MediaReferenceExclusion("rewards", reward_id) for reward_id in snapshot.reward_ids)
+    exclusions.extend(MediaReferenceExclusion("person_media", media_id) for media_id in snapshot.person_media_ids)
+    expected_counts = [
+        RowCountExpectation("person", "id", person_id, 1),
+        RowCountExpectation("rewards", "person_id", person_id, len(snapshot.rewards)),
+    ]
+    if snapshot.person_media:
+        expected_counts.append(
+            RowCountExpectation("person_media", "person_id", person_id, len(snapshot.person_media))
+        )
+
+    try:
+        plan = build_delete_plan(
+            settings,
+            operation_id=operation_id,
+            entity_type="person",
+            entity_ids=(person_id,),
+            expected_row_counts=tuple(expected_counts),
+            reference_paths=snapshot.reference_paths,
+            excluded_rows=tuple(exclusions),
+            owned_paths=(person_owned_directory(person_id),),
+        )
+    except DeletionLifecycleError as exc:
+        raise PersonDeleteBlockedError(
+            "Нельзя безопасно удалить кавалера: путь к материалам не прошёл проверку."
+        ) from exc
+
+    def delete_database_rows(connection) -> None:
+        current = _person_delete_snapshot(connection, person_id)
+        if current != snapshot:
+            raise PersonDeleteBlockedError("Данные кавалера изменились во время подготовки удаления.")
+        connection.execute("delete from rewards where person_id = ?", (person_id,))
+        if _table_exists(connection, "person_media"):
+            connection.execute("delete from person_media where person_id = ?", (person_id,))
         cursor = connection.execute("delete from person where id = ?", (person_id,))
-        if cursor.rowcount == 0:
+        if cursor.rowcount != 1:
             raise PersonValidationError("Награжденный не найден.")
-        connection.commit()
-    log_action("delete", "person", person_id, {"blocked_if_rewards": True})
+
+    try:
+        operation = execute_delete_plan(settings, plan, delete_database_rows, fault_hook=fault_hook)
+    except PersonDeleteBlockedError:
+        raise
+    except DeletionLifecycleError as exc:
+        raise PersonDeleteBlockedError(
+            "Нельзя безопасно удалить кавалера: обнаружены внешние ссылки или неоднозначные материалы."
+        ) from exc
+    log_action(
+        "delete",
+        "person",
+        person_id,
+        {
+            "operation_id": operation.operation_id,
+            "status": operation.status,
+            "rewards_deleted": preview.reward_count,
+            "person_media_deleted": preview.person_media_count,
+            "database_media_references": preview.database_media_reference_count,
+            "folder_items": preview.folder_item_count,
+            "staged_paths": operation.staged_paths,
+            "preserved_shared_references": operation.preserved_shared_references,
+        },
+    )
+    return PersonDeleteResult(operation, preview)
+
+
+def delete_person(settings: Settings, person_id: int, confirm: bool = False) -> None:
+    delete_person_with_result(settings, person_id, confirm=confirm)

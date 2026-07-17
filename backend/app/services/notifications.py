@@ -25,6 +25,10 @@ STATUS_NOTIFICATIONS: Mapping[str, NotificationSpec] = {
         "Нельзя удалить кавалера: сначала удалите или перенесите его награды.",
         "error",
     ),
+    "person_delete_blocked": NotificationSpec(
+        "Нельзя безопасно удалить кавалера: обнаружены внешние ссылки или неоднозначные материалы.",
+        "error",
+    ),
     "reward_created": NotificationSpec("Награда добавлена."),
     "reward_updated": NotificationSpec("Награда сохранена."),
     "reward_deleted": NotificationSpec("Награда удалена."),

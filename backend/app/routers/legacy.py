@@ -19,6 +19,7 @@ from ..repositories.legacy_rewards import (
 )
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
 from ..repositories.persons import get_person, list_person_rewards, person_photo_items
+from ..repositories.persons_write import person_delete_confirmation_message, person_delete_preview
 from ..repositories.search import search_all, search_suggestions
 from ..repositories.summary import (
     summary_filter_cascade,
@@ -473,6 +474,8 @@ def legacy_index(
         ),
         "rewards_tab_return": _legacy_rewards_url(rewards_filters),
         "selected_person_return": _legacy_rewards_url(rewards_filters, person_id) if person_id is not None else _legacy_rewards_url(rewards_filters),
+        "person_delete_operation_id": "",
+        "person_delete_confirmation": "",
         "rewards_totals": {
             "persons_total": 0,
             "rewards_total": 0,
@@ -559,6 +562,9 @@ def legacy_index(
         context["person_rewards"] = selected_person_rewards
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
         if selected_person is not None:
+            delete_preview = person_delete_preview(settings, selected_person_id)
+            context["person_delete_operation_id"] = uuid4().hex
+            context["person_delete_confirmation"] = person_delete_confirmation_message(delete_preview)
             context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
             selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
             selected_person_additional_photos = person_folder_image_items(

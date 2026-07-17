@@ -50,6 +50,11 @@ class Ale277TransientNotificationTests(unittest.TestCase):
         cases = {
             "person_updated": ("Кавалер сохранён.", "success", SUCCESS_TIMEOUT_MS),
             "person_deleted": ("Кавалер удалён.", "success", SUCCESS_TIMEOUT_MS),
+            "person_delete_blocked": (
+                "Нельзя безопасно удалить кавалера: обнаружены внешние ссылки или неоднозначные материалы.",
+                "error",
+                ATTENTION_TIMEOUT_MS,
+            ),
             "reward_updated": ("Награда сохранена.", "success", SUCCESS_TIMEOUT_MS),
             "mark_updated": ("Знак сохранён.", "success", SUCCESS_TIMEOUT_MS),
             "media_cleanup_failed": (

@@ -11,13 +11,15 @@ from ..repositories.persons_write import (
     PersonDeleteBlockedError,
     PersonValidationError,
     create_person,
-    delete_person,
+    delete_person_with_result,
+    person_delete_confirmation_message,
+    person_delete_preview,
     person_data_from_mapping,
     update_person,
 )
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
-from ..services.navigation import safe_return_to, with_status
+from ..services.navigation import safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.person_files import (
     PersonFilesError,
@@ -172,6 +174,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
     photos = person_photo_items(person, rewards)
     additional_photos = person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos])
+    delete_preview = person_delete_preview(settings, person_id)
     return templates.TemplateResponse(
         request,
         "person_detail.html",
@@ -186,6 +189,8 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
             "reward_delete_operation_ids": {int(reward["id"]): uuid4().hex for reward in rewards},
+            "person_delete_operation_id": uuid4().hex,
+            "person_delete_confirmation": person_delete_confirmation_message(delete_preview),
         },
     )
 
@@ -333,15 +338,22 @@ async def person_delete(request: Request, person_id: int):
     if form_values.get("delete_person_confirm") != "true":
         raise _delete_validation_error(PersonValidationError("Действие требует подтверждения."))
     try:
-        delete_person(settings, person_id, confirm=form_values.get("confirm") == "true")
+        result = delete_person_with_result(
+            settings,
+            person_id,
+            confirm=form_values.get("confirm") == "true",
+            operation_id=str(form_values.get("delete_operation_id") or ""),
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonDeleteBlockedError:
-        target = with_status(return_to, "delete_blocked") if return_to else f"/persons/{person_id}?status=delete_blocked"
+        target = with_status(return_to, "person_delete_blocked") if return_to else f"/persons/{person_id}?status=person_delete_blocked"
         return RedirectResponse(target, status_code=303)
     except PersonValidationError as exc:
         raise _delete_validation_error(exc) from exc
     target = with_status(return_to, "person_deleted") if return_to else "/persons?status=person_deleted"
+    if result.operation.warning_required:
+        target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)
 
 

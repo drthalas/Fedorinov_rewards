@@ -6,7 +6,6 @@ import unittest
 
 from backend.app.config import Settings
 from backend.app.repositories.persons_write import (
-    PersonDeleteBlockedError,
     PersonValidationError,
     PersonWriteData,
     create_person,
@@ -170,13 +169,17 @@ class PersonWriteTests(unittest.TestCase):
         delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNone(self.fetch_person(person_id))
 
-    def test_delete_person_with_rewards_is_blocked(self) -> None:
+    def test_delete_person_with_rewards_cascades(self) -> None:
         person_id = create_person(self.settings(), self.person_data("Has rewards"))
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("insert into rewards (person_id) values (?)", (person_id,))
-        with self.assertRaises(PersonDeleteBlockedError):
-            delete_person(self.settings(), person_id, confirm=True)
-        self.assertIsNotNone(self.fetch_person(person_id))
+        delete_person(self.settings(), person_id, confirm=True)
+        self.assertIsNone(self.fetch_person(person_id))
+        with sqlite3.connect(self.db_path) as connection:
+            reward_count = connection.execute(
+                "select count(*) from rewards where person_id = ?", (person_id,)
+            ).fetchone()[0]
+        self.assertEqual(reward_count, 0)
 
     def test_sql_handles_quotes_in_fio_and_comment(self) -> None:
         fio = "O'Connor \"TEST\""

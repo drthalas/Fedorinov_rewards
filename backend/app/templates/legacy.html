@@ -69,9 +69,10 @@
             <a class="tool-button legacy-action-add" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">Добавить</a>
             {% if selected_person %}
               <a class="tool-button legacy-action-edit" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">Изменить</a>
-              <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-message="Вы точно хотите удалить кавалера? Это действие нельзя отменить.">
+              <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-message="{{ person_delete_confirmation }}">
                 <input type="hidden" name="confirm" value="">
                 <input type="hidden" name="delete_person_confirm" value="">
+                <input type="hidden" name="delete_operation_id" value="{{ person_delete_operation_id }}">
                 <input type="hidden" name="return_to" value="{{ rewards_tab_return }}">
                 <button class="tool-button danger legacy-action-delete" type="submit">Удалить</button>
               </form>

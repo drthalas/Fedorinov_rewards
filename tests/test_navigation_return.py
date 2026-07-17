@@ -11,11 +11,12 @@ from fastapi import HTTPException
 
 from backend.app.routers.dashboard import dashboard, dashboard_head
 from backend.app.routers.marks import mark_delete, mark_update
-from backend.app.routers.persons import person_update
+from backend.app.routers.persons import person_delete, person_update
 from backend.app.routers.rewards import reward_delete, reward_duplicate_check, reward_update
 from backend.app.routers.templates import photo_view_url
 from backend.app.repositories.rewards_write import RewardDeleteResult
 from backend.app.repositories.marks_write import MarkDeleteResult
+from backend.app.repositories.persons_write import PersonDeleteResult
 from backend.app.services.deletion_lifecycle import DeletionExecutionResult
 from backend.app.services.navigation import safe_return_to, with_status
 
@@ -284,6 +285,49 @@ class ReturnNavigationTests(unittest.TestCase):
         self.assertEqual(
             response.headers["location"],
             "/legacy?tab=marks&mark_id=20&status=mark_deleted&media_cleanup=failed",
+        )
+
+    def test_person_delete_without_dual_confirmation_does_not_delete(self) -> None:
+        request = FakeRequest({"confirm": "true", "return_to": "/legacy?tab=rewards&person_id=1"})
+        with self.assertRaises(HTTPException) as blocked:
+            asyncio.run(person_delete(request, 1))
+        self.assertEqual(blocked.exception.status_code, 400)
+        self.assertEqual(blocked.exception.detail, "Действие требует подтверждения.")
+        with sqlite3.connect(self.db_path) as connection:
+            self.assertEqual(connection.execute("select count(*) from person where id = 1").fetchone()[0], 1)
+
+    def test_person_delete_cascades_and_preserves_legacy_return_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_person_confirm": "true",
+                "delete_operation_id": "person-route-delete",
+                "return_to": "/legacy?tab=rewards",
+            }
+        )
+        response = asyncio.run(person_delete(request, 1))
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&status=person_deleted")
+        with sqlite3.connect(self.db_path) as connection:
+            self.assertEqual(connection.execute("select count(*) from person where id = 1").fetchone()[0], 0)
+            self.assertEqual(connection.execute("select count(*) from rewards where person_id = 1").fetchone()[0], 0)
+
+    def test_person_delete_cleanup_warning_preserves_return_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_person_confirm": "true",
+                "delete_operation_id": "person-cleanup-warning",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        result = PersonDeleteResult(
+            DeletionExecutionResult("person-cleanup-warning", "cleanup_pending", error="busy")
+        )
+        with patch("backend.app.routers.persons.delete_person_with_result", return_value=result):
+            response = asyncio.run(person_delete(request, 1))
+        self.assertEqual(
+            response.headers["location"],
+            "/legacy?tab=rewards&person_id=1&status=person_deleted&media_cleanup=failed",
         )
 
     def test_reward_duplicate_check_returns_free_status(self) -> None:
