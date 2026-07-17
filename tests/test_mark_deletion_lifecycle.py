@@ -7,7 +7,12 @@ import unittest
 from unittest.mock import patch
 
 from backend.app.config import Settings
-from backend.app.repositories.marks_write import MarkDeleteBlockedError, delete_mark_with_result
+from backend.app.repositories.marks_write import (
+    MarkDeleteBlockedError,
+    delete_mark_with_result,
+    mark_delete_confirmation_message,
+    mark_delete_preview,
+)
 
 
 MEDIA_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto")
@@ -102,6 +107,13 @@ class MarkDeletionLifecycleTests(unittest.TestCase):
         self._update_mark(20, front_foto="SourceMark/shared.jpg", back_foto="SourceMark/20/owned.jpg")
         self._update_mark(21, front_foto="SourceMark/shared.jpg")
 
+        preview = mark_delete_preview(self.settings(), 20)
+        self.assertEqual(preview.media.linked_media_count, 2)
+        self.assertEqual(preview.media.folder_item_count, 1)
+        self.assertEqual(preview.media.preserved_shared_reference_count, 1)
+        self.assertIsNone(preview.media.block_reason)
+        self.assertIn("общих файлов будет сохранено: 1", mark_delete_confirmation_message(preview))
+
         result = delete_mark_with_result(self.settings(), 20, confirm=True, operation_id="mark-shared-ref")
 
         self.assertEqual(result.operation.preserved_shared_references, 1)
@@ -113,6 +125,9 @@ class MarkDeletionLifecycleTests(unittest.TestCase):
         shared_inside = self._write("SourceMark/20/shared.jpg")
         self._update_mark(20, front_foto="SourceMark/20/shared.jpg")
         self._update_mark(21, front_foto="SourceMark/20/shared.jpg")
+
+        preview = mark_delete_preview(self.settings(), 20)
+        self.assertIn("Внешняя запись", preview.media.block_reason or "")
 
         with self.assertRaises(MarkDeleteBlockedError):
             delete_mark_with_result(self.settings(), 20, confirm=True, operation_id="mark-external-ref")

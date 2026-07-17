@@ -4,7 +4,7 @@ from typing import Callable
 from uuid import uuid4
 
 from ..config import Settings
-from ..db import open_write_connection
+from ..db import open_readonly_connection, open_write_connection
 from ..services.audit import log_action
 from ..services.deletion_lifecycle import (
     DeletionExecutionResult,
@@ -18,6 +18,7 @@ from ..services.deletion_lifecycle import (
     recover_delete_operation,
 )
 from ..services.dates import normalize_date_input
+from ..services.deletion_confirmation import MediaDeletePreview, confirmation_message, media_delete_preview
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -79,6 +80,11 @@ class MarkWriteData:
 @dataclass(frozen=True)
 class MarkDeleteResult:
     operation: DeletionExecutionResult
+
+
+@dataclass(frozen=True)
+class MarkDeletePreview:
+    media: MediaDeletePreview
 
 
 def _empty_to_none(value: object) -> object:
@@ -199,6 +205,29 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
             raise MarkValidationError("Знак не найден.")
         connection.commit()
     log_action("update", "mark", mark_id, {"fields": list(MARK_FIELDS)})
+
+
+def mark_delete_preview(settings: Settings, mark_id: int) -> MarkDeletePreview:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        row = connection.execute(
+            "select front_foto, back_foto, book1_foto, book2_foto from mark where id = ?",
+            (mark_id,),
+        ).fetchone()
+        if row is None:
+            raise MarkValidationError("Знак не найден.")
+        media = media_delete_preview(
+            connection,
+            settings,
+            tuple(row[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto")),
+            excluded_rows=(MediaReferenceExclusion("mark", mark_id),),
+            owned_folder=settings.rewards_data_dir / "SourceMark" / str(mark_id),
+            owned_relative_prefix=f"SourceMark/{mark_id}",
+        )
+    return MarkDeletePreview(media)
+
+
+def mark_delete_confirmation_message(preview: MarkDeletePreview) -> str:
+    return confirmation_message("Удалить знак и принадлежащие ему материалы?", media=preview.media)
 
 
 def delete_mark_with_result(

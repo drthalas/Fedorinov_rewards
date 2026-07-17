@@ -164,13 +164,17 @@ class PersonDeletionLifecycleTests(unittest.TestCase):
         self.assertEqual(preview.folder_item_count, 3)
         self.assertIn("Наград: 2", message)
         self.assertIn("дополнительных материалов: 1", message)
-        self.assertIn("ссылок на файлы: 3", message)
+        self.assertIn("связанных материалов: 3", message)
         self.assertIn("файлов и папок: 3", message)
 
     def test_shared_path_outside_person_folder_is_preserved(self) -> None:
         shared = self._write("Source/2/shared.jpg")
         self._update("person", 1, person_foto="Source/2/shared.jpg")
         self._update("person", 2, person_foto="Source/2/shared.jpg")
+
+        preview = person_delete_preview(self.settings(), 1)
+        self.assertEqual(preview.preserved_shared_reference_count, 1)
+        self.assertIsNone(preview.block_reason)
 
         result = delete_person_with_result(self.settings(), 1, confirm=True, operation_id="person-shared-outside")
 
@@ -182,6 +186,9 @@ class PersonDeletionLifecycleTests(unittest.TestCase):
         shared_inside = self._write("Source/1/shared.jpg")
         self._update("person", 1, person_foto="Source/1/shared.jpg")
         self._update("person", 2, person_foto="Source/1/shared.jpg")
+
+        preview = person_delete_preview(self.settings(), 1)
+        self.assertIn("Внешняя запись", preview.block_reason or "")
 
         with self.assertRaises(PersonDeleteBlockedError):
             delete_person_with_result(self.settings(), 1, confirm=True, operation_id="person-external-ref")

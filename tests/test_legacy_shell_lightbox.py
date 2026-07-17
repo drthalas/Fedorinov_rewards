@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260717-ale281-image-replacement-confirm-3"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260717-ale291-delete-confirmations-2"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -410,7 +410,9 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('name="delete_operation_id" value="{{ person_delete_operation_id }}"', person_detail)
         self.assertIn('form_values.get("delete_person_confirm") != "true"', persons_router)
         self.assertIn("Действие требует подтверждения.", persons_router)
-        self.assertIn('setInputValue(form, "delete_person_confirm", "true")', confirm_js)
+        self.assertIn('setDeleteConfirmation(form, true)', confirm_js)
+        self.assertIn('setInputValue(form, "delete_person_confirm", value)', confirm_js)
+        self.assertIn('role", "alertdialog"', confirm_js)
 
     def test_reward_delete_requires_confirmation_in_ui_and_route(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()
@@ -421,9 +423,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         rewards_router = (ROOT / "backend" / "app" / "routers" / "rewards.py").read_text()
         confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
-        expected_text = "Вы действительно хотите удалить награду?"
-        self.assertIn(expected_text, person_detail)
-        self.assertIn(expected_text, reward_detail)
+        self.assertIn("reward_delete_confirmations.get(reward.id", person_detail)
+        self.assertIn('data-confirm-message="{{ delete_confirmation }}"', reward_detail)
         self.assertIn('/rewards/{{ reward.id }}/delete', person_detail)
         self.assertIn("static_url('confirm_submit.js')", base)
         self.assertIn("static_url('confirm_submit.js')", legacy_base)
@@ -434,29 +435,28 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('name="confirm" value=""', reward_detail)
         self.assertIn('name="delete_reward_confirm" value=""', person_detail)
         self.assertIn('name="delete_reward_confirm" value=""', reward_detail)
-        self.assertIn(
-            'action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">\n'
-            '            <input type="hidden" name="confirm" value="">',
-            person_detail,
-        )
+        self.assertIn('data-confirm-title="Удаление награды"', person_detail)
+        self.assertIn('data-confirm-blocked=', person_detail)
         self.assertIn('name="return_to" value="{{ person_card_return }}"', person_detail)
         self.assertIn('form_values.get("delete_reward_confirm") != "true" or form_values.get("confirm") != "true"', rewards_router)
         self.assertIn("event.preventDefault()", confirm_js)
-        self.assertIn('setInputValue(form, "confirm", "")', confirm_js)
-        self.assertIn('setInputValue(form, "confirm", "true")', confirm_js)
-        self.assertIn('setInputValue(form, "delete_reward_confirm", "true")', confirm_js)
+        self.assertIn('setDeleteConfirmation(form, false)', confirm_js)
+        self.assertIn('setDeleteConfirmation(form, true)', confirm_js)
+        self.assertIn('setInputValue(form, "delete_reward_confirm", value)', confirm_js)
         self.assertNotIn('@router.get("/rewards/{reward_id}/delete"', rewards_router)
 
     def test_mark_delete_uses_same_confirmation_and_operation_contract_on_both_surfaces(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
         mark_detail = (ROOT / "backend" / "app" / "templates" / "mark_detail.html").read_text()
-        expected_text = "Удалить знак и принадлежащие ему материалы?"
-
         for template in (legacy_template, mark_detail):
-            self.assertIn(expected_text, template)
             self.assertIn('data-confirm-submit="mark-delete"', template)
+            self.assertIn('data-confirm-title="Удаление знака"', template)
+            self.assertIn('data-confirm-blocked=', template)
             self.assertIn('name="confirm" value=""', template)
             self.assertIn('name="delete_operation_id"', template)
+
+        self.assertIn('data-confirm-message="{{ mark_delete_confirmation }}"', legacy_template)
+        self.assertIn('data-confirm-message="{{ delete_confirmation }}"', mark_detail)
 
         self.assertNotIn("Фото и папки не будут удалены", mark_detail)
 

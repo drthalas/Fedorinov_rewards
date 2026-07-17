@@ -10,6 +10,8 @@ from backend.app.config import Settings
 from backend.app.repositories.rewards_write import (
     RewardDeleteBlockedError,
     delete_reward_with_result,
+    reward_delete_confirmation_message,
+    reward_delete_preview,
 )
 
 
@@ -115,6 +117,13 @@ class RewardDeletionLifecycleTests(unittest.TestCase):
         self._update_reward(10, front_foto="Source/1/shared.jpg", back_foto="Source/1/10/owned.jpg")
         self._update_reward(11, front_foto="Source/1/shared.jpg")
 
+        preview = reward_delete_preview(self.settings(), 10)
+        self.assertEqual(preview.media.linked_media_count, 2)
+        self.assertEqual(preview.media.folder_item_count, 1)
+        self.assertEqual(preview.media.preserved_shared_reference_count, 1)
+        self.assertIsNone(preview.media.block_reason)
+        self.assertIn("общих файлов будет сохранено: 1", reward_delete_confirmation_message(preview))
+
         result = delete_reward_with_result(
             self.settings(), 10, confirm=True, operation_id="reward-shared-ref"
         )
@@ -128,6 +137,9 @@ class RewardDeletionLifecycleTests(unittest.TestCase):
         shared_inside = self._write("Source/1/10/shared.jpg")
         self._update_reward(10, front_foto="Source/1/10/shared.jpg")
         self._update_reward(11, front_foto="Source/1/10/shared.jpg")
+
+        preview = reward_delete_preview(self.settings(), 10)
+        self.assertIn("Внешняя запись", preview.media.block_reason or "")
 
         with self.assertRaises(RewardDeleteBlockedError):
             delete_reward_with_result(

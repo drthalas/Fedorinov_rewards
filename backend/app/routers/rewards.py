@@ -15,6 +15,8 @@ from ..repositories.rewards_write import (
     create_reward,
     delete_reward_with_result,
     reward_data_from_mapping,
+    reward_delete_confirmation_message,
+    reward_delete_preview,
     reward_duplicate_message,
     update_reward,
 )
@@ -180,6 +182,7 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
         raise HTTPException(status_code=404, detail="Награда не найдена.")
+    delete_preview = reward_delete_preview(settings, reward_id)
     safe_back = safe_return_to(return_to)
     return templates.TemplateResponse(
         request,
@@ -194,6 +197,8 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
             "status_message": status_message(status),
             "return_to": safe_back,
             "delete_operation_id": uuid4().hex,
+            "delete_confirmation": reward_delete_confirmation_message(delete_preview),
+            "delete_blocked": delete_preview.media.block_reason is not None,
         },
     )
 

@@ -4,7 +4,7 @@ from typing import Callable
 from uuid import uuid4
 
 from ..config import Settings
-from ..db import open_write_connection
+from ..db import open_readonly_connection, open_write_connection
 from ..services.audit import log_action
 from ..services.deletion_lifecycle import (
     DeletionExecutionResult,
@@ -18,6 +18,7 @@ from ..services.deletion_lifecycle import (
     recover_delete_operation,
 )
 from ..services.guide_images import normalize_guide_image_path
+from ..services.deletion_confirmation import MediaDeletePreview, confirmation_message, media_delete_preview
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -51,6 +52,27 @@ class GuideLevelData:
     parent_id: int
     rating_rank: int | None = None
     image_path: str | None = None
+
+
+@dataclass(frozen=True)
+class RankDeletePreview:
+    used_count: int
+    media: MediaDeletePreview
+
+    @property
+    def blocked(self) -> bool:
+        return self.used_count > 0 or self.media.block_reason is not None
+
+
+@dataclass(frozen=True)
+class GuideDeletePreview:
+    child_count: int
+    usage_count: int
+    media: MediaDeletePreview
+
+    @property
+    def blocked(self) -> bool:
+        return self.child_count > 0 or self.usage_count > 0 or self.media.block_reason is not None
 
 
 def _name_from_mapping(values: dict[str, object]) -> str:
@@ -227,6 +249,60 @@ def _rank_unused(connection, rank_id: int) -> None:
         raise GuideDeleteBlockedError("Нельзя удалить: значение используется в карточках награждённых.")
 
 
+def _rank_delete_preview_in_connection(connection, settings: Settings, rank_id: int) -> RankDeletePreview:
+    row = connection.execute("select * from guide where id = ?", (rank_id,)).fetchone()
+    if row is None:
+        raise GuideValidationError("Звание/специальность не найдены.")
+    columns = set(row.keys())
+    image_path = row["image_path"] if "image_path" in columns else None
+    used_count = int(
+        connection.execute("select count(*) as count from person where id_rank = ?", (rank_id,)).fetchone()["count"]
+    )
+    media = media_delete_preview(
+        connection,
+        settings,
+        (image_path,),
+        excluded_rows=(MediaReferenceExclusion("guide", rank_id),),
+    )
+    if image_path not in {None, ""}:
+        try:
+            normalize_guide_image_path(image_path)
+        except ValueError:
+            media = MediaDeletePreview(
+                media.linked_media_count,
+                media.folder_item_count,
+                media.preserved_shared_reference_count,
+                "Путь изображения звания не прошёл безопасную проверку.",
+            )
+    return RankDeletePreview(used_count, media)
+
+
+def rank_delete_preview(settings: Settings, rank_id: int) -> RankDeletePreview:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        return _rank_delete_preview_in_connection(connection, settings, rank_id)
+
+
+def rank_delete_previews(settings: Settings, rank_ids: tuple[int, ...]) -> dict[int, RankDeletePreview]:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        return {
+            rank_id: _rank_delete_preview_in_connection(connection, settings, rank_id)
+            for rank_id in rank_ids
+        }
+
+
+def rank_delete_confirmation_message(preview: RankDeletePreview) -> str:
+    block_reason = (
+        f"звание используется в карточках кавалеров ({preview.used_count})"
+        if preview.used_count
+        else preview.media.block_reason
+    )
+    return confirmation_message(
+        "Удалить звание/специальность?",
+        media=preview.media,
+        block_reason=block_reason,
+    )
+
+
 def delete_rank(
     settings: Settings,
     rank_id: int,
@@ -387,6 +463,76 @@ def _assert_guide_item_deletable(connection, level: int, item_id: int) -> None:
             raise GuideDeleteBlockedError("Нельзя удалить: у элемента есть дочерние записи.")
     if _usage_count(connection, level, item_id) > 0:
         raise GuideDeleteBlockedError("Нельзя удалить: значение используется в наградах или знаках.")
+
+
+def _guide_delete_preview_in_connection(
+    connection,
+    settings: Settings,
+    level: int,
+    item_id: int,
+) -> GuideDeletePreview:
+    safe_level = _validate_level(level)
+    table = f"guide_lev_{safe_level}"
+    row = connection.execute(f"select * from {table} where id = ?", (item_id,)).fetchone()
+    if row is None:
+        raise GuideValidationError("Элемент справочника не найден.")
+    child_count = 0
+    if safe_level < 4:
+        child_count = int(
+            connection.execute(
+                f"select count(*) as count from guide_lev_{safe_level + 1} where idl = ?",
+                (item_id,),
+            ).fetchone()["count"]
+        )
+    usage_count = _usage_count(connection, safe_level, item_id)
+    image_path = row["image_path"] if safe_level == 3 and "image_path" in row.keys() else None
+    media = media_delete_preview(
+        connection,
+        settings,
+        (image_path,),
+        excluded_rows=(MediaReferenceExclusion(table, item_id),),
+    )
+    if image_path not in {None, ""}:
+        try:
+            normalize_guide_image_path(image_path)
+        except ValueError:
+            media = MediaDeletePreview(
+                media.linked_media_count,
+                media.folder_item_count,
+                media.preserved_shared_reference_count,
+                "Путь изображения элемента не прошёл безопасную проверку.",
+            )
+    return GuideDeletePreview(child_count, usage_count, media)
+
+
+def guide_delete_preview(settings: Settings, level: int, item_id: int) -> GuideDeletePreview:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        return _guide_delete_preview_in_connection(connection, settings, level, item_id)
+
+
+def guide_delete_previews(
+    settings: Settings,
+    item_keys: tuple[tuple[int, int], ...],
+) -> dict[str, GuideDeletePreview]:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        return {
+            f"{level}-{item_id}": _guide_delete_preview_in_connection(connection, settings, level, item_id)
+            for level, item_id in item_keys
+        }
+
+
+def guide_delete_confirmation_message(preview: GuideDeletePreview) -> str:
+    if preview.child_count:
+        block_reason = f"у элемента есть дочерние записи ({preview.child_count})"
+    elif preview.usage_count:
+        block_reason = f"значение используется в наградах или знаках ({preview.usage_count})"
+    else:
+        block_reason = preview.media.block_reason
+    return confirmation_message(
+        "Удалить элемент справочника?",
+        media=preview.media,
+        block_reason=block_reason,
+    )
 
 
 def delete_guide_level_item(

@@ -1,7 +1,5 @@
 from dataclasses import dataclass
 from contextlib import closing
-import os
-from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
@@ -20,6 +18,12 @@ from ..services.deletion_lifecycle import (
     recover_delete_operation,
 )
 from ..services.dates import normalize_birth_year_input
+from ..services.deletion_confirmation import (
+    MediaDeletePreview,
+    confirmation_message,
+    folder_item_count,
+    media_delete_preview,
+)
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -52,6 +56,8 @@ class PersonDeletePreview:
     person_media_count: int
     database_media_reference_count: int
     folder_item_count: int
+    preserved_shared_reference_count: int = 0
+    block_reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -246,33 +252,46 @@ def _person_delete_snapshot(connection, person_id: int) -> _PersonDeleteSnapshot
     )
 
 
-def _folder_item_count(folder: Path) -> int:
-    if not folder.exists() or not folder.is_dir():
-        return 0
-    count = 0
-    for _, directories, files in os.walk(folder, followlinks=False):
-        count += len(directories) + len(files)
-    return count
-
-
 def person_delete_preview(settings: Settings, person_id: int) -> PersonDeletePreview:
     with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
         snapshot = _person_delete_snapshot(connection, person_id)
+        if snapshot is not None:
+            exclusions = [MediaReferenceExclusion("person", person_id)]
+            exclusions.extend(MediaReferenceExclusion("rewards", reward_id) for reward_id in snapshot.reward_ids)
+            exclusions.extend(MediaReferenceExclusion("person_media", media_id) for media_id in snapshot.person_media_ids)
+            media = media_delete_preview(
+                connection,
+                settings,
+                snapshot.reference_paths,
+                excluded_rows=tuple(exclusions),
+                owned_folder=settings.rewards_data_dir / "Source" / str(person_id),
+                owned_relative_prefix=f"Source/{person_id}",
+            )
     if snapshot is None:
         raise PersonValidationError("Награжденный не найден.")
     return PersonDeletePreview(
         reward_count=len(snapshot.rewards),
         person_media_count=len(snapshot.person_media),
-        database_media_reference_count=len(snapshot.reference_paths),
-        folder_item_count=_folder_item_count(settings.rewards_data_dir / "Source" / str(person_id)),
+        database_media_reference_count=media.linked_media_count,
+        folder_item_count=media.folder_item_count,
+        preserved_shared_reference_count=media.preserved_shared_reference_count,
+        block_reason=media.block_reason,
     )
 
 
 def person_delete_confirmation_message(preview: PersonDeletePreview) -> str:
-    return (
-        "Удалить кавалера и все связанные данные? "
-        f"Наград: {preview.reward_count}; дополнительных материалов: {preview.person_media_count}; "
-        f"ссылок на файлы: {preview.database_media_reference_count}; файлов и папок: {preview.folder_item_count}."
+    return confirmation_message(
+        "Удалить кавалера и все связанные данные?",
+        child_counts=(
+            ("наград", preview.reward_count),
+            ("дополнительных материалов", preview.person_media_count),
+        ),
+        media=MediaDeletePreview(
+            linked_media_count=preview.database_media_reference_count,
+            folder_item_count=preview.folder_item_count,
+            preserved_shared_reference_count=preview.preserved_shared_reference_count,
+            block_reason=preview.block_reason,
+        ),
     )
 
 
@@ -309,7 +328,7 @@ def delete_person_with_result(
         reward_count=len(snapshot.rewards),
         person_media_count=len(snapshot.person_media),
         database_media_reference_count=len(snapshot.reference_paths),
-        folder_item_count=_folder_item_count(settings.rewards_data_dir / "Source" / str(person_id)),
+        folder_item_count=folder_item_count(settings.rewards_data_dir / "Source" / str(person_id)),
     )
     exclusions = [MediaReferenceExclusion("person", person_id)]
     exclusions.extend(MediaReferenceExclusion("rewards", reward_id) for reward_id in snapshot.reward_ids)

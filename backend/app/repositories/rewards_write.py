@@ -18,6 +18,7 @@ from ..services.deletion_lifecycle import (
     reward_owned_directory,
 )
 from ..services.dates import normalize_date_input
+from ..services.deletion_confirmation import MediaDeletePreview, confirmation_message, media_delete_preview
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
 
@@ -88,6 +89,12 @@ class RewardWriteData:
 class RewardDeleteResult:
     person_id: int
     operation: DeletionExecutionResult
+
+
+@dataclass(frozen=True)
+class RewardDeletePreview:
+    person_id: int
+    media: MediaDeletePreview
 
 
 def _empty_to_none(value: object) -> object:
@@ -283,6 +290,34 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
         connection.commit()
     log_action("update", "reward", reward_id, {"fields": list(REWARD_FIELDS)})
     return person_id
+
+
+def reward_delete_preview(settings: Settings, reward_id: int) -> RewardDeletePreview:
+    with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
+        row = connection.execute(
+            "select person_id, front_foto, back_foto, book1_foto, book2_foto, reward_list "
+            "from rewards where id = ?",
+            (reward_id,),
+        ).fetchone()
+        if row is None:
+            raise RewardValidationError("Награда не найдена.")
+        person_id = int(row["person_id"])
+        media = media_delete_preview(
+            connection,
+            settings,
+            tuple(row[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")),
+            excluded_rows=(MediaReferenceExclusion("rewards", reward_id),),
+            owned_folder=settings.rewards_data_dir / "Source" / str(person_id) / str(reward_id),
+            owned_relative_prefix=f"Source/{person_id}/{reward_id}",
+        )
+    return RewardDeletePreview(person_id, media)
+
+
+def reward_delete_confirmation_message(preview: RewardDeletePreview) -> str:
+    return confirmation_message(
+        "Удалить награду и принадлежащие ей материалы?",
+        media=preview.media,
+    )
 
 
 def delete_reward_with_result(

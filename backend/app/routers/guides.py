@@ -23,8 +23,12 @@ from ..repositories.guides_write import (
     create_rank,
     delete_guide_level_item,
     delete_rank,
+    guide_delete_confirmation_message,
+    guide_delete_previews,
     guide_level_data_from_mapping,
     rank_data_from_mapping,
+    rank_delete_confirmation_message,
+    rank_delete_previews,
     update_guide_level_item,
     update_rank,
 )
@@ -162,6 +166,16 @@ def _guide_delete_operation_ids(nodes: list[dict[str, object]]) -> dict[str, str
     return operation_ids
 
 
+def _guide_item_keys(nodes: list[dict[str, object]]) -> tuple[tuple[int, int], ...]:
+    item_keys: list[tuple[int, int]] = []
+    pending = list(nodes)
+    while pending:
+        node = pending.pop()
+        item_keys.append((int(node["level"]), int(node["id"])))
+        pending.extend(node.get("children") or [])
+    return tuple(item_keys)
+
+
 def _context(
     settings,
     request: Request,
@@ -174,6 +188,8 @@ def _context(
 ):
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     tree = guide_tree(settings.rewards_db_path) if settings.db_exists else []
+    rank_previews = rank_delete_previews(settings, tuple(int(rank["id"]) for rank in ranks)) if ranks else {}
+    guide_previews = guide_delete_previews(settings, _guide_item_keys(tree)) if tree else {}
     safe_open, safe_focus = apply_guide_tree_state(tree, open_nodes, focus)
     safe_return = safe_return_to(return_to)
     safe_section = section if section in {"ranks", "tree"} else ""
@@ -197,7 +213,19 @@ def _context(
         "ranks": ranks,
         "tree": tree,
         "rank_delete_operation_ids": {int(rank["id"]): uuid4().hex for rank in ranks},
+        "rank_delete_confirmations": {
+            rank_id: rank_delete_confirmation_message(preview)
+            for rank_id, preview in rank_previews.items()
+        },
+        "rank_delete_blocked": {rank_id: preview.blocked for rank_id, preview in rank_previews.items()},
         "guide_delete_operation_ids": _guide_delete_operation_ids(tree),
+        "guide_delete_confirmations": {
+            guide_key: guide_delete_confirmation_message(preview)
+            for guide_key, preview in guide_previews.items()
+        },
+        "guide_delete_blocked": {
+            guide_key: preview.blocked for guide_key, preview in guide_previews.items()
+        },
         "return_to": safe_return,
         "section": safe_section,
         "guides_self": guides_self,

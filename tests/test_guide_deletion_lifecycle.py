@@ -10,6 +10,10 @@ from backend.app.repositories.guides_write import (
     GuideDeleteBlockedError,
     delete_guide_level_item,
     delete_rank,
+    guide_delete_confirmation_message,
+    guide_delete_preview,
+    rank_delete_confirmation_message,
+    rank_delete_preview,
 )
 from backend.app.services.deletion_lifecycle import DeletionCrash, recover_delete_operation
 
@@ -87,6 +91,11 @@ class GuideDeletionLifecycleTests(unittest.TestCase):
             connection.execute("insert into guide values (2, 'Used', ?)", (image_path,))
             connection.execute("insert into person values (10, 2)")
 
+        preview = rank_delete_preview(self.settings(), 2)
+        self.assertTrue(preview.blocked)
+        self.assertEqual(preview.used_count, 1)
+        self.assertIn("Удаление недоступно", rank_delete_confirmation_message(preview))
+
         with self.assertRaises(GuideDeleteBlockedError):
             delete_rank(self.settings(), 2, confirm=True, operation_id="rank-delete-002")
 
@@ -138,6 +147,11 @@ class GuideDeletionLifecycleTests(unittest.TestCase):
                 )
             connection.execute("insert into guide_lev_4 values (104, -1, 'Common', null, null)")
             connection.execute("insert into rewards (id, id_link) values (1, 'prefix common suffix')")
+
+        child_preview = guide_delete_preview(self.settings(), 0, 100)
+        self.assertTrue(child_preview.blocked)
+        self.assertEqual(child_preview.child_count, 1)
+        self.assertIn("дочерние записи", guide_delete_confirmation_message(child_preview))
 
         for level in range(4):
             with self.subTest(level=level), self.assertRaises(GuideDeleteBlockedError):

@@ -18,6 +18,7 @@ from ..repositories.legacy_rewards import (
     normalized_legacy_rewards_filters,
 )
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
+from ..repositories.marks_write import mark_delete_confirmation_message, mark_delete_preview
 from ..repositories.persons import get_person, list_person_rewards, person_photo_items
 from ..repositories.persons_write import person_delete_confirmation_message, person_delete_preview
 from ..repositories.search import search_all, search_suggestions
@@ -476,6 +477,7 @@ def legacy_index(
         "selected_person_return": _legacy_rewards_url(rewards_filters, person_id) if person_id is not None else _legacy_rewards_url(rewards_filters),
         "person_delete_operation_id": "",
         "person_delete_confirmation": "",
+        "person_delete_blocked": False,
         "rewards_totals": {
             "persons_total": 0,
             "rewards_total": 0,
@@ -489,6 +491,8 @@ def legacy_index(
         "selected_mark": None,
         "selected_mark_photos": [],
         "mark_delete_operation_id": "",
+        "mark_delete_confirmation": "",
+        "mark_delete_blocked": False,
         "q": q,
         "scope": scope,
         "mode": mode,
@@ -565,6 +569,7 @@ def legacy_index(
             delete_preview = person_delete_preview(settings, selected_person_id)
             context["person_delete_operation_id"] = uuid4().hex
             context["person_delete_confirmation"] = person_delete_confirmation_message(delete_preview)
+            context["person_delete_blocked"] = delete_preview.block_reason is not None
             context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
             selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
             selected_person_additional_photos = person_folder_image_items(
@@ -585,6 +590,10 @@ def legacy_index(
         context["selected_mark"] = selected_mark
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
         context["mark_delete_operation_id"] = uuid4().hex if selected_mark else ""
+        if selected_mark is not None:
+            delete_preview = mark_delete_preview(settings, selected_mark_id)
+            context["mark_delete_confirmation"] = mark_delete_confirmation_message(delete_preview)
+            context["mark_delete_blocked"] = delete_preview.media.block_reason is not None
 
     if active_tab == "search" and (q.strip() or scope != "all"):
         search_results = search_all(settings.rewards_db_path, q, limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
