@@ -26,6 +26,12 @@ class MediaReferenceField:
 
 
 @dataclass(frozen=True)
+class MediaReferenceExclusion:
+    table: str
+    row_id: int
+
+
+@dataclass(frozen=True)
 class MediaCleanupResult:
     status: str
     path: str | None = None
@@ -143,14 +149,30 @@ def _available_reference_fields(connection) -> tuple[MediaReferenceField, ...]:
     return tuple(available)
 
 
-def _reference_count(connection, settings: Settings, normalized_path: str) -> int:
+def managed_image_reference_count_in_connection(
+    connection,
+    settings: Settings,
+    raw_path: object,
+    *,
+    excluded_rows: tuple[MediaReferenceExclusion, ...] = (),
+) -> int:
+    normalized_path = normalize_managed_image_path(settings, raw_path)
+    excluded = {(item.table, int(item.row_id)) for item in excluded_rows}
     count = 0
     for field in _available_reference_fields(connection):
+        columns = {
+            str(row["name"])
+            for row in connection.execute(f"pragma table_info({field.table})").fetchall()
+        }
+        if "id" not in columns:
+            continue
         rows = connection.execute(
-            f"select {field.column} as media_path from {field.table} "
+            f"select id as row_id, {field.column} as media_path from {field.table} "
             f"where {field.column} is not null and trim({field.column}) != ''"
         ).fetchall()
         for row in rows:
+            if (field.table, int(row["row_id"])) in excluded:
+                continue
             try:
                 candidate = normalize_managed_image_path(settings, row["media_path"])
             except MediaLifecycleError:
@@ -158,6 +180,10 @@ def _reference_count(connection, settings: Settings, normalized_path: str) -> in
             if candidate == normalized_path:
                 count += 1
     return count
+
+
+def _reference_count(connection, settings: Settings, normalized_path: str) -> int:
+    return managed_image_reference_count_in_connection(connection, settings, normalized_path)
 
 
 def managed_image_reference_count(settings: Settings, raw_path: object) -> int:
