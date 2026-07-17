@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="{{ static_url('styles.css') }}">
 </head>
 <body class="booklet-page">
+  {% include "_transient_notifications.html" %}
   <header class="booklet-toolbar no-print">
     <a class="button secondary-button" href="{{ return_to }}">← Назад</a>
     <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
@@ -15,13 +16,6 @@
       <button type="submit">Сохранить PDF</button>
     </form>
   </header>
-
-  {% if error %}
-  <section class="notice notice-error no-print">{{ error }}</section>
-  {% endif %}
-  {% if message %}
-  <section class="notice notice-success no-print">{{ message }}</section>
-  {% endif %}
 
   <main class="booklet-document">
     <section class="booklet-title-block">
@@ -125,5 +119,6 @@
     </section>
   </main>
   <script src="{{ static_url('save_as.js') }}" defer></script>
+  <script src="{{ static_url('transient_notifications.js') }}" defer></script>
 </body>
 </html>

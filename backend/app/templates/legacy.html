@@ -3,14 +3,6 @@
 {% block content %}
   {% if message == "pdf_not_implemented" %}
     <div class="notice">PDF export будет реализован позже. Сейчас кнопка оставлена как заглушка legacy-интерфейса.</div>
-  {% elif message %}
-    <div class="notice notice-success">{{ message }}</div>
-  {% endif %}
-  {% if error_message %}
-    <div class="notice notice-error">{{ error_message }}</div>
-  {% endif %}
-  {% if status_message %}
-    <div class="notice notice-success">{{ status_message }}</div>
   {% endif %}
 
   {% if not settings.db_exists %}

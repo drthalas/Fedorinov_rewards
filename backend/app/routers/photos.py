@@ -73,6 +73,8 @@ async def photo_upload(request: Request):
 
     if result.cleanup.warning_required:
         return_url = with_query_value(return_url, "media_cleanup", "failed")
+    else:
+        return_url = with_query_value(return_url, "status", "photo_updated")
     return RedirectResponse(return_url, status_code=303)
 
 
@@ -97,4 +99,6 @@ async def photo_clear(request: Request):
 
     if result.cleanup.warning_required:
         return_url = with_query_value(return_url, "media_cleanup", "failed")
+    else:
+        return_url = with_query_value(return_url, "status", "photo_cleared")
     return RedirectResponse(return_url, status_code=303)

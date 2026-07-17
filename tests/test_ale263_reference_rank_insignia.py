@@ -208,12 +208,11 @@ class Ale263ReferenceRankInsigniaTests(unittest.TestCase):
         self.assertIn("[data-guide-rank-row][hidden]", styles)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", styles)
         self.assertIn("object-position: center center", styles)
-        self.assertIn(".guide-toast-region", styles)
+        self.assertIn(".app-toast-region", styles)
         self.assertIn("position: fixed", styles)
-        self.assertIn("data-guide-toast-timeout=\"{{ status_timeout_ms }}\"", guides)
-        self.assertIn("data-guide-toast-close", guides)
-        self.assertIn("initGuideToasts", tree_script)
-        self.assertIn('cleanUrl.searchParams.delete("status")', tree_script)
+        self.assertNotIn("data-guide-toast", guides)
+        self.assertNotIn("initGuideToasts", tree_script)
+        self.assertIn("_transient_notifications.html", (ROOT / "backend/app/templates/base.html").read_text(encoding="utf-8"))
 
     def test_guide_statuses_have_scoped_success_and_error_lifetimes(self) -> None:
         with (

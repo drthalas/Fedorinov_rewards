@@ -16,10 +16,6 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
-{% if created_message %}
-<section class="notice notice-success">{{ created_message }}</section>
-{% endif %}
-
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
 <form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" data-reward-duplicate-check data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}">

@@ -42,9 +42,6 @@
 </td>
 {%- endmacro %}
 <h1>Поиск</h1>
-{% if message %}
-<div class="notice notice-success">{{ message }}</div>
-{% endif %}
 <form class="search-controls search-suggestions-form" method="get" action="/search" autocomplete="off">
   <script type="application/json" data-search-suggestions>{{ search_suggestions|tojson }}</script>
   <label class="search-scope-control">

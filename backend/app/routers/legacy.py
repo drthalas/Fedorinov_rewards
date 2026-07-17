@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 import subprocess
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -33,6 +34,7 @@ from ..services.display import has_media_path
 from ..services.update_checker import check_for_updates
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.person_files import person_archive_filename, person_folder_image_items
+from ..services.notifications import status_message
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
 from ..version import APP_NAME, APP_VERSION, APP_VERSION_DATE
@@ -40,19 +42,10 @@ from .templates import templates
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 VALID_TABS = {"rewards", "search", "marks", "summary", "about"}
 SEARCH_PAGE_SIZE = 50
-STATUS_MESSAGES = {
-    "created": "Награждённый добавлен.",
-    "updated": "Изменения сохранены.",
-    "deleted": "Запись удалена.",
-    "delete_blocked": "Нельзя удалить: у награждённого есть награды.",
-    "reward_created": "Награда добавлена.",
-    "reward_deleted": "Награда удалена.",
-    "mark_created": "Знак добавлен.",
-    "mark_deleted": "Знак удалён.",
-}
 LEGACY_DOCUMENT_PHOTO_SLOTS = (
     ("card1_foto", "FotoCard1", "Учётная карточка, сторона 1"),
     ("card2_foto", "FotoCard2", "Учётная карточка, сторона 2"),
@@ -453,7 +446,7 @@ def legacy_index(
         ],
         "message": message,
         "error_message": error,
-        "status_message": STATUS_MESSAGES.get(status),
+        "status_message": status_message(status),
         "persons": [],
         "selected_person": None,
         "selected_person_archive_filename": "",
@@ -665,8 +658,9 @@ async def legacy_about_title_update(request: Request):
     try:
         ensure_write_allowed(settings)
         save_program_title(settings, form_values.get("program_title"))
-    except (WriteBlockedError, AppSettingsError, OSError) as exc:
-        return RedirectResponse(_with_error(return_to, str(exc)), status_code=303)
+    except (WriteBlockedError, AppSettingsError, OSError):
+        logger.exception("Could not save program title")
+        return RedirectResponse(_with_error(return_to, "Не удалось сохранить название программы."), status_code=303)
     return RedirectResponse(_with_message(return_to, "Название программы сохранено."), status_code=303)
 
 
@@ -716,9 +710,10 @@ async def summary_csv_save(request: Request):
         path = _write_csv_to_chosen_path("summary.csv", "Сохранить CSV сводной таблицы", summary_csv_text(rows))
     except SaveDialogCancelled:
         return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
-    except SaveDialogError as exc:
-        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"CSV сохранён: {path}"), status_code=303)
+    except SaveDialogError:
+        logger.exception("Could not open summary CSV save dialog")
+        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
+    return RedirectResponse(_with_message(return_to, "CSV сохранён."), status_code=303)
 
 
 @router.head("/summary.csv")
@@ -903,9 +898,10 @@ async def summary_matrix_csv_save(request: Request):
         path = _write_csv_to_chosen_path("summary_matrix.csv", "Сохранить CSV шахматки", summary_matrix_csv_text(matrix))
     except SaveDialogCancelled:
         return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
-    except SaveDialogError as exc:
-        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"CSV сохранён: {path}"), status_code=303)
+    except SaveDialogError:
+        logger.exception("Could not open summary matrix CSV save dialog")
+        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
+    return RedirectResponse(_with_message(return_to, "CSV сохранён."), status_code=303)
 
 
 @router.head("/summary_matrix.csv")

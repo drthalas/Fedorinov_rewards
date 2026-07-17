@@ -1,0 +1,25 @@
+{% set app_notifications = transient_notifications(
+  request,
+  status_message|default(''),
+  status_kind|default(''),
+  created_message|default(''),
+  message|default(''),
+  error_message|default(''),
+  notification_error_message|default('')
+) %}
+{% if app_notifications %}
+<div class="app-toast-region" data-app-toast-region aria-live="polite" aria-atomic="true">
+  {% for notification in app_notifications %}
+  <section
+    class="app-toast app-toast-{{ notification.kind }}"
+    data-app-toast
+    data-app-toast-timeout="{{ notification.timeout_ms }}"
+    {% if notification.query_keys %}data-app-toast-query-keys="{{ notification.query_keys|join(',') }}"{% endif %}
+    role="{% if notification.kind in ('warning', 'error') %}alert{% else %}status{% endif %}"
+  >
+    <span>{{ notification.message }}</span>
+    <button type="button" data-app-toast-close aria-label="Закрыть уведомление" title="Закрыть уведомление">×</button>
+  </section>
+  {% endfor %}
+</div>
+{% endif %}

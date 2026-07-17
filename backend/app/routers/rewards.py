@@ -18,20 +18,13 @@ from ..repositories.rewards_write import (
     update_reward,
 )
 from ..services.navigation import safe_return_to, with_status
+from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
 
 router = APIRouter()
-
-
-STATUS_MESSAGES = {
-    "created": "Награда добавлена.",
-    "created_next": "Награда добавлена. Теперь можно добавить фотографии и документы.",
-    "updated": "Изменения сохранены.",
-    "deleted": "Награда удалена.",
-}
 
 
 async def _read_form(request: Request) -> dict[str, object]:
@@ -197,7 +190,7 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
             "reward_heading": _reward_heading(reward),
             "reward_back_url": safe_back or _reward_legacy_back_url(reward),
             "photos": reward_photo_items(reward),
-            "status_message": STATUS_MESSAGES.get(status),
+            "status_message": status_message(status),
             "return_to": safe_back,
         },
     )
@@ -225,7 +218,7 @@ def reward_edit(request: Request, reward_id: int, return_to: str = "", created: 
             "photo_controls": photo_items("reward", reward),
             "return_to": safe_return_to(return_to),
             "error": None,
-            "created_message": STATUS_MESSAGES["created_next"] if created == "1" else "",
+            "created_message": "Награда добавлена. Теперь можно добавить фотографии и документы." if created == "1" else "",
         },
     )
 
@@ -261,7 +254,7 @@ async def reward_update(request: Request, reward_id: int):
             },
             status_code=400,
         )
-    target = with_status(return_to, "updated") if return_to else f"/rewards/{reward_id}?status=updated"
+    target = with_status(return_to, "reward_updated") if return_to else f"/rewards/{reward_id}?status=reward_updated"
     return RedirectResponse(target, status_code=303)
 
 

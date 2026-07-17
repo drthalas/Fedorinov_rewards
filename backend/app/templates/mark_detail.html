@@ -4,7 +4,6 @@
 {% block content %}
 <section class="cavalier-standalone-page cavalier-reward-detail cavalier-mark-detail">
 <h1 class="wrap-text">Знак: {{ mark.name|dash }}</h1>
-{% if status_message %}<section class="notice notice-success">{{ status_message }}</section>{% endif %}
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/marks' }}">← Назад</a></p>
 {% if settings.write_mode %}
 <div class="actions">

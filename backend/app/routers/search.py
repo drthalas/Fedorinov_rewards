@@ -1,5 +1,6 @@
 from io import StringIO
 import csv
+import logging
 from pathlib import Path
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -13,6 +14,7 @@ from .templates import templates
 
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _clean_photo_mode(photo_mode: str = "") -> str:
@@ -299,6 +301,7 @@ async def search_csv_save(request: Request):
         target_path.write_text(_search_csv_text(q, scope, mode, sort, direction), encoding="utf-8")
     except SaveDialogCancelled:
         return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
-    except SaveDialogError as exc:
-        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"CSV сохранён: {target_path}"), status_code=303)
+    except SaveDialogError:
+        logger.exception("Could not open search CSV save dialog")
+        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
+    return RedirectResponse(_with_message(return_to, "CSV сохранён."), status_code=303)

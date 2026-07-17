@@ -171,12 +171,12 @@ class ReturnNavigationTests(unittest.TestCase):
             }
         )
         response = asyncio.run(person_update(request, 1))
-        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=updated")
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=person_updated")
 
     def test_reward_edit_post_respects_safe_return_to(self) -> None:
         request = FakeRequest({"number": "101", "return_to": "/legacy?tab=rewards&person_id=1"})
         response = asyncio.run(reward_update(request, 10))
-        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=updated")
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=reward_updated")
 
     def test_reward_delete_without_explicit_confirmation_does_not_delete(self) -> None:
         request = FakeRequest({"confirm": "true", "return_to": "/persons/1"})
@@ -254,7 +254,7 @@ class ReturnNavigationTests(unittest.TestCase):
     def test_mark_edit_post_respects_safe_return_to(self) -> None:
         request = FakeRequest({"number": "201", "return_to": "/legacy?tab=marks&mark_id=20"})
         response = asyncio.run(mark_update(request, 20))
-        self.assertEqual(response.headers["location"], "/legacy?tab=marks&mark_id=20&status=updated")
+        self.assertEqual(response.headers["location"], "/legacy?tab=marks&mark_id=20&status=mark_updated")
 
     def test_mark_edit_post_preserves_guide_ids_when_payload_omits_them(self) -> None:
         request = FakeRequest({"number": "202", "price_now": "700", "return_to": "/legacy?tab=marks&mark_id=20"})

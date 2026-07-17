@@ -8,6 +8,7 @@
   </head>
   <body class="legacy-body legacy-rewards-theme legacy-{{ tab|default('rewards', true) }}-theme">
     {% include "_user_nav.html" %}
+    {% include "_transient_notifications.html" %}
     <main class="legacy-shell">
       {% block content %}{% endblock %}
     </main>
@@ -18,6 +19,7 @@
     <script src="{{ static_url('save_as.js') }}" defer></script>
     <script src="{{ static_url('clipboard_paste.js') }}" defer></script>
     <script src="{{ static_url('confirm_submit.js') }}" defer></script>
+    <script src="{{ static_url('transient_notifications.js') }}" defer></script>
     <script src="{{ static_url('custom_select.js') }}" defer></script>
     <script src="{{ static_url('escape_back.js') }}" defer></script>
     <script src="{{ static_url('legacy_rewards.js') }}" defer></script>

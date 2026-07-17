@@ -44,33 +44,12 @@ from ..services.guide_tree_state import (
     guide_tree_return_url,
 )
 from ..services.navigation import safe_return_to, with_status
+from ..services.notifications import status_notification
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
 
 router = APIRouter()
-
-STATUS_MESSAGES = {
-    "rank_created": "Звание/специальность добавлены.",
-    "rank_updated": "Звание/специальность сохранены.",
-    "rank_deleted": "Звание/специальность удалены.",
-    "guide_created": "Элемент справочника добавлен.",
-    "guide_updated": "Элемент справочника сохранён.",
-    "guide_deleted": "Элемент справочника удалён.",
-    "guide_image_deleted": "Изображение элемента справочника удалено.",
-    "delete_blocked": "Удаление заблокировано: значение используется или имеет дочерние записи.",
-    "rank_delete_used": "Нельзя удалить: это звание используется в карточках награждённых.",
-    "guide_delete_children": "Нельзя удалить: у этого раздела есть дочерние записи.",
-    "guide_delete_used": "Нельзя удалить: это значение используется в наградах или знаках.",
-    "media_cleanup_failed": "Изменения сохранены, но старый файл не удалось удалить. Проверьте журнал приложения.",
-}
-ERROR_STATUS_CODES = {
-    "delete_blocked",
-    "rank_delete_used",
-    "guide_delete_children",
-    "guide_delete_used",
-    "media_cleanup_failed",
-}
 
 GUIDE_IMAGE_ROOTS = frozenset({"GuideImages"})
 
@@ -209,8 +188,9 @@ def _context(
         query["focus"] = safe_focus
     if query:
         guides_self += "?" + urlencode(query)
-    status_message = STATUS_MESSAGES.get(status)
-    status_kind = "error" if status in ERROR_STATUS_CODES else "success"
+    notification = status_notification(status)
+    status_message = notification.message if notification is not None else None
+    status_kind = notification.kind if notification is not None else "success"
     return {
         "settings": settings,
         "ranks": ranks,
@@ -222,8 +202,9 @@ def _context(
         "guide_focus": safe_focus,
         "status_message": status_message,
         "status_kind": status_kind,
-        "status_timeout_ms": 8000 if status_kind == "error" else 4000,
+        "status_timeout_ms": notification.timeout_ms if notification is not None else 4000,
         "error": error,
+        "notification_error_message": error,
     }
 
 

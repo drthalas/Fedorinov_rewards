@@ -14,12 +14,13 @@ from ..services.display import (
 )
 from ..services.dates import format_birth_year_input, format_date_input
 from ..services.media import resolve_media_path
+from ..services.notifications import transient_notifications
 
 
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260716-ale276-clipboard-refresh-1"
+STATIC_ASSET_VERSION = "20260717-ale277-transient-notifications-1"
 
 
 def static_url(path: str) -> str:
@@ -52,6 +53,7 @@ templates.env.globals["photo_view_url"] = photo_view_url
 templates.env.globals["static_url"] = static_url
 templates.env.globals["STATIC_ASSET_VERSION"] = STATIC_ASSET_VERSION
 templates.env.globals["media_exists"] = media_exists
+templates.env.globals["transient_notifications"] = transient_notifications
 templates.env.globals["has_media_path"] = has_media_path
 templates.env.globals["safe_external_url"] = safe_external_url
 templates.env.filters["bool_class"] = bool_class

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
+import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from ..config import get_settings
@@ -16,6 +17,7 @@ from ..repositories.persons_write import (
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import safe_return_to, with_status
+from ..services.notifications import status_message
 from ..services.person_files import (
     PersonFilesError,
     open_person_folder,
@@ -31,22 +33,7 @@ from .templates import templates
 
 
 router = APIRouter()
-
-
-STATUS_MESSAGES = {
-    "created": "Награжденный добавлен.",
-    "created_next": "Кавалер создан. Теперь можно добавить фотографии и документы.",
-    "updated": "Изменения сохранены.",
-    "deleted": "Награжденный удален.",
-    "delete_blocked": "Нельзя удалить: у награжденного есть награды. Сначала удалите или перенесите награды.",
-    "reward_created": "Награда добавлена.",
-    "reward_deleted": "Награда удалена.",
-    "folder_opened": "Каталог кавалера открыт.",
-    "folder_missing": "Каталог кавалера не найден.",
-    "archive_empty": "В каталоге кавалера нет файлов для архивации.",
-    "archive_cancelled": "Сохранение отменено.",
-    "save_dialog_unavailable": "Системный диалог сохранения недоступен.",
-}
+logger = logging.getLogger(__name__)
 
 
 async def _read_form(request: Request) -> dict[str, object]:
@@ -115,7 +102,7 @@ def persons_index(request: Request, page: int = 1, page_size: int = 25, status: 
             "settings": settings,
             "persons": persons,
             "pagination": pager,
-            "status_message": STATUS_MESSAGES.get(status),
+            "status_message": status_message(status),
         },
     )
 
@@ -193,7 +180,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "rewards": rewards,
             "photos": photos,
             "additional_photos": additional_photos,
-            "status_message": STATUS_MESSAGES.get(status),
+            "status_message": status_message(status),
             "return_to": safe_back,
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
@@ -219,6 +206,7 @@ def person_booklet(request: Request, person_id: int, return_to: str = "", error:
             "pdf_filename": person_booklet_filename(settings, person_id),
             "error": error,
             "message": message,
+            "error_message": error,
         },
     )
 
@@ -242,6 +230,7 @@ async def person_booklet_pdf(request: Request, person_id: int):
                     "return_to": return_to,
                     "error": str(exc),
                     "message": "",
+                    "error_message": str(exc),
                 },
                 status_code=400,
             )
@@ -254,8 +243,9 @@ async def person_booklet_pdf(request: Request, person_id: int):
         )
     except SaveDialogCancelled:
         return RedirectResponse(_with_message(return_to, "Сохранение буклета отменено."), status_code=303)
-    except SaveDialogError as exc:
-        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
+    except SaveDialogError:
+        logger.exception("Could not open booklet save dialog for person %s", person_id)
+        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
     try:
         result = generate_person_booklet_pdf(settings, person_id, output_path=target_path)
     except BookletError as exc:
@@ -269,10 +259,11 @@ async def person_booklet_pdf(request: Request, person_id: int):
                 "return_to": return_to,
                 "error": str(exc),
                 "message": "",
+                "error_message": str(exc),
             },
             status_code=400,
         )
-    return RedirectResponse(_with_message(return_to, f"Буклет сохранён: {result.path}"), status_code=303)
+    return RedirectResponse(_with_message(return_to, "Буклет сохранён."), status_code=303)
 
 
 @router.get("/persons/{person_id}/edit")
@@ -295,7 +286,7 @@ def person_edit(request: Request, person_id: int, return_to: str = "", created: 
             "photo_controls": photo_items("person", person),
             "return_to": safe_return_to(return_to),
             "error": None,
-            "created_message": STATUS_MESSAGES["created_next"] if created == "1" else "",
+            "created_message": "Кавалер создан. Теперь можно добавить фотографии и документы." if created == "1" else "",
         },
     )
 
@@ -328,7 +319,7 @@ async def person_update(request: Request, person_id: int):
             },
             status_code=400,
         )
-    target = with_status(return_to, "updated") if return_to else f"/persons/{person_id}?status=updated"
+    target = with_status(return_to, "person_updated") if return_to else f"/persons/{person_id}?status=person_updated"
     return RedirectResponse(target, status_code=303)
 
 
@@ -348,7 +339,7 @@ async def person_delete(request: Request, person_id: int):
         return RedirectResponse(target, status_code=303)
     except PersonValidationError as exc:
         raise _delete_validation_error(exc) from exc
-    target = with_status(return_to, "deleted") if return_to else "/persons?status=deleted"
+    target = with_status(return_to, "person_deleted") if return_to else "/persons?status=person_deleted"
     return RedirectResponse(target, status_code=303)
 
 
@@ -384,11 +375,13 @@ async def person_archive_folder(request: Request, person_id: int):
         return RedirectResponse(with_status(return_to, "save_dialog_unavailable"), status_code=303)
     try:
         save_person_archive(settings, person_id, target_path)
-    except PersonArchiveError as exc:
-        return RedirectResponse(_with_message(return_to, str(exc)), status_code=303)
-    except OSError as exc:
-        return RedirectResponse(_with_message(return_to, f"Не удалось записать архив: {exc}"), status_code=303)
-    return RedirectResponse(_with_message(return_to, f"Архив создан: {target_path}"), status_code=303)
+    except PersonArchiveError:
+        logger.exception("Could not build archive for person %s", person_id)
+        return RedirectResponse(_with_message(return_to, "Не удалось создать архив."), status_code=303)
+    except OSError:
+        logger.exception("Could not write archive for person %s", person_id)
+        return RedirectResponse(_with_message(return_to, "Не удалось записать архив."), status_code=303)
+    return RedirectResponse(_with_message(return_to, "Архив создан."), status_code=303)
 
 
 @router.post("/persons/{person_id}/archive-folder.zip")

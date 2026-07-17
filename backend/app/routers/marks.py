@@ -16,20 +16,13 @@ from ..repositories.marks_write import (
 )
 from ..services.display import pagination
 from ..services.navigation import safe_return_to, with_status
+from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
 
 router = APIRouter()
-
-
-STATUS_MESSAGES = {
-    "mark_created": "Знак добавлен.",
-    "created": "Знак добавлен.",
-    "updated": "Изменения сохранены.",
-    "mark_deleted": "Знак удален.",
-}
 
 
 async def _read_form(request: Request) -> dict[str, object]:
@@ -88,7 +81,7 @@ def marks_index(request: Request, page: int = 1, page_size: int = 25, status: st
             "settings": settings,
             "marks": marks,
             "pagination": pager,
-            "status_message": STATUS_MESSAGES.get(status),
+            "status_message": status_message(status),
         },
     )
 
@@ -140,7 +133,7 @@ async def mark_create(request: Request):
             },
             status_code=400,
         )
-    target = with_status(return_to, "mark_created") if return_to else f"/marks/{mark_id}?status=created"
+    target = with_status(return_to, "mark_created") if return_to else f"/marks/{mark_id}?status=mark_created"
     return RedirectResponse(target, status_code=303)
 
 
@@ -157,7 +150,7 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
             "settings": settings,
             "mark": mark,
             "photos": mark_photo_items(mark),
-            "status_message": STATUS_MESSAGES.get(status),
+            "status_message": status_message(status),
             "return_to": safe_return_to(return_to),
         },
     )
@@ -214,7 +207,7 @@ async def mark_update(request: Request, mark_id: int):
             },
             status_code=400,
         )
-    target = with_status(return_to, "updated") if return_to else f"/marks/{mark_id}?status=updated"
+    target = with_status(return_to, "mark_updated") if return_to else f"/marks/{mark_id}?status=mark_updated"
     return RedirectResponse(target, status_code=303)
 
 
