@@ -67,6 +67,11 @@ class Ale277TransientNotificationTests(unittest.TestCase):
                 "error",
                 ATTENTION_TIMEOUT_MS,
             ),
+            "guide_delete_media_blocked": (
+                "Нельзя безопасно удалить элемент справочника: проверьте связанные материалы.",
+                "error",
+                ATTENTION_TIMEOUT_MS,
+            ),
         }
         for marker, expected in cases.items():
             with self.subTest(marker=marker):

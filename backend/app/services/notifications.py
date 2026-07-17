@@ -61,6 +61,10 @@ STATUS_NOTIFICATIONS: Mapping[str, NotificationSpec] = {
         "Нельзя удалить: это значение используется в наградах или знаках.",
         "error",
     ),
+    "guide_delete_media_blocked": NotificationSpec(
+        "Нельзя безопасно удалить элемент справочника: проверьте связанные материалы.",
+        "error",
+    ),
     "media_cleanup_failed": NotificationSpec(
         "Изменения сохранены, но старый файл не удалось удалить. Проверьте журнал приложения.",
         "warning",

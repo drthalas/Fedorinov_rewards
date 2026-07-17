@@ -69,22 +69,3 @@ def save_guide_image(settings: Settings, filename: str, content: bytes) -> str:
         raise GuideImageValidationError("Недопустимый путь изображения.") from exc
     target.write_bytes(content)
     return normalize_guide_image_path(f"{GUIDE_IMAGE_ROOT}/{target.name}")
-
-
-def delete_guide_image_file(settings: Settings, raw_path: object) -> bool:
-    ensure_write_allowed(settings)
-    if raw_path is None or raw_path == "":
-        return False
-    relative_path = normalize_guide_image_path(raw_path)
-    root = settings.guide_images_dir.resolve()
-    target = (settings.rewards_data_dir / relative_path).resolve()
-    try:
-        target.relative_to(root)
-    except ValueError as exc:
-        raise GuideImageValidationError("Недопустимый путь изображения.") from exc
-    if not target.exists():
-        return False
-    if not target.is_file():
-        raise GuideImageValidationError("Путь изображения не является файлом.")
-    target.unlink()
-    return True

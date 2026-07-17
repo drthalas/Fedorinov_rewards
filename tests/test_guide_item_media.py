@@ -16,8 +16,10 @@ from backend.app.repositories.guides import get_guide_level_item, guide_tree, li
 from backend.app.repositories.guides_write import (
     GuideLevelData,
     GuideValidationError,
+    RankGuideData,
     clear_guide_level_image,
     create_guide_level_item,
+    create_rank,
     guide_level_data_from_mapping,
     update_guide_level_item,
 )
@@ -25,10 +27,10 @@ from backend.app.routers import guides as guides_router
 from backend.app.services.guide_images import (
     MAX_GUIDE_IMAGE_BYTES,
     GuideImageValidationError,
-    delete_guide_image_file,
     normalize_guide_image_path,
     save_guide_image,
 )
+from backend.app.services.media_lifecycle import cleanup_unreferenced_image
 from backend.app.services.guide_tree_state import (
     apply_guide_tree_state,
     guide_tree_return_url,
@@ -194,7 +196,12 @@ class GuideItemMediaTests(unittest.TestCase):
 
         cleared_path = clear_guide_level_image(self.settings(), 0, item_id)
         self.assertEqual(cleared_path, image_path)
-        self.assertTrue(delete_guide_image_file(self.settings(), cleared_path))
+        cleanup = cleanup_unreferenced_image(
+            self.settings(),
+            cleared_path,
+            allowed_roots=frozenset({"GuideImages"}),
+        )
+        self.assertEqual(cleanup.status, "deleted")
         self.assertFalse(image_file.exists())
         self.assertIsNone(get_guide_level_item(self.db_path, 0, item_id)["image_path"])
 
@@ -281,6 +288,59 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIsNone(get_guide_level_item(self.db_path, 3, item_id))
         self.assertFalse((self.root / image_path).exists())
 
+    def test_router_item_delete_exposes_recoverable_cleanup_warning(self) -> None:
+        image_path = save_guide_image(self.settings(), "warning.png", PNG_BYTES)
+        item_id = create_guide_level_item(
+            self.settings(),
+            GuideLevelData(level=3, name="Cleanup warning", parent_id=1, image_path=image_path),
+        )
+        request = FakeUrlencodedRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "guide-warning-001",
+                "return_to": "/guides?open=0-1&focus=3-1",
+            }
+        )
+        with (
+            patch.object(guides_router, "get_settings", return_value=self.settings()),
+            patch(
+                "backend.app.services.deletion_lifecycle._purge_operation",
+                side_effect=OSError("injected purge failure"),
+            ),
+        ):
+            response = asyncio.run(guides_router.guide_level_delete(request, 3, item_id))
+
+        location = response.headers["location"]
+        self.assertIn("status=guide_deleted", location)
+        self.assertIn("media_cleanup=failed", location)
+        self.assertIn("open=0-1", location)
+        self.assertIn("focus=3-1", location)
+        self.assertIsNone(get_guide_level_item(self.db_path, 3, item_id))
+
+    def test_router_rank_delete_exposes_recoverable_cleanup_warning(self) -> None:
+        image_path = save_guide_image(self.settings(), "rank-warning.png", PNG_BYTES)
+        rank_id = create_rank(self.settings(), RankGuideData(name="Cleanup warning", image_path=image_path))
+        request = FakeUrlencodedRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "rank-warning-001",
+                "return_to": "/guides?section=ranks&focus=rank-1",
+            }
+        )
+        with (
+            patch.object(guides_router, "get_settings", return_value=self.settings()),
+            patch(
+                "backend.app.services.deletion_lifecycle._purge_operation",
+                side_effect=OSError("injected purge failure"),
+            ),
+        ):
+            response = asyncio.run(guides_router.rank_delete(request, rank_id))
+
+        location = response.headers["location"]
+        self.assertIn("status=rank_deleted", location)
+        self.assertIn("media_cleanup=failed", location)
+        self.assertIn("section=ranks", location)
+
     def test_non_award_routes_ignore_rating_and_image_upload(self) -> None:
         upload = UploadFile(file=BytesIO(PNG_BYTES), filename="country.png")
         request = FakeMultipartRequest(
@@ -314,6 +374,9 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn("Добавить дочерний", guides)
         self.assertIn(">Изменить</a>", guides)
         self.assertIn(">Удалить</button>", guides)
+        self.assertIn('name="delete_operation_id"', guides)
+        self.assertIn("guide_delete_operation_ids.get(node.guide_key", guides)
+        self.assertIn("rank_delete_operation_ids.get(rank.id", guides)
         self.assertIn("guide-theme", guides)
         self.assertIn("guide-directory-grid", guides)
         self.assertIn("guide-tree-scroll", guides)

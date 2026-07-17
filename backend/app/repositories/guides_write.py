@@ -1,9 +1,22 @@
 from contextlib import closing
 from dataclasses import dataclass
+from typing import Callable
+from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
+from ..services.deletion_lifecycle import (
+    DeletionExecutionResult,
+    DeletionLifecycleError,
+    MediaReferenceExclusion,
+    RowCountExpectation,
+    build_delete_plan,
+    execute_delete_plan,
+    guide_owned_image,
+    recorded_delete_plan,
+    recover_delete_operation,
+)
 from ..services.guide_images import normalize_guide_image_path
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
@@ -184,19 +197,97 @@ def update_rank(settings: Settings, rank_id: int, data: RankGuideData) -> None:
 CONFIRM_REQUIRED_MESSAGE = "Действие требует подтверждения."
 
 
-def delete_rank(settings: Settings, rank_id: int, confirm: bool = False) -> None:
+def _row_signature(row) -> tuple[tuple[str, object], ...]:
+    return tuple((key, row[key]) for key in row.keys())
+
+
+def _recover_missing_delete(
+    settings: Settings,
+    operation_id: str,
+    entity_type: str,
+    entity_id: int,
+) -> DeletionExecutionResult:
+    try:
+        recorded = recorded_delete_plan(settings, operation_id)
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError("Некорректный идентификатор операции удаления.") from exc
+    if recorded is None or recorded.entity_type != entity_type or recorded.entity_ids != (entity_id,):
+        raise GuideValidationError("Элемент справочника не найден.")
+    try:
+        return recover_delete_operation(settings, operation_id)
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError(
+            "Не удалось безопасно завершить удаление. Повторите действие или проверьте журнал."
+        ) from exc
+
+
+def _rank_unused(connection, rank_id: int) -> None:
+    used = connection.execute("select count(*) as count from person where id_rank = ?", (rank_id,)).fetchone()["count"]
+    if int(used) > 0:
+        raise GuideDeleteBlockedError("Нельзя удалить: значение используется в карточках награждённых.")
+
+
+def delete_rank(
+    settings: Settings,
+    rank_id: int,
+    confirm: bool = False,
+    *,
+    operation_id: str | None = None,
+    fault_hook: Callable[[str], None] | None = None,
+) -> DeletionExecutionResult:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
+    operation_id = str(operation_id or uuid4().hex)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        if not _rank_exists(connection, rank_id):
-            raise GuideValidationError("Звание/специальность не найдены.")
-        used = connection.execute("select count(*) as count from person where id_rank = ?", (rank_id,)).fetchone()["count"]
-        if int(used) > 0:
-            raise GuideDeleteBlockedError("Нельзя удалить: значение используется в карточках награждённых.")
+        row = connection.execute("select * from guide where id = ?", (rank_id,)).fetchone()
+        if row is None:
+            return _recover_missing_delete(settings, operation_id, "guide_rank", rank_id)
+        _rank_unused(connection, rank_id)
+        snapshot = _row_signature(row)
+        image_path = dict(snapshot).get("image_path")
+
+    try:
+        owned_paths = (guide_owned_image(settings, image_path),) if image_path not in {None, ""} else ()
+        plan = build_delete_plan(
+            settings,
+            operation_id=operation_id,
+            entity_type="guide_rank",
+            entity_ids=(rank_id,),
+            expected_row_counts=(RowCountExpectation("guide", "id", rank_id, 1),),
+            reference_paths=(image_path,) if image_path not in {None, ""} else (),
+            excluded_rows=(MediaReferenceExclusion("guide", rank_id),),
+            owned_paths=owned_paths,
+        )
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError("Нельзя безопасно удалить изображение звания/специальности.") from exc
+
+    def delete_database_row(connection) -> None:
+        current = connection.execute("select * from guide where id = ?", (rank_id,)).fetchone()
+        if current is None or _row_signature(current) != snapshot:
+            raise GuideDeleteBlockedError("Звание/специальность изменились во время подготовки удаления.")
+        _rank_unused(connection, rank_id)
         connection.execute("delete from guide where id = ?", (rank_id,))
-        connection.commit()
-    log_action("delete", "guide_rank", rank_id, {"blocked_if_used_by_person": True})
+
+    try:
+        result = execute_delete_plan(settings, plan, delete_database_row, fault_hook=fault_hook)
+    except GuideDeleteBlockedError:
+        raise
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError("Нельзя безопасно удалить изображение звания/специальности.") from exc
+    log_action(
+        "delete",
+        "guide_rank",
+        rank_id,
+        {
+            "blocked_if_used_by_person": True,
+            "operation_id": result.operation_id,
+            "status": result.status,
+            "staged_paths": result.staged_paths,
+            "preserved_shared_references": result.preserved_shared_references,
+        },
+    )
+    return result
 
 
 def create_guide_level_item(settings: Settings, data: GuideLevelData) -> int:
@@ -286,23 +377,80 @@ def _usage_count(connection, level: int, item_id: int) -> int:
     return 0
 
 
-def delete_guide_level_item(settings: Settings, level: int, item_id: int, confirm: bool = False) -> None:
+def _assert_guide_item_deletable(connection, level: int, item_id: int) -> None:
+    if level < 4:
+        child_count = connection.execute(
+            f"select count(*) as count from guide_lev_{level + 1} where idl = ?",
+            (item_id,),
+        ).fetchone()["count"]
+        if int(child_count) > 0:
+            raise GuideDeleteBlockedError("Нельзя удалить: у элемента есть дочерние записи.")
+    if _usage_count(connection, level, item_id) > 0:
+        raise GuideDeleteBlockedError("Нельзя удалить: значение используется в наградах или знаках.")
+
+
+def delete_guide_level_item(
+    settings: Settings,
+    level: int,
+    item_id: int,
+    confirm: bool = False,
+    *,
+    operation_id: str | None = None,
+    fault_hook: Callable[[str], None] | None = None,
+) -> DeletionExecutionResult:
     safe_level = _validate_level(level)
     ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise GuideValidationError(CONFIRM_REQUIRED_MESSAGE)
+    operation_id = str(operation_id or uuid4().hex)
+    table = f"guide_lev_{safe_level}"
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        if not _guide_item_exists(connection, safe_level, item_id):
-            raise GuideValidationError("Элемент справочника не найден.")
-        if safe_level < 4:
-            child_count = connection.execute(
-                f"select count(*) as count from guide_lev_{safe_level + 1} where idl = ?",
-                (item_id,),
-            ).fetchone()["count"]
-            if int(child_count) > 0:
-                raise GuideDeleteBlockedError("Нельзя удалить: у элемента есть дочерние записи.")
-        if _usage_count(connection, safe_level, item_id) > 0:
-            raise GuideDeleteBlockedError("Нельзя удалить: значение используется в наградах или знаках.")
-        connection.execute(f"delete from guide_lev_{safe_level} where id = ?", (item_id,))
-        connection.commit()
-    log_action("delete", f"guide_lev_{safe_level}", item_id, {"level": safe_level, "cascade_deleted": False})
+        row = connection.execute(f"select * from {table} where id = ?", (item_id,)).fetchone()
+        if row is None:
+            return _recover_missing_delete(settings, operation_id, table, item_id)
+        _assert_guide_item_deletable(connection, safe_level, item_id)
+        snapshot = _row_signature(row)
+        image_path = dict(snapshot).get("image_path") if safe_level == 3 else None
+
+    try:
+        owned_paths = (guide_owned_image(settings, image_path),) if image_path not in {None, ""} else ()
+        plan = build_delete_plan(
+            settings,
+            operation_id=operation_id,
+            entity_type=table,
+            entity_ids=(item_id,),
+            expected_row_counts=(RowCountExpectation(table, "id", item_id, 1),),
+            reference_paths=(image_path,) if image_path not in {None, ""} else (),
+            excluded_rows=(MediaReferenceExclusion(table, item_id),),
+            owned_paths=owned_paths,
+        )
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError("Нельзя безопасно удалить изображение элемента справочника.") from exc
+
+    def delete_database_row(connection) -> None:
+        current = connection.execute(f"select * from {table} where id = ?", (item_id,)).fetchone()
+        if current is None or _row_signature(current) != snapshot:
+            raise GuideDeleteBlockedError("Элемент справочника изменился во время подготовки удаления.")
+        _assert_guide_item_deletable(connection, safe_level, item_id)
+        connection.execute(f"delete from {table} where id = ?", (item_id,))
+
+    try:
+        result = execute_delete_plan(settings, plan, delete_database_row, fault_hook=fault_hook)
+    except GuideDeleteBlockedError:
+        raise
+    except DeletionLifecycleError as exc:
+        raise GuideDeleteBlockedError("Нельзя безопасно удалить изображение элемента справочника.") from exc
+    log_action(
+        "delete",
+        table,
+        item_id,
+        {
+            "level": safe_level,
+            "cascade_deleted": False,
+            "operation_id": result.operation_id,
+            "status": result.status,
+            "staged_paths": result.staged_paths,
+            "preserved_shared_references": result.preserved_shared_references,
+        },
+    )
+    return result

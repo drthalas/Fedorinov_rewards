@@ -29,6 +29,7 @@
         <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
         <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" onsubmit="return window.confirm('Удалить элемент справочника?');">
           <input type="hidden" name="confirm" value="true">
+          <input type="hidden" name="delete_operation_id" value="{{ guide_delete_operation_ids.get(node.guide_key, '') }}">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
@@ -74,6 +75,7 @@
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
           <form method="post" action="/guides/ranks/{{ rank.id }}/delete" onsubmit="return window.confirm('Удалить звание/специальность?');">
             <input type="hidden" name="confirm" value="true">
+            <input type="hidden" name="delete_operation_id" value="{{ rank_delete_operation_ids.get(rank.id, '') }}">
             <input type="hidden" name="return_to" value="{{ guides_self }}">
             <button class="link-button" type="submit">Удалить</button>
           </form>

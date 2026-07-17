@@ -1,5 +1,6 @@
 from dataclasses import replace
 from urllib.parse import parse_qs, urlencode
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -30,7 +31,6 @@ from ..repositories.guides_write import (
 from ..services.guide_images import (
     MAX_GUIDE_IMAGE_BYTES,
     GuideImageValidationError,
-    delete_guide_image_file,
     save_guide_image,
 )
 from ..services.media_lifecycle import (
@@ -43,7 +43,7 @@ from ..services.guide_tree_state import (
     guide_node_key,
     guide_tree_return_url,
 )
-from ..services.navigation import safe_return_to, with_status
+from ..services.navigation import safe_return_to, with_query_value, with_status
 from ..services.notifications import status_notification
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -110,15 +110,6 @@ async def _save_uploaded_guide_image(settings, upload: UploadFile | None) -> str
     return save_guide_image(settings, upload.filename or "", content)
 
 
-def _delete_guide_image_safely(settings, image_path: object) -> None:
-    if image_path is None or image_path == "":
-        return
-    try:
-        delete_guide_image_file(settings, image_path)
-    except (GuideImageValidationError, OSError):
-        return
-
-
 def _discard_guide_image_candidate(settings, image_path: object) -> MediaCleanupResult:
     return discard_uncommitted_image(settings, image_path, allowed_roots=GUIDE_IMAGE_ROOTS)
 
@@ -161,6 +152,16 @@ def _supports_award_media(level: int) -> bool:
     return level == 3
 
 
+def _guide_delete_operation_ids(nodes: list[dict[str, object]]) -> dict[str, str]:
+    operation_ids: dict[str, str] = {}
+    pending = list(nodes)
+    while pending:
+        node = pending.pop()
+        operation_ids[str(node.get("guide_key") or "")] = uuid4().hex
+        pending.extend(node.get("children") or [])
+    return operation_ids
+
+
 def _context(
     settings,
     request: Request,
@@ -195,6 +196,8 @@ def _context(
         "settings": settings,
         "ranks": ranks,
         "tree": tree,
+        "rank_delete_operation_ids": {int(rank["id"]): uuid4().hex for rank in ranks},
+        "guide_delete_operation_ids": _guide_delete_operation_ids(tree),
         "return_to": safe_return,
         "section": safe_section,
         "guides_self": guides_self,
@@ -350,15 +353,23 @@ async def rank_delete(request: Request, rank_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        delete_rank(settings, rank_id, confirm=form_values.get("confirm") == "true")
+        result = delete_rank(
+            settings,
+            rank_id,
+            confirm=form_values.get("confirm") == "true",
+            operation_id=str(form_values.get("delete_operation_id") or ""),
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except GuideDeleteBlockedError:
-        target = with_status(return_to, "rank_delete_used") if return_to else "/guides?status=rank_delete_used"
+    except GuideDeleteBlockedError as exc:
+        status_code = "rank_delete_used" if "использ" in str(exc).lower() else "guide_delete_media_blocked"
+        target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
         raise _delete_validation_error(exc) from exc
     target = with_status(return_to, "rank_deleted") if return_to else "/guides?status=rank_deleted"
+    if result.warning_required:
+        target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)
 
 
@@ -561,18 +572,29 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
-    item = get_guide_level_item(settings.rewards_db_path, level, item_id) if settings.db_exists else None
     try:
-        delete_guide_level_item(settings, level, item_id, confirm=form_values.get("confirm") == "true")
+        result = delete_guide_level_item(
+            settings,
+            level,
+            item_id,
+            confirm=form_values.get("confirm") == "true",
+            operation_id=str(form_values.get("delete_operation_id") or ""),
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except GuideDeleteBlockedError as exc:
-        status_code = "guide_delete_children" if "дочер" in str(exc).lower() else "guide_delete_used"
+        message = str(exc).lower()
+        if "дочер" in message:
+            status_code = "guide_delete_children"
+        elif "использ" in message:
+            status_code = "guide_delete_used"
+        else:
+            status_code = "guide_delete_media_blocked"
         target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
         return RedirectResponse(target, status_code=303)
     except GuideValidationError as exc:
         raise _delete_validation_error(exc) from exc
-    if item is not None:
-        _delete_guide_image_safely(settings, item.get("image_path"))
     target = with_status(return_to, "guide_deleted") if return_to else "/guides?status=guide_deleted"
+    if result.warning_required:
+        target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)
