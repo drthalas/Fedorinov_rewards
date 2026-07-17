@@ -1,9 +1,22 @@
 from contextlib import closing
 from dataclasses import dataclass
+from typing import Callable
+from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
 from ..services.audit import log_action
+from ..services.deletion_lifecycle import (
+    DeletionExecutionResult,
+    DeletionLifecycleError,
+    MediaReferenceExclusion,
+    RowCountExpectation,
+    build_delete_plan,
+    execute_delete_plan,
+    mark_owned_directory,
+    recorded_delete_plan,
+    recover_delete_operation,
+)
 from ..services.dates import normalize_date_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
@@ -27,6 +40,10 @@ MARK_FIELDS = (
 
 
 class MarkValidationError(ValueError):
+    pass
+
+
+class MarkDeleteBlockedError(MarkValidationError):
     pass
 
 
@@ -57,6 +74,11 @@ class MarkWriteData:
     back_foto: str | None = None
     book1_foto: str | None = None
     book2_foto: str | None = None
+
+
+@dataclass(frozen=True)
+class MarkDeleteResult:
+    operation: DeletionExecutionResult
 
 
 def _empty_to_none(value: object) -> object:
@@ -179,13 +201,90 @@ def update_mark(settings: Settings, mark_id: int, data: MarkWriteData) -> None:
     log_action("update", "mark", mark_id, {"fields": list(MARK_FIELDS)})
 
 
-def delete_mark(settings: Settings, mark_id: int, confirm: bool = False) -> None:
+def delete_mark_with_result(
+    settings: Settings,
+    mark_id: int,
+    confirm: bool = False,
+    *,
+    operation_id: str | None = None,
+    fault_hook: Callable[[str], None] | None = None,
+) -> MarkDeleteResult:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise MarkValidationError("Действие требует подтверждения.")
+    operation_id = str(operation_id or uuid4().hex)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        cursor = connection.execute("delete from mark where id = ?", (mark_id,))
-        if cursor.rowcount == 0:
-            raise MarkValidationError("Знак не найден.")
-        connection.commit()
-    log_action("delete", "mark", mark_id, {"media_deleted": False})
+        row = connection.execute(
+            "select front_foto, back_foto, book1_foto, book2_foto from mark where id = ?",
+            (mark_id,),
+        ).fetchone()
+        if row is None:
+            try:
+                recorded = recorded_delete_plan(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise MarkDeleteBlockedError("Некорректный идентификатор операции удаления.") from exc
+            if recorded is None or recorded.entity_type != "mark" or recorded.entity_ids != (mark_id,):
+                raise MarkValidationError("Знак не найден.")
+            try:
+                recovered = recover_delete_operation(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise MarkDeleteBlockedError(
+                    "Не удалось безопасно завершить удаление знака. Повторите действие или проверьте журнал."
+                ) from exc
+            return MarkDeleteResult(recovered)
+        media_values = tuple(row[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto"))
+
+    try:
+        plan = build_delete_plan(
+            settings,
+            operation_id=operation_id,
+            entity_type="mark",
+            entity_ids=(mark_id,),
+            expected_row_counts=(RowCountExpectation("mark", "id", mark_id, 1),),
+            reference_paths=media_values,
+            excluded_rows=(MediaReferenceExclusion("mark", mark_id),),
+            owned_paths=(mark_owned_directory(mark_id),),
+        )
+    except DeletionLifecycleError as exc:
+        raise MarkDeleteBlockedError(
+            "Нельзя безопасно удалить знак: путь к материалам не прошёл проверку."
+        ) from exc
+
+    def delete_database_row(connection) -> None:
+        current = connection.execute(
+            "select front_foto, back_foto, book1_foto, book2_foto from mark where id = ?",
+            (mark_id,),
+        ).fetchone()
+        if current is None:
+            raise MarkDeleteBlockedError("Знак изменился во время подготовки удаления.")
+        current_media = tuple(
+            current[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto")
+        )
+        if current_media != media_values:
+            raise MarkDeleteBlockedError("Материалы знака изменились во время подготовки удаления.")
+        connection.execute("delete from mark where id = ?", (mark_id,))
+
+    try:
+        operation = execute_delete_plan(settings, plan, delete_database_row, fault_hook=fault_hook)
+    except MarkDeleteBlockedError:
+        raise
+    except DeletionLifecycleError as exc:
+        raise MarkDeleteBlockedError(
+            "Нельзя безопасно удалить знак: обнаружены внешние ссылки или неоднозначные материалы."
+        ) from exc
+    log_action(
+        "delete",
+        "mark",
+        mark_id,
+        {
+            "operation_id": operation.operation_id,
+            "status": operation.status,
+            "staged_paths": operation.staged_paths,
+            "preserved_shared_references": operation.preserved_shared_references,
+        },
+    )
+    return MarkDeleteResult(operation)
+
+
+def delete_mark(settings: Settings, mark_id: int, confirm: bool = False) -> None:
+    delete_mark_with_result(settings, mark_id, confirm=confirm)

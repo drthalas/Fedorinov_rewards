@@ -506,8 +506,9 @@
             {% if selected_mark %}
               {% set selected_mark_return = "/legacy?tab=marks&mark_id=" ~ selected_mark.id %}
               <a class="tool-button legacy-action-edit" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">Изменить</a>
-              <form method="post" action="/marks/{{ selected_mark.id }}/delete" onsubmit="return confirm('Подтвердите удаление знака')">
-                <input type="hidden" name="confirm" value="true">
+              <form method="post" action="/marks/{{ selected_mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-message="Удалить знак и принадлежащие ему материалы?">
+                <input type="hidden" name="confirm" value="">
+                <input type="hidden" name="delete_operation_id" value="{{ mark_delete_operation_id }}">
                 <input type="hidden" name="return_to" value="{{ marks_tab_return }}">
                 <button class="tool-button danger legacy-action-delete" type="submit">Удалить</button>
               </form>

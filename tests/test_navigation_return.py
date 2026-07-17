@@ -10,11 +10,12 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from backend.app.routers.dashboard import dashboard, dashboard_head
-from backend.app.routers.marks import mark_update
+from backend.app.routers.marks import mark_delete, mark_update
 from backend.app.routers.persons import person_update
 from backend.app.routers.rewards import reward_delete, reward_duplicate_check, reward_update
 from backend.app.routers.templates import photo_view_url
 from backend.app.repositories.rewards_write import RewardDeleteResult
+from backend.app.repositories.marks_write import MarkDeleteResult
 from backend.app.services.deletion_lifecycle import DeletionExecutionResult
 from backend.app.services.navigation import safe_return_to, with_status
 
@@ -241,6 +242,48 @@ class ReturnNavigationTests(unittest.TestCase):
         self.assertEqual(
             response.headers["location"],
             "/legacy?tab=rewards&person_id=1&status=reward_deleted&media_cleanup=failed",
+        )
+
+    def test_mark_delete_without_confirmation_does_not_delete(self) -> None:
+        request = FakeRequest({"return_to": "/legacy?tab=marks&mark_id=20"})
+        with self.assertRaises(HTTPException) as blocked:
+            asyncio.run(mark_delete(request, 20))
+        self.assertEqual(blocked.exception.status_code, 400)
+        self.assertEqual(blocked.exception.detail, "Действие требует подтверждения.")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from mark where id = 20").fetchone()
+        self.assertIsNotNone(row)
+
+    def test_mark_delete_preserves_legacy_return_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "mark-route-delete",
+                "return_to": "/legacy?tab=marks",
+            }
+        )
+        response = asyncio.run(mark_delete(request, 20))
+        self.assertEqual(response.headers["location"], "/legacy?tab=marks&status=mark_deleted")
+        with sqlite3.connect(self.db_path) as connection:
+            row = connection.execute("select id from mark where id = 20").fetchone()
+        self.assertIsNone(row)
+
+    def test_mark_delete_cleanup_warning_preserves_return_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "mark-cleanup-warning",
+                "return_to": "/legacy?tab=marks&mark_id=20",
+            }
+        )
+        result = MarkDeleteResult(
+            DeletionExecutionResult("mark-cleanup-warning", "cleanup_pending", error="busy")
+        )
+        with patch("backend.app.routers.marks.delete_mark_with_result", return_value=result):
+            response = asyncio.run(mark_delete(request, 20))
+        self.assertEqual(
+            response.headers["location"],
+            "/legacy?tab=marks&mark_id=20&status=mark_deleted&media_cleanup=failed",
         )
 
     def test_reward_duplicate_check_returns_free_status(self) -> None:

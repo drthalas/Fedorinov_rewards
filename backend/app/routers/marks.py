@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -10,12 +11,12 @@ from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_i
 from ..repositories.marks_write import (
     MarkValidationError,
     create_mark,
-    delete_mark,
+    delete_mark_with_result,
     mark_data_from_mapping,
     update_mark,
 )
 from ..services.display import pagination
-from ..services.navigation import safe_return_to, with_status
+from ..services.navigation import safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
@@ -152,6 +153,7 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
             "photos": mark_photo_items(mark),
             "status_message": status_message(status),
             "return_to": safe_return_to(return_to),
+            "delete_operation_id": uuid4().hex,
         },
     )
 
@@ -217,10 +219,17 @@ async def mark_delete(request: Request, mark_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        delete_mark(settings, mark_id, confirm=form_values.get("confirm") == "true")
+        result = delete_mark_with_result(
+            settings,
+            mark_id,
+            confirm=form_values.get("confirm") == "true",
+            operation_id=str(form_values.get("delete_operation_id") or ""),
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except MarkValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     target = with_status(return_to, "mark_deleted") if return_to else "/marks?status=mark_deleted"
+    if result.operation.warning_required:
+        target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)

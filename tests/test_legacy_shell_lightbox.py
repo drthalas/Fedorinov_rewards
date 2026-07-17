@@ -446,6 +446,19 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('setInputValue(form, "delete_reward_confirm", "true")', confirm_js)
         self.assertNotIn('@router.get("/rewards/{reward_id}/delete"', rewards_router)
 
+    def test_mark_delete_uses_same_confirmation_and_operation_contract_on_both_surfaces(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        mark_detail = (ROOT / "backend" / "app" / "templates" / "mark_detail.html").read_text()
+        expected_text = "Удалить знак и принадлежащие ему материалы?"
+
+        for template in (legacy_template, mark_detail):
+            self.assertIn(expected_text, template)
+            self.assertIn('data-confirm-submit="mark-delete"', template)
+            self.assertIn('name="confirm" value=""', template)
+            self.assertIn('name="delete_operation_id"', template)
+
+        self.assertNotIn("Фото и папки не будут удалены", mark_detail)
+
     def test_photo_frames_do_not_stretch_real_images(self) -> None:
         styles = (ROOT / "backend" / "app" / "static" / "styles.css").read_text()
 

@@ -205,15 +205,14 @@ class MarkWriteTests(unittest.TestCase):
         self.assertEqual(row["id_sub_catigory"], 3)
         self.assertEqual(row["id_name"], 4)
 
-    def test_delete_mark_removes_row_but_not_media_folder(self) -> None:
+    def test_delete_mark_removes_row_and_owned_media_folder(self) -> None:
         media_dir = self.root / "SourceMark" / "1"
         media_dir.mkdir(parents=True)
         (media_dir / "FotoFront.jpg").write_bytes(b"fake")
         mark_id = create_mark(self.settings(), self.mark_data(front_foto="SourceMark/1/FotoFront.jpg"))
         delete_mark(self.settings(), mark_id, confirm=True)
         self.assertIsNone(self.fetch_mark(mark_id))
-        self.assertTrue(media_dir.exists())
-        self.assertTrue((media_dir / "FotoFront.jpg").exists())
+        self.assertFalse(media_dir.exists())
 
     def test_delete_mark_with_confirm_works_without_mandatory_backup(self) -> None:
         mark_id = create_mark(self.settings(), self.mark_data(number=101))

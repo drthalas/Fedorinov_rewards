@@ -1,6 +1,7 @@
 from pathlib import Path
 import logging
 import subprocess
+from uuid import uuid4
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Request, Response
@@ -484,6 +485,7 @@ def legacy_index(
         "marks": [],
         "selected_mark": None,
         "selected_mark_photos": [],
+        "mark_delete_operation_id": "",
         "q": q,
         "scope": scope,
         "mode": mode,
@@ -576,6 +578,7 @@ def legacy_index(
         selected_mark = get_mark(settings.rewards_db_path, selected_mark_id)
         context["selected_mark"] = selected_mark
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
+        context["mark_delete_operation_id"] = uuid4().hex if selected_mark else ""
 
     if active_tab == "search" and (q.strip() or scope != "all"):
         search_results = search_all(settings.rewards_db_path, q, limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
