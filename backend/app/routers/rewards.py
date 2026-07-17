@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -12,12 +13,12 @@ from ..repositories.rewards_write import (
     RewardValidationError,
     check_reward_duplicate,
     create_reward,
-    delete_reward,
+    delete_reward_with_result,
     reward_data_from_mapping,
     reward_duplicate_message,
     update_reward,
 )
-from ..services.navigation import safe_return_to, with_status
+from ..services.navigation import safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
@@ -192,6 +193,7 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
             "photos": reward_photo_items(reward),
             "status_message": status_message(status),
             "return_to": safe_back,
+            "delete_operation_id": uuid4().hex,
         },
     )
 
@@ -266,10 +268,17 @@ async def reward_delete(request: Request, reward_id: int):
     if form_values.get("delete_reward_confirm") != "true" or form_values.get("confirm") != "true":
         raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
-        person_id = delete_reward(settings, reward_id, confirm=True)
+        result = delete_reward_with_result(
+            settings,
+            reward_id,
+            confirm=True,
+            operation_id=str(form_values.get("delete_operation_id") or ""),
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    target = with_status(return_to, "reward_deleted") if return_to else f"/persons/{person_id}?status=reward_deleted"
+    target = with_status(return_to, "reward_deleted") if return_to else f"/persons/{result.person_id}?status=reward_deleted"
+    if result.operation.warning_required:
+        target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)

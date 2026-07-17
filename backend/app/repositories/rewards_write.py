@@ -1,9 +1,22 @@
 from dataclasses import dataclass
 from contextlib import closing
+from typing import Callable
+from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_readonly_connection, open_write_connection
 from ..services.audit import log_action
+from ..services.deletion_lifecycle import (
+    DeletionExecutionResult,
+    DeletionLifecycleError,
+    MediaReferenceExclusion,
+    RowCountExpectation,
+    build_delete_plan,
+    execute_delete_plan,
+    recorded_delete_plan,
+    recover_delete_operation,
+    reward_owned_directory,
+)
 from ..services.dates import normalize_date_input
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
 
@@ -28,6 +41,10 @@ REWARD_FIELDS = (
 
 
 class RewardValidationError(ValueError):
+    pass
+
+
+class RewardDeleteBlockedError(RewardValidationError):
     pass
 
 
@@ -65,6 +82,12 @@ class RewardWriteData:
     book1_foto: str | None = None
     book2_foto: str | None = None
     reward_list: str | None = None
+
+
+@dataclass(frozen=True)
+class RewardDeleteResult:
+    person_id: int
+    operation: DeletionExecutionResult
 
 
 def _empty_to_none(value: object) -> object:
@@ -262,16 +285,99 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
     return person_id
 
 
-def delete_reward(settings: Settings, reward_id: int, confirm: bool = False) -> int:
+def delete_reward_with_result(
+    settings: Settings,
+    reward_id: int,
+    confirm: bool = False,
+    *,
+    operation_id: str | None = None,
+    fault_hook: Callable[[str], None] | None = None,
+) -> RewardDeleteResult:
     ensure_dangerous_action_allowed(settings)
     if not confirm:
         raise RewardValidationError("Действие требует подтверждения.")
+    operation_id = str(operation_id or uuid4().hex)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        row = connection.execute("select person_id from rewards where id = ?", (reward_id,)).fetchone()
+        row = connection.execute(
+            "select person_id, front_foto, back_foto, book1_foto, book2_foto, reward_list "
+            "from rewards where id = ?",
+            (reward_id,),
+        ).fetchone()
         if row is None:
-            raise RewardValidationError("Награда не найдена.")
+            try:
+                recorded = recorded_delete_plan(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise RewardDeleteBlockedError("Некорректный идентификатор операции удаления.") from exc
+            if (
+                recorded is None
+                or recorded.entity_type != "reward"
+                or len(recorded.entity_ids) != 2
+                or recorded.entity_ids[0] != reward_id
+            ):
+                raise RewardValidationError("Награда не найдена.")
+            try:
+                recovered = recover_delete_operation(settings, operation_id)
+            except DeletionLifecycleError as exc:
+                raise RewardDeleteBlockedError(
+                    "Не удалось безопасно завершить удаление награды. Повторите действие или проверьте журнал."
+                ) from exc
+            return RewardDeleteResult(recorded.entity_ids[1], recovered)
         person_id = int(row["person_id"])
+        media_values = tuple(row[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list"))
+
+    try:
+        plan = build_delete_plan(
+            settings,
+            operation_id=operation_id,
+            entity_type="reward",
+            entity_ids=(reward_id, person_id),
+            expected_row_counts=(RowCountExpectation("rewards", "id", reward_id, 1),),
+            reference_paths=media_values,
+            excluded_rows=(MediaReferenceExclusion("rewards", reward_id),),
+            owned_paths=(reward_owned_directory(person_id, reward_id),),
+        )
+    except DeletionLifecycleError as exc:
+        raise RewardDeleteBlockedError(
+            "Нельзя безопасно удалить награду: путь к материалам не прошёл проверку."
+        ) from exc
+
+    def delete_database_row(connection) -> None:
+        current = connection.execute(
+            "select person_id, front_foto, back_foto, book1_foto, book2_foto, reward_list "
+            "from rewards where id = ?",
+            (reward_id,),
+        ).fetchone()
+        if current is None or int(current["person_id"]) != person_id:
+            raise RewardDeleteBlockedError("Награда изменилась во время подготовки удаления.")
+        current_media = tuple(
+            current[field] for field in ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")
+        )
+        if current_media != media_values:
+            raise RewardDeleteBlockedError("Материалы награды изменились во время подготовки удаления.")
         connection.execute("delete from rewards where id = ?", (reward_id,))
-        connection.commit()
-    log_action("delete", "reward", reward_id, {"person_id": person_id, "media_deleted": False})
-    return person_id
+
+    try:
+        operation = execute_delete_plan(settings, plan, delete_database_row, fault_hook=fault_hook)
+    except RewardDeleteBlockedError:
+        raise
+    except DeletionLifecycleError as exc:
+        raise RewardDeleteBlockedError(
+            "Нельзя безопасно удалить награду: обнаружены внешние ссылки или неоднозначные материалы."
+        ) from exc
+    log_action(
+        "delete",
+        "reward",
+        reward_id,
+        {
+            "person_id": person_id,
+            "operation_id": operation.operation_id,
+            "status": operation.status,
+            "staged_paths": operation.staged_paths,
+            "preserved_shared_references": operation.preserved_shared_references,
+        },
+    )
+    return RewardDeleteResult(person_id, operation)
+
+
+def delete_reward(settings: Settings, reward_id: int, confirm: bool = False) -> int:
+    return delete_reward_with_result(settings, reward_id, confirm=confirm).person_id

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from uuid import uuid4
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -184,6 +185,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "return_to": safe_back,
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
+            "reward_delete_operation_ids": {int(reward["id"]): uuid4().hex for reward in rewards},
         },
     )
 

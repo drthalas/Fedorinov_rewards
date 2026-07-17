@@ -150,15 +150,14 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["id_name"], 5)
         self.assertEqual(row["number"], 999)
 
-    def test_delete_reward_removes_row_but_not_media_folder(self) -> None:
+    def test_delete_reward_removes_row_and_owned_media_folder(self) -> None:
         media_dir = self.root / "Source" / "1" / "1"
         media_dir.mkdir(parents=True)
         (media_dir / "FotoFront.jpg").write_bytes(b"fake")
         reward_id = create_reward(self.settings(), 1, self.reward_data(front_foto="Source/1/1/FotoFront.jpg"))
         delete_reward(self.settings(), reward_id, confirm=True)
         self.assertIsNone(self.fetch_reward(reward_id))
-        self.assertTrue(media_dir.exists())
-        self.assertTrue((media_dir / "FotoFront.jpg").exists())
+        self.assertFalse(media_dir.exists())
 
     def test_delete_reward_with_confirm_works_without_mandatory_backup(self) -> None:
         reward_id = create_reward(self.settings(), 1, self.reward_data(number=101))

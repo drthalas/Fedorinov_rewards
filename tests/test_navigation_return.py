@@ -5,6 +5,7 @@ import os
 import sqlite3
 import unittest
 from urllib.parse import urlencode
+from unittest.mock import patch
 
 from fastapi import HTTPException
 
@@ -13,6 +14,8 @@ from backend.app.routers.marks import mark_update
 from backend.app.routers.persons import person_update
 from backend.app.routers.rewards import reward_delete, reward_duplicate_check, reward_update
 from backend.app.routers.templates import photo_view_url
+from backend.app.repositories.rewards_write import RewardDeleteResult
+from backend.app.services.deletion_lifecycle import DeletionExecutionResult
 from backend.app.services.navigation import safe_return_to, with_status
 
 
@@ -219,6 +222,26 @@ class ReturnNavigationTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as connection:
             row = connection.execute("select id from rewards where id = 10").fetchone()
         self.assertIsNone(row)
+
+    def test_reward_delete_cleanup_warning_preserves_return_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_reward_confirm": "true",
+                "delete_operation_id": "cleanup-warning",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        result = RewardDeleteResult(
+            1,
+            DeletionExecutionResult("cleanup-warning", "cleanup_pending", error="busy"),
+        )
+        with patch("backend.app.routers.rewards.delete_reward_with_result", return_value=result):
+            response = asyncio.run(reward_delete(request, 10))
+        self.assertEqual(
+            response.headers["location"],
+            "/legacy?tab=rewards&person_id=1&status=reward_deleted&media_cleanup=failed",
+        )
 
     def test_reward_duplicate_check_returns_free_status(self) -> None:
         result = reward_duplicate_check(id_name="2", number="101")

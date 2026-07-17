@@ -315,6 +315,22 @@ def recover_delete_operation(
     )
 
 
+def recorded_delete_plan(settings: Settings, operation_id: str) -> DeletePlan | None:
+    """Return the immutable plan recorded for one operation without changing state."""
+    _validate_operation_id(operation_id)
+    receipt = _read_receipt(settings, operation_id)
+    manifest = _read_manifest(settings, operation_id)
+    if receipt is not None and manifest is not None:
+        receipt_plan = _plan_from_mapping(receipt.get("plan"))
+        manifest_plan = _plan_from_mapping(manifest.get("plan"))
+        if _plan_digest(receipt_plan) != _plan_digest(manifest_plan):
+            raise DeletionStateMismatchError("Deletion receipt and manifest contain different plans.")
+    recorded = manifest or receipt
+    if recorded is None:
+        return None
+    return _plan_from_mapping(recorded.get("plan"))
+
+
 def _existing_operation_result(
     settings: Settings,
     plan: DeletePlan,

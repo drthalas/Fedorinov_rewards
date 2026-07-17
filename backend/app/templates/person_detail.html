@@ -99,6 +99,7 @@
           <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
+            <input type="hidden" name="delete_operation_id" value="{{ reward_delete_operation_ids[reward.id] }}">
             <input type="hidden" name="return_to" value="{{ person_card_return }}">
             <button type="submit" class="link-button reward-icon-action reward-delete-icon reward-icon-danger" title="Удалить награду" aria-label="Удалить награду"><span class="visually-hidden">Удалить</span></button>
           </form>

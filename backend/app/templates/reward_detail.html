@@ -13,6 +13,7 @@
   <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-message="Вы действительно хотите удалить награду?">
     <input type="hidden" name="confirm" value="">
     <input type="hidden" name="delete_reward_confirm" value="">
+    <input type="hidden" name="delete_operation_id" value="{{ delete_operation_id }}">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>
