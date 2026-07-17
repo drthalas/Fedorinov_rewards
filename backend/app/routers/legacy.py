@@ -566,6 +566,11 @@ def legacy_index(
         context["person_rewards"] = selected_person_rewards
         context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
         if selected_person is not None:
+            selected_person["detail_url"] = str(
+                URL(path=f"/persons/{selected_person_id}").include_query_params(
+                    return_to=context["selected_person_return"]
+                )
+            )
             delete_preview = person_delete_preview(settings, selected_person_id)
             context["person_delete_operation_id"] = uuid4().hex
             context["person_delete_confirmation"] = person_delete_confirmation_message(delete_preview)

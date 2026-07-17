@@ -362,6 +362,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('aria-label="Перечень наград"', legacy_template)
         person_header_actions = legacy_template.split('<div class="legacy-actions">', 1)[1].split("</div>", 1)[0]
         self.assertIn("Карточка кавалера", person_header_actions)
+        self.assertIn('href="{{ selected_person.detail_url }}"', person_header_actions)
         self.assertNotIn(">Карточка</a>", person_header_actions)
         rewards_block = legacy_template.split('<section class="legacy-block legacy-rewards-block">', 1)[1].split("</section>", 1)[0]
         self.assertNotIn("Добавить награду", rewards_block)
@@ -413,6 +414,18 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn('setDeleteConfirmation(form, true)', confirm_js)
         self.assertIn('setInputValue(form, "delete_person_confirm", value)', confirm_js)
         self.assertIn('role", "alertdialog"', confirm_js)
+
+    def test_legacy_detail_links_preserve_origin_context(self) -> None:
+        legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
+        legacy_router = (ROOT / "backend" / "app" / "routers" / "legacy.py").read_text()
+
+        self.assertIn('href="{{ selected_person.detail_url }}"', legacy_template)
+        self.assertIn('selected_person["detail_url"] = str(', legacy_router)
+        self.assertIn('return_to=context["selected_person_return"]', legacy_router)
+        self.assertIn(
+            'href="/marks/{{ selected_mark.id }}?return_to={{ selected_mark_return|urlencode }}"',
+            legacy_template,
+        )
 
     def test_reward_delete_requires_confirmation_in_ui_and_route(self) -> None:
         base = (ROOT / "backend" / "app" / "templates" / "base.html").read_text()

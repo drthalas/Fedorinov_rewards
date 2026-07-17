@@ -20,7 +20,7 @@ from ..repositories.persons_write import (
 from ..repositories.rewards_write import reward_delete_confirmation_message, reward_delete_preview
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
-from ..services.navigation import safe_return_to, with_query_value, with_status
+from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.person_files import (
     PersonFilesError,
@@ -361,11 +361,13 @@ async def person_delete(request: Request, person_id: int):
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonDeleteBlockedError:
-        target = with_status(return_to, "person_delete_blocked") if return_to else f"/persons/{person_id}?status=person_delete_blocked"
+        blocked_return = delete_return_to(return_to)
+        target = with_status(blocked_return, "person_delete_blocked") if blocked_return else f"/persons/{person_id}?status=person_delete_blocked"
         return RedirectResponse(target, status_code=303)
     except PersonValidationError as exc:
         raise _delete_validation_error(exc) from exc
-    target = with_status(return_to, "person_deleted") if return_to else "/persons?status=person_deleted"
+    success_return = delete_return_to(return_to, "person_id")
+    target = with_status(success_return, "person_deleted") if success_return else "/persons?status=person_deleted"
     if result.operation.warning_required:
         target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)

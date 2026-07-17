@@ -18,7 +18,7 @@ from backend.app.repositories.rewards_write import RewardDeleteResult
 from backend.app.repositories.marks_write import MarkDeleteResult
 from backend.app.repositories.persons_write import PersonDeleteResult
 from backend.app.services.deletion_lifecycle import DeletionExecutionResult
-from backend.app.services.navigation import safe_return_to, with_status
+from backend.app.services.navigation import delete_return_to, safe_return_to, with_status, without_query_keys
 
 
 class FakeRequest:
@@ -162,6 +162,14 @@ class ReturnNavigationTests(unittest.TestCase):
             "/legacy?tab=rewards&person_id=1&status=updated",
         )
 
+    def test_delete_return_to_preserves_context_and_removes_stale_markers(self) -> None:
+        value = "/legacy?tab=rewards&rank_id=2&person_id=1&status=old&message=old#list"
+        self.assertEqual(
+            delete_return_to(value, "person_id"),
+            "/legacy?tab=rewards&rank_id=2#list",
+        )
+        self.assertEqual(without_query_keys("https://example.com", "status"), "")
+
     def test_photo_view_url_preserves_return_to(self) -> None:
         url = photo_view_url("Source/1/Foto.jpg", "Фото", "/legacy?tab=rewards&person_id=1")
         self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards%26person_id%3D1", url)
@@ -225,6 +233,17 @@ class ReturnNavigationTests(unittest.TestCase):
             row = connection.execute("select id from rewards where id = 10").fetchone()
         self.assertIsNone(row)
 
+    def test_reward_delete_cleans_old_toast_markers_but_keeps_legacy_person(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_reward_confirm": "true",
+                "return_to": "/legacy?tab=rewards&person_id=1&status=old&media_cleanup=failed",
+            }
+        )
+        response = asyncio.run(reward_delete(request, 10))
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&person_id=1&status=reward_deleted")
+
     def test_reward_delete_cleanup_warning_preserves_return_context(self) -> None:
         request = FakeRequest(
             {
@@ -269,6 +288,17 @@ class ReturnNavigationTests(unittest.TestCase):
             row = connection.execute("select id from mark where id = 20").fetchone()
         self.assertIsNone(row)
 
+    def test_mark_delete_removes_deleted_selection_and_preserves_legacy_context(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "mark-route-delete-context",
+                "return_to": "/legacy?tab=marks&mark_id=20&status=old",
+            }
+        )
+        response = asyncio.run(mark_delete(request, 20))
+        self.assertEqual(response.headers["location"], "/legacy?tab=marks&status=mark_deleted")
+
     def test_mark_delete_cleanup_warning_preserves_return_context(self) -> None:
         request = FakeRequest(
             {
@@ -284,8 +314,19 @@ class ReturnNavigationTests(unittest.TestCase):
             response = asyncio.run(mark_delete(request, 20))
         self.assertEqual(
             response.headers["location"],
-            "/legacy?tab=marks&mark_id=20&status=mark_deleted&media_cleanup=failed",
+            "/legacy?tab=marks&status=mark_deleted&media_cleanup=failed",
         )
+
+    def test_mark_delete_rejects_external_return_to(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "mark-external-return",
+                "return_to": "//example.com/legacy?tab=marks",
+            }
+        )
+        response = asyncio.run(mark_delete(request, 20))
+        self.assertEqual(response.headers["location"], "/marks?status=mark_deleted")
 
     def test_person_delete_without_dual_confirmation_does_not_delete(self) -> None:
         request = FakeRequest({"confirm": "true", "return_to": "/legacy?tab=rewards&person_id=1"})
@@ -311,6 +352,34 @@ class ReturnNavigationTests(unittest.TestCase):
             self.assertEqual(connection.execute("select count(*) from person where id = 1").fetchone()[0], 0)
             self.assertEqual(connection.execute("select count(*) from rewards where person_id = 1").fetchone()[0], 0)
 
+    def test_person_delete_removes_deleted_selection_and_preserves_filters(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_person_confirm": "true",
+                "delete_operation_id": "person-route-delete-context",
+                "return_to": "/legacy?tab=rewards&rank_id=2&person_id=1&message=old",
+            }
+        )
+        response = asyncio.run(person_delete(request, 1))
+        self.assertEqual(response.headers["location"], "/legacy?tab=rewards&rank_id=2&status=person_deleted")
+
+    def test_delete_routes_reject_external_return_to_and_use_standalone_fallbacks(self) -> None:
+        person_response = asyncio.run(
+            person_delete(
+                FakeRequest(
+                    {
+                        "confirm": "true",
+                        "delete_person_confirm": "true",
+                        "delete_operation_id": "person-external-return",
+                        "return_to": "https://example.com/legacy?tab=rewards",
+                    }
+                ),
+                1,
+            )
+        )
+        self.assertEqual(person_response.headers["location"], "/persons?status=person_deleted")
+
     def test_person_delete_cleanup_warning_preserves_return_context(self) -> None:
         request = FakeRequest(
             {
@@ -327,8 +396,20 @@ class ReturnNavigationTests(unittest.TestCase):
             response = asyncio.run(person_delete(request, 1))
         self.assertEqual(
             response.headers["location"],
-            "/legacy?tab=rewards&person_id=1&status=person_deleted&media_cleanup=failed",
+            "/legacy?tab=rewards&status=person_deleted&media_cleanup=failed",
         )
+
+    def test_reward_delete_rejects_external_return_to(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_reward_confirm": "true",
+                "delete_operation_id": "reward-external-return",
+                "return_to": "https://example.com/persons/1",
+            }
+        )
+        response = asyncio.run(reward_delete(request, 10))
+        self.assertEqual(response.headers["location"], "/persons/1?status=reward_deleted")
 
     def test_reward_duplicate_check_returns_free_status(self) -> None:
         result = reward_duplicate_check(id_name="2", number="101")

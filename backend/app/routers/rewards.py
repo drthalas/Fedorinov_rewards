@@ -20,7 +20,7 @@ from ..repositories.rewards_write import (
     reward_duplicate_message,
     update_reward,
 )
-from ..services.navigation import safe_return_to, with_query_value, with_status
+from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
@@ -283,7 +283,8 @@ async def reward_delete(request: Request, reward_id: int):
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    target = with_status(return_to, "reward_deleted") if return_to else f"/persons/{result.person_id}?status=reward_deleted"
+    success_return = delete_return_to(return_to)
+    target = with_status(success_return, "reward_deleted") if success_return else f"/persons/{result.person_id}?status=reward_deleted"
     if result.operation.warning_required:
         target = with_query_value(target, "media_cleanup", "failed")
     return RedirectResponse(target, status_code=303)

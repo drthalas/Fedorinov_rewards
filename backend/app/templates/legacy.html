@@ -121,7 +121,7 @@
               {% endif %}
             </div>
             <div class="legacy-actions">
-              <a class="button" href="/persons/{{ selected_person.id }}">Карточка кавалера</a>
+              <a class="button" href="{{ selected_person.detail_url }}">Карточка кавалера</a>
               <a class="button legacy-show-all-photos-link" href="/persons/{{ selected_person.id }}/photos?return_to={{ selected_person_return|urlencode }}">Показать все фото</a>
             </div>
           </div>
@@ -497,15 +497,15 @@
       {% endif %}
     </section>
   {% elif tab == "marks" %}
+    {% set marks_tab_return = "/legacy?tab=marks" %}
+    {% set selected_mark_return = "/legacy?tab=marks&mark_id=" ~ selected_mark.id if selected_mark else marks_tab_return %}
     <div class="legacy-layout legacy-layout-marks legacy-marks-tab">
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title"><span class="legacy-panel-mark-icon" aria-hidden="true"></span>Знаки <span class="legacy-panel-count">{{ marks_total or marks|length }}</span></div>
         <div class="legacy-toolbar">
-          {% set marks_tab_return = "/legacy?tab=marks" %}
           {% if settings.write_mode %}
             <a class="tool-button legacy-action-add" href="/marks/new?return_to={{ marks_tab_return|urlencode }}">Добавить знак</a>
             {% if selected_mark %}
-              {% set selected_mark_return = "/legacy?tab=marks&mark_id=" ~ selected_mark.id %}
               <a class="tool-button legacy-action-edit" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">Изменить</a>
               <form method="post" action="/marks/{{ selected_mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-title="Удаление знака" data-confirm-message="{{ mark_delete_confirmation }}" data-confirm-blocked="{{ 'true' if mark_delete_blocked else 'false' }}">
                 <input type="hidden" name="confirm" value="">
@@ -538,7 +538,7 @@
               <h1>{{ selected_mark.name|dash }}</h1>
               {% if selected_mark.number %}<p class="secondary">№ {{ selected_mark.number }}</p>{% endif %}
             </div>
-            <a class="button" href="/marks/{{ selected_mark.id }}">Карточка</a>
+            <a class="button" href="/marks/{{ selected_mark.id }}?return_to={{ selected_mark_return|urlencode }}">Карточка</a>
           </div>
           <div class="legacy-bottom-grid">
             <section class="legacy-block">
