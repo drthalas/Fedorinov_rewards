@@ -58,7 +58,7 @@ FORBIDDEN_PATTERNS = (
 
 # These are application-owned assets only. Arbitrary images remain forbidden.
 SYSTEM_UI_ASSET_PATHS = {
-    ("backend", "app", "static", "assets", "cavaliers", "cavaliers-empty-state-awards.png"),
+    ("backend", "app", "static", "assets", "cavaliers", "cavaliers-empty-state-awards-optimized.jpg"),
     ("backend", "app", "static", "assets", "cavaliers", "left-rail.png"),
     ("backend", "app", "static", "assets", "cavaliers", "top-right-emblem.png"),
     ("backend", "app", "static", "assets", "guides", "archive-header-bg.png"),

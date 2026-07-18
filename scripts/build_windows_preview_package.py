@@ -49,6 +49,7 @@ EXCLUDED_PATTERNS = [
     "*.dll",
 ]
 EMBEDDED_UI_ASSETS = {Path(*parts) for parts in SYSTEM_UI_ASSET_PATHS}
+MAX_EMBEDDED_ASSET_TOKEN_CHARS = 1_500_000
 
 DIRECTORIES_TO_COPY = [
     "backend",
@@ -139,8 +140,13 @@ def _embed_ui_assets() -> None:
         if marker not in styles:
             raise RuntimeError(f"UI asset is not referenced by packaged CSS: {relative}")
         encoded = base64.b64encode(source.read_bytes()).decode("ascii")
+        if len(encoded) > MAX_EMBEDDED_ASSET_TOKEN_CHARS:
+            raise RuntimeError(
+                f"Embedded UI asset exceeds the browser-safe CSS token budget: {relative} "
+                f"({len(encoded)} > {MAX_EMBEDDED_ASSET_TOKEN_CHARS})"
+            )
         declarations.append(f'  {variable}: url("data:{_asset_mime_type(relative)};base64,{encoded}");')
-        styles = styles.replace(marker, f"var({variable})")
+        styles = styles.replace(marker, f"var({variable}, none)")
     styles_path.write_text(":root {\n" + "\n".join(declarations) + "\n}\n" + styles, encoding="utf-8")
 
 

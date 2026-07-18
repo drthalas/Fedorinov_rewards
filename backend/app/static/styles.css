@@ -5455,11 +5455,15 @@ body.legacy-rewards-theme::after {
   place-items: center;
   overflow: hidden;
   isolation: isolate;
-  background-color: #11120f;
+  background-color: #2a261e;
+  background-image:
+    radial-gradient(ellipse at center, rgb(124 102 68 / 32%), transparent 55%),
+    linear-gradient(135deg, #393126, #171814 72%);
   background-image:
     linear-gradient(90deg, rgb(8 9 8 / 54%), rgb(8 9 8 / 14%) 42%, rgb(8 9 8 / 12%) 68%, rgb(8 9 8 / 48%)),
     linear-gradient(180deg, rgb(8 9 8 / 25%), transparent 26%, transparent 72%, rgb(7 8 7 / 56%)),
-    url("/static/assets/cavaliers/cavaliers-empty-state-awards.png");
+    url("/static/assets/cavaliers/cavaliers-empty-state-awards-optimized.jpg"),
+    radial-gradient(ellipse at center, rgb(124 102 68 / 32%), transparent 55%);
   background-position: center;
   background-size: cover;
   box-shadow: inset 0 0 90px rgb(0 0 0 / 44%);

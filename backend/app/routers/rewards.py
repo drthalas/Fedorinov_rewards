@@ -182,7 +182,6 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
     reward = get_reward(settings.rewards_db_path, reward_id)
     if reward is None:
         raise HTTPException(status_code=404, detail="Награда не найдена.")
-    delete_preview = reward_delete_preview(settings, reward_id)
     safe_back = safe_return_to(return_to)
     return templates.TemplateResponse(
         request,
@@ -196,11 +195,22 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
             "photos": reward_photo_items(reward),
             "status_message": status_message(status),
             "return_to": safe_back,
-            "delete_operation_id": uuid4().hex,
-            "delete_confirmation": reward_delete_confirmation_message(delete_preview),
-            "delete_blocked": delete_preview.media.block_reason is not None,
         },
     )
+
+
+@router.get("/rewards/{reward_id}/delete-preview")
+def reward_delete_preflight(reward_id: int):
+    settings = get_settings()
+    try:
+        preview = reward_delete_preview(settings, reward_id)
+    except RewardValidationError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "message": reward_delete_confirmation_message(preview),
+        "blocked": preview.media.block_reason is not None,
+        "operation_id": uuid4().hex,
+    }
 
 
 @router.get("/rewards/{reward_id}/edit")

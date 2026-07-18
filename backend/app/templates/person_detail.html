@@ -25,10 +25,10 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-title="Удаление кавалера" data-confirm-message="{{ person_delete_confirmation }}" data-confirm-blocked="{{ 'true' if person_delete_blocked else 'false' }}">
+  <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/persons/{{ person.id }}/delete-preview" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false">
     <input type="hidden" name="confirm" value="">
     <input type="hidden" name="delete_person_confirm" value="">
-    <input type="hidden" name="delete_operation_id" value="{{ person_delete_operation_id }}">
+    <input type="hidden" name="delete_operation_id" value="">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>
@@ -97,10 +97,10 @@
           <a class="reward-icon-action reward-view-icon" href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}" title="Открыть награду" aria-label="Открыть награду"><span class="visually-hidden">Открыть</span></a>
           {% if settings.write_mode %}
           <a class="reward-icon-action reward-edit-icon" href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}" title="Изменить награду" aria-label="Изменить награду"><span class="visually-hidden">Изменить</span></a>
-          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-title="Удаление награды" data-confirm-message="{{ reward_delete_confirmations.get(reward.id, 'Удалить награду?') }}" data-confirm-blocked="{{ 'true' if reward_delete_blocked.get(reward.id, false) else 'false' }}">
+          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-preview-url="/rewards/{{ reward.id }}/delete-preview" data-confirm-title="Удаление награды" data-confirm-message="Удалить награду?" data-confirm-blocked="false">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
-            <input type="hidden" name="delete_operation_id" value="{{ reward_delete_operation_ids[reward.id] }}">
+            <input type="hidden" name="delete_operation_id" value="">
             <input type="hidden" name="return_to" value="{{ person_card_return }}">
             <button type="submit" class="link-button reward-icon-action reward-delete-icon reward-icon-danger" title="Удалить награду" aria-label="Удалить награду"><span class="visually-hidden">Удалить</span></button>
           </form>

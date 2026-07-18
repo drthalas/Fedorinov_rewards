@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260718-ale296-clipboard-consume-1"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260718-ale300-hotfix-1"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -231,7 +231,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertNotIn("legacy-empty-state-copy", legacy_template)
         self.assertIn("legacy-person-list-title", legacy_template)
         self.assertIn("format_birth_year", legacy_template)
-        self.assertIn("/static/assets/cavaliers/cavaliers-empty-state-awards.png", styles)
+        self.assertIn("/static/assets/cavaliers/cavaliers-empty-state-awards-optimized.jpg", styles)
 
     def test_legacy_rewards_has_quick_person_search(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -270,7 +270,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn(".legacy-loading-state", styles)
         self.assertIn(".legacy-error-state", styles)
         self.assertIn('setAttribute("role", role || "status")', script)
-        self.assertIn('showWorkspaceState("legacy-error-state", ERROR_TEXT, "alert")', script)
+        self.assertIn('showWorkspaceState("legacy-error-state", text || ERROR_TEXT, "alert")', script)
 
     def test_legacy_rewards_person_list_is_keyboard_focusable(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
@@ -399,16 +399,16 @@ class LegacyShellLightboxTests(unittest.TestCase):
         persons_router = (ROOT / "backend" / "app" / "routers" / "persons.py").read_text()
         confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
-        self.assertIn('data-confirm-message="{{ person_delete_confirmation }}"', legacy_template)
-        self.assertIn('data-confirm-message="{{ person_delete_confirmation }}"', person_detail)
+        self.assertIn('data-confirm-preview-url="/persons/{{ selected_person.id }}/delete-preview"', legacy_template)
+        self.assertIn('data-confirm-preview-url="/persons/{{ person.id }}/delete-preview"', person_detail)
         self.assertIn('data-confirm-submit="person-delete"', legacy_template)
         self.assertIn('data-confirm-submit="person-delete"', person_detail)
         self.assertIn('name="confirm" value=""', legacy_template)
         self.assertIn('name="confirm" value=""', person_detail)
         self.assertIn('name="delete_person_confirm" value=""', legacy_template)
         self.assertIn('name="delete_person_confirm" value=""', person_detail)
-        self.assertIn('name="delete_operation_id" value="{{ person_delete_operation_id }}"', legacy_template)
-        self.assertIn('name="delete_operation_id" value="{{ person_delete_operation_id }}"', person_detail)
+        self.assertIn('name="delete_operation_id" value=""', legacy_template)
+        self.assertIn('name="delete_operation_id" value=""', person_detail)
         self.assertIn('form_values.get("delete_person_confirm") != "true"', persons_router)
         self.assertIn("Действие требует подтверждения.", persons_router)
         self.assertIn('setDeleteConfirmation(form, true)', confirm_js)
@@ -436,8 +436,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
         rewards_router = (ROOT / "backend" / "app" / "routers" / "rewards.py").read_text()
         confirm_js = (ROOT / "backend" / "app" / "static" / "confirm_submit.js").read_text()
 
-        self.assertIn("reward_delete_confirmations.get(reward.id", person_detail)
-        self.assertIn('data-confirm-message="{{ delete_confirmation }}"', reward_detail)
+        self.assertIn('data-confirm-preview-url="/rewards/{{ reward.id }}/delete-preview"', person_detail)
+        self.assertIn('data-confirm-preview-url="/rewards/{{ reward.id }}/delete-preview"', reward_detail)
         self.assertIn('/rewards/{{ reward.id }}/delete', person_detail)
         self.assertIn("static_url('confirm_submit.js')", base)
         self.assertIn("static_url('confirm_submit.js')", legacy_base)
@@ -468,8 +468,8 @@ class LegacyShellLightboxTests(unittest.TestCase):
             self.assertIn('name="confirm" value=""', template)
             self.assertIn('name="delete_operation_id"', template)
 
-        self.assertIn('data-confirm-message="{{ mark_delete_confirmation }}"', legacy_template)
-        self.assertIn('data-confirm-message="{{ delete_confirmation }}"', mark_detail)
+        self.assertIn('data-confirm-preview-url="/marks/{{ selected_mark.id }}/delete-preview"', legacy_template)
+        self.assertIn('data-confirm-preview-url="/marks/{{ mark.id }}/delete-preview"', mark_detail)
 
         self.assertNotIn("Фото и папки не будут удалены", mark_detail)
 

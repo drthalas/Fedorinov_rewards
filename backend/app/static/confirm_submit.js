@@ -22,6 +22,49 @@ function disableDeleteSubmitters(form) {
   });
 }
 
+const DELETE_PREVIEW_TIMEOUT_MS = 15000;
+const DELETE_PREVIEW_ERROR = "Не удалось проверить возможность удаления. Повторите попытку.";
+
+function setDeletePreview(form, preview) {
+  form.dataset.confirmMessage = String(preview.message || "Подтвердите удаление.");
+  form.dataset.confirmBlocked = preview.blocked === true ? "true" : "false";
+  setInputValue(form, "delete_operation_id", String(preview.operation_id || ""));
+}
+
+async function loadDeletePreview(form) {
+  const url = form.dataset.confirmPreviewUrl;
+  if (!url) {
+    return;
+  }
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), DELETE_PREVIEW_TIMEOUT_MS);
+  try {
+    const response = await window.fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const preview = await response.json();
+    if (!preview || typeof preview.message !== "string" || typeof preview.blocked !== "boolean" || typeof preview.operation_id !== "string") {
+      throw new Error("Invalid delete preview response.");
+    }
+    setDeletePreview(form, preview);
+  } catch (_error) {
+    setDeletePreview(form, {
+      message: DELETE_PREVIEW_ERROR,
+      blocked: true,
+      operation_id: "",
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
 function createDeleteConfirmationDialog() {
   const dialog = document.createElement("dialog");
   dialog.className = "delete-confirmation-dialog";
@@ -136,7 +179,26 @@ document.addEventListener(
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    openDeleteConfirmation(form, event.submitter);
+    const submitter = event.submitter;
+    if (!form.dataset.confirmPreviewUrl) {
+      openDeleteConfirmation(form, submitter);
+      return;
+    }
+    if (form.dataset.deletePreviewLoading === "true") {
+      return;
+    }
+    form.dataset.deletePreviewLoading = "true";
+    if (submitter instanceof HTMLElement) {
+      submitter.setAttribute("aria-busy", "true");
+    }
+    loadDeletePreview(form).then(() => {
+      openDeleteConfirmation(form, submitter);
+    }).finally(() => {
+      delete form.dataset.deletePreviewLoading;
+      if (submitter instanceof HTMLElement) {
+        submitter.removeAttribute("aria-busy");
+      }
+    });
   },
   true
 );

@@ -47,7 +47,7 @@ class Ale250UiPolishTests(unittest.TestCase):
         self.assertNotIn("Выберите кавалера из списка слева", template)
         self.assertNotIn("После выбора откроется карточка", template)
         self.assertNotIn("legacy-empty-state-copy", template)
-        self.assertIn('/static/assets/cavaliers/cavaliers-empty-state-awards.png', styles)
+        self.assertIn('/static/assets/cavaliers/cavaliers-empty-state-awards-optimized.jpg', styles)
         self.assertIn("{% if selected_person %}", template)
 
     def test_edit_person_removes_helpers_and_birth_hint(self) -> None:

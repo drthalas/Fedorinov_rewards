@@ -5,8 +5,10 @@
   const TYPEAHEAD_NAVIGATION_DELAY_MS = 2600;
   const CLICK_NAVIGATION_DELAY_MS = 160;
   const KEYBOARD_NAVIGATION_DELAY_MS = 320;
+  const REQUEST_TIMEOUT_MS = 15000;
   const LOADING_TEXT = "Загрузка карточки кавалера…";
   const ERROR_TEXT = "Не удалось загрузить карточку кавалера. Попробуйте выбрать кавалера ещё раз.";
+  const TIMEOUT_TEXT = "Карточка загружается слишком долго. Повторите попытку.";
 
   let activeFetchController = null;
 
@@ -35,7 +37,17 @@
   };
 
   const showLoadingState = () => showWorkspaceState("legacy-loading-state", LOADING_TEXT, "status");
-  const showErrorState = () => showWorkspaceState("legacy-error-state", ERROR_TEXT, "alert");
+  const showErrorState = (text) => showWorkspaceState("legacy-error-state", text || ERROR_TEXT, "alert");
+
+  const restoreSelectionFromLocation = () => {
+    const currentPersonId = new URL(window.location.href).searchParams.get("person_id");
+    document.querySelectorAll("[data-person-name]").forEach((row) => {
+      const rowPersonId = new URL(row.dataset.selectUrl || "", window.location.origin).searchParams.get("person_id");
+      const selected = Boolean(currentPersonId && rowPersonId === currentPersonId);
+      row.classList.toggle("selected-row", selected);
+      row.setAttribute("aria-selected", selected ? "true" : "false");
+    });
+  };
 
   const replaceRewardsLayout = (html, focusList, listScrollTop) => {
     const parser = new DOMParser();
@@ -60,12 +72,12 @@
     }
   };
 
-  const navigateToUrl = (url, options) => {
+  const navigateToUrl = async (url, options) => {
     if (!url) {
       return;
     }
     const settings = options || {};
-    if (!window.fetch || !window.DOMParser || !window.history) {
+    if (!window.fetch || !window.DOMParser || !window.history || !window.AbortController) {
       window.location.href = url;
       return;
     }
@@ -81,29 +93,47 @@
       : currentList ? currentList.scrollTop : 0;
     showLoadingState();
 
-    window.fetch(url, {
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-      signal: controller.signal,
-    }).then((response) => {
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await window.fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        signal: controller.signal,
+      });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
-      return response.text();
-    }).then((html) => {
+      const html = await response.text();
+      if (activeFetchController !== controller) {
+        return;
+      }
       replaceRewardsLayout(html, Boolean(settings.focusList), listScrollTop);
       if (settings.updateHistory !== false) {
         window.history.pushState({ legacyRewardsUrl: url }, "", url);
       }
-    }).catch((error) => {
-      if (error && error.name === "AbortError") {
+    } catch (error) {
+      if (error && error.name === "AbortError" && !timedOut) {
         return;
       }
-      showErrorState();
-    }).finally(() => {
+      if (activeFetchController === controller) {
+        restoreSelectionFromLocation();
+        showErrorState(timedOut ? TIMEOUT_TEXT : ERROR_TEXT);
+      }
+    } finally {
+      window.clearTimeout(timeoutId);
       if (activeFetchController === controller) {
         activeFetchController = null;
+        const target = workspace();
+        if (target && target.getAttribute("aria-busy") === "true") {
+          restoreSelectionFromLocation();
+          showErrorState(timedOut ? TIMEOUT_TEXT : ERROR_TEXT);
+        }
       }
-    });
+    }
   };
 
   function initLegacyRewards(root) {

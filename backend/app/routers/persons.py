@@ -175,11 +175,6 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     person_folder, person_folder_exists = person_folder_status(settings, person_id)
     photos = person_photo_items(person, rewards)
     additional_photos = person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos])
-    delete_preview = person_delete_preview(settings, person_id)
-    reward_delete_previews = {
-        int(reward["id"]): reward_delete_preview(settings, int(reward["id"]))
-        for reward in rewards
-    }
     return templates.TemplateResponse(
         request,
         "person_detail.html",
@@ -193,20 +188,22 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "return_to": safe_back,
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
-            "reward_delete_operation_ids": {int(reward["id"]): uuid4().hex for reward in rewards},
-            "reward_delete_confirmations": {
-                reward_id: reward_delete_confirmation_message(preview)
-                for reward_id, preview in reward_delete_previews.items()
-            },
-            "reward_delete_blocked": {
-                reward_id: preview.media.block_reason is not None
-                for reward_id, preview in reward_delete_previews.items()
-            },
-            "person_delete_operation_id": uuid4().hex,
-            "person_delete_confirmation": person_delete_confirmation_message(delete_preview),
-            "person_delete_blocked": delete_preview.block_reason is not None,
         },
     )
+
+
+@router.get("/persons/{person_id}/delete-preview")
+def person_delete_preflight(person_id: int):
+    settings = get_settings()
+    try:
+        preview = person_delete_preview(settings, person_id)
+    except PersonValidationError as exc:
+        raise _delete_validation_error(exc) from exc
+    return {
+        "message": person_delete_confirmation_message(preview),
+        "blocked": preview.block_reason is not None,
+        "operation_id": uuid4().hex,
+    }
 
 
 @router.get("/persons/{person_id}/booklet")

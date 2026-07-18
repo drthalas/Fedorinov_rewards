@@ -144,28 +144,28 @@ def _available_reference_fields(connection) -> tuple[MediaReferenceField, ...]:
                 for row in connection.execute(f"pragma table_info({field.table})").fetchall()
             }
             columns_by_table[field.table] = columns
-        if field.column in columns:
+        if field.column in columns and "id" in columns:
             available.append(field)
     return tuple(available)
 
 
-def managed_image_reference_count_in_connection(
+def managed_image_reference_counts_in_connection(
     connection,
     settings: Settings,
-    raw_path: object,
+    raw_paths: tuple[object, ...] | set[str],
     *,
     excluded_rows: tuple[MediaReferenceExclusion, ...] = (),
-) -> int:
-    normalized_path = normalize_managed_image_path(settings, raw_path)
+) -> dict[str, int]:
+    normalized_paths = {
+        normalize_managed_image_path(settings, raw_path)
+        for raw_path in raw_paths
+    }
+    counts = {path: 0 for path in normalized_paths}
+    if not normalized_paths:
+        return counts
+
     excluded = {(item.table, int(item.row_id)) for item in excluded_rows}
-    count = 0
     for field in _available_reference_fields(connection):
-        columns = {
-            str(row["name"])
-            for row in connection.execute(f"pragma table_info({field.table})").fetchall()
-        }
-        if "id" not in columns:
-            continue
         rows = connection.execute(
             f"select id as row_id, {field.column} as media_path from {field.table} "
             f"where {field.column} is not null and trim({field.column}) != ''"
@@ -177,9 +177,25 @@ def managed_image_reference_count_in_connection(
                 candidate = normalize_managed_image_path(settings, row["media_path"])
             except MediaLifecycleError:
                 continue
-            if candidate == normalized_path:
-                count += 1
-    return count
+            if candidate in counts:
+                counts[candidate] += 1
+    return counts
+
+
+def managed_image_reference_count_in_connection(
+    connection,
+    settings: Settings,
+    raw_path: object,
+    *,
+    excluded_rows: tuple[MediaReferenceExclusion, ...] = (),
+) -> int:
+    normalized_path = normalize_managed_image_path(settings, raw_path)
+    return managed_image_reference_counts_in_connection(
+        connection,
+        settings,
+        (normalized_path,),
+        excluded_rows=excluded_rows,
+    )[normalized_path]
 
 
 def _reference_count(connection, settings: Settings, normalized_path: str) -> int:

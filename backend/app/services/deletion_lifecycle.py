@@ -20,6 +20,7 @@ from .media_lifecycle import (
     MediaLifecycleError,
     MediaReferenceExclusion,
     managed_image_reference_count_in_connection,
+    managed_image_reference_counts_in_connection,
     normalize_managed_image_path,
 )
 from .write_guard import ensure_dangerous_action_allowed
@@ -378,24 +379,41 @@ def _stage_owned_paths(
 ) -> dict[str, object]:
     preserved: set[str] = set()
     covered_references: set[str] = set()
+    managed_paths_by_owned: dict[str, set[str]] = {}
     for owned in plan.owned_paths:
         source = _owned_target(settings, owned)
         if source.exists() or source.is_symlink():
-            _validate_source_tree(settings, connection, plan, owned, source, preserved, covered_references)
+            managed_paths_by_owned[owned.relative_path] = _validate_source_tree(settings, owned, source)
             _validate_same_volume(settings, source)
+        else:
+            managed_paths_by_owned[owned.relative_path] = set()
         for reference in plan.normalized_references:
             if _owned_path_covers(owned, reference):
                 covered_references.add(reference)
 
+    paths_to_check = set(plan.normalized_references)
+    for paths in managed_paths_by_owned.values():
+        paths_to_check.update(paths)
+    reference_counts = managed_image_reference_counts_in_connection(
+        connection,
+        settings,
+        paths_to_check,
+        excluded_rows=plan.excluded_rows,
+    )
+
+    for owned in plan.owned_paths:
+        managed_paths = managed_paths_by_owned[owned.relative_path]
+        if owned.kind == "file":
+            if reference_counts.get(owned.relative_path, 0):
+                preserved.add(owned.relative_path)
+            continue
+        if any(reference_counts.get(path, 0) for path in managed_paths):
+            raise DeletionBlockedError("An external database reference points inside an owned directory.")
+
     for reference in plan.normalized_references:
         if reference in covered_references:
             continue
-        count = managed_image_reference_count_in_connection(
-            connection,
-            settings,
-            reference,
-            excluded_rows=plan.excluded_rows,
-        )
+        count = reference_counts.get(reference, 0)
         if count:
             preserved.add(reference)
             continue
@@ -431,31 +449,22 @@ def _stage_owned_paths(
 
 def _validate_source_tree(
     settings: Settings,
-    connection,
-    plan: DeletePlan,
     owned: OwnedPath,
     source: Path,
-    preserved: set[str],
-    covered_references: set[str],
-) -> None:
+) -> set[str]:
     _validate_no_symlink_chain(settings, source)
     if owned.kind == "file":
         if not source.is_file():
             raise DeletionBlockedError("Owned image path is not a regular file.")
         _validate_regular_file(source)
-        count = managed_image_reference_count_in_connection(
-            connection,
-            settings,
-            owned.relative_path,
-            excluded_rows=plan.excluded_rows,
-        )
-        covered_references.add(owned.relative_path)
-        if count:
-            preserved.add(owned.relative_path)
-        return
+        try:
+            return {normalize_managed_image_path(settings, owned.relative_path)}
+        except MediaLifecycleError as exc:
+            raise DeletionBlockedError("Owned image path does not satisfy the managed media policy.") from exc
 
     if not source.is_dir():
         raise DeletionBlockedError("Owned directory path is not a directory.")
+    managed_paths: set[str] = set()
     for entry in sorted(source.rglob("*"), key=lambda item: item.as_posix()):
         if entry.is_symlink():
             raise DeletionBlockedError("Symbolic links are not allowed in an owned deletion tree.")
@@ -471,15 +480,8 @@ def _validate_source_tree(
             normalized = normalize_managed_image_path(settings, relative)
         except MediaLifecycleError as exc:
             raise DeletionBlockedError("Owned image path does not satisfy the managed media policy.") from exc
-        covered_references.add(normalized)
-        count = managed_image_reference_count_in_connection(
-            connection,
-            settings,
-            normalized,
-            excluded_rows=plan.excluded_rows,
-        )
-        if count:
-            raise DeletionBlockedError("An external database reference points inside an owned directory.")
+        managed_paths.add(normalized)
+    return managed_paths
 
 
 def _validate_regular_file(path: Path) -> None:

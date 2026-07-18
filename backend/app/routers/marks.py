@@ -146,7 +146,6 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
     mark = get_mark(settings.rewards_db_path, mark_id)
     if mark is None:
         raise HTTPException(status_code=404, detail="Знак не найден.")
-    delete_preview = mark_delete_preview(settings, mark_id)
     return templates.TemplateResponse(
         request,
         "mark_detail.html",
@@ -156,11 +155,22 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
             "photos": mark_photo_items(mark),
             "status_message": status_message(status),
             "return_to": safe_return_to(return_to),
-            "delete_operation_id": uuid4().hex,
-            "delete_confirmation": mark_delete_confirmation_message(delete_preview),
-            "delete_blocked": delete_preview.media.block_reason is not None,
         },
     )
+
+
+@router.get("/marks/{mark_id}/delete-preview")
+def mark_delete_preflight(mark_id: int):
+    settings = get_settings()
+    try:
+        preview = mark_delete_preview(settings, mark_id)
+    except MarkValidationError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {
+        "message": mark_delete_confirmation_message(preview),
+        "blocked": preview.media.block_reason is not None,
+        "operation_id": uuid4().hex,
+    }
 
 
 @router.get("/marks/{mark_id}/edit")
