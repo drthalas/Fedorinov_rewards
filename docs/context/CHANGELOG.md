@@ -1,5 +1,26 @@
 # История изменений
 
+## v2.0.3
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-18.
+
+Ключевые изменения:
+
+- В packaged Windows-приложении восстановлен согласованный фон пустого экрана «Кавалеры»; оптимизированное изображение совместимо с updater предыдущих версий.
+- Открытие карточек кавалеров на больших базах значительно ускорено: destructive delete preview больше не вычисляется при обычном просмотре.
+- Добавлен конечный timeout загрузки карточки с корректной очисткой spinner и возможностью повторить запрос после сетевой или HTTP-ошибки.
+- Подготовка delete confirmation загружается по требованию и сохраняет точные counts, shared-media safety, quarantine и recovery.
+
+Проверки перед релизом:
+
+- Focused ALE-300 и deletion/media regression: PASS.
+- Full suite: PASS.
+- Headed Chromium, packaged CSSOM/background и TEMP browser smoke: PASS.
+- Старый публичный updater, backup/install/restart/update-check/rollback и package safety: PASS.
+- Реальные DB и media не изменялись.
+
 ## v2.0.2
 
 Статус: выпущено.

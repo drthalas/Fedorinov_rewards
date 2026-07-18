@@ -112,22 +112,22 @@ if settings.update_backup_dir.exists() and any(settings.update_backup_dir.iterdi
 if updater.read_update_status(settings).get("status") != "error":
     raise AssertionError("failed attempt did not leave a retryable error status")
 
-with patch.object(updater, "check_for_updates", return_value=manifest("2.0.2", candidate_zip)):
+with patch.object(updater, "check_for_updates", return_value=manifest("2.0.3", candidate_zip)):
     result = updater.apply_update(
         settings,
         current_version="0.1.14",
         zip_downloader=downloader_for(candidate_zip),
     )
 if not result.get("ok"):
-    raise AssertionError(f"v2.0.2 legacy apply failed: {result}")
+    raise AssertionError(f"v2.0.3 legacy apply failed: {result}")
 
 styles = (legacy_root / "backend" / "app" / "static" / "styles.css").read_text(encoding="utf-8")
 if styles.count(";base64,") != 6:
     raise AssertionError("installed CSS does not contain all six embedded UI assets")
 if "/static/assets/cavaliers/" in styles or "/static/assets/guides/" in styles:
     raise AssertionError("installed CSS still depends on unpackaged binary UI assets")
-if "APP_VERSION = \"2.0.2\"" not in (legacy_root / "backend" / "app" / "version.py").read_text(encoding="utf-8"):
-    raise AssertionError("installed version source is not 2.0.2")
+if "APP_VERSION = \"2.0.3\"" not in (legacy_root / "backend" / "app" / "version.py").read_text(encoding="utf-8"):
+    raise AssertionError("installed version source is not 2.0.3")
 
 data_after = {str(path.relative_to(data_root)): digest(path) for path in (db_path, person_photo, person_document, mark_photo)}
 if data_after != data_before:
@@ -157,18 +157,18 @@ from backend.app.services.update_checker import check_for_updates
 from backend.app.config import Settings
 from backend.app.version import APP_VERSION
 settings = Settings(rewards_data_dir=root.parent/'user-data', rewards_db_path=root.parent/'user-data/database/MyDatabase.sqlite', update_check_enabled=True, update_manifest_url='https://example.test/latest.json')
-manifest = json.dumps({'version': '2.0.2', 'download_url': 'https://example.test/v2.0.2.zip', 'sha256': 'a'*64}).encode()
+manifest = json.dumps({'version': '2.0.3', 'download_url': 'https://example.test/v2.0.3.zip', 'sha256': 'a'*64}).encode()
 check = check_for_updates(settings, current_version=APP_VERSION, fetcher=lambda _url, _timeout: manifest)
 print(json.dumps({'version': APP_VERSION, 'update_available': check['update_available']}))
 """
 restart = subprocess.run([sys.executable, "-c", restart_code, str(legacy_root)], text=True, capture_output=True, check=True)
 restart_result = json.loads(restart.stdout)
-if restart_result != {"version": "2.0.2", "update_available": False}:
+if restart_result != {"version": "2.0.3", "update_available": False}:
     raise AssertionError(f"restart/update-check validation failed: {restart_result}")
 
 if [item["destination"] for item in downloads] != [
     "FedorinovRewards_WebPreview_v2.0.0.zip",
-    "FedorinovRewards_WebPreview_v2.0.2.zip",
+    "FedorinovRewards_WebPreview_v2.0.3.zip",
 ]:
     raise AssertionError(f"retry reused a stale download path: {downloads}")
 

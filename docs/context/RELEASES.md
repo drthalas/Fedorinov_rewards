@@ -68,6 +68,29 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.3
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-18.
+
+Тип: patch hotfix.
+
+Состав:
+
+- Восстановленный packaged background пустого экрана «Кавалеры» с updater-compatible optimized artwork.
+- Ускоренное открытие карточек кавалеров на больших базах без eager destructive preview.
+- Lazy delete confirmation с точными counts и сохранённой безопасностью общих media.
+- Конечный frontend timeout, гарантированная очистка loading state и повторяемый запрос после ошибки.
+
+Проверки:
+
+- Owner/manual QA ALE-300: PASS.
+- Focused regression и full suite: PASS.
+- Packaged CSSOM/background, TEMP browser smoke и performance budgets: PASS.
+- v0.1.14 updater compatibility, backup/install/restart/update-check/rollback: PASS.
+- Real DB/media SHA и fingerprint до/после релизной процедуры совпадают.
+
 ## v2.0.2
 
 Статус: выпущено.
