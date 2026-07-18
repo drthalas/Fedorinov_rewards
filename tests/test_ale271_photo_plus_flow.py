@@ -67,7 +67,7 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
         self.assertNotIn("resetPhotoPlusMode", script)
         self.assertNotIn("photoPlusMode", script)
         self.assertNotIn("file-next", script)
-        self.assertLess(handler.index("imageBlobFromClipboardWithTimeout"), handler.index("openPersonFilePicker(button)"))
+        self.assertLess(handler.index("freshImageBlobFromClipboardWithTimeout"), handler.index("openPersonFilePicker(button)"))
         self.assertIn("normalizedPageSearch(window.location.search)", script)
         self.assertIn("normalizedPageSearch(state.search)", script)
         self.assertIn("input.click();", picker)

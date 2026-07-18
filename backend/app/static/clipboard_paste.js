@@ -2,6 +2,116 @@
   "use strict";
 
   var PHOTO_INTERACTION_STORAGE_KEY = "fedorinov-photo-interaction";
+  var CLIPBOARD_PENDING_STORAGE_KEY = "fedorinov-clipboard-image-pending-v1";
+  var CLIPBOARD_CONSUMED_STORAGE_KEY = "fedorinov-clipboard-image-consumed-v1";
+  var CLIPBOARD_PENDING_MAX_AGE_MS = 5 * 60 * 1000;
+
+  function readStoredJson(key) {
+    try {
+      var raw = window.sessionStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function removeStoredValue(key) {
+    try {
+      window.sessionStorage.removeItem(key);
+    } catch (error) {
+      // Clipboard consume-once state is a progressive enhancement.
+    }
+  }
+
+  function storeJson(key, value) {
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function bytesToHex(bytes) {
+    var parts = [];
+    for (var i = 0; i < bytes.length; i += 1) {
+      parts.push(bytes[i].toString(16).padStart(2, "0"));
+    }
+    return parts.join("");
+  }
+
+  async function fingerprintImageBlob(blob) {
+    if (!window.crypto || !window.crypto.subtle || typeof blob.arrayBuffer !== "function") {
+      throw new Error("Clipboard fingerprint unavailable");
+    }
+    var digest = await window.crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+    return bytesToHex(new Uint8Array(digest));
+  }
+
+  function isConsumedFingerprint(fingerprint) {
+    var consumed = readStoredJson(CLIPBOARD_CONSUMED_STORAGE_KEY);
+    return Boolean(fingerprint && consumed && consumed.fingerprint === fingerprint);
+  }
+
+  function rememberPendingClipboardImage(image, successMarkers) {
+    if (!image || !image.fingerprint) return false;
+    return storeJson(CLIPBOARD_PENDING_STORAGE_KEY, {
+      fingerprint: image.fingerprint,
+      successMarkers: Array.isArray(successMarkers) ? successMarkers : [],
+      savedAt: Date.now()
+    });
+  }
+
+  function clearPendingClipboardImage(fingerprint) {
+    var pending = readStoredJson(CLIPBOARD_PENDING_STORAGE_KEY);
+    if (!pending || !fingerprint || pending.fingerprint === fingerprint) {
+      removeStoredValue(CLIPBOARD_PENDING_STORAGE_KEY);
+    }
+  }
+
+  function consumePendingClipboardImage(fingerprint) {
+    var pending = readStoredJson(CLIPBOARD_PENDING_STORAGE_KEY);
+    if (!pending || pending.fingerprint !== fingerprint) return false;
+    storeJson(CLIPBOARD_CONSUMED_STORAGE_KEY, {
+      fingerprint: fingerprint,
+      consumedAt: Date.now()
+    });
+    removeStoredValue(CLIPBOARD_PENDING_STORAGE_KEY);
+    return true;
+  }
+
+  function urlHasSuccessMarker(url, markers) {
+    for (var i = 0; i < markers.length; i += 1) {
+      var marker = String(markers[i] || "");
+      var separator = marker.indexOf("=");
+      if (separator <= 0) continue;
+      var key = marker.slice(0, separator);
+      var value = marker.slice(separator + 1);
+      if (url.searchParams.get(key) === value) return true;
+    }
+    return false;
+  }
+
+  function settlePendingClipboardImage(urlValue) {
+    var pending = readStoredJson(CLIPBOARD_PENDING_STORAGE_KEY);
+    if (!pending) return false;
+    if (Date.now() - Number(pending.savedAt || 0) > CLIPBOARD_PENDING_MAX_AGE_MS) {
+      removeStoredValue(CLIPBOARD_PENDING_STORAGE_KEY);
+      return false;
+    }
+    var url;
+    try {
+      url = new URL(urlValue, window.location.href);
+    } catch (error) {
+      removeStoredValue(CLIPBOARD_PENDING_STORAGE_KEY);
+      return false;
+    }
+    if (urlHasSuccessMarker(url, pending.successMarkers || [])) {
+      return consumePendingClipboardImage(pending.fingerprint);
+    }
+    removeStoredValue(CLIPBOARD_PENDING_STORAGE_KEY);
+    return false;
+  }
 
   function photoSourceError(button) {
     var container = button.closest(".photo-manage-actions");
@@ -86,8 +196,9 @@
         var type = item.types[j];
         if (type.indexOf("image/") === 0) {
           var blob = await item.getType(type);
+          var fingerprint = await fingerprintImageBlob(blob);
           var jpegBlob = await jpegBlobFromClipboardBlob(blob);
-          return { blob: jpegBlob, type: "image/jpeg" };
+          return { blob: jpegBlob, type: "image/jpeg", fingerprint: fingerprint };
         }
       }
     }
@@ -107,6 +218,16 @@
         reject(error);
       });
     });
+  }
+
+  async function freshImageBlobFromClipboardWithTimeout(timeoutMs) {
+    var image = await imageBlobFromClipboardWithTimeout(timeoutMs);
+    if (isConsumedFingerprint(image.fingerprint)) {
+      var error = new Error("Clipboard image already consumed");
+      error.code = "clipboard-image-consumed";
+      throw error;
+    }
+    return image;
   }
 
   function photoPageScroller() {
@@ -206,15 +327,29 @@
     form.append("photo_field", button.getAttribute("data-photo-field") || "");
     form.append("return_url", returnUrl);
     form.append("file", image.blob, "clipboard.jpg");
-    var response = await fetch("/photos/upload", {
-      method: "POST",
-      body: form,
-      credentials: "same-origin"
-    });
+    rememberPendingClipboardImage(image, ["status=photo_updated", "media_cleanup=failed"]);
+    var response;
+    try {
+      response = await fetch("/photos/upload", {
+        method: "POST",
+        body: form,
+        credentials: "same-origin"
+      });
+    } catch (error) {
+      clearPendingClipboardImage(image.fingerprint);
+      throw error;
+    }
     if (!response.ok) {
       var text = await response.text();
+      clearPendingClipboardImage(image.fingerprint);
       throw new Error(text || "Не удалось сохранить фото из буфера.");
     }
+    var responseUrl = new URL(response.url, window.location.href);
+    if (!response.redirected || !urlHasSuccessMarker(responseUrl, ["status=photo_updated", "media_cleanup=failed"])) {
+      clearPendingClipboardImage(image.fingerprint);
+      throw new Error("Не удалось подтвердить сохранение фото из буфера.");
+    }
+    consumePendingClipboardImage(image.fingerprint);
     var target = new URL(returnUrl, window.location.href);
     if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
       window.history.replaceState(null, "", target.pathname + target.search + target.hash);
@@ -278,7 +413,7 @@
       clearSourceError(button);
       var image;
       try {
-        image = await imageBlobFromClipboardWithTimeout(2000);
+        image = await freshImageBlobFromClipboardWithTimeout(2000);
       } catch (error) {
         openPersonFilePicker(button);
         return;
@@ -305,10 +440,16 @@
   }
 
   window.FedorinovClipboardImages = Object.freeze({
-    readWithTimeout: imageBlobFromClipboardWithTimeout
+    readWithTimeout: freshImageBlobFromClipboardWithTimeout,
+    rememberPending: rememberPendingClipboardImage,
+    clearPending: clearPendingClipboardImage,
+    isConsumed: function (image) {
+      return Boolean(image && isConsumedFingerprint(image.fingerprint));
+    }
   });
 
   document.addEventListener("DOMContentLoaded", function () {
+    settlePendingClipboardImage(window.location.href);
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       async function beginClipboardPaste() {
         button.disabled = true;

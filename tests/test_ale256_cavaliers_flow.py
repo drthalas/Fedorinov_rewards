@@ -254,13 +254,13 @@ class Ale256UiContractTests(unittest.TestCase):
             'document.addEventListener("DOMContentLoaded"', 1
         )[0]
         self.assertLess(
-            person_handler.index("await imageBlobFromClipboardWithTimeout(2000)"),
+            person_handler.index("await freshImageBlobFromClipboardWithTimeout(2000)"),
             person_handler.index("await uploadClipboardImage"),
         )
         self.assertIn("openPersonFilePicker(button)", person_handler)
         self.assertIn("input.click()", script)
         self.assertNotIn("input.showPicker()", script)
-        self.assertIn("imageBlobFromClipboardWithTimeout(2000)", person_handler)
+        self.assertIn("freshImageBlobFromClipboardWithTimeout(2000)", person_handler)
         self.assertIn("window.location.reload()", script)
         self.assertIn('form.append("entity_id", button.getAttribute("data-entity-id")', script)
         self.assertIn('form.append("photo_field", button.getAttribute("data-photo-field")', script)
@@ -268,7 +268,7 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260717-ale292-blocked-confirmation-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260718-ale296-clipboard-consume-1"', templates)
         self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 

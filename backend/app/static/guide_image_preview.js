@@ -352,6 +352,8 @@
     input.addEventListener("change", async () => {
       const file = input.files && input.files[0];
       if (!file) return;
+      const helper = window.FedorinovClipboardImages;
+      if (helper && typeof helper.clearPending === "function") helper.clearPending();
       trigger.disabled = true;
       try {
         if (!await useFile(file)) throw new Error("Image assignment unavailable");
@@ -378,6 +380,13 @@
         if (!helper || typeof helper.readWithTimeout !== "function") throw new Error("Clipboard API unavailable");
         const clipboardImage = await helper.readWithTimeout(1200);
         if (!await assignClipboardImage(clipboardImage)) throw new Error("Clipboard assignment unavailable");
+        if (typeof helper.rememberPending === "function") {
+          helper.rememberPending(clipboardImage, [
+            "status=rank_created",
+            "status=rank_updated",
+            "status=media_cleanup_failed",
+          ]);
+        }
         trigger.disabled = false;
       } catch (error) {
         openFilePicker();
@@ -405,6 +414,8 @@
       trigger.title = "Добавить изображение погона";
       setTriggerOccupied(false);
       clearError();
+      const helper = window.FedorinovClipboardImages;
+      if (helper && typeof helper.clearPending === "function") helper.clearPending();
     });
 
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });
