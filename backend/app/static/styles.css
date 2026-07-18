@@ -5459,7 +5459,7 @@ body.legacy-rewards-theme::after {
   background-image:
     linear-gradient(90deg, rgb(8 9 8 / 54%), rgb(8 9 8 / 14%) 42%, rgb(8 9 8 / 12%) 68%, rgb(8 9 8 / 48%)),
     linear-gradient(180deg, rgb(8 9 8 / 25%), transparent 26%, transparent 72%, rgb(7 8 7 / 56%)),
-    url("/static/assets/cavaliers/empty-hero.jpg");
+    url("/static/assets/cavaliers/cavaliers-empty-state-awards.png");
   background-position: center;
   background-size: cover;
   box-shadow: inset 0 0 90px rgb(0 0 0 / 44%);

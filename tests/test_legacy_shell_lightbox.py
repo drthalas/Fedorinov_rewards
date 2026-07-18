@@ -231,7 +231,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertNotIn("legacy-empty-state-copy", legacy_template)
         self.assertIn("legacy-person-list-title", legacy_template)
         self.assertIn("format_birth_year", legacy_template)
-        self.assertIn("/static/assets/cavaliers/empty-hero.jpg", styles)
+        self.assertIn("/static/assets/cavaliers/cavaliers-empty-state-awards.png", styles)
 
     def test_legacy_rewards_has_quick_person_search(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()
