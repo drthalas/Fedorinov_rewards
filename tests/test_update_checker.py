@@ -72,7 +72,7 @@ class UpdateCheckerTests(unittest.TestCase):
             self.assertEqual(timeout, 10)
             return _manifest_bytes(
                 {
-                    "version": "2.0.2",
+                    "version": "2.0.3",
                     "released_at": "2026-06-04",
                     "download_url": "https://example.test/app.zip",
                     "sha256": "abc",
@@ -82,7 +82,7 @@ class UpdateCheckerTests(unittest.TestCase):
 
         result = check_for_updates(_settings(), fetcher=fetcher)
         self.assertTrue(result["update_available"])
-        self.assertEqual(result["latest_version"], "2.0.2")
+        self.assertEqual(result["latest_version"], "2.0.3")
         self.assertEqual(result["notes"], ["Новая версия"])
 
     def test_update_checker_returns_no_update_for_same_version(self) -> None:

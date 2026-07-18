@@ -68,6 +68,32 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.2
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-18.
+
+Тип: patch release.
+
+Состав:
+
+- Безопасный lifecycle замены и удаления managed media с reference-counted cleanup общих файлов.
+- Полное удаление кавалеров, наград, знаков, званий и элементов справочника с owned row/file/folder cleanup, quarantine/recovery и safe blocking.
+- Корректный возврат в исходный legacy context после удаления.
+- Единые transient notifications и очистка одноразовых query markers.
+- Подтверждение перед заменой занятого image slot.
+- Consume-once поведение clipboard image с обычным file picker для уже использованного содержимого.
+- Финальная фотография empty state вкладки «Кавалеры».
+
+Проверки:
+
+- Owner/manual QA: PASS.
+- Full suite, focused lifecycle tests и browser smoke: PASS.
+- Старый публичный updater принимает пакет с новым фоном; system UI assets встроены в packaged CSS.
+- Temp backup/install/restart/update-check/rollback: PASS.
+- Real DB/media SHA и fingerprint до/после релизной процедуры совпадают.
+
 ## v2.0.1
 
 Статус: выпущено.

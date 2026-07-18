@@ -1,5 +1,29 @@
 # История изменений
 
+## v2.0.2
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-18.
+
+Ключевые изменения:
+
+- Введён централизованный безопасный lifecycle замены и удаления managed media с сохранением общих файлов до исчезновения последней ссылки.
+- Полностью обработано удаление кавалеров, наград, знаков, званий и элементов дерева справочника: owned DB rows/files/folders, safe blocking, quarantine и recovery.
+- После удаления из legacy-карточек сохраняется исходный контекст вкладки «Кавалеры» или «Знаки».
+- Все одноразовые success/warning/error уведомления используют transient toast без сдвига layout; query markers очищаются и не повторяются после reload.
+- Перед заменой занятого image slot требуется подтверждение; Cancel не меняет данные и возвращает focus.
+- Clipboard image используется один раз: неизменившийся буфер при следующем `+` открывает file picker, а новое изображение снова вставляется штатно.
+- Empty state вкладки «Кавалеры» получил финальную согласованную фотографию с наградами.
+
+Проверки перед релизом:
+
+- Focused deletion/media/navigation/clipboard tests: PASS.
+- Full suite: PASS.
+- Browser smoke и temp destructive/write smoke: PASS.
+- Legacy updater compatibility, package safety, backup/install/restart/rollback: PASS.
+- Реальные DB и media не изменялись.
+
 ## v2.0.1
 
 Статус: выпущено.
