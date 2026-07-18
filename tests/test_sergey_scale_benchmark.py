@@ -4,6 +4,8 @@ import json
 from contextlib import closing
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 from tempfile import TemporaryDirectory
 import unittest
 
@@ -13,6 +15,10 @@ from scripts.generate_sergey_scale_benchmark import (
     REWARD_COUNT,
     generate_profile,
 )
+from scripts.run_sergey_scale_benchmark import route_specs
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 class SergeyScaleGeneratorTests(unittest.TestCase):
@@ -84,6 +90,74 @@ class SergeyScaleGeneratorTests(unittest.TestCase):
         unsafe_root = Path(__file__).resolve().parents[1] / "generated-sergey-scale"
         with self.assertRaisesRegex(ValueError, "unique child"):
             generate_profile("sergey-count-matched", unsafe_root)
+
+    def test_route_inventory_covers_required_surfaces(self) -> None:
+        manifest = {
+            "fixture_ids": {
+                "zero_person": 1,
+                "ordinary_person": 2,
+                "many_person": 3,
+                "heavy_person": 4,
+                "ordinary_reward": 10,
+                "heavy_reward": 11,
+                "mark": 20,
+            }
+        }
+        names = {name for name, _ in route_specs(manifest)}
+        self.assertTrue(
+            {
+                "main",
+                "person_zero",
+                "person_ordinary",
+                "person_heavy",
+                "person_delete_preflight",
+                "reward_delete_preflight",
+                "mark_delete_preflight",
+                "guides",
+                "guides_selected",
+                "guide_form",
+                "reward_form_cascade",
+                "search_initial",
+                "search_exact",
+                "search_contains",
+                "marks",
+                "summary",
+            }.issubset(names)
+        )
+
+    def test_route_probe_reports_sql_filesystem_and_response_metrics(self) -> None:
+        with TemporaryDirectory(prefix="ale302-probe-") as parent:
+            data_root = Path(parent) / "data"
+            generate_profile("sergey-count-matched", data_root)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/sergey_scale_route_probe.py"),
+                    "--app-root",
+                    str(ROOT),
+                    "--data-root",
+                    str(data_root),
+                    "--route-name",
+                    "person_detail",
+                    "--path",
+                    "/persons/2",
+                    "--warm-runs",
+                    "1",
+                    "--timeout",
+                    "10",
+                ],
+                cwd=ROOT,
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=30,
+            )
+            result = json.loads(completed.stdout)
+            self.assertEqual(result["cold"]["status"], 200)
+            self.assertGreater(result["cold"]["response_bytes"], 0)
+            self.assertGreater(result["cold"]["sql_counts"]["SELECT"], 0)
+            self.assertIn("filesystem_counts", result["cold"])
+            self.assertEqual(result["aggregate"]["successful_warm_runs"], 1)
 
 
 if __name__ == "__main__":
