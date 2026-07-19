@@ -12,9 +12,8 @@ from unittest.mock import patch
 from PIL import Image
 
 from backend.app.config import Settings
-from backend.app.routers import marks as marks_router
-from backend.app.routers import persons as persons_router
-from backend.app.routers import rewards as rewards_router
+from backend.app.routers import delete_preflight as delete_preflight_router
+from backend.app.services.delete_preflight import reset_delete_preflight_registry
 from backend.app.services.media_lifecycle import (
     MediaReferenceExclusion,
     managed_image_reference_counts_in_connection,
@@ -99,6 +98,7 @@ class Ale300DeletePreviewTests(unittest.TestCase):
             require_backup_before_dangerous_actions=False,
         )
         self._create_db()
+        reset_delete_preflight_registry()
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -144,12 +144,10 @@ class Ale300DeletePreviewTests(unittest.TestCase):
             target.write_bytes(b"\xff\xd8\xff\xe0ale300")
 
     def test_preflight_endpoints_return_fresh_operation_and_exact_counts(self) -> None:
-        with patch.object(persons_router, "get_settings", return_value=self.settings):
-            person = persons_router.person_delete_preflight(1)
-        with patch.object(rewards_router, "get_settings", return_value=self.settings):
-            reward = rewards_router.reward_delete_preflight(10)
-        with patch.object(marks_router, "get_settings", return_value=self.settings):
-            mark = marks_router.mark_delete_preflight(20)
+        with patch.object(delete_preflight_router, "get_settings", return_value=self.settings):
+            person = delete_preflight_router.delete_preflight("person", 1)
+            reward = delete_preflight_router.delete_preflight("reward", 10)
+            mark = delete_preflight_router.delete_preflight("mark", 20)
 
         self.assertIn("Наград: 1", person["message"])
         self.assertIn("общих файлов будет сохранено: 1", person["message"])
@@ -208,8 +206,10 @@ class Ale300DeletePreviewTests(unittest.TestCase):
         navigation_script = (ROOT / "backend/app/static/legacy_rewards.js").read_text(encoding="utf-8")
 
         self.assertGreaterEqual(templates.count("data-confirm-preview-url="), 6)
-        self.assertIn("loadDeletePreview(form)", confirm_script)
-        self.assertIn("DELETE_PREVIEW_TIMEOUT_MS = 15000", confirm_script)
+        self.assertIn("loadDeletePreflight(form, submitter, dialog)", confirm_script)
+        self.assertIn("DELETE_PREFLIGHT_TIMEOUT_MS = 15000", confirm_script)
+        self.assertIn("validateDeletePreview(form", confirm_script)
+        self.assertIn("abortActiveDeleteRequest()", confirm_script)
         self.assertIn("confirmButton.hidden = blocked", confirm_script)
         self.assertIn("REQUEST_TIMEOUT_MS = 15000", navigation_script)
         self.assertIn("const response = await window.fetch", navigation_script)

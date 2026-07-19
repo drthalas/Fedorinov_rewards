@@ -1,6 +1,4 @@
 from datetime import date
-from uuid import uuid4
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs, urlencode
@@ -15,12 +13,11 @@ from ..repositories.rewards_write import (
     create_reward,
     delete_reward_with_result,
     reward_data_from_mapping,
-    reward_delete_confirmation_message,
-    reward_delete_preview,
     reward_duplicate_message,
     update_reward,
 )
 from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
+from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
@@ -199,20 +196,6 @@ def reward_detail(request: Request, reward_id: int, status: str = "", return_to:
     )
 
 
-@router.get("/rewards/{reward_id}/delete-preview")
-def reward_delete_preflight(reward_id: int):
-    settings = get_settings()
-    try:
-        preview = reward_delete_preview(settings, reward_id)
-    except RewardValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {
-        "message": reward_delete_confirmation_message(preview),
-        "blocked": preview.media.block_reason is not None,
-        "operation_id": uuid4().hex,
-    }
-
-
 @router.get("/rewards/{reward_id}/edit")
 def reward_edit(request: Request, reward_id: int, return_to: str = "", created: str = ""):
     settings = get_settings()
@@ -283,6 +266,12 @@ async def reward_delete(request: Request, reward_id: int):
     if form_values.get("delete_reward_confirm") != "true" or form_values.get("confirm") != "true":
         raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
+        authorize_delete_execution(
+            settings,
+            "reward",
+            reward_id,
+            str(form_values.get("delete_operation_id") or ""),
+        )
         result = delete_reward_with_result(
             settings,
             reward_id,
@@ -291,6 +280,8 @@ async def reward_delete(request: Request, reward_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
+    except DeletePreflightValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except RewardValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     success_return = delete_return_to(return_to)

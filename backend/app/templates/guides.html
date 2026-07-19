@@ -27,9 +27,9 @@
       <div class="tree-actions">
         {% if node.level < 3 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" data-confirm-submit="guide-delete" data-confirm-title="Удаление элемента справочника" data-confirm-message="{{ guide_delete_confirmations.get(node.guide_key, 'Удалить элемент справочника?') }}" data-confirm-blocked="{{ 'true' if guide_delete_blocked.get(node.guide_key, false) else 'false' }}">
+        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" data-confirm-submit="guide-delete" data-confirm-preview-url="/delete-preflight/guide_level_{{ node.level }}/{{ node.id }}" data-delete-entity-type="guide_level_{{ node.level }}" data-delete-entity-id="{{ node.id }}" data-confirm-title="Удаление элемента справочника" data-confirm-message="Удалить элемент справочника?" data-confirm-blocked="false">
           <input type="hidden" name="confirm" value="">
-          <input type="hidden" name="delete_operation_id" value="{{ guide_delete_operation_ids.get(node.guide_key, '') }}">
+          <input type="hidden" name="delete_operation_id" value="">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
           <button class="link-button" type="submit">Удалить</button>
         </form>
@@ -73,9 +73,9 @@
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" data-confirm-submit="rank-delete" data-confirm-title="Удаление звания / специальности" data-confirm-message="{{ rank_delete_confirmations.get(rank.id, 'Удалить звание/специальность?') }}" data-confirm-blocked="{{ 'true' if rank_delete_blocked.get(rank.id, false) else 'false' }}">
+          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" data-confirm-submit="rank-delete" data-confirm-preview-url="/delete-preflight/rank/{{ rank.id }}" data-delete-entity-type="rank" data-delete-entity-id="{{ rank.id }}" data-confirm-title="Удаление звания / специальности" data-confirm-message="Удалить звание/специальность?" data-confirm-blocked="false">
             <input type="hidden" name="confirm" value="">
-            <input type="hidden" name="delete_operation_id" value="{{ rank_delete_operation_ids.get(rank.id, '') }}">
+            <input type="hidden" name="delete_operation_id" value="">
             <input type="hidden" name="return_to" value="{{ guides_self }}">
             <button class="link-button" type="submit">Удалить</button>
           </form>

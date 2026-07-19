@@ -22,47 +22,31 @@ function disableDeleteSubmitters(form) {
   });
 }
 
-const DELETE_PREVIEW_TIMEOUT_MS = 15000;
-const DELETE_PREVIEW_ERROR = "Не удалось проверить возможность удаления. Повторите попытку.";
+const DELETE_PREFLIGHT_TIMEOUT_MS = 15000;
+const DELETE_PREFLIGHT_LOADING = "Проверяем возможность удаления…";
+const DELETE_PREFLIGHT_ERROR = "Не удалось проверить возможность удаления. Повторите попытку.";
 
 function setDeletePreview(form, preview) {
   form.dataset.confirmMessage = String(preview.message || "Подтвердите удаление.");
-  form.dataset.confirmBlocked = preview.blocked === true ? "true" : "false";
+  form.dataset.confirmBlocked = preview.blocked === true || preview.allowed === false ? "true" : "false";
   setInputValue(form, "delete_operation_id", String(preview.operation_id || ""));
 }
 
-async function loadDeletePreview(form) {
-  const url = form.dataset.confirmPreviewUrl;
-  if (!url) {
-    return;
+function validateDeletePreview(form, preview) {
+  const expectedType = String(form.dataset.deleteEntityType || "");
+  const expectedId = String(form.dataset.deleteEntityId || "");
+  if (
+    !preview
+    || typeof preview.message !== "string"
+    || typeof preview.blocked !== "boolean"
+    || typeof preview.allowed !== "boolean"
+    || typeof preview.operation_id !== "string"
+    || String(preview.entity_type || "") !== expectedType
+    || String(preview.entity_id ?? "") !== expectedId
+  ) {
+    throw new Error("Invalid delete preflight response.");
   }
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), DELETE_PREVIEW_TIMEOUT_MS);
-  try {
-    const response = await window.fetch(url, {
-      headers: {
-        "Accept": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
-      },
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    const preview = await response.json();
-    if (!preview || typeof preview.message !== "string" || typeof preview.blocked !== "boolean" || typeof preview.operation_id !== "string") {
-      throw new Error("Invalid delete preview response.");
-    }
-    setDeletePreview(form, preview);
-  } catch (_error) {
-    setDeletePreview(form, {
-      message: DELETE_PREVIEW_ERROR,
-      blocked: true,
-      operation_id: "",
-    });
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
+  return preview;
 }
 
 function createDeleteConfirmationDialog() {
@@ -107,14 +91,32 @@ function createDeleteConfirmationDialog() {
 let activeDeleteForm = null;
 let activeDeleteSubmitter = null;
 let activeDeleteTrigger = null;
+let activeDeleteRequest = null;
+let deleteRequestSequence = 0;
 let dialogResult = "cancel";
 
 function focusableDialogControls(dialog) {
   return Array.from(dialog.querySelectorAll("button:not([hidden]):not([disabled])"));
 }
 
+function abortActiveDeleteRequest() {
+  if (!activeDeleteRequest) {
+    return;
+  }
+  activeDeleteRequest.controller.abort();
+  window.clearTimeout(activeDeleteRequest.timeoutId);
+  if (activeDeleteRequest.submitter instanceof HTMLElement) {
+    activeDeleteRequest.submitter.removeAttribute("aria-busy");
+  }
+  delete activeDeleteRequest.form.dataset.deletePreviewLoading;
+  activeDeleteRequest = null;
+}
+
 function closeDeleteConfirmation(dialog, result = "cancel") {
   dialogResult = result;
+  if (result === "cancel") {
+    abortActiveDeleteRequest();
+  }
   if (typeof dialog.close === "function" && dialog.open) {
     dialog.close();
   } else {
@@ -123,37 +125,111 @@ function closeDeleteConfirmation(dialog, result = "cancel") {
   }
 }
 
-function openDeleteConfirmation(form, submitter) {
-  const dialog = document.querySelector(".delete-confirmation-dialog") || createDeleteConfirmationDialog();
-  const blocked = form.dataset.confirmBlocked === "true";
+function renderDeleteConfirmation(dialog, form, state = "ready") {
+  const loading = state === "loading";
+  const blocked = loading || form.dataset.confirmBlocked === "true";
   const title = dialog.querySelector("#delete-confirmation-title");
   const message = dialog.querySelector("#delete-confirmation-message");
   const cancelButton = dialog.querySelector("[data-delete-confirmation-cancel]");
   const confirmButton = dialog.querySelector("[data-delete-confirmation-confirm]");
 
+  title.textContent = form.dataset.confirmTitle || "Подтверждение удаления";
+  message.textContent = loading ? DELETE_PREFLIGHT_LOADING : (form.dataset.confirmMessage || "Подтвердите действие.");
+  confirmButton.hidden = blocked;
+  confirmButton.disabled = blocked;
+  cancelButton.textContent = loading ? "Отмена" : (blocked ? "Закрыть" : "Отмена");
+  dialog.classList.toggle("delete-confirmation-blocked", blocked && !loading);
+  dialog.classList.toggle("delete-confirmation-loading", loading);
+  dialog.setAttribute("aria-busy", loading ? "true" : "false");
+
+  if (!loading) {
+    (blocked ? cancelButton : confirmButton).focus();
+  }
+}
+
+function openDeleteConfirmation(form, submitter, state = "ready") {
+  const dialog = document.querySelector(".delete-confirmation-dialog") || createDeleteConfirmationDialog();
   activeDeleteForm = form;
   activeDeleteSubmitter = submitter || null;
   activeDeleteTrigger = submitter || document.activeElement;
   dialogResult = "cancel";
   setDeleteConfirmation(form, false);
+  renderDeleteConfirmation(dialog, form, state);
 
-  title.textContent = form.dataset.confirmTitle || "Подтверждение удаления";
-  message.textContent = form.dataset.confirmMessage || "Подтвердите действие.";
-  confirmButton.hidden = blocked;
-  confirmButton.disabled = blocked;
-  cancelButton.textContent = blocked ? "Закрыть" : "Отмена";
-  dialog.classList.toggle("delete-confirmation-blocked", blocked);
-
-  if (dialog.open) {
+  if (!dialog.open) {
+    if (typeof dialog.showModal === "function") {
+      dialog.showModal();
+    } else {
+      dialog.setAttribute("open", "");
+    }
+  }
+  const cancelButton = dialog.querySelector("[data-delete-confirmation-cancel]");
+  if (state === "loading" && cancelButton instanceof HTMLElement) {
     cancelButton.focus();
+  }
+  return dialog;
+}
+
+async function loadDeletePreflight(form, submitter, dialog) {
+  abortActiveDeleteRequest();
+  const url = form.dataset.confirmPreviewUrl;
+  if (!url) {
     return;
   }
-  if (typeof dialog.showModal === "function") {
-    dialog.showModal();
-  } else {
-    dialog.setAttribute("open", "");
+  const sequence = ++deleteRequestSequence;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeoutId = window.setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, DELETE_PREFLIGHT_TIMEOUT_MS);
+  activeDeleteRequest = { controller, form, sequence, submitter, timeoutId };
+  form.dataset.deletePreviewLoading = "true";
+  setDeletePreview(form, { message: DELETE_PREFLIGHT_LOADING, blocked: true, allowed: false, operation_id: "" });
+  if (submitter instanceof HTMLElement) {
+    submitter.setAttribute("aria-busy", "true");
   }
-  (blocked ? cancelButton : confirmButton).focus();
+
+  try {
+    const response = await window.fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        "X-Requested-With": "XMLHttpRequest",
+      },
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const preview = validateDeletePreview(form, await response.json());
+    if (!activeDeleteRequest || activeDeleteRequest.sequence !== sequence || activeDeleteForm !== form) {
+      return;
+    }
+    setDeletePreview(form, preview);
+    renderDeleteConfirmation(dialog, form, "ready");
+  } catch (error) {
+    const superseded = !activeDeleteRequest || activeDeleteRequest.sequence !== sequence || activeDeleteForm !== form;
+    if (superseded || (controller.signal.aborted && !timedOut)) {
+      return;
+    }
+    setDeletePreview(form, {
+      message: DELETE_PREFLIGHT_ERROR,
+      blocked: true,
+      allowed: false,
+      operation_id: "",
+    });
+    renderDeleteConfirmation(dialog, form, "error");
+  } finally {
+    window.clearTimeout(timeoutId);
+    if (activeDeleteRequest && activeDeleteRequest.sequence === sequence) {
+      activeDeleteRequest = null;
+      delete form.dataset.deletePreviewLoading;
+      if (submitter instanceof HTMLElement) {
+        submitter.removeAttribute("aria-busy");
+      }
+      dialog.setAttribute("aria-busy", "false");
+    }
+  }
 }
 
 document.addEventListener(
@@ -184,21 +260,10 @@ document.addEventListener(
       openDeleteConfirmation(form, submitter);
       return;
     }
-    if (form.dataset.deletePreviewLoading === "true") {
-      return;
-    }
-    form.dataset.deletePreviewLoading = "true";
-    if (submitter instanceof HTMLElement) {
-      submitter.setAttribute("aria-busy", "true");
-    }
-    loadDeletePreview(form).then(() => {
-      openDeleteConfirmation(form, submitter);
-    }).finally(() => {
-      delete form.dataset.deletePreviewLoading;
-      if (submitter instanceof HTMLElement) {
-        submitter.removeAttribute("aria-busy");
-      }
-    });
+
+    setDeletePreview(form, { message: DELETE_PREFLIGHT_LOADING, blocked: true, allowed: false, operation_id: "" });
+    const dialog = openDeleteConfirmation(form, submitter, "loading");
+    void loadDeletePreflight(form, submitter, dialog);
   },
   true
 );
@@ -278,6 +343,7 @@ document.addEventListener("close", (event) => {
   if (!dialog || !dialog.matches(".delete-confirmation-dialog")) {
     return;
   }
+  abortActiveDeleteRequest();
   if (dialogResult === "cancel" && activeDeleteTrigger instanceof HTMLElement) {
     activeDeleteTrigger.focus();
   }

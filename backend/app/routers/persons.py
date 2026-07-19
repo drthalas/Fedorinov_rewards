@@ -2,7 +2,6 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse, Response
 import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
-from uuid import uuid4
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -12,12 +11,10 @@ from ..repositories.persons_write import (
     PersonValidationError,
     create_person,
     delete_person_with_result,
-    person_delete_confirmation_message,
-    person_delete_preview,
     person_data_from_mapping,
     update_person,
 )
-from ..repositories.rewards_write import reward_delete_confirmation_message, reward_delete_preview
+from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
@@ -192,20 +189,6 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
     )
 
 
-@router.get("/persons/{person_id}/delete-preview")
-def person_delete_preflight(person_id: int):
-    settings = get_settings()
-    try:
-        preview = person_delete_preview(settings, person_id)
-    except PersonValidationError as exc:
-        raise _delete_validation_error(exc) from exc
-    return {
-        "message": person_delete_confirmation_message(preview),
-        "blocked": preview.block_reason is not None,
-        "operation_id": uuid4().hex,
-    }
-
-
 @router.get("/persons/{person_id}/booklet")
 def person_booklet(request: Request, person_id: int, return_to: str = "", error: str = "", message: str = ""):
     settings = get_settings()
@@ -346,9 +329,15 @@ async def person_delete(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
-    if form_values.get("delete_person_confirm") != "true":
+    if form_values.get("delete_person_confirm") != "true" or form_values.get("confirm") != "true":
         raise _delete_validation_error(PersonValidationError("Действие требует подтверждения."))
     try:
+        authorize_delete_execution(
+            settings,
+            "person",
+            person_id,
+            str(form_values.get("delete_operation_id") or ""),
+        )
         result = delete_person_with_result(
             settings,
             person_id,
@@ -357,6 +346,8 @@ async def person_delete(request: Request, person_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
+    except DeletePreflightValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except PersonDeleteBlockedError:
         blocked_return = delete_return_to(return_to)
         target = with_status(blocked_return, "person_delete_blocked") if blocked_return else f"/persons/{person_id}?status=person_delete_blocked"

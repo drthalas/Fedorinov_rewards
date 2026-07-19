@@ -8,7 +8,7 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/marks/{{ mark.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/marks/{{ mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-preview-url="/marks/{{ mark.id }}/delete-preview" data-confirm-title="Удаление знака" data-confirm-message="Удалить знак?" data-confirm-blocked="false">
+  <form method="post" action="/marks/{{ mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-preview-url="/delete-preflight/mark/{{ mark.id }}" data-delete-entity-type="mark" data-delete-entity-id="{{ mark.id }}" data-confirm-title="Удаление знака" data-confirm-message="Удалить знак?" data-confirm-blocked="false">
     <input type="hidden" name="confirm" value="">
     <input type="hidden" name="delete_operation_id" value="">
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}

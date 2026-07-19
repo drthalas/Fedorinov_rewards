@@ -1,6 +1,5 @@
 from dataclasses import replace
 from urllib.parse import parse_qs, urlencode
-from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -23,12 +22,8 @@ from ..repositories.guides_write import (
     create_rank,
     delete_guide_level_item,
     delete_rank,
-    guide_delete_confirmation_message,
-    guide_delete_previews,
     guide_level_data_from_mapping,
     rank_data_from_mapping,
-    rank_delete_confirmation_message,
-    rank_delete_previews,
     update_guide_level_item,
     update_rank,
 )
@@ -47,6 +42,7 @@ from ..services.guide_tree_state import (
     guide_node_key,
     guide_tree_return_url,
 )
+from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.navigation import safe_return_to, with_query_value, with_status
 from ..services.notifications import status_notification
 from ..services.write_guard import WriteBlockedError
@@ -156,26 +152,6 @@ def _supports_award_media(level: int) -> bool:
     return level == 3
 
 
-def _guide_delete_operation_ids(nodes: list[dict[str, object]]) -> dict[str, str]:
-    operation_ids: dict[str, str] = {}
-    pending = list(nodes)
-    while pending:
-        node = pending.pop()
-        operation_ids[str(node.get("guide_key") or "")] = uuid4().hex
-        pending.extend(node.get("children") or [])
-    return operation_ids
-
-
-def _guide_item_keys(nodes: list[dict[str, object]]) -> tuple[tuple[int, int], ...]:
-    item_keys: list[tuple[int, int]] = []
-    pending = list(nodes)
-    while pending:
-        node = pending.pop()
-        item_keys.append((int(node["level"]), int(node["id"])))
-        pending.extend(node.get("children") or [])
-    return tuple(item_keys)
-
-
 def _context(
     settings,
     request: Request,
@@ -188,8 +164,6 @@ def _context(
 ):
     ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     tree = guide_tree(settings.rewards_db_path) if settings.db_exists else []
-    rank_previews = rank_delete_previews(settings, tuple(int(rank["id"]) for rank in ranks)) if ranks else {}
-    guide_previews = guide_delete_previews(settings, _guide_item_keys(tree)) if tree else {}
     safe_open, safe_focus = apply_guide_tree_state(tree, open_nodes, focus)
     safe_return = safe_return_to(return_to)
     safe_section = section if section in {"ranks", "tree"} else ""
@@ -212,20 +186,6 @@ def _context(
         "settings": settings,
         "ranks": ranks,
         "tree": tree,
-        "rank_delete_operation_ids": {int(rank["id"]): uuid4().hex for rank in ranks},
-        "rank_delete_confirmations": {
-            rank_id: rank_delete_confirmation_message(preview)
-            for rank_id, preview in rank_previews.items()
-        },
-        "rank_delete_blocked": {rank_id: preview.blocked for rank_id, preview in rank_previews.items()},
-        "guide_delete_operation_ids": _guide_delete_operation_ids(tree),
-        "guide_delete_confirmations": {
-            guide_key: guide_delete_confirmation_message(preview)
-            for guide_key, preview in guide_previews.items()
-        },
-        "guide_delete_blocked": {
-            guide_key: preview.blocked for guide_key, preview in guide_previews.items()
-        },
         "return_to": safe_return,
         "section": safe_section,
         "guides_self": guides_self,
@@ -380,7 +340,15 @@ async def rank_delete(request: Request, rank_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("confirm") != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
+        authorize_delete_execution(
+            settings,
+            "rank",
+            rank_id,
+            str(form_values.get("delete_operation_id") or ""),
+        )
         result = delete_rank(
             settings,
             rank_id,
@@ -389,6 +357,8 @@ async def rank_delete(request: Request, rank_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
+    except DeletePreflightValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except GuideDeleteBlockedError as exc:
         status_code = "rank_delete_used" if "использ" in str(exc).lower() else "guide_delete_media_blocked"
         target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
@@ -600,7 +570,15 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("confirm") != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
+        authorize_delete_execution(
+            settings,
+            f"guide_level_{level}",
+            item_id,
+            str(form_values.get("delete_operation_id") or ""),
+        )
         result = delete_guide_level_item(
             settings,
             level,
@@ -610,6 +588,8 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
+    except DeletePreflightValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except GuideDeleteBlockedError as exc:
         message = str(exc).lower()
         if "дочер" in message:

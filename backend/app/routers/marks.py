@@ -1,6 +1,4 @@
 from datetime import date
-from uuid import uuid4
-
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs
@@ -13,12 +11,11 @@ from ..repositories.marks_write import (
     create_mark,
     delete_mark_with_result,
     mark_data_from_mapping,
-    mark_delete_confirmation_message,
-    mark_delete_preview,
     update_mark,
 )
 from ..services.display import pagination
 from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
+from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.notifications import status_message
 from ..services.photos import photo_items
 from ..services.write_guard import WriteBlockedError
@@ -159,20 +156,6 @@ def mark_detail(request: Request, mark_id: int, status: str = "", return_to: str
     )
 
 
-@router.get("/marks/{mark_id}/delete-preview")
-def mark_delete_preflight(mark_id: int):
-    settings = get_settings()
-    try:
-        preview = mark_delete_preview(settings, mark_id)
-    except MarkValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return {
-        "message": mark_delete_confirmation_message(preview),
-        "blocked": preview.media.block_reason is not None,
-        "operation_id": uuid4().hex,
-    }
-
-
 @router.get("/marks/{mark_id}/edit")
 def mark_edit(request: Request, mark_id: int, return_to: str = ""):
     settings = get_settings()
@@ -233,7 +216,15 @@ async def mark_delete(request: Request, mark_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    if form_values.get("confirm") != "true":
+        raise HTTPException(status_code=400, detail="Действие требует подтверждения.")
     try:
+        authorize_delete_execution(
+            settings,
+            "mark",
+            mark_id,
+            str(form_values.get("delete_operation_id") or ""),
+        )
         result = delete_mark_with_result(
             settings,
             mark_id,
@@ -242,6 +233,8 @@ async def mark_delete(request: Request, mark_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
+    except DeletePreflightValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except MarkValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     success_return = delete_return_to(return_to, "mark_id")

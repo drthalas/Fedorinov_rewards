@@ -67,6 +67,9 @@ class GuideItemMediaTests(unittest.TestCase):
         self.db_path.parent.mkdir(parents=True)
         os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
         self._create_db()
+        self._preflight_patch = patch("backend.app.routers.guides.authorize_delete_execution")
+        self._preflight_patch.start()
+        self.addCleanup(self._preflight_patch.stop)
 
     def tearDown(self) -> None:
         os.environ.pop("REWARDS_AUDIT_LOG", None)
@@ -375,8 +378,10 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertIn(">Изменить</a>", guides)
         self.assertIn(">Удалить</button>", guides)
         self.assertIn('name="delete_operation_id"', guides)
-        self.assertIn("guide_delete_operation_ids.get(node.guide_key", guides)
-        self.assertIn("rank_delete_operation_ids.get(rank.id", guides)
+        self.assertIn('data-confirm-preview-url="/delete-preflight/guide_level_{{ node.level }}/{{ node.id }}"', guides)
+        self.assertIn('data-confirm-preview-url="/delete-preflight/rank/{{ rank.id }}"', guides)
+        self.assertNotIn("guide_delete_operation_ids", guides)
+        self.assertNotIn("rank_delete_operation_ids", guides)
         self.assertIn("guide-theme", guides)
         self.assertIn("guide-directory-grid", guides)
         self.assertIn("guide-tree-scroll", guides)

@@ -445,7 +445,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("Номер свободен", duplicate_js)
         self.assertIn("Такая награда с этим номером уже есть в базе", duplicate_js)
         self.assertIn("/rewards/check-duplicate", duplicate_js)
-        self.assertIn('data-confirm-preview-url="/rewards/{{ reward.id }}/delete-preview"', person_detail)
+        self.assertIn('data-confirm-preview-url="/delete-preflight/reward/{{ reward.id }}"', person_detail)
         self.assertIn('data-confirm-title="Удаление награды"', person_detail)
 
     def test_mark_form_preserves_cascading_guides_after_validation_error(self) -> None:

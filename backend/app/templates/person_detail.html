@@ -25,7 +25,7 @@
 {% if settings.write_mode %}
 <div class="actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
-  <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/persons/{{ person.id }}/delete-preview" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false">
+  <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/delete-preflight/person/{{ person.id }}" data-delete-entity-type="person" data-delete-entity-id="{{ person.id }}" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false">
     <input type="hidden" name="confirm" value="">
     <input type="hidden" name="delete_person_confirm" value="">
     <input type="hidden" name="delete_operation_id" value="">
@@ -97,7 +97,7 @@
           <a class="reward-icon-action reward-view-icon" href="/rewards/{{ reward.id }}?return_to={{ person_card_return|urlencode }}" title="Открыть награду" aria-label="Открыть награду"><span class="visually-hidden">Открыть</span></a>
           {% if settings.write_mode %}
           <a class="reward-icon-action reward-edit-icon" href="/rewards/{{ reward.id }}/edit?return_to={{ person_card_return|urlencode }}" title="Изменить награду" aria-label="Изменить награду"><span class="visually-hidden">Изменить</span></a>
-          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-preview-url="/rewards/{{ reward.id }}/delete-preview" data-confirm-title="Удаление награды" data-confirm-message="Удалить награду?" data-confirm-blocked="false">
+          <form method="post" action="/rewards/{{ reward.id }}/delete" data-confirm-submit="reward-delete" data-confirm-preview-url="/delete-preflight/reward/{{ reward.id }}" data-delete-entity-type="reward" data-delete-entity-id="{{ reward.id }}" data-confirm-title="Удаление награды" data-confirm-message="Удалить награду?" data-confirm-blocked="false">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_reward_confirm" value="">
             <input type="hidden" name="delete_operation_id" value="">

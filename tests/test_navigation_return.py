@@ -42,6 +42,14 @@ class ReturnNavigationTests(unittest.TestCase):
         os.environ["REQUIRE_BACKUP_BEFORE_WRITE"] = "false"
         os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
         self._create_db()
+        for target in (
+            "backend.app.routers.persons.authorize_delete_execution",
+            "backend.app.routers.rewards.authorize_delete_execution",
+            "backend.app.routers.marks.authorize_delete_execution",
+        ):
+            preflight_patch = patch(target)
+            preflight_patch.start()
+            self.addCleanup(preflight_patch.stop)
 
     def tearDown(self) -> None:
         for key in [
