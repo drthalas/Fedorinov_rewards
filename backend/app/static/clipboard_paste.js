@@ -5,6 +5,37 @@
   var CLIPBOARD_PENDING_STORAGE_KEY = "fedorinov-clipboard-image-pending-v1";
   var CLIPBOARD_CONSUMED_STORAGE_KEY = "fedorinov-clipboard-image-consumed-v1";
   var CLIPBOARD_PENDING_MAX_AGE_MS = 5 * 60 * 1000;
+  var CLIPBOARD_ATTEMPT_TIMEOUT_MS = 500;
+  var CLIPBOARD_ATTEMPT_HARD_CEILING_MS = 1000;
+  var clipboardFeedbackState = new WeakMap();
+
+  function beginClipboardFeedback(trigger) {
+    if (!trigger || clipboardFeedbackState.has(trigger)) return false;
+    clipboardFeedbackState.set(trigger, {
+      ariaLabel: trigger.getAttribute("aria-label"),
+      title: trigger.getAttribute("title"),
+    });
+    trigger.dataset.clipboardPending = "true";
+    trigger.setAttribute("aria-busy", "true");
+    trigger.setAttribute("aria-label", "Проверяем буфер…");
+    trigger.setAttribute("title", "Проверяем буфер…");
+    trigger.disabled = true;
+    return true;
+  }
+
+  function endClipboardFeedback(trigger) {
+    if (!trigger) return;
+    var state = clipboardFeedbackState.get(trigger);
+    delete trigger.dataset.clipboardPending;
+    trigger.removeAttribute("aria-busy");
+    trigger.disabled = false;
+    if (!state) return;
+    if (state.ariaLabel === null) trigger.removeAttribute("aria-label");
+    else trigger.setAttribute("aria-label", state.ariaLabel);
+    if (state.title === null) trigger.removeAttribute("title");
+    else trigger.setAttribute("title", state.title);
+    clipboardFeedbackState.delete(trigger);
+  }
 
   function readStoredJson(key) {
     try {
@@ -207,9 +238,11 @@
 
   function imageBlobFromClipboardWithTimeout(timeoutMs) {
     return new Promise(function (resolve, reject) {
+      var requestedTimeout = Number(timeoutMs) || CLIPBOARD_ATTEMPT_TIMEOUT_MS;
+      var boundedTimeout = Math.min(Math.max(1, requestedTimeout), CLIPBOARD_ATTEMPT_HARD_CEILING_MS);
       var timeout = window.setTimeout(function () {
         reject(new Error("Буфер обмена не ответил вовремя."));
-      }, timeoutMs);
+      }, boundedTimeout);
       imageBlobFromClipboard().then(function (image) {
         window.clearTimeout(timeout);
         resolve(image);
@@ -350,6 +383,7 @@
       throw new Error("Не удалось подтвердить сохранение фото из буфера.");
     }
     consumePendingClipboardImage(image.fingerprint);
+    endClipboardFeedback(button);
     var target = new URL(returnUrl, window.location.href);
     if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
       window.history.replaceState(null, "", target.pathname + target.search + target.hash);
@@ -362,7 +396,7 @@
   function openPersonFilePicker(button) {
     var inputId = button.getAttribute("data-file-input-id") || "";
     var input = inputId ? document.getElementById(inputId) : null;
-    button.disabled = false;
+    endClipboardFeedback(button);
     if (!(input instanceof HTMLInputElement)) {
       showSourceError(button, "Не удалось открыть выбор файла.");
       return false;
@@ -408,12 +442,12 @@
 
   function bindInlinePhotoTrigger(button) {
     async function beginPhotoFlow() {
+      if (!beginClipboardFeedback(button)) return;
       rememberPhotoInteraction(button);
-      button.disabled = true;
       clearSourceError(button);
       var image;
       try {
-        image = await freshImageBlobFromClipboardWithTimeout(2000);
+        image = await freshImageBlobFromClipboardWithTimeout(CLIPBOARD_ATTEMPT_TIMEOUT_MS);
       } catch (error) {
         openPersonFilePicker(button);
         return;
@@ -421,9 +455,9 @@
       try {
         await uploadClipboardImage(button, image, true);
       } catch (error) {
+        endClipboardFeedback(button);
         rememberPhotoInteraction(button);
         showSourceError(button, error && error.message ? error.message : "Не удалось сохранить фотографию.");
-        button.disabled = false;
         restorePhotoInteraction();
       }
     }
@@ -441,6 +475,9 @@
 
   window.FedorinovClipboardImages = Object.freeze({
     readWithTimeout: freshImageBlobFromClipboardWithTimeout,
+    attemptTimeoutMs: CLIPBOARD_ATTEMPT_TIMEOUT_MS,
+    beginFeedback: beginClipboardFeedback,
+    endFeedback: endClipboardFeedback,
     rememberPending: rememberPendingClipboardImage,
     clearPending: clearPendingClipboardImage,
     isConsumed: function (image) {
@@ -452,14 +489,14 @@
     settlePendingClipboardImage(window.location.href);
     document.querySelectorAll("[data-clipboard-paste]").forEach(function (button) {
       async function beginClipboardPaste() {
-        button.disabled = true;
+        if (!beginClipboardFeedback(button)) return;
         clearSourceError(button);
         try {
           var image = await imageBlobFromClipboard();
           await uploadClipboardImage(button, image, false);
         } catch (error) {
+          endClipboardFeedback(button);
           showSourceError(button, error && error.message ? error.message : "Не удалось вставить фото из буфера.");
-          button.disabled = false;
         }
       }
 

@@ -333,7 +333,9 @@
     }
 
     function openFilePicker() {
-      trigger.disabled = false;
+      const helper = window.FedorinovClipboardImages;
+      if (helper && typeof helper.endFeedback === "function") helper.endFeedback(trigger);
+      else trigger.disabled = false;
       clearError();
       try {
         input.click();
@@ -374,11 +376,15 @@
     });
 
     async function beginRankImageFlow() {
-      trigger.disabled = true;
+      const helper = window.FedorinovClipboardImages;
+      if (helper && typeof helper.beginFeedback === "function") {
+        if (!helper.beginFeedback(trigger)) return;
+      } else {
+        trigger.disabled = true;
+      }
       try {
-        const helper = window.FedorinovClipboardImages;
         if (!helper || typeof helper.readWithTimeout !== "function") throw new Error("Clipboard API unavailable");
-        const clipboardImage = await helper.readWithTimeout(1200);
+        const clipboardImage = await helper.readWithTimeout(helper.attemptTimeoutMs || 500);
         if (!await assignClipboardImage(clipboardImage)) throw new Error("Clipboard assignment unavailable");
         if (typeof helper.rememberPending === "function") {
           helper.rememberPending(clipboardImage, [
@@ -387,7 +393,8 @@
             "status=media_cleanup_failed",
           ]);
         }
-        trigger.disabled = false;
+        if (typeof helper.endFeedback === "function") helper.endFeedback(trigger);
+        else trigger.disabled = false;
       } catch (error) {
         openFilePicker();
       }

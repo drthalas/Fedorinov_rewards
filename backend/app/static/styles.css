@@ -801,6 +801,36 @@ th {
   font-size: 12px;
 }
 
+[data-photo-plus-trigger][data-clipboard-pending="true"],
+[data-rank-image-trigger][data-clipboard-pending="true"] {
+  position: relative;
+  color: transparent;
+  cursor: progress;
+}
+
+[data-photo-plus-trigger][data-clipboard-pending="true"]::after,
+[data-rank-image-trigger][data-clipboard-pending="true"]::after {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgb(255 255 255 / 38%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  content: "";
+  animation: photo-clipboard-spin 0.65s linear infinite;
+}
+
+.clipboard-paste-button[data-clipboard-pending="true"] {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+@keyframes photo-clipboard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .person-file-actions {
   display: flex;
   flex-wrap: wrap;

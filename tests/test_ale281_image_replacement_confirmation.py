@@ -160,7 +160,7 @@ process.stdout.write(JSON.stringify({ emptyResult, beforeCancel, afterCancel, af
             "window.FedorinovClipboardImages", 1
         )[0]
         self.assertIn("confirmation.run(button, beginPhotoFlow)", inline)
-        self.assertIn("freshImageBlobFromClipboardWithTimeout(2000)", inline)
+        self.assertIn("freshImageBlobFromClipboardWithTimeout(CLIPBOARD_ATTEMPT_TIMEOUT_MS)", inline)
         self.assertLess(
             inline.index("confirmation.run(button, beginPhotoFlow)"),
             inline.index("beginPhotoFlow();", inline.index("confirmation.run(button, beginPhotoFlow)")),

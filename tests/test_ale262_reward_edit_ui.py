@@ -67,7 +67,7 @@ class Ale262RewardEditUiTests(unittest.TestCase):
         self.assertIn("event.preventDefault()", handler)
         self.assertIn("rememberPhotoInteraction(button)", handler)
         self.assertLess(
-            handler.index("await freshImageBlobFromClipboardWithTimeout(2000)"),
+            handler.index("await freshImageBlobFromClipboardWithTimeout(CLIPBOARD_ATTEMPT_TIMEOUT_MS)"),
             handler.index("await uploadClipboardImage"),
         )
         self.assertIn("openPersonFilePicker(button)", handler)
