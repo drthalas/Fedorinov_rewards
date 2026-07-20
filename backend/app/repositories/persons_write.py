@@ -17,7 +17,8 @@ from ..services.deletion_lifecycle import (
     recorded_delete_plan,
     recover_delete_operation,
 )
-from ..services.dates import normalize_birth_year_input
+from ..services.dates import format_birth_year_input, normalize_birth_year_input
+from ..services.person_files import ensure_person_folder, safe_person_folder
 from ..services.deletion_confirmation import (
     MediaDeletePreview,
     confirmation_message,
@@ -32,7 +33,9 @@ PERSON_OPTIONAL_FIELDS = ("biography",)
 
 
 class PersonValidationError(ValueError):
-    pass
+    def __init__(self, message: str, *, field: str | None = None):
+        super().__init__(message)
+        self.field = field
 
 
 class PersonDeleteBlockedError(RuntimeError):
@@ -116,15 +119,34 @@ def _empty_to_none(value: object) -> object:
     return value
 
 
-def person_data_from_mapping(values: dict[str, object]) -> PersonWriteData:
+def person_data_from_mapping(
+    values: dict[str, object],
+    *,
+    existing_birthday: object = None,
+) -> PersonWriteData:
     fio = str(values.get("fio") or "").strip()
     if not fio:
         raise PersonValidationError("Заполните ФИО.")
 
+    raw_birthday = values.get("birthday")
+    submitted_year = "" if raw_birthday is None else str(raw_birthday).strip()
+    existing_year = format_birth_year_input(existing_birthday)
+    preserves_legacy_year = bool(
+        existing_year.isdigit()
+        and len(existing_year) == 4
+        and submitted_year == existing_year
+        and int(existing_year) < 1900
+    )
     try:
-        birthday = normalize_birth_year_input(values.get("birthday"))
+        birthday = normalize_birth_year_input(
+            raw_birthday,
+            required=True,
+            minimum_year=1800 if preserves_legacy_year else 1900,
+        )
     except ValueError as exc:
-        raise PersonValidationError(str(exc)) from exc
+        raise PersonValidationError(str(exc), field="birthday") from exc
+    if preserves_legacy_year:
+        birthday = str(existing_birthday)
 
     rank_value = _empty_to_none(values.get("id_rank"))
     if rank_value is None:
@@ -168,14 +190,25 @@ def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, 
     )
 
 
-def _validate_person_data(data: PersonWriteData) -> None:
+def _validate_person_data(data: PersonWriteData, *, existing_birthday: object = None) -> None:
     if not data.fio.strip():
         raise PersonValidationError("Заполните ФИО.")
-    if data.birthday:
-        try:
-            normalize_birth_year_input(data.birthday)
-        except ValueError as exc:
-            raise PersonValidationError(str(exc)) from exc
+    submitted_year = format_birth_year_input(data.birthday)
+    existing_year = format_birth_year_input(existing_birthday)
+    preserves_legacy_year = bool(
+        existing_year.isdigit()
+        and len(existing_year) == 4
+        and submitted_year == existing_year
+        and int(existing_year) < 1900
+    )
+    try:
+        normalize_birth_year_input(
+            submitted_year,
+            required=True,
+            minimum_year=1800 if preserves_legacy_year else 1900,
+        )
+    except ValueError as exc:
+        raise PersonValidationError(str(exc), field="birthday") from exc
     if data.id_rank is None:
         raise PersonValidationError("Выберите звание / специальность.")
 
@@ -183,6 +216,7 @@ def _validate_person_data(data: PersonWriteData) -> None:
 def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
     _validate_person_data(data)
+    created_folder = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         _ensure_biography_column(connection)
         fields = _active_fields(connection)
@@ -193,24 +227,39 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
             _as_params(data, fields),
         )
         person_id = int(cursor.lastrowid)
-        connection.commit()
+        folder = safe_person_folder(settings, person_id)
+        folder_existed = folder.exists()
+        try:
+            ensure_person_folder(settings, person_id)
+            if not folder_existed:
+                created_folder = folder
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            if created_folder is not None:
+                try:
+                    created_folder.rmdir()
+                except OSError:
+                    pass
+            raise
     log_action("create", "person", person_id, {"fields": list(fields)})
     return person_id
 
 
 def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:
     ensure_write_allowed(settings)
-    _validate_person_data(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        existing = connection.execute("select birthday from person where id = ?", (person_id,)).fetchone()
+        if existing is None:
+            raise PersonValidationError("Награжденный не найден.")
+        _validate_person_data(data, existing_birthday=existing["birthday"])
         _ensure_biography_column(connection)
         fields = _active_fields(connection)
         assignments = ", ".join(f"{field} = ?" for field in fields)
-        cursor = connection.execute(
+        connection.execute(
             f"update person set {assignments} where id = ?",
             (*_as_params(data, fields), person_id),
         )
-        if cursor.rowcount == 0:
-            raise PersonValidationError("Награжденный не найден.")
         connection.commit()
     log_action("update", "person", person_id, {"fields": list(fields)})
 

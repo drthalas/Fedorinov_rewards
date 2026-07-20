@@ -17,18 +17,19 @@
   <div class="person-edit-main">
 {% endif %}
 
-<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}">
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-person-form>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
     <div class="form-grid two-columns">
       <label>
         <span>ФИО</span>
-        <input name="fio" value="{{ person.fio or '' }}" required>
+        <input name="fio" value="{{ person.fio or '' }}" required autocomplete="off" spellcheck="false">
       </label>
       <label>
         <span>Год рождения</span>
-        <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" maxlength="4">
+        <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required autocomplete="off" aria-describedby="birth-year-error" data-birth-year data-min-year="1900" data-max-year="{{ birth_year_max }}" data-original-year="{{ person.birthday|format_birth_year_input }}" {% if field_errors and field_errors.birthday %}aria-invalid="true"{% endif %}>
+        <p id="birth-year-error" class="field-error" data-birth-year-error {% if not (field_errors and field_errors.birthday) %}hidden{% endif %}>{{ field_errors.birthday if field_errors and field_errors.birthday else '' }}</p>
       </label>
     </div>
     <label>
@@ -47,11 +48,11 @@
     <div class="form-grid two-columns">
       <label>
         <span>Ссылка на сайт “Память народа”</span>
-        <input name="link1" value="{{ person.link1 or '' }}">
+        <input name="link1" value="{{ person.link1 or '' }}" autocomplete="off">
       </label>
       <label>
         <span>Ссылка на сайт “Форум коллекционеров”</span>
-        <input name="link2" value="{{ person.link2 or '' }}">
+        <input name="link2" value="{{ person.link2 or '' }}" autocomplete="off">
       </label>
     </div>
   </fieldset>

@@ -11,6 +11,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from ..config import Settings
 from .audit import log_action
+from .write_guard import ensure_write_allowed
 
 
 class PersonFilesError(ValueError):
@@ -55,10 +56,19 @@ def person_folder_status(settings: Settings, person_id: int) -> tuple[Path, bool
     return folder, folder.exists() and folder.is_dir()
 
 
+def ensure_person_folder(settings: Settings, person_id: int) -> Path:
+    folder = safe_person_folder(settings, person_id)
+    if folder.is_dir():
+        return folder
+    ensure_write_allowed(settings)
+    folder.mkdir(parents=True, exist_ok=True)
+    if not folder.is_dir():
+        raise PersonFilesError("Не удалось создать каталог кавалера.")
+    return folder
+
+
 def open_person_folder(settings: Settings, person_id: int, opener=None) -> Path:
-    folder, exists = person_folder_status(settings, person_id)
-    if not exists:
-        raise PersonFilesError("Каталог кавалера не найден.")
+    folder = ensure_person_folder(settings, person_id)
     opener = opener or _default_opener
     opener(folder)
     return folder

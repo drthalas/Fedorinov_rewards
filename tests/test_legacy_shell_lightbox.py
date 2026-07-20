@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260719-ale304-photo-feedback-1"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260720-ale317-owner-qa-2"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -200,7 +200,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("Наградная книжка, сторона 2", legacy_router)
         self.assertIn("person_folder_image_items", legacy_router)
         self.assertIn("selected_person_full_photos", legacy_router)
-        self.assertIn("selected_person_photos + selected_person_document_photos + selected_person_additional_photos", legacy_router)
+        self.assertIn("selected_person_photos\n                + selected_person_document_photos\n                + selected_person_additional_photos", legacy_router)
         self.assertIn(".legacy-document-photo-block", styles)
         self.assertIn(".legacy-document-photo-grid", styles)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", styles)
@@ -421,7 +421,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
 
         self.assertIn('href="{{ selected_person.detail_url }}"', legacy_template)
         self.assertIn('selected_person["detail_url"] = str(', legacy_router)
-        self.assertIn('return_to=context["selected_person_return"]', legacy_router)
+        self.assertIn("include_query_params(return_to=selected_return)", legacy_router)
         self.assertIn(
             'href="/marks/{{ selected_mark.id }}?return_to={{ selected_mark_return|urlencode }}"',
             legacy_template,

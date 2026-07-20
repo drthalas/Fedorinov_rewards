@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
-from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
 from .audit import log_action
 from .media_lifecycle import MediaCleanupResult, cleanup_unreferenced_image, discard_uncommitted_image
+from .media_filenames import write_collision_safe_media
 from .write_guard import ensure_write_allowed
 
 
@@ -35,26 +34,26 @@ class PhotoMutationResult:
 
 
 PERSON_PHOTO_FIELDS = (
-    PhotoField("person_foto", "Фото кавалера", "FotoPerson"),
-    PhotoField("main_foto", "Главное фото", "FotoMain"),
-    PhotoField("rewards_foto", "Общее фото наград", "FotoAllMedal"),
-    PhotoField("book1_foto", "Фото наградной книжки, сторона 1", "FotoBook1"),
-    PhotoField("book2_foto", "Фото наградной книжки, сторона 2", "FotoBook2"),
-    PhotoField("card1_foto", "Фото учётной карточки, страница 1", "FotoCard1"),
-    PhotoField("card2_foto", "Фото учётной карточки, страница 2", "FotoCard2"),
+    PhotoField("person_foto", "Фото кавалера", "фото_кавалера"),
+    PhotoField("main_foto", "Главное фото", "главное_фото"),
+    PhotoField("rewards_foto", "Общее фото наград", "фото_наград"),
+    PhotoField("book1_foto", "Фото наградной книжки, сторона 1", "наградная_книжка_1"),
+    PhotoField("book2_foto", "Фото наградной книжки, сторона 2", "наградная_книжка_2"),
+    PhotoField("card1_foto", "Фото учётной карточки, страница 1", "учётная_карточка_1"),
+    PhotoField("card2_foto", "Фото учётной карточки, страница 2", "учётная_карточка_2"),
 )
 REWARD_PHOTO_FIELDS = (
-    PhotoField("front_foto", "Фото награды: аверс", "FotoFront"),
-    PhotoField("back_foto", "Фото награды: реверс", "FotoBack"),
-    PhotoField("book1_foto", "Фото книжки, сторона 1", "FotoBook1"),
-    PhotoField("book2_foto", "Фото книжки, сторона 2", "FotoBook2"),
-    PhotoField("reward_list", "Наградной лист", "RewardList"),
+    PhotoField("front_foto", "Фото награды: аверс", "награда_аверс"),
+    PhotoField("back_foto", "Фото награды: реверс", "награда_реверс"),
+    PhotoField("book1_foto", "Фото книжки, сторона 1", "книжка_1"),
+    PhotoField("book2_foto", "Фото книжки, сторона 2", "книжка_2"),
+    PhotoField("reward_list", "Наградной лист", "наградной_лист"),
 )
 MARK_PHOTO_FIELDS = (
-    PhotoField("front_foto", "Фото знака: аверс", "FotoFront"),
-    PhotoField("back_foto", "Фото знака: реверс", "FotoBack"),
-    PhotoField("book1_foto", "Фото книжки, сторона 1", "FotoBook1"),
-    PhotoField("book2_foto", "Фото книжки, сторона 2", "FotoBook2"),
+    PhotoField("front_foto", "Фото знака: аверс", "знак_аверс"),
+    PhotoField("back_foto", "Фото знака: реверс", "знак_реверс"),
+    PhotoField("book1_foto", "Фото книжки, сторона 1", "книжка_1"),
+    PhotoField("book2_foto", "Фото книжки, сторона 2", "книжка_2"),
 )
 
 PHOTO_FIELDS = {
@@ -100,10 +99,6 @@ def _matches_image_signature(extension: str, content: bytes) -> bool:
     if extension == ".webp":
         return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
     return False
-
-
-def _timestamp() -> str:
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
 def _entity_row(connection, entity_type: str, entity_id: int):
@@ -187,12 +182,9 @@ def save_photo_with_result(
         old_path = current["photo_path"] if current is not None else None
         relative_dir = _relative_dir(entity_type, entity_id, row)
         target_dir = settings.rewards_data_dir / relative_dir
-        target_dir.mkdir(parents=True, exist_ok=True)
-        filename = f"{field.stem}_{_timestamp()}_{uuid4().hex}{extension}"
-        target_path = target_dir / filename
-        relative_path = (relative_dir / filename).as_posix()
         try:
-            target_path.write_bytes(content)
+            target_path = write_collision_safe_media(target_dir, field.stem, extension, content)
+            relative_path = (relative_dir / target_path.name).as_posix()
             connection.execute(f"update {table} set {field.field} = ? where id = ?", (relative_path, entity_id))
             connection.commit()
         except Exception:

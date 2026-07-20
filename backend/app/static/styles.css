@@ -7063,6 +7063,17 @@ body.legacy-rewards-theme::after {
   margin: 0;
 }
 
+.person-edit-form .field-error {
+  margin: 6px 0 0;
+  color: #9b1c1c;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.person-edit-form [aria-invalid="true"] {
+  border-color: #9b1c1c;
+}
+
 @media (max-width: 760px) {
   .guide-theme .guide-ranks-panel .guide-list li {
     grid-template-columns: minmax(0, 1fr) auto;

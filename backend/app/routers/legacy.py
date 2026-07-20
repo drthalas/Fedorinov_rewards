@@ -392,6 +392,54 @@ def _legacy_summary(db_path: Path) -> dict[str, object]:
     }
 
 
+def _populate_selected_person_context(
+    context: dict[str, object],
+    settings,
+    rewards_filters,
+    person_id: int,
+) -> None:
+    selected_person = get_person(settings.rewards_db_path, person_id)
+    if selected_person is None:
+        return
+    selected_person_rewards = list_person_rewards(settings.rewards_db_path, person_id)
+    selected_return = _legacy_rewards_url(rewards_filters, person_id)
+    selected_person["detail_url"] = str(
+        URL(path=f"/persons/{person_id}").include_query_params(return_to=selected_return)
+    )
+    selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
+    selected_person_additional_photos = person_folder_image_items(
+        settings,
+        person_id,
+        [photo.get("path") for photo in selected_person_photos],
+    )
+    selected_person_document_photos = _legacy_document_photo_items(
+        selected_person,
+        selected_person_additional_photos,
+    )
+    context.update(
+        {
+            "selected_person": selected_person,
+            "person_rewards": selected_person_rewards,
+            "selected_person_return": selected_return,
+            "selected_person_archive_filename": person_archive_filename(
+                str(selected_person.get("fio") or "person"),
+                person_id,
+            ),
+            "selected_person_photos": selected_person_photos,
+            "selected_person_document_photos": selected_person_document_photos,
+            "selected_person_additional_photos": selected_person_additional_photos,
+            "selected_person_full_photos": (
+                selected_person_photos
+                + selected_person_document_photos
+                + selected_person_additional_photos
+            ),
+        }
+    )
+    context["selected_person_available_photos"] = _unique_available_photo_items(
+        context["selected_person_full_photos"]
+    )
+
+
 @router.get("/legacy")
 def legacy_index(
     request: Request,
@@ -532,6 +580,15 @@ def legacy_index(
     if not settings.db_exists:
         return templates.TemplateResponse(request, "legacy.html", context)
 
+    partial_rewards_request = (
+        active_tab == "rewards"
+        and getattr(request, "headers", {}).get("x-requested-with", "").lower() == "xmlhttprequest"
+    )
+    if partial_rewards_request:
+        if person_id is not None:
+            _populate_selected_person_context(context, settings, rewards_filters, person_id)
+        return templates.TemplateResponse(request, "legacy.html", context)
+
     context["rewards_filter_options"] = legacy_rewards_filter_options(settings.rewards_db_path, rewards_filters)
     context["rewards_filter_cascade"] = legacy_rewards_filter_cascade(settings.rewards_db_path)
     persons = list_legacy_reward_persons(settings.rewards_db_path, rewards_filters)
@@ -551,30 +608,7 @@ def legacy_index(
     person_ids = {int(row["id"]) for row in persons}
     selected_person_id = person_id if person_id in person_ids else None
     if selected_person_id is not None:
-        selected_person = get_person(settings.rewards_db_path, selected_person_id)
-        context["selected_person"] = selected_person
-        selected_person_rewards = list_person_rewards(settings.rewards_db_path, selected_person_id)
-        context["person_rewards"] = selected_person_rewards
-        context["selected_person_return"] = _legacy_rewards_url(rewards_filters, selected_person_id)
-        if selected_person is not None:
-            selected_person["detail_url"] = str(
-                URL(path=f"/persons/{selected_person_id}").include_query_params(
-                    return_to=context["selected_person_return"]
-                )
-            )
-            context["selected_person_archive_filename"] = person_archive_filename(str(selected_person.get("fio") or "person"), selected_person_id)
-            selected_person_photos = _legacy_person_photo_items(selected_person, selected_person_rewards)
-            selected_person_additional_photos = person_folder_image_items(
-                settings,
-                selected_person_id,
-                [photo.get("path") for photo in selected_person_photos],
-            )
-            selected_person_document_photos = _legacy_document_photo_items(selected_person, selected_person_additional_photos)
-            context["selected_person_photos"] = selected_person_photos
-            context["selected_person_document_photos"] = selected_person_document_photos
-            context["selected_person_additional_photos"] = selected_person_additional_photos
-            context["selected_person_full_photos"] = selected_person_photos + selected_person_document_photos + selected_person_additional_photos
-            context["selected_person_available_photos"] = _unique_available_photo_items(context["selected_person_full_photos"])
+        _populate_selected_person_context(context, settings, rewards_filters, selected_person_id)
 
     selected_mark_id = (mark_id or (int(marks[0]["id"]) if marks else None)) if active_tab == "marks" else None
     if selected_mark_id is not None:

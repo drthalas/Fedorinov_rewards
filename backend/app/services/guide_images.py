@@ -1,8 +1,8 @@
 from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote
-from uuid import uuid4
 
 from ..config import Settings
+from .media_filenames import readable_media_stem, write_collision_safe_media
 from .write_guard import ensure_write_allowed
 
 
@@ -61,11 +61,10 @@ def save_guide_image(settings: Settings, filename: str, content: bytes) -> str:
         raise GuideImageValidationError("Файл не является корректным изображением выбранного типа.")
 
     root = settings.guide_images_dir.resolve()
-    root.mkdir(parents=True, exist_ok=True)
-    target = (root / f"guide_{uuid4().hex}{extension}").resolve()
+    source_stem = readable_media_stem(Path(filename).stem, fallback="изображение_справочника")
+    target = write_collision_safe_media(root, source_stem, extension, content).resolve()
     try:
         target.relative_to(root)
     except ValueError as exc:
         raise GuideImageValidationError("Недопустимый путь изображения.") from exc
-    target.write_bytes(content)
     return normalize_guide_image_path(f"{GUIDE_IMAGE_ROOT}/{target.name}")

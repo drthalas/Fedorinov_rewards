@@ -178,6 +178,7 @@ class GuideItemMediaTests(unittest.TestCase):
 
     def test_image_save_tree_display_clear_and_physical_delete(self) -> None:
         image_path = save_guide_image(self.settings(), "award.png", PNG_BYTES)
+        self.assertEqual(image_path, "GuideImages/award.png")
         image_file = self.root / image_path
         self.assertTrue(image_file.is_file())
 
@@ -205,6 +206,15 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertEqual(cleanup.status, "deleted")
         self.assertFalse(image_file.exists())
         self.assertIsNone(get_guide_level_item(self.db_path, 0, item_id)["image_path"])
+
+    def test_guide_image_collision_uses_short_numeric_suffix(self) -> None:
+        first = save_guide_image(self.settings(), "Кириллическое имя.png", PNG_BYTES)
+        second = save_guide_image(self.settings(), "Кириллическое имя.png", PNG_BYTES)
+
+        self.assertEqual(first, "GuideImages/Кириллическое_имя.png")
+        self.assertEqual(second, "GuideImages/Кириллическое_имя_2.png")
+        self.assertTrue((self.root / first).is_file())
+        self.assertTrue((self.root / second).is_file())
 
     def test_router_add_replace_and_delete_image_on_temp_database(self) -> None:
         create_upload = UploadFile(file=BytesIO(PNG_BYTES), filename="award.png")

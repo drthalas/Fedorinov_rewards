@@ -57,17 +57,26 @@
     if (!nextLayout || !currentLayout) {
       throw new Error("Rewards layout was not found in response.");
     }
-    currentLayout.replaceWith(nextLayout);
-    document.dispatchEvent(new CustomEvent("legacy:content-updated", { detail: { root: nextLayout } }));
-    const nextList = nextLayout.querySelector("[data-person-list]");
-    if (nextList && Number.isFinite(listScrollTop)) {
-      nextList.scrollTop = Math.max(0, listScrollTop);
-      nextList.dataset.scrollRestored = "true";
+    const nextWorkspace = nextLayout.querySelector("[data-legacy-person-workspace]");
+    const currentWorkspace = currentLayout.querySelector("[data-legacy-person-workspace]");
+    const nextToolbar = nextLayout.querySelector(".legacy-toolbar");
+    const currentToolbar = currentLayout.querySelector(".legacy-toolbar");
+    const nextMain = nextLayout.querySelector(".legacy-main");
+    const currentMain = currentLayout.querySelector(".legacy-main");
+    if (!nextWorkspace || !currentWorkspace || !nextToolbar || !currentToolbar || !nextMain || !currentMain) {
+      throw new Error("Rewards card fragment was not found in response.");
     }
-    initLegacyRewards(nextLayout);
+    currentWorkspace.replaceWith(nextWorkspace);
+    currentToolbar.replaceWith(nextToolbar);
+    currentMain.className = nextMain.className;
+    const currentList = currentLayout.querySelector("[data-person-list]");
+    if (currentList && Number.isFinite(listScrollTop)) {
+      currentList.scrollTop = Math.max(0, listScrollTop);
+    }
+    document.dispatchEvent(new CustomEvent("legacy:content-updated", { detail: { root: currentLayout } }));
     if (focusList) {
-      if (nextList) {
-        nextList.focus({ preventScroll: true });
+      if (currentList) {
+        currentList.focus({ preventScroll: true });
       }
     }
   };
@@ -115,6 +124,7 @@
       if (settings.updateHistory !== false) {
         window.history.pushState({ legacyRewardsUrl: url }, "", url);
       }
+      restoreSelectionFromLocation();
     } catch (error) {
       if (error && error.name === "AbortError" && !timedOut) {
         return;

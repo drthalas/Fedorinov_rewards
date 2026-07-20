@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from datetime import date
 import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
+
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse, Response
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -126,6 +128,8 @@ def person_new(request: Request, return_to: str = ""):
             "return_to": safe_return_to(return_to),
             "error": None,
             "created_message": "",
+            "birth_year_max": date.today().year,
+            "field_errors": {},
         },
     )
 
@@ -154,6 +158,8 @@ async def person_create(request: Request):
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",
+                "birth_year_max": date.today().year,
+                "field_errors": {exc.field: str(exc)} if exc.field else {},
             },
             status_code=400,
         )
@@ -288,6 +294,8 @@ def person_edit(request: Request, person_id: int, return_to: str = "", created: 
             "return_to": safe_return_to(return_to),
             "error": None,
             "created_message": "Кавалер создан. Теперь можно добавить фотографии и документы." if created == "1" else "",
+            "birth_year_max": date.today().year,
+            "field_errors": {},
         },
     )
 
@@ -298,7 +306,10 @@ async def person_update(request: Request, person_id: int):
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
     try:
-        data = person_data_from_mapping(form_values)
+        existing_person = get_person(settings.rewards_db_path, person_id)
+        if existing_person is None:
+            raise PersonValidationError("Награжденный не найден.")
+        data = person_data_from_mapping(form_values, existing_birthday=existing_person.get("birthday"))
         update_person(settings, person_id, data)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
@@ -317,6 +328,8 @@ async def person_update(request: Request, person_id: int):
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",
+                "birth_year_max": date.today().year,
+                "field_errors": {exc.field: str(exc)} if exc.field else {},
             },
             status_code=400,
         )
@@ -369,8 +382,12 @@ async def person_open_folder(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}"
+    if get_person(settings.rewards_db_path, person_id) is None:
+        raise HTTPException(status_code=404, detail="Награжденный не найден.")
     try:
         open_person_folder(settings, person_id)
+    except WriteBlockedError as exc:
+        raise _write_error(exc) from exc
     except PersonFilesError:
         return RedirectResponse(with_status(return_to, "folder_missing"), status_code=303)
     return RedirectResponse(with_status(return_to, "folder_opened"), status_code=303)

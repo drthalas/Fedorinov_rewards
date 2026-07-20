@@ -71,6 +71,8 @@ class ReturnNavigationTests(unittest.TestCase):
     def _create_db(self) -> None:
         connection = sqlite3.connect(self.db_path)
         try:
+            connection.execute("create table guide (id integer primary key, name text)")
+            connection.execute("insert into guide (id, name) values (1, 'Test Rank')")
             connection.execute(
                 """
                 create table person (

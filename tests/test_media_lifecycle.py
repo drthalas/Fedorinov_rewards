@@ -187,7 +187,7 @@ class MediaLifecycleTests(unittest.TestCase):
             save_photo_with_result(self.settings(), "person", 1, "person_foto", "new.png", PNG_BYTES)
         self.assertEqual(self._value("person", 1, "person_foto"), old_path)
         self.assertTrue(old_file.is_file())
-        created = list((self.root / "Source" / "1").glob("FotoPerson_*.png"))
+        created = list((self.root / "Source" / "1").glob("фото_кавалера*.png"))
         self.assertEqual(created, [])
 
     def test_file_write_failure_keeps_old_reference(self) -> None:
@@ -195,7 +195,7 @@ class MediaLifecycleTests(unittest.TestCase):
         old_file = self._write_media(old_path)
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("update person set person_foto = ? where id = 1", (old_path,))
-        with patch("pathlib.Path.write_bytes", side_effect=PermissionError("read only")):
+        with patch("backend.app.services.media_filenames.Path.open", side_effect=PermissionError("read only")):
             with self.assertRaises(PermissionError):
                 save_photo_with_result(self.settings(), "person", 1, "person_foto", "new.png", PNG_BYTES)
         self.assertEqual(self._value("person", 1, "person_foto"), old_path)

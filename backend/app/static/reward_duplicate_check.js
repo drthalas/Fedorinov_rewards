@@ -48,12 +48,20 @@
 
     let timer = 0;
     let requestToken = 0;
+    const editing = Boolean(form.dataset.currentRewardId);
+    const initialNumber = String(numberInput.value || "").trim();
+    let numberChanged = false;
 
     function scheduleCheck() {
       window.clearTimeout(timer);
       const token = ++requestToken;
       const number = String(numberInput.value || "").trim();
       const nameId = String(nameSelect.value || "").trim();
+      if (editing && (!numberChanged || number === initialNumber)) {
+        numberChanged = false;
+        setStatus(status, "neutral", "");
+        return;
+      }
       if (!number) {
         setStatus(status, "neutral", "");
         return;
@@ -94,9 +102,16 @@
       }, DEBOUNCE_MS);
     }
 
-    numberInput.addEventListener("input", scheduleCheck);
-    nameSelect.addEventListener("change", scheduleCheck);
-    scheduleCheck();
+    numberInput.addEventListener("input", () => {
+      numberChanged = String(numberInput.value || "").trim() !== initialNumber;
+      scheduleCheck();
+    });
+    nameSelect.addEventListener("change", () => {
+      if (!editing || numberChanged) {
+        scheduleCheck();
+      }
+    });
+    setStatus(status, "neutral", "");
   }
 
   function initAll(root) {

@@ -14,6 +14,7 @@ from backend.app.services.person_files import (
     person_folder_image_items,
     safe_person_folder,
 )
+from backend.app.services.media_filenames import readable_media_stem, write_collision_safe_media
 from backend.app.services.photos import PhotoValidationError, clear_photo, photo_items, save_photo
 from backend.app.services.write_guard import WriteBlockedError
 
@@ -96,8 +97,7 @@ class PhotoManagementTests(unittest.TestCase):
 
     def test_person_photo_upload_and_clear(self) -> None:
         path = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
-        self.assertTrue(path.startswith("Source/1/FotoPerson_"))
-        self.assertTrue(path.endswith(".jpg"))
+        self.assertEqual(path, "Source/1/фото_кавалера.jpg")
         self.assertEqual(self.fetch_value("person", 1, "person_foto"), path)
         target = self.root / path
         self.assertTrue(target.exists())
@@ -108,8 +108,7 @@ class PhotoManagementTests(unittest.TestCase):
 
     def test_clipboard_jpeg_upload_saves_jpg_path(self) -> None:
         path = save_photo(self.settings(), "person", 1, "person_foto", "clipboard.jpg", JPEG_BYTES)
-        self.assertTrue(path.startswith("Source/1/FotoPerson_"))
-        self.assertTrue(path.endswith(".jpg"))
+        self.assertEqual(path, "Source/1/фото_кавалера.jpg")
         target = self.root / path
         self.assertTrue(target.exists())
         self.assertEqual(target.read_bytes(), JPEG_BYTES)
@@ -118,9 +117,8 @@ class PhotoManagementTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("update person set main_foto = ? where id = 1", ("Source/1/neighbor.jpg",))
 
-        with patch("backend.app.services.photos._timestamp", side_effect=["20260712_120000", "20260712_120001"]):
-            first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
-            replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.png", PNG_BYTES)
+        first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
+        replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.png", PNG_BYTES)
 
         self.assertNotEqual(first, replacement)
         self.assertEqual(self.fetch_value("person", 1, "person_foto"), replacement)
@@ -138,10 +136,18 @@ class PhotoManagementTests(unittest.TestCase):
         self.assertEqual(self.fetch_value("person", 1, "main_foto"), "Source/1/neighbor.jpg")
         self.assertFalse((self.root / replacement).exists())
 
+    def test_same_extension_replacement_uses_short_collision_suffix(self) -> None:
+        first = save_photo(self.settings(), "person", 1, "person_foto", "portrait.jpg", JPEG_BYTES)
+        replacement = save_photo(self.settings(), "person", 1, "person_foto", "replacement.jpg", JPEG_BYTES + b"-2")
+
+        self.assertEqual(first, "Source/1/фото_кавалера.jpg")
+        self.assertEqual(replacement, "Source/1/фото_кавалера_2.jpg")
+        self.assertFalse((self.root / first).exists())
+        self.assertEqual((self.root / replacement).read_bytes(), JPEG_BYTES + b"-2")
+
     def test_reward_photo_upload_uses_person_reward_folder(self) -> None:
         path = save_photo(self.settings(), "reward", 10, "front_foto", "front.png", PNG_BYTES)
-        self.assertTrue(path.startswith("Source/1/10/FotoFront_"))
-        self.assertTrue(path.endswith(".png"))
+        self.assertEqual(path, "Source/1/10/награда_аверс.png")
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), path)
         self.assertTrue((self.root / path).exists())
 
@@ -149,9 +155,8 @@ class PhotoManagementTests(unittest.TestCase):
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("update rewards set back_foto = ? where id = 10", ("Source/1/10/neighbor.jpg",))
 
-        with patch("backend.app.services.photos._timestamp", side_effect=["20260715_120000", "20260715_120001"]):
-            first = save_photo(self.settings(), "reward", 10, "front_foto", "front.jpg", JPEG_BYTES)
-            replacement = save_photo(self.settings(), "reward", 10, "front_foto", "replacement.webp", WEBP_BYTES)
+        first = save_photo(self.settings(), "reward", 10, "front_foto", "front.jpg", JPEG_BYTES)
+        replacement = save_photo(self.settings(), "reward", 10, "front_foto", "replacement.webp", WEBP_BYTES)
 
         self.assertNotEqual(first, replacement)
         self.assertEqual(self.fetch_value("rewards", 10, "front_foto"), replacement)
@@ -166,7 +171,7 @@ class PhotoManagementTests(unittest.TestCase):
 
     def test_mark_photo_upload_uses_source_mark_folder(self) -> None:
         path = save_photo(self.settings(), "mark", 20, "back_foto", "back.webp", WEBP_BYTES)
-        self.assertTrue(path.startswith("SourceMark/20/FotoBack_"))
+        self.assertEqual(path, "SourceMark/20/знак_реверс.webp")
         self.assertEqual(self.fetch_value("mark", 20, "back_foto"), path)
         self.assertTrue((self.root / path).exists())
 
@@ -193,9 +198,37 @@ class PhotoManagementTests(unittest.TestCase):
         with self.assertRaises(PersonFilesError):
             safe_person_folder(self.settings(), -1)
 
-    def test_person_folder_missing_is_handled(self) -> None:
-        with self.assertRaises(PersonFilesError):
-            open_person_folder(self.settings(), 1, opener=lambda path: None)
+    def test_person_folder_missing_is_created_lazily(self) -> None:
+        opened: list[Path] = []
+        folder = open_person_folder(self.settings(), 1, opener=opened.append)
+        self.assertTrue(folder.is_dir())
+        self.assertEqual(opened, [folder])
+
+    def test_read_only_open_allows_existing_folder_but_not_lazy_creation(self) -> None:
+        opened: list[Path] = []
+        with self.assertRaises(WriteBlockedError):
+            open_person_folder(self.settings(write_mode=False), 1, opener=opened.append)
+        self.assertFalse((self.root / "Source" / "1").exists())
+
+        folder = self.root / "Source" / "1"
+        folder.mkdir(parents=True)
+        open_person_folder(self.settings(write_mode=False), 1, opener=opened.append)
+        self.assertEqual(opened, [folder.resolve()])
+
+    def test_media_filename_is_windows_safe_and_partial_write_is_removed(self) -> None:
+        self.assertEqual(readable_media_stem("CON"), "_CON")
+        target_dir = self.root / "Source" / "1"
+        original_open = Path.open
+
+        def partial_write(path: Path, *_args, **_kwargs):
+            with original_open(path, "xb") as handle:
+                handle.write(b"partial")
+            raise OSError("disk full")
+
+        with patch.object(Path, "open", autospec=True, side_effect=partial_write):
+            with self.assertRaises(OSError):
+                write_collision_safe_media(target_dir, "фото", ".jpg", JPEG_BYTES)
+        self.assertEqual(list(target_dir.iterdir()), [])
 
     def test_person_folder_open_uses_injected_opener(self) -> None:
         folder = self.root / "Source" / "1"
