@@ -29,11 +29,9 @@ Linear важен для процесса, но не является единс
 ```text
 READ_ONLY=false
 WRITE_MODE=true
-REQUIRE_BACKUP_BEFORE_WRITE=false
-REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 ```
 
-Обычные операции доступны без mandatory backup перед каждым сохранением:
+Обычные операции доступны сразу после запуска:
 
 - создать или изменить кавалера;
 - создать или изменить награду;
@@ -42,7 +40,7 @@ REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 - добавить, заменить или отвязать фото;
 - изменить биографию, комментарии, ссылки, номера и цены.
 
-Опасные действия остаются с подтверждением и защитой:
+Опасные действия остаются с подтверждением, точным preflight и защитой ссылок:
 
 - delete person;
 - delete reward;

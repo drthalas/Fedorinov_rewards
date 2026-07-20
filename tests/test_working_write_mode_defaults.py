@@ -1,7 +1,9 @@
 from pathlib import Path
+import os
 import unittest
+from unittest.mock import patch
 
-from backend.app.config import Settings
+from backend.app.config import Settings, get_settings
 from backend.app.services.write_guard import WriteBlockedError, ensure_dangerous_action_allowed, ensure_write_allowed
 from backend.app.version import APP_VERSION
 
@@ -14,8 +16,8 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
         text = (ROOT / ".env.windows.example").read_text(encoding="utf-8")
         self.assertIn("READ_ONLY=false", text)
         self.assertIn("WRITE_MODE=true", text)
-        self.assertIn("REQUIRE_BACKUP_BEFORE_WRITE=false", text)
-        self.assertIn("REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true", text)
+        self.assertNotIn("REQUIRE_BACKUP_BEFORE_WRITE", text)
+        self.assertNotIn("REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS", text)
         self.assertIn("UPDATE_CHECK_ENABLED=true", text)
 
     def test_write_guard_blocks_when_write_mode_false(self) -> None:
@@ -24,7 +26,6 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
             read_only=False,
             write_mode=False,
-            require_backup_before_write=False,
         )
         with self.assertRaises(WriteBlockedError):
             ensure_write_allowed(settings)
@@ -35,41 +36,35 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
             read_only=True,
             write_mode=True,
-            require_backup_before_write=False,
         )
         with self.assertRaises(WriteBlockedError):
             ensure_write_allowed(settings)
 
-    def test_ordinary_write_allowed_without_mandatory_backup(self) -> None:
+    def test_default_settings_allow_write_and_delete(self) -> None:
         settings = Settings(
             rewards_data_dir=Path("/tmp/rewards"),
             rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
-            read_only=False,
-            write_mode=True,
-            require_backup_before_write=False,
         )
         ensure_write_allowed(settings)
-
-    def test_dangerous_action_allowed_without_mandatory_backup_when_dangerous_backup_disabled(self) -> None:
-        settings = Settings(
-            rewards_data_dir=Path("/tmp/rewards"),
-            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
-            read_only=False,
-            write_mode=True,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
-        )
         ensure_dangerous_action_allowed(settings)
 
-    def test_dangerous_action_allowed_when_mandatory_write_backup_disabled(self) -> None:
-        settings = Settings(
-            rewards_data_dir=Path("/tmp/rewards"),
-            rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
-            read_only=False,
-            write_mode=True,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=True,
-        )
+    def test_legacy_backup_environment_cannot_restore_a_write_gate(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "REWARDS_DATA_DIR": "/tmp/rewards",
+                "REWARDS_DB_PATH": "/tmp/rewards/database/MyDatabase.sqlite",
+                "READ_ONLY": "false",
+                "WRITE_MODE": "true",
+                "REQUIRE_BACKUP_BEFORE_WRITE": "true",
+                "REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS": "true",
+            },
+            clear=False,
+        ):
+            settings = get_settings()
+        self.assertFalse(settings.read_only)
+        self.assertTrue(settings.write_mode)
+        ensure_write_allowed(settings)
         ensure_dangerous_action_allowed(settings)
 
     def test_dangerous_action_still_respects_read_only_and_write_mode(self) -> None:
@@ -78,26 +73,26 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
             read_only=True,
             write_mode=True,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
         write_off = Settings(
             rewards_data_dir=Path("/tmp/rewards"),
             rewards_db_path=Path("/tmp/rewards/database/MyDatabase.sqlite"),
             read_only=False,
             write_mode=False,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
         with self.assertRaises(WriteBlockedError):
             ensure_dangerous_action_allowed(read_only)
         with self.assertRaises(WriteBlockedError):
             ensure_dangerous_action_allowed(write_off)
 
-    def test_no_old_english_backup_message_in_user_templates(self) -> None:
-        for relative in ["backend/app/templates/base.html", "backend/app/templates/legacy.html", "HELP_RU.md"]:
+    def test_no_backup_gate_message_in_user_surfaces(self) -> None:
+        for relative in ["backend/app/templates/base.html", "backend/app/templates/legacy.html", "HELP_RU.md", "README.md"]:
             self.assertNotIn(
                 "Create a fresh backup before making changes",
+                (ROOT / relative).read_text(encoding="utf-8"),
+            )
+            self.assertNotIn(
+                "Перед этим действием нужно создать резервную копию.",
                 (ROOT / relative).read_text(encoding="utf-8"),
             )
 

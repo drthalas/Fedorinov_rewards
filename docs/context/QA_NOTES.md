@@ -98,13 +98,13 @@ git diff --check
 Smoke backend:
 
 ```sh
-WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
+WRITE_MODE=true READ_ONLY=false REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
 ```
 
 Если порт 8080 занят:
 
 ```sh
-APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REQUIRE_BACKUP_BEFORE_WRITE=false REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
+APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards scripts/run_dev.sh
 ```
 
 ## Known limitations

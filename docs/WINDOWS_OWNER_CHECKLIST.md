@@ -18,15 +18,12 @@
 ## Безопасность данных
 
 - [ ] База и фотографии находятся вне папки приложения.
-- [ ] Backup сделан перед любыми write-тестами.
-- [ ] Backup location: ______________________________
-- [ ] Backup проверен и читается.
+- [ ] При необходимости есть отдельная резервная копия данных.
 
 ## Режим запуска
 
 - [ ] Read-only preview: `READ_ONLY=true`, `WRITE_MODE=false`.
-- [ ] Write test only after backup: `READ_ONLY=false`, `WRITE_MODE=true`.
-- [ ] После write-теста режим возвращен в read-only.
+- [ ] Рабочий режим: `READ_ONLY=false`, `WRITE_MODE=true`.
 
 ## Проверка preview
 

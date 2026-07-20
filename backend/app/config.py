@@ -15,10 +15,8 @@ class Settings(BaseModel):
     rewards_db_path: Path
     app_host: str = "127.0.0.1"
     app_port: int = 8080
-    read_only: bool = True
-    write_mode: bool = False
-    require_backup_before_write: bool = True
-    require_backup_before_dangerous_actions: bool = True
+    read_only: bool = False
+    write_mode: bool = True
     update_check_enabled: bool = True
     update_manifest_url: str = "https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json"
     update_timeout_seconds: int = 10
@@ -111,10 +109,8 @@ def get_settings() -> Settings:
         rewards_db_path=db_path,
         app_host=os.getenv("APP_HOST", "127.0.0.1"),
         app_port=_env_int("APP_PORT", "8080"),
-        read_only=_env_bool("READ_ONLY", "true"),
-        write_mode=_env_bool("WRITE_MODE", "false"),
-        require_backup_before_write=_env_bool("REQUIRE_BACKUP_BEFORE_WRITE", "true"),
-        require_backup_before_dangerous_actions=_env_bool("REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS", "true"),
+        read_only=_env_bool("READ_ONLY", "false"),
+        write_mode=_env_bool("WRITE_MODE", "true"),
         update_check_enabled=_env_bool("UPDATE_CHECK_ENABLED", "true"),
         update_manifest_url=os.getenv(
             "UPDATE_MANIFEST_URL",

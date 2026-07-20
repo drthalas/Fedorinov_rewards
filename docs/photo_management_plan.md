@@ -42,7 +42,7 @@ Mark fields:
 
 ## Upload / Replace
 
-Photo upload is available only when `WRITE_MODE=true`. In the working preview defaults, ordinary photo upload does not require a fresh backup before every save because `REQUIRE_BACKUP_BEFORE_WRITE=false`; regular backups are still recommended before serious work.
+Photo upload is available when `WRITE_MODE=true`. In the working defaults it is available immediately; regular backups are still recommended before serious work.
 
 The upload endpoint accepts only approved entity types and photo fields. It accepts image files with these extensions:
 

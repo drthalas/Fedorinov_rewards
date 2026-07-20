@@ -35,8 +35,6 @@ class PersonWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=not write_mode,
             write_mode=write_mode,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
 
     def person_data(self, fio: str = "Test Person", **overrides) -> PersonWriteData:
@@ -92,17 +90,15 @@ class PersonWriteTests(unittest.TestCase):
         with self.assertRaises(WriteBlockedError):
             delete_person(settings, 1, confirm=True)
 
-    def test_missing_backup_blocks_create_when_required(self) -> None:
+    def test_writable_settings_create_without_backup_marker(self) -> None:
         settings = Settings(
             rewards_data_dir=self.root,
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=True,
-            require_backup_before_dangerous_actions=False,
         )
-        with self.assertRaises(WriteBlockedError):
-            create_person(settings, self.person_data("Needs backup"))
+        person_id = create_person(settings, self.person_data("Writable by default"))
+        self.assertIsNotNone(self.fetch_person(person_id))
 
     def test_read_only_blocks_create_even_when_write_mode_true(self) -> None:
         settings = Settings(
@@ -110,12 +106,11 @@ class PersonWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=True,
             write_mode=True,
-            require_backup_before_write=False,
         )
         with self.assertRaises(WriteBlockedError):
             create_person(settings, self.person_data("Read only"))
 
-    def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
+    def test_dangerous_delete_uses_confirmation_not_backup_marker(self) -> None:
         settings = self.settings()
         person_id = create_person(settings, self.person_data("Dangerous delete"))
         dangerous_settings = Settings(
@@ -123,14 +118,11 @@ class PersonWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=True,
-            require_backup_before_dangerous_actions=True,
         )
-        with self.assertRaises(WriteBlockedError):
-            delete_person(dangerous_settings, person_id, confirm=True)
-        self.assertIsNotNone(self.fetch_person(person_id))
+        delete_person(dangerous_settings, person_id, confirm=True)
+        self.assertIsNone(self.fetch_person(person_id))
 
-    def test_delete_person_with_confirm_works_without_mandatory_backup(self) -> None:
+    def test_delete_person_with_confirm_works(self) -> None:
         person_id = create_person(self.settings(), self.person_data("Delete without backup"))
         delete_person(self.settings(), person_id, confirm=True)
         self.assertIsNone(self.fetch_person(person_id))

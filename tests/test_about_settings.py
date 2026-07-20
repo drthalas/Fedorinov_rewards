@@ -37,8 +37,6 @@ class AboutSettingsTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=not write_mode,
             write_mode=write_mode,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
 
     def test_program_title_defaults_to_app_name_and_saves(self) -> None:

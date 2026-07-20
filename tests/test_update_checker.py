@@ -21,8 +21,6 @@ def _settings(**overrides) -> Settings:
         "rewards_db_path": Path("/tmp/rewards/database/MyDatabase.sqlite"),
         "read_only": True,
         "write_mode": False,
-        "require_backup_before_write": True,
-        "require_backup_before_dangerous_actions": True,
         "update_check_enabled": True,
         "update_manifest_url": "https://example.test/latest.json",
         "update_timeout_seconds": 10,

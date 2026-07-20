@@ -239,11 +239,9 @@ After owner QA passed, the Windows preview defaults to working edit mode:
 ```sh
 READ_ONLY=false
 WRITE_MODE=true
-REQUIRE_BACKUP_BEFORE_WRITE=false
-REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 ```
 
-Ordinary create/update operations, guide edits, photo upload/unlink, biography, links, prices, and numbers can be saved without creating a backup before every action. Dangerous actions such as deletes and migrations remain separately protected with confirmation and backup-sensitive guards. Make regular backups before serious work:
+Create, edit, photo upload/unlink, biography, links, prices, numbers, and delete operations are available immediately. Deletes remain separately protected by explicit confirmation and reference-safety checks. Make regular backups before serious work:
 
 ```sh
 REWARDS_DATA_DIR=/Users/hermes/LocalData/FedorinovRewards/Rewards python3 scripts/backup_dev_data.py
@@ -274,7 +272,7 @@ Current development write-mode CRUD:
 - Browser clipboard paste is available in write mode through the same guarded upload pipeline. If the browser does not expose image clipboard access on localhost, use the `+` file upload button.
 - The legacy rewards screen can open the selected person's local `Source/{person_id}` folder and create a ZIP archive of that folder after the user selects a save path. Source files are not deleted.
 
-Photo upload/clear remains behind `WRITE_MODE=true`. With the working preview defaults, these ordinary photo operations do not require a fresh backup before every save, but regular backups are still recommended.
+Photo upload/clear remains behind `WRITE_MODE=true` and is available immediately with the working defaults. Regular backups are still recommended.
 
 Guide deletes are protected: ranks used by person cards cannot be deleted, and tree nodes cannot be deleted while they have child nodes or are referenced by rewards/marks. Person, reward, and mark forms include links back to the guide page so new guide values can be managed before returning to the edit flow.
 
@@ -410,13 +408,11 @@ Windows preview defaults are now the working preview mode:
 ```text
 READ_ONLY=false
 WRITE_MODE=true
-REQUIRE_BACKUP_BEFORE_WRITE=false
-REQUIRE_BACKUP_BEFORE_DANGEROUS_ACTIONS=true
 APP_HOST=127.0.0.1
 APP_PORT=8080
 ```
 
-Ordinary editing is enabled without requiring a fresh backup before every save. Dangerous actions such as deletes remain protected by confirmation and backup-sensitive guards. Make regular backups before serious work. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.
+Ordinary editing and media changes are enabled immediately. Deletes remain protected by confirmation and reference-safety checks. Make regular backups before serious work. To disable editing in local `.env`, set `READ_ONLY=true` and `WRITE_MODE=false`.
 
 ## Daily Telegram Reports
 

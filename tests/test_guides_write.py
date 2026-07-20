@@ -41,8 +41,6 @@ class GuideWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=not write_mode,
             write_mode=write_mode,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
 
     def _create_db(self) -> None:
@@ -156,7 +154,7 @@ class GuideWriteTests(unittest.TestCase):
         self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
         self.assertIsNotNone(self.fetch_one("guide_lev_0", item_id))
 
-    def test_delete_guide_level_with_confirm_works_without_mandatory_backup(self) -> None:
+    def test_delete_guide_level_with_confirm_works(self) -> None:
         item_id = create_guide_level_item(self.settings(), GuideLevelData(level=0, name="Delete no backup", parent_id=-1))
         delete_guide_level_item(self.settings(), 0, item_id, confirm=True)
         self.assertIsNone(self.fetch_one("guide_lev_0", item_id))

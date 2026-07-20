@@ -47,7 +47,6 @@ class Ale256ArchiveTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=False,
         )
         self._create_db()
         self._create_materials()

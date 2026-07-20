@@ -94,8 +94,6 @@ class Ale300DeletePreviewTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
         self._create_db()
         reset_delete_preflight_registry()

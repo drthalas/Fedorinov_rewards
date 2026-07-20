@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from contextlib import closing
 from dataclasses import dataclass
-from datetime import datetime, timedelta
 from pathlib import Path
 import argparse
 import os
@@ -23,7 +22,6 @@ class MigrationSettings:
     rewards_data_dir: Path
     rewards_db_path: Path
     write_mode: bool
-    require_backup_before_write: bool
 
 
 def _load_local_env() -> None:
@@ -52,8 +50,7 @@ def _settings() -> MigrationSettings:
     return MigrationSettings(
         rewards_data_dir=data_dir,
         rewards_db_path=db_path,
-        write_mode=os.getenv("WRITE_MODE", "false").lower() == "true",
-        require_backup_before_write=os.getenv("REQUIRE_BACKUP_BEFORE_WRITE", "true").lower() == "true",
+        write_mode=os.getenv("WRITE_MODE", "true").lower() == "true",
     )
 
 
@@ -72,23 +69,9 @@ def _open_write(db_path: Path) -> sqlite3.Connection:
     return connection
 
 
-def _backup_dir_for_data_root(data_dir: Path) -> Path:
-    return data_dir.expanduser().resolve().parent / "backups"
-
-
-def _recent_backup_exists(data_dir: Path, max_age_hours: int = 24) -> bool:
-    backup_dir = _backup_dir_for_data_root(data_dir)
-    if not backup_dir.exists() or not backup_dir.is_dir():
-        return False
-    cutoff = datetime.now().timestamp() - timedelta(hours=max_age_hours).total_seconds()
-    return any(path.is_file() and path.stat().st_mtime >= cutoff for path in backup_dir.glob("Rewards_backup_*.zip"))
-
-
 def _ensure_write_allowed(settings: MigrationSettings) -> None:
     if not settings.write_mode:
         raise MigrationBlockedError("Редактирование выключено.")
-    if settings.require_backup_before_write and not _recent_backup_exists(settings.rewards_data_dir):
-        raise MigrationBlockedError("Перед миграцией нужно создать резервную копию.")
 
 
 def biography_column_exists(db_path: Path) -> bool:
@@ -121,7 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Add person.biography column safely.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--dry-run", action="store_true", help="Show migration status without changing SQLite.")
-    group.add_argument("--apply", action="store_true", help="Apply migration. Requires write mode and backup.")
+    group.add_argument("--apply", action="store_true", help="Apply migration. Requires write mode.")
     args = parser.parse_args(argv)
 
     try:

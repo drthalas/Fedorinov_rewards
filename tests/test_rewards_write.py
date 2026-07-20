@@ -35,8 +35,6 @@ class RewardWriteTests(unittest.TestCase):
             rewards_db_path=self.db_path,
             read_only=not write_mode,
             write_mode=write_mode,
-            require_backup_before_write=False,
-            require_backup_before_dangerous_actions=False,
         )
 
     def reward_data(self, **overrides) -> RewardWriteData:
@@ -159,7 +157,7 @@ class RewardWriteTests(unittest.TestCase):
         self.assertIsNone(self.fetch_reward(reward_id))
         self.assertFalse(media_dir.exists())
 
-    def test_delete_reward_with_confirm_works_without_mandatory_backup(self) -> None:
+    def test_delete_reward_with_confirm_works(self) -> None:
         reward_id = create_reward(self.settings(), 1, self.reward_data(number=101))
         delete_reward(self.settings(), reward_id, confirm=True)
         self.assertIsNone(self.fetch_reward(reward_id))
@@ -171,19 +169,16 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(str(blocked.exception), "Действие требует подтверждения.")
         self.assertIsNotNone(self.fetch_reward(reward_id))
 
-    def test_dangerous_delete_requires_backup_when_enabled(self) -> None:
+    def test_dangerous_delete_uses_confirmation_not_backup_marker(self) -> None:
         reward_id = create_reward(self.settings(), 1, self.reward_data(number=103))
         settings = Settings(
             rewards_data_dir=self.root,
             rewards_db_path=self.db_path,
             read_only=False,
             write_mode=True,
-            require_backup_before_write=True,
-            require_backup_before_dangerous_actions=True,
         )
-        with self.assertRaises(WriteBlockedError):
-            delete_reward(settings, reward_id, confirm=True)
-        self.assertIsNotNone(self.fetch_reward(reward_id))
+        delete_reward(settings, reward_id, confirm=True)
+        self.assertIsNone(self.fetch_reward(reward_id))
 
     def test_sql_handles_quotes_and_text(self) -> None:
         text = "Link 'single' and \"double\""

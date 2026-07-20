@@ -22,7 +22,6 @@ class PersonBiographyTests(unittest.TestCase):
         os.environ["REWARDS_DB_PATH"] = str(self.db_path)
         os.environ["READ_ONLY"] = "false"
         os.environ["WRITE_MODE"] = "true"
-        os.environ["REQUIRE_BACKUP_BEFORE_WRITE"] = "false"
         os.environ["REWARDS_AUDIT_LOG"] = str(self.root / "logs" / "audit.log")
 
     def tearDown(self) -> None:
@@ -40,7 +39,6 @@ class PersonBiographyTests(unittest.TestCase):
             "REWARDS_DB_PATH",
             "READ_ONLY",
             "WRITE_MODE",
-            "REQUIRE_BACKUP_BEFORE_WRITE",
             "REWARDS_AUDIT_LOG",
         ]
 
