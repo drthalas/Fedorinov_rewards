@@ -68,6 +68,28 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.4
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-20.
+
+Тип: patch release.
+
+Состав:
+
+- Более быстрые и стабильные карточки и основные экраны на больших базах.
+- Значительно ускоренный «Справочник» без destructive-расчётов при обычном просмотре.
+- Проверка удаления только после явного нажатия «Удалить» с сохранёнными точными сведениями и защитой общих файлов.
+- Более отзывчивая кнопка `+` для вставки из буфера или выбора файла.
+- Полностью закреплённый набор зависимостей для воспроизводимой установки и обновления.
+
+Проверки:
+
+- Focused regression, full suite, clean pinned install и TEMP Browser smoke: PASS.
+- Package safety, legacy updater compatibility, TEMP backup/install/restart/update-check/rollback: PASS.
+- Реальные DB/media SHA и fingerprints до/после релизной процедуры совпадают.
+
 ## v2.0.3
 
 Статус: выпущено.

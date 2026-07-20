@@ -89,7 +89,7 @@ class AboutSettingsTests(unittest.TestCase):
         self.assertIn("app_version_date|format_date", template)
         self.assertIn("APP_VERSION_DATE", router)
         self.assertRegex(APP_VERSION_DATE, r"^\d{4}-\d{2}-\d{2}$")
-        self.assertEqual(APP_VERSION, "2.0.3")
+        self.assertEqual(APP_VERSION, "2.0.4")
 
 
 if __name__ == "__main__":
