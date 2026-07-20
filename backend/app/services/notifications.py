@@ -29,6 +29,10 @@ STATUS_NOTIFICATIONS: Mapping[str, NotificationSpec] = {
         "Нельзя безопасно удалить кавалера: обнаружены внешние ссылки или неоднозначные материалы.",
         "error",
     ),
+    "delete_preflight_retry": NotificationSpec(
+        "Проверка удаления устарела. Откройте подтверждение повторно.",
+        "warning",
+    ),
     "reward_created": NotificationSpec("Награда добавлена."),
     "reward_updated": NotificationSpec("Награда сохранена."),
     "reward_deleted": NotificationSpec("Награда удалена."),

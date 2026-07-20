@@ -16,7 +16,7 @@ from ..repositories.rewards_write import (
     reward_duplicate_message,
     update_reward,
 )
-from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
+from ..services.navigation import delete_preflight_retry_return_to, delete_return_to, safe_return_to, with_query_value, with_status
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.notifications import status_message
 from ..services.photos import photo_items
@@ -280,8 +280,11 @@ async def reward_delete(request: Request, reward_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except DeletePreflightValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DeletePreflightValidationError:
+        return RedirectResponse(
+            delete_preflight_retry_return_to(return_to, f"/rewards/{reward_id}"),
+            status_code=303,
+        )
     except RewardValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     success_return = delete_return_to(return_to)

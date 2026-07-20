@@ -43,7 +43,7 @@ from ..services.guide_tree_state import (
     guide_tree_return_url,
 )
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
-from ..services.navigation import safe_return_to, with_query_value, with_status
+from ..services.navigation import delete_preflight_retry_return_to, safe_return_to, with_query_value, with_status
 from ..services.notifications import status_notification
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -357,8 +357,8 @@ async def rank_delete(request: Request, rank_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except DeletePreflightValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DeletePreflightValidationError:
+        return RedirectResponse(delete_preflight_retry_return_to(return_to, "/guides"), status_code=303)
     except GuideDeleteBlockedError as exc:
         status_code = "rank_delete_used" if "использ" in str(exc).lower() else "guide_delete_media_blocked"
         target = with_status(return_to, status_code) if return_to else f"/guides?status={status_code}"
@@ -588,8 +588,8 @@ async def guide_level_delete(request: Request, level: int, item_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except DeletePreflightValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DeletePreflightValidationError:
+        return RedirectResponse(delete_preflight_retry_return_to(return_to, "/guides"), status_code=303)
     except GuideDeleteBlockedError as exc:
         message = str(exc).lower()
         if "дочер" in message:

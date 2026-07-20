@@ -18,7 +18,14 @@ from backend.app.repositories.rewards_write import RewardDeleteResult
 from backend.app.repositories.marks_write import MarkDeleteResult
 from backend.app.repositories.persons_write import PersonDeleteResult
 from backend.app.services.deletion_lifecycle import DeletionExecutionResult
-from backend.app.services.navigation import delete_return_to, safe_return_to, with_status, without_query_keys
+from backend.app.services.delete_preflight import DeletePreflightValidationError
+from backend.app.services.navigation import (
+    delete_preflight_retry_return_to,
+    delete_return_to,
+    safe_return_to,
+    with_status,
+    without_query_keys,
+)
 
 
 class FakeRequest:
@@ -175,6 +182,58 @@ class ReturnNavigationTests(unittest.TestCase):
             "/legacy?tab=rewards&rank_id=2#list",
         )
         self.assertEqual(without_query_keys("https://example.com", "status"), "")
+
+    def test_delete_preflight_retry_preserves_context_without_old_markers(self) -> None:
+        self.assertEqual(
+            delete_preflight_retry_return_to(
+                "/legacy?tab=rewards&person_id=1&status=old&media_cleanup=failed",
+                "/persons/1",
+            ),
+            "/legacy?tab=rewards&person_id=1&status=delete_preflight_retry",
+        )
+
+    def test_stale_preflight_redirects_reward_to_legacy_without_delete(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_reward_confirm": "true",
+                "delete_operation_id": "stale",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+        with patch(
+            "backend.app.routers.rewards.authorize_delete_execution",
+            side_effect=DeletePreflightValidationError("Проверка удаления устарела."),
+        ), patch("backend.app.routers.rewards.delete_reward_with_result") as delete_call:
+            response = asyncio.run(reward_delete(request, 10))
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(
+            response.headers["location"],
+            "/legacy?tab=rewards&person_id=1&status=delete_preflight_retry",
+        )
+        delete_call.assert_not_called()
+
+    def test_stale_preflight_redirects_mark_to_legacy_without_delete(self) -> None:
+        request = FakeRequest(
+            {
+                "confirm": "true",
+                "delete_operation_id": "stale",
+                "return_to": "/legacy?tab=marks&mark_id=20",
+            }
+        )
+        with patch(
+            "backend.app.routers.marks.authorize_delete_execution",
+            side_effect=DeletePreflightValidationError("Проверка удаления устарела."),
+        ), patch("backend.app.routers.marks.delete_mark_with_result") as delete_call:
+            response = asyncio.run(mark_delete(request, 20))
+
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(
+            response.headers["location"],
+            "/legacy?tab=marks&mark_id=20&status=delete_preflight_retry",
+        )
+        delete_call.assert_not_called()
 
     def test_photo_view_url_preserves_return_to(self) -> None:
         url = photo_view_url("Source/1/Foto.jpg", "Фото", "/legacy?tab=rewards&person_id=1")

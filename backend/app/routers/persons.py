@@ -17,7 +17,7 @@ from ..repositories.persons_write import (
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
-from ..services.navigation import delete_return_to, safe_return_to, with_query_value, with_status
+from ..services.navigation import delete_preflight_retry_return_to, delete_return_to, safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.person_files import (
     PersonFilesError,
@@ -346,8 +346,11 @@ async def person_delete(request: Request, person_id: int):
         )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except DeletePreflightValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DeletePreflightValidationError:
+        return RedirectResponse(
+            delete_preflight_retry_return_to(return_to, f"/persons/{person_id}"),
+            status_code=303,
+        )
     except PersonDeleteBlockedError:
         blocked_return = delete_return_to(return_to)
         target = with_status(blocked_return, "person_delete_blocked") if blocked_return else f"/persons/{person_id}?status=person_delete_blocked"

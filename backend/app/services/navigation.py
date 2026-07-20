@@ -44,3 +44,9 @@ def without_query_keys(url: str, *keys: str) -> str:
 def delete_return_to(url: str, selection_key: str = "") -> str:
     keys = (*TRANSIENT_QUERY_KEYS, selection_key) if selection_key else TRANSIENT_QUERY_KEYS
     return without_query_keys(url, *keys)
+
+
+def delete_preflight_retry_return_to(url: str, fallback: str) -> str:
+    """Return a safe retry location when an optimistic delete preflight expires."""
+    target = without_query_keys(safe_return_to(url, fallback), *TRANSIENT_QUERY_KEYS)
+    return with_status(target or fallback, "delete_preflight_retry")

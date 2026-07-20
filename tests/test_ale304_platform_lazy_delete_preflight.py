@@ -7,8 +7,6 @@ import unittest
 from unittest.mock import Mock, patch
 from urllib.parse import urlencode
 
-from fastapi import HTTPException
-
 from backend.app.routers import guides as guides_router
 from backend.app.routers import persons as persons_router
 from backend.app.services import delete_preflight
@@ -130,7 +128,7 @@ class DeletePreflightGrantTests(unittest.TestCase):
                     str(expired["operation_id"]),
                 )
 
-    def test_post_route_rejects_missing_grant_before_repository_delete(self) -> None:
+    def test_post_route_redirects_stale_grant_without_repository_delete(self) -> None:
         settings = SimpleNamespace()
         request = FakeRequest(
             {
@@ -145,10 +143,10 @@ class DeletePreflightGrantTests(unittest.TestCase):
             "delete_person_with_result",
             delete_call,
         ):
-            with self.assertRaises(HTTPException) as caught:
-                asyncio.run(persons_router.person_delete(request, 1))
+            response = asyncio.run(persons_router.person_delete(request, 1))
 
-        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.headers["location"], "/persons/1?status=delete_preflight_retry")
         delete_call.assert_not_called()
 
 
