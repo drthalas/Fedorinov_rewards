@@ -35,6 +35,14 @@ def _manifest_bytes(payload: dict[str, object]) -> bytes:
     return json.dumps(payload).encode("utf-8")
 
 
+def _strictly_newer_patch(version: str) -> str:
+    parsed = parse_semver(version)
+    if parsed is None:
+        raise AssertionError(f"APP_VERSION is not semantic: {version}")
+    major, minor, patch = parsed
+    return f"{major}.{minor}.{patch + 1}"
+
+
 class UpdateCheckerTests(unittest.TestCase):
     def test_version_route_returns_app_name_and_version(self) -> None:
         self.assertEqual(updates.version_info(), {"app_name": APP_NAME, "version": APP_VERSION})
@@ -67,12 +75,14 @@ class UpdateCheckerTests(unittest.TestCase):
         self.assertIn("Не указан адрес", str(result["error"]))
 
     def test_update_checker_detects_newer_version(self) -> None:
+        newer_version = _strictly_newer_patch(APP_VERSION)
+
         def fetcher(url: str, timeout: int) -> bytes:
             self.assertEqual(url, "https://example.test/latest.json")
             self.assertEqual(timeout, 10)
             return _manifest_bytes(
                 {
-                    "version": "2.0.3",
+                    "version": newer_version,
                     "released_at": "2026-06-04",
                     "download_url": "https://example.test/app.zip",
                     "sha256": "abc",
@@ -82,13 +92,43 @@ class UpdateCheckerTests(unittest.TestCase):
 
         result = check_for_updates(_settings(), fetcher=fetcher)
         self.assertTrue(result["update_available"])
-        self.assertEqual(result["latest_version"], "2.0.3")
+        self.assertEqual(result["latest_version"], newer_version)
         self.assertEqual(result["notes"], ["Новая версия"])
 
     def test_update_checker_returns_no_update_for_same_version(self) -> None:
         result = check_for_updates(_settings(), fetcher=lambda url, timeout: _manifest_bytes({"version": APP_VERSION}))
         self.assertFalse(result["update_available"])
         self.assertEqual(result["latest_version"], APP_VERSION)
+
+    def test_version_policy_accepts_newer_patch_minor_and_major(self) -> None:
+        current = parse_semver(APP_VERSION)
+        self.assertIsNotNone(current)
+        major, minor, _patch = current or (0, 0, 0)
+        candidates = [
+            _strictly_newer_patch(APP_VERSION),
+            f"{major}.{minor + 1}.0",
+            f"{major + 1}.0.0",
+        ]
+        for candidate in candidates:
+            with self.subTest(candidate=candidate):
+                result = check_for_updates(
+                    _settings(),
+                    fetcher=lambda url, timeout, version=candidate: _manifest_bytes({"version": version}),
+                )
+                self.assertTrue(result["update_available"])
+
+    def test_version_policy_rejects_older_and_malformed_versions(self) -> None:
+        older = check_for_updates(
+            _settings(),
+            fetcher=lambda url, timeout: _manifest_bytes({"version": "0.0.0"}),
+        )
+        self.assertFalse(older["update_available"])
+        malformed = check_for_updates(
+            _settings(),
+            fetcher=lambda url, timeout: _manifest_bytes({"version": "not-semver"}),
+        )
+        self.assertFalse(malformed["update_available"])
+        self.assertIn("некорректный формат версии", str(malformed["error"]))
 
     def test_update_checker_handles_invalid_json(self) -> None:
         result = check_for_updates(_settings(), fetcher=lambda url, timeout: b"{not-json")
