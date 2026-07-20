@@ -257,8 +257,8 @@ CHANGE_PATTERNS: list[tuple[str, list[str]]] = [
         ["добавили кнопки добавления, изменения и удаления для награждённых;"],
     ),
     (
-        "Stage 3A backup and write-mode foundation",
-        ["добавили защиту: перед изменениями система требует резервную копию;"],
+        "Stage 3A writable-mode foundation",
+        ["настроили рабочий режим редактирования и защиту целостности данных;"],
     ),
     (
         "Stage 2B UX readability polish",
@@ -272,7 +272,7 @@ TECH_REPLACEMENTS = [
     (re.compile(r"photo viewer|photo management", re.IGNORECASE), "удобный просмотр фотографий и работа с фото"),
     (re.compile(r"search rewrite", re.IGNORECASE), "исправили поиск по фамилиям, названиям и номерам"),
     (re.compile(r"Windows media fix", re.IGNORECASE), "исправили отображение фотографий на Windows"),
-    (re.compile(r"backup/write guard", re.IGNORECASE), "добавили защиту: перед изменениями система требует резервную копию"),
+    (re.compile(r"backup/write guard", re.IGNORECASE), "настроили рабочий режим редактирования и защиту целостности данных"),
     (re.compile(r"return navigation", re.IGNORECASE), "исправили возврат назад после редактирования"),
     (re.compile(r"lightbox|modal", re.IGNORECASE), "фото открываются крупно прямо на странице"),
     (re.compile(r"Stage\s+\w+", re.IGNORECASE), ""),

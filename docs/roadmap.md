@@ -12,13 +12,13 @@ Map legacy screens, database tables, fields, relationships, and workflows withou
 
 Build a browser interface that mirrors the old interface and reads from the existing SQLite database.
 
-## Stage 3A: Backup and Write-Mode Foundation
+## Stage 3A: Writable-Mode Foundation
 
-Create safe development backups, explicit write-mode configuration, write connection guardrails, audit logging, and the legacy feature gap map.
+Create writable-mode configuration, write connection guardrails, audit logging, and the legacy feature gap map.
 
 ## Stage 3B: Person CRUD
 
-Add person create/edit/delete only after backup validation and write-mode checks are enforced.
+Add person create/edit/delete with normal writable-mode checks and entity-integrity protections.
 
 ## Stage 3C: Reward CRUD
 
