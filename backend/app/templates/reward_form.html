@@ -18,7 +18,7 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
-<form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" data-reward-duplicate-check data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}">
+<form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}">
   <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
@@ -53,7 +53,7 @@
         </select>
       </label>
       <label>
-        <span>Наименование</span>
+        <span>Наименование <span class="required-marker" aria-hidden="true">*</span></span>
         <select name="id_name" data-guide-role="name" data-styled-select required>
           <option value="">—</option>
           {% for item in guides.names %}
@@ -64,7 +64,7 @@
     </div>
     <label>
       <span>Ссылка на Монетный двор / справочник</span>
-      <input name="id_link" value="{{ reward.id_link or '' }}">
+      <input name="id_link" value="{{ reward.id_link or '' }}" autocomplete="off">
     </label>
   </fieldset>
 
@@ -73,20 +73,20 @@
     <div class="form-grid two-columns">
       <label>
         <span>Номер</span>
-        <input name="number" value="{{ reward.number or '' }}" inputmode="numeric" data-reward-number>
-        <p class="secondary reward-duplicate-status" data-reward-duplicate-status role="status" aria-live="polite" hidden></p>
+        <input name="number" value="{{ reward.number or '' }}" inputmode="numeric" autocomplete="off" aria-describedby="reward-number-status" data-reward-number>
+        <p id="reward-number-status" class="secondary reward-duplicate-status" data-reward-duplicate-status role="status" aria-live="polite" hidden></p>
       </label>
       <label>
         <span>Дата покупки</span>
-        <input name="date_purchase" value="{{ reward.date_purchase|format_date_input }}" placeholder="ДД.ММ.ГГГГ">
+        <input name="date_purchase" value="{{ reward.date_purchase|format_date_input }}" placeholder="ДД.ММ.ГГГГ" autocomplete="off">
       </label>
       <label>
         <span>Цена покупки</span>
-        <input name="price_purchase" value="{{ reward.price_purchase or '' }}" inputmode="numeric">
+        <input name="price_purchase" value="{{ reward.price_purchase or '' }}" inputmode="numeric" autocomplete="off">
       </label>
       <label>
         <span>Текущая цена</span>
-        <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric">
+        <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric" autocomplete="off">
       </label>
     </div>
     <label class="checkbox-row">

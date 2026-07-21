@@ -17,7 +17,12 @@ from ..services.deletion_lifecycle import (
     recorded_delete_plan,
     recover_delete_operation,
 )
-from ..services.dates import format_birth_year_input, normalize_birth_year_input
+from ..services.dates import (
+    BIRTH_YEAR_MAXIMUM,
+    BIRTH_YEAR_MINIMUM,
+    format_birth_year_input,
+    normalize_birth_year_input,
+)
 from ..services.person_files import ensure_person_folder, safe_person_folder
 from ..services.deletion_confirmation import (
     MediaDeletePreview,
@@ -135,18 +140,18 @@ def person_data_from_mapping(
         existing_year.isdigit()
         and len(existing_year) == 4
         and submitted_year == existing_year
-        and int(existing_year) < 1900
+        and not BIRTH_YEAR_MINIMUM <= int(existing_year) <= BIRTH_YEAR_MAXIMUM
     )
-    try:
-        birthday = normalize_birth_year_input(
-            raw_birthday,
-            required=True,
-            minimum_year=1800 if preserves_legacy_year else 1900,
-        )
-    except ValueError as exc:
-        raise PersonValidationError(str(exc), field="birthday") from exc
     if preserves_legacy_year:
         birthday = str(existing_birthday)
+    else:
+        try:
+            birthday = normalize_birth_year_input(
+                raw_birthday,
+                required=True,
+            )
+        except ValueError as exc:
+            raise PersonValidationError(str(exc), field="birthday") from exc
 
     rank_value = _empty_to_none(values.get("id_rank"))
     if rank_value is None:
@@ -199,16 +204,16 @@ def _validate_person_data(data: PersonWriteData, *, existing_birthday: object = 
         existing_year.isdigit()
         and len(existing_year) == 4
         and submitted_year == existing_year
-        and int(existing_year) < 1900
+        and not BIRTH_YEAR_MINIMUM <= int(existing_year) <= BIRTH_YEAR_MAXIMUM
     )
-    try:
-        normalize_birth_year_input(
-            submitted_year,
-            required=True,
-            minimum_year=1800 if preserves_legacy_year else 1900,
-        )
-    except ValueError as exc:
-        raise PersonValidationError(str(exc), field="birthday") from exc
+    if not preserves_legacy_year:
+        try:
+            normalize_birth_year_input(
+                submitted_year,
+                required=True,
+            )
+        except ValueError as exc:
+            raise PersonValidationError(str(exc), field="birthday") from exc
     if data.id_rank is None:
         raise PersonValidationError("Выберите звание / специальность.")
 

@@ -1,4 +1,3 @@
-from datetime import date
 import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
@@ -17,6 +16,7 @@ from ..repositories.persons_write import (
     update_person,
 )
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
+from ..services.dates import BIRTH_YEAR_MAXIMUM, BIRTH_YEAR_MINIMUM
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.navigation import delete_preflight_retry_return_to, delete_return_to, safe_return_to, with_query_value, with_status
@@ -66,9 +66,15 @@ def _with_message(url: str, message: str) -> str:
 
 
 def _person_created_edit_url(person_id: int, return_to: str = "") -> str:
+    safe_back = safe_return_to(return_to)
+    if safe_back:
+        parts = urlsplit(safe_back)
+        query_values = parse_qs(parts.query, keep_blank_values=True)
+        if parts.path.rstrip("/") == "/legacy" and query_values.get("tab", [""])[-1] == "rewards":
+            safe_back = with_query_value(safe_back, "person_id", str(person_id))
     query = [("created", "1")]
-    if return_to:
-        query.append(("return_to", return_to))
+    if safe_back:
+        query.append(("return_to", safe_back))
     return f"/persons/{person_id}/edit?{urlencode(query)}"
 
 
@@ -128,7 +134,8 @@ def person_new(request: Request, return_to: str = ""):
             "return_to": safe_return_to(return_to),
             "error": None,
             "created_message": "",
-            "birth_year_max": date.today().year,
+            "birth_year_min": BIRTH_YEAR_MINIMUM,
+            "birth_year_max": BIRTH_YEAR_MAXIMUM,
             "field_errors": {},
         },
     )
@@ -158,7 +165,8 @@ async def person_create(request: Request):
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",
-                "birth_year_max": date.today().year,
+                "birth_year_min": BIRTH_YEAR_MINIMUM,
+                "birth_year_max": BIRTH_YEAR_MAXIMUM,
                 "field_errors": {exc.field: str(exc)} if exc.field else {},
             },
             status_code=400,
@@ -294,7 +302,8 @@ def person_edit(request: Request, person_id: int, return_to: str = "", created: 
             "return_to": safe_return_to(return_to),
             "error": None,
             "created_message": "Кавалер создан. Теперь можно добавить фотографии и документы." if created == "1" else "",
-            "birth_year_max": date.today().year,
+            "birth_year_min": BIRTH_YEAR_MINIMUM,
+            "birth_year_max": BIRTH_YEAR_MAXIMUM,
             "field_errors": {},
         },
     )
@@ -328,7 +337,8 @@ async def person_update(request: Request, person_id: int):
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",
-                "birth_year_max": date.today().year,
+                "birth_year_min": BIRTH_YEAR_MINIMUM,
+                "birth_year_max": BIRTH_YEAR_MAXIMUM,
                 "field_errors": {exc.field: str(exc)} if exc.field else {},
             },
             status_code=400,

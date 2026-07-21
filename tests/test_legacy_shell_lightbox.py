@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260720-ale317-owner-qa-2"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260721-ale317-form-corrective-1"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)

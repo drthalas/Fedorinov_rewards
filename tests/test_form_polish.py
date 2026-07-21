@@ -6,7 +6,7 @@ import re
 import sqlite3
 import unittest
 from datetime import date
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlsplit
 from unittest.mock import patch
 
 from jinja2 import Environment
@@ -196,13 +196,28 @@ class FormPolishTests(unittest.TestCase):
         location = response.headers["location"]
         self.assertTrue(location.startswith("/persons/2/edit?"))
         self.assertIn("created=1", location)
-        self.assertIn("return_to=%2Flegacy%3Ftab%3Drewards", location)
+        selected_return = parse_qs(urlsplit(location).query)["return_to"][0]
+        self.assertEqual(selected_return, "/legacy?tab=rewards&person_id=2")
 
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
-            edit_response = persons_router.person_edit(object(), 2, return_to="/legacy?tab=rewards", created="1")
+            edit_response = persons_router.person_edit(object(), 2, return_to=selected_return, created="1")
         context = edit_response["context"]
         self.assertEqual(context["created_message"], "Кавалер создан. Теперь можно добавить фотографии и документы.")
-        self.assertEqual(context["return_to"], "/legacy?tab=rewards")
+        self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=2")
+
+        update_request = FakeRequest(
+            {
+                "fio": "Петров Пётр Петрович",
+                "birthday": "1914",
+                "id_rank": "1",
+                "return_to": selected_return,
+            }
+        )
+        update_response = asyncio.run(persons_router.person_update(update_request, 2))
+        self.assertEqual(
+            update_response.headers["location"],
+            "/legacy?tab=rewards&person_id=2&status=person_updated",
+        )
 
     def test_person_edit_contains_inline_photo_controls_without_next_actions(self) -> None:
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
@@ -439,7 +454,8 @@ class FormPolishTests(unittest.TestCase):
         self.assertIn("data-current-reward-id", reward_template)
         self.assertIn("data-reward-number", reward_template)
         self.assertIn("data-reward-duplicate-status", reward_template)
-        self.assertIn("Выберите наименование награды для проверки номера", duplicate_js)
+        self.assertIn("Для проверки занятости выберите наименование награды.", duplicate_js)
+        self.assertIn("Укажите номер цифрами.", duplicate_js)
         self.assertIn("Номер свободен", duplicate_js)
         self.assertIn("Такая награда с этим номером уже есть в базе", duplicate_js)
         self.assertIn("/rewards/check-duplicate", duplicate_js)

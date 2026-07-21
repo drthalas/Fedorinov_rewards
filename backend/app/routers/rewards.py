@@ -99,10 +99,10 @@ def reward_duplicate_check(id_name: str = "", number: str = "", current_reward_i
         return {"duplicate": False, "message": ""}
     if not raw_number:
         return {"duplicate": False, "message": ""}
-    if name_id is None:
-        return {"duplicate": False, "message": "Выберите наименование награды для проверки номера"}
     if reward_number is None:
         return {"duplicate": False, "message": "Укажите корректный номер награды."}
+    if name_id is None:
+        return {"duplicate": False, "message": "Для проверки занятости выберите наименование награды."}
     duplicate = check_reward_duplicate(settings, name_id, reward_number, current_id)
     if not duplicate:
         return {"duplicate": False, "message": "Номер свободен"}

@@ -75,7 +75,12 @@ const status = {
   appendChild() {},
 };
 const nameSelect = { value: "2", addEventListener(type, callback) { listeners[`name:${type}`] = callback; } };
-const numberInput = { value: "100", addEventListener(type, callback) { listeners[`number:${type}`] = callback; } };
+const numberInput = {
+  value: "100",
+  addEventListener(type, callback) { listeners[`number:${type}`] = callback; },
+  setCustomValidity() {},
+  setAttribute() {},
+};
 const form = {
   dataset: { currentRewardId: "10" },
   querySelector(selector) {
@@ -158,7 +163,7 @@ eval(source);
         template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")
         validation = (ROOT / "backend/app/static/person_form_validation.js").read_text(encoding="utf-8")
 
-        self.assertIn('autocomplete="off" data-person-form', template)
+        self.assertIn('autocomplete="off" data-managed-validation data-person-form', template)
         self.assertIn('name="birthday"', template)
         self.assertIn("required autocomplete=\"off\"", template)
         self.assertIn('data-original-year="{{ person.birthday|format_birth_year_input }}"', template)
@@ -171,7 +176,8 @@ eval(source);
         templates = (ROOT / "backend/app/routers/templates.py").read_text(encoding="utf-8")
 
         self.assertIn("person_form_validation.js", base)
-        self.assertIn('STATIC_ASSET_VERSION = "20260720-ale317-owner-qa-2"', templates)
+        self.assertIn("form_behavior.js", base)
+        self.assertIn('STATIC_ASSET_VERSION = "20260721-ale317-form-corrective-1"', templates)
 
 
 if __name__ == "__main__":

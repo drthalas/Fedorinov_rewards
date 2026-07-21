@@ -7063,14 +7063,25 @@ body.legacy-rewards-theme::after {
   margin: 0;
 }
 
-.person-edit-form .field-error {
+.field-error {
   margin: 6px 0 0;
   color: #9b1c1c;
   font-size: 13px;
   line-height: 1.35;
 }
 
-.person-edit-form [aria-invalid="true"] {
+.required-marker {
+  color: #9b1c1c;
+  font-weight: 700;
+}
+
+.managed-form-summary {
+  margin: 0 0 14px;
+}
+
+.edit-form [aria-invalid="true"],
+.edit-form .form-field-invalid,
+.edit-form .styled-select-button[aria-invalid="true"] {
   border-color: #9b1c1c;
 }
 

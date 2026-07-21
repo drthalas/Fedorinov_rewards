@@ -9,7 +9,7 @@
     status.className = "reward-duplicate-status";
     if (state === "free") {
       status.classList.add("notice", "notice-success");
-    } else if (state === "duplicate") {
+    } else if (state === "duplicate" || state === "invalid") {
       status.classList.add("notice", "notice-error");
     } else {
       status.classList.add("secondary");
@@ -52,6 +52,11 @@
     const initialNumber = String(numberInput.value || "").trim();
     let numberChanged = false;
 
+    function setNumberValidity(message) {
+      numberInput.setCustomValidity(message || "");
+      numberInput.setAttribute("aria-invalid", message ? "true" : "false");
+    }
+
     function scheduleCheck() {
       window.clearTimeout(timer);
       const token = ++requestToken;
@@ -59,15 +64,24 @@
       const nameId = String(nameSelect.value || "").trim();
       if (editing && (!numberChanged || number === initialNumber)) {
         numberChanged = false;
+        setNumberValidity("");
         setStatus(status, "neutral", "");
         return;
       }
       if (!number) {
+        setNumberValidity("");
         setStatus(status, "neutral", "");
         return;
       }
+      if (!/^\d+$/.test(number)) {
+        const message = "Укажите номер цифрами.";
+        setNumberValidity(message);
+        setStatus(status, "invalid", message);
+        return;
+      }
+      setNumberValidity("");
       if (!nameId) {
-        setStatus(status, "neutral", "Выберите наименование награды для проверки номера");
+        setStatus(status, "neutral", "Для проверки занятости выберите наименование награды.");
         return;
       }
       timer = window.setTimeout(async () => {

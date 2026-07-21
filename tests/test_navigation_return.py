@@ -507,7 +507,11 @@ class ReturnNavigationTests(unittest.TestCase):
         self.assertFalse(empty_number["duplicate"])
         self.assertEqual(empty_number["message"], "")
         self.assertFalse(missing_name["duplicate"])
-        self.assertEqual(missing_name["message"], "Выберите наименование награды для проверки номера")
+        self.assertEqual(missing_name["message"], "Для проверки занятости выберите наименование награды.")
+
+        malformed_without_name = reward_duplicate_check(id_name="", number="AB12")
+        self.assertFalse(malformed_without_name["duplicate"])
+        self.assertEqual(malformed_without_name["message"], "Укажите корректный номер награды.")
 
     def test_mark_edit_post_respects_safe_return_to(self) -> None:
         request = FakeRequest({"number": "201", "return_to": "/legacy?tab=marks&mark_id=20"})

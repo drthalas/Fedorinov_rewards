@@ -17,17 +17,19 @@
 
     const validate = () => {
       const value = String(input.value || "").trim();
-      const minimum = Number(input.dataset.minYear || 1900);
-      const maximum = Number(input.dataset.maxYear || new Date().getFullYear());
+      const minimum = Number(input.dataset.minYear || 1800);
+      const maximum = Number(input.dataset.maxYear || 1999);
       const original = String(input.dataset.originalYear || "").trim();
-      const unchangedLegacyYear = value === original && /^\d{4}$/.test(value) && Number(value) < minimum;
+      const unchangedLegacyYear = value === original
+        && /^\d{4}$/.test(value)
+        && (Number(value) < minimum || Number(value) > maximum);
       let message = "";
       if (!value) {
         message = REQUIRED_MESSAGE;
       } else if (!/^\d{4}$/.test(value)) {
         message = FORMAT_MESSAGE;
       } else if (!unchangedLegacyYear && (Number(value) < minimum || Number(value) > maximum)) {
-        message = `Год рождения должен быть от ${minimum} до текущего года.`;
+        message = `Год рождения должен быть от ${minimum} до ${maximum}.`;
       }
       input.setCustomValidity(message);
       input.setAttribute("aria-invalid", message ? "true" : "false");
@@ -39,6 +41,7 @@
     input.addEventListener("input", validate);
     input.addEventListener("blur", validate);
     input.addEventListener("invalid", validate);
+    form.addEventListener("managed-form:validate", validate);
     form.addEventListener("submit", (event) => {
       if (!validate()) {
         event.preventDefault();

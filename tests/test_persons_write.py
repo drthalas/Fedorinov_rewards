@@ -221,34 +221,45 @@ class PersonWriteTests(unittest.TestCase):
             person_data_from_mapping({"fio": "No rank", "birthday": "1913", "id_rank": ""})
         self.assertEqual(str(exc.exception), "Выберите звание / специальность.")
 
-    def test_birthday_accepts_year_only(self) -> None:
-        data = person_data_from_mapping({"fio": "Date user", "birthday": "1913", "id_rank": "2"})
-        self.assertEqual(data.birthday, "1913")
+    def test_birthday_accepts_exact_supported_boundaries(self) -> None:
+        minimum = person_data_from_mapping({"fio": "Date user", "birthday": "1800", "id_rank": "2"})
+        maximum = person_data_from_mapping({"fio": "Date user", "birthday": "1999", "id_rank": "2"})
+        self.assertEqual(minimum.birthday, "1800")
+        self.assertEqual(maximum.birthday, "1999")
 
     def test_birthday_rejects_full_date(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
             person_data_from_mapping({"fio": "Date user", "birthday": "09.05.1913", "id_rank": "2"})
         self.assertEqual(str(exc.exception), "Укажите год рождения в формате ГГГГ.")
 
-    def test_birthday_rejects_out_of_range_year(self) -> None:
+    def test_birthday_rejects_non_ascii_digits(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
-            person_data_from_mapping({"fio": "Date user", "birthday": "1799", "id_rank": "2"})
-        self.assertEqual(str(exc.exception), "Год рождения должен быть от 1900 до текущего года.")
+            person_data_from_mapping({"fio": "Date user", "birthday": "١٨٠٠", "id_rank": "2"})
+        self.assertEqual(str(exc.exception), "Укажите год рождения в формате ГГГГ.")
 
-    def test_unchanged_legacy_birth_year_before_1900_is_preserved(self) -> None:
-        data = person_data_from_mapping(
-            {"fio": "Legacy year", "birthday": "1897", "id_rank": "2"},
-            existing_birthday="1897-05-09",
-        )
-        self.assertEqual(data.birthday, "1897-05-09")
+    def test_birthday_rejects_both_out_of_range_boundaries(self) -> None:
+        for value in ("1799", "2000"):
+            with self.subTest(value=value), self.assertRaises(PersonValidationError) as exc:
+                person_data_from_mapping({"fio": "Date user", "birthday": value, "id_rank": "2"})
+            self.assertEqual(str(exc.exception), "Год рождения должен быть от 1800 до 1999.")
 
-    def test_changed_legacy_birth_year_before_1900_is_rejected(self) -> None:
+    def test_unchanged_out_of_range_legacy_birth_year_is_preserved(self) -> None:
+        for value in ("1799", "2000"):
+            with self.subTest(value=value):
+                existing = f"{value}-05-09"
+                data = person_data_from_mapping(
+                    {"fio": "Legacy year", "birthday": value, "id_rank": "2"},
+                    existing_birthday=existing,
+                )
+                self.assertEqual(data.birthday, existing)
+
+    def test_changed_out_of_range_legacy_birth_year_is_rejected(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
             person_data_from_mapping(
-                {"fio": "Legacy year", "birthday": "1898", "id_rank": "2"},
-                existing_birthday="1897-05-09",
+                {"fio": "Legacy year", "birthday": "1798", "id_rank": "2"},
+                existing_birthday="1799-05-09",
             )
-        self.assertEqual(str(exc.exception), "Год рождения должен быть от 1900 до текущего года.")
+        self.assertEqual(str(exc.exception), "Год рождения должен быть от 1800 до 1999.")
 
 
 if __name__ == "__main__":

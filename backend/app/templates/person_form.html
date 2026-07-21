@@ -17,23 +17,23 @@
   <div class="person-edit-main">
 {% endif %}
 
-<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-person-form>
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>
     <div class="form-grid two-columns">
       <label>
-        <span>ФИО</span>
+        <span>ФИО <span class="required-marker" aria-hidden="true">*</span></span>
         <input name="fio" value="{{ person.fio or '' }}" required autocomplete="off" spellcheck="false">
       </label>
       <label>
-        <span>Год рождения</span>
-        <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" minlength="4" maxlength="4" pattern="[0-9]{4}" required autocomplete="off" aria-describedby="birth-year-error" data-birth-year data-min-year="1900" data-max-year="{{ birth_year_max }}" data-original-year="{{ person.birthday|format_birth_year_input }}" {% if field_errors and field_errors.birthday %}aria-invalid="true"{% endif %}>
+        <span>Год рождения <span class="required-marker" aria-hidden="true">*</span></span>
+        <input name="birthday" value="{{ person.birthday|format_birth_year_input }}" placeholder="ГГГГ" inputmode="numeric" minlength="4" maxlength="4" pattern="(18|19)[0-9]{2}" required autocomplete="off" aria-describedby="birth-year-error" data-birth-year data-min-year="{{ birth_year_min }}" data-max-year="{{ birth_year_max }}" data-original-year="{{ person.birthday|format_birth_year_input }}" {% if field_errors and field_errors.birthday %}aria-invalid="true"{% endif %}>
         <p id="birth-year-error" class="field-error" data-birth-year-error {% if not (field_errors and field_errors.birthday) %}hidden{% endif %}>{{ field_errors.birthday if field_errors and field_errors.birthday else '' }}</p>
       </label>
     </div>
     <label>
-      <span>Звание / специальность</span>
+      <span>Звание / специальность <span class="required-marker" aria-hidden="true">*</span></span>
       <select name="id_rank" data-styled-select required>
         <option value="">—</option>
         {% for rank in ranks %}

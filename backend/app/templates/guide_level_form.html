@@ -9,12 +9,12 @@
   <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 </header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<form class="edit-form guide-item-form guide-form-card" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}">
+<form class="edit-form guide-item-form guide-form-card" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}" autocomplete="off" data-managed-validation>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <p class="guide-form-kicker">{{ level_label }}</p>
   {% if level > 0 %}
   <label>
-    <span>Родительский элемент</span>
+    <span>Родительский элемент <span class="required-marker" aria-hidden="true">*</span></span>
     <select name="parent_id" required>
       <option value="">—</option>
       {% for parent in parent_options %}
@@ -24,13 +24,13 @@
   </label>
   {% endif %}
   <label>
-    <span>Название</span>
-    <input name="name" value="{{ item.name or '' }}" required>
+    <span>Название <span class="required-marker" aria-hidden="true">*</span></span>
+    <input name="name" value="{{ item.name or '' }}" required autocomplete="off">
   </label>
   {% if supports_award_media %}
   <label>
     <span>Рейтинг</span>
-    <input type="number" name="rating_rank" value="{{ item.rating_rank or '' }}" min="1" step="1" inputmode="numeric" placeholder="Положительное целое число">
+    <input type="number" name="rating_rank" value="{{ item.rating_rank or '' }}" min="1" step="1" inputmode="numeric" placeholder="Положительное целое число" autocomplete="off">
   </label>
   <section class="guide-image-editor" aria-label="Изображение элемента справочника">
     <h2>Изображение</h2>

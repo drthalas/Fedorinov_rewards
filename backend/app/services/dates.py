@@ -5,7 +5,9 @@ import re
 DATE_INPUT_MESSAGE = "Укажите дату в формате ДД.ММ.ГГГГ."
 BIRTH_YEAR_INPUT_MESSAGE = "Укажите год рождения в формате ГГГГ."
 BIRTH_YEAR_REQUIRED_MESSAGE = "Укажите год рождения."
-BIRTH_YEAR_RANGE_MESSAGE = "Год рождения должен быть от {minimum_year} до текущего года."
+BIRTH_YEAR_RANGE_MESSAGE = "Год рождения должен быть от {minimum_year} до {maximum_year}."
+BIRTH_YEAR_MINIMUM = 1800
+BIRTH_YEAR_MAXIMUM = 1999
 
 
 def today_iso() -> str:
@@ -60,16 +62,22 @@ def normalize_birth_year_input(
     value: object,
     *,
     required: bool = False,
-    minimum_year: int = 1800,
+    minimum_year: int = BIRTH_YEAR_MINIMUM,
+    maximum_year: int = BIRTH_YEAR_MAXIMUM,
 ) -> str | None:
     text = "" if value is None else str(value).strip()
     if not text:
         if required:
             raise ValueError(BIRTH_YEAR_REQUIRED_MESSAGE)
         return None
-    if not re.fullmatch(r"\d{4}", text):
+    if not re.fullmatch(r"[0-9]{4}", text):
         raise ValueError(BIRTH_YEAR_INPUT_MESSAGE)
     year = int(text)
-    if year < minimum_year or year > date.today().year:
-        raise ValueError(BIRTH_YEAR_RANGE_MESSAGE.format(minimum_year=minimum_year))
+    if year < minimum_year or year > maximum_year:
+        raise ValueError(
+            BIRTH_YEAR_RANGE_MESSAGE.format(
+                minimum_year=minimum_year,
+                maximum_year=maximum_year,
+            )
+        )
     return text

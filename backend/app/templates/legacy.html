@@ -11,7 +11,7 @@
     <div class="legacy-layout" data-legacy-rewards-layout>
       <aside class="legacy-sidebar">
         <div class="legacy-panel-title legacy-filter-title"><span class="legacy-panel-heading-icon" aria-hidden="true"></span>Фильтры</div>
-        <form class="legacy-rewards-filters guide-cascade" method="get" action="/legacy">
+        <form class="legacy-rewards-filters guide-cascade" method="get" action="/legacy" autocomplete="off">
           <script type="application/json" data-guide-cascade-options>{{ rewards_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="rewards">
           <label>
@@ -584,7 +584,7 @@
     <section class="legacy-tab-panel legacy-archive-tab legacy-summary-tab">
       <h1>Сводная таблица</h1>
       {% if summary %}
-        <form class="summary-filter-form guide-cascade" method="get" action="/legacy">
+        <form class="summary-filter-form guide-cascade" method="get" action="/legacy" autocomplete="off">
           <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="summary">
           <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
@@ -807,9 +807,9 @@
       <dl class="details">
         <dt>Название</dt>
         <dd>
-          <form class="about-title-form" method="post" action="/legacy/about/title">
+          <form class="about-title-form" method="post" action="/legacy/about/title" autocomplete="off">
             <input type="hidden" name="return_to" value="/legacy?tab=about">
-            <input type="text" name="program_title" value="{{ app_display_name }}" placeholder="{{ app_name }}" maxlength="160" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>
+            <input type="text" name="program_title" value="{{ app_display_name }}" placeholder="{{ app_name }}" maxlength="160" autocomplete="off" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>
             <button type="submit" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>Сохранить</button>
           </form>
         </dd>
