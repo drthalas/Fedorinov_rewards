@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from shutil import copy2, rmtree
 import hashlib
@@ -47,7 +48,10 @@ UPDATE_STEPS = {
     "downloading": "Скачиваем обновление",
     "verifying": "Проверяем файл",
     "backing_up": "Создаём резервную копию",
+    "stopping": "Останавливаем старую версию",
     "installing": "Устанавливаем обновление",
+    "dependencies": "Проверяем компоненты приложения",
+    "starting": "Запускаем новую версию",
     "success": "Готово",
     "error": "Ошибка обновления",
 }
@@ -105,7 +109,9 @@ def write_update_status(
         "started_at": started_at,
         "finished_at": finished_at,
     }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
     return payload
 
 

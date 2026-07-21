@@ -4,7 +4,8 @@ from urllib.parse import parse_qs
 
 from ..config import get_settings
 from ..services.update_checker import check_for_updates
-from ..services.updater import UpdateError, apply_update, read_update_status
+from ..services.supervised_update import schedule_supervised_update
+from ..services.updater import UpdateError, read_update_status
 from ..version import APP_NAME, APP_VERSION
 from .templates import templates
 
@@ -49,7 +50,7 @@ async def updates_apply(request: Request):
         raise HTTPException(status_code=400, detail=detail)
 
     try:
-        result = apply_update(settings, dry_run=False)
+        result = schedule_supervised_update(settings)
     except UpdateError as exc:
         result = {"ok": False, "error": str(exc), "message": str(exc)}
 

@@ -2,9 +2,22 @@ from fastapi import APIRouter
 
 from ..config import get_settings
 from ..repositories.common import db_readable, table_counts
+from ..services.runtime_identity import current_runtime_identity
+from ..version import APP_VERSION
 
 
 router = APIRouter()
+
+
+@router.get("/runtime/identity")
+def runtime_identity() -> dict[str, object]:
+    settings = get_settings()
+    return current_runtime_identity(
+        version=APP_VERSION,
+        install_root=settings.app_install_dir,
+        host=settings.app_host,
+        port=settings.app_port,
+    )
 
 
 @router.get("/health")

@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  var POLL_INTERVAL_MS = 750;
+  var UPDATE_TIMEOUT_MS = 15 * 60 * 1000;
+
   function setHidden(element, hidden) {
     if (element) {
       element.hidden = hidden;
@@ -39,14 +42,55 @@
     }
   }
 
-  async function pollStatus(progress) {
-    var response = await fetch("/updates/status", { headers: { "Accept": "application/json" } });
+  function delay(milliseconds) {
+    return new Promise(function (resolve) {
+      window.setTimeout(resolve, milliseconds);
+    });
+  }
+
+  async function fetchJson(url, options) {
+    var response = await fetch(url, options || { headers: { "Accept": "application/json" } });
     if (!response.ok) {
-      return null;
+      var body = await response.json().catch(function () { return {}; });
+      var failure = new Error(body.error || body.detail || "HTTP " + response.status);
+      failure.httpStatus = response.status;
+      throw failure;
     }
-    var data = await response.json();
-    renderStatus(progress, data);
-    return data;
+    return response.json();
+  }
+
+  async function waitForFinishedUpdate(progress) {
+    var deadline = Date.now() + UPDATE_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      try {
+        var status = await fetchJson("/updates/status", {
+          headers: { "Accept": "application/json", "Cache-Control": "no-store" },
+          cache: "no-store",
+        });
+        renderStatus(progress, status);
+        if (status.status === "error") {
+          return status;
+        }
+        if (status.status === "success") {
+          var identity = await fetchJson("/runtime/identity", {
+            headers: { "Accept": "application/json", "Cache-Control": "no-store" },
+            cache: "no-store",
+          });
+          if (identity.managed) {
+            return status;
+          }
+        }
+      } catch (error) {
+        // The backend is intentionally unavailable for a short bounded restart window.
+      }
+      await delay(POLL_INTERVAL_MS);
+    }
+    return {
+      status: "error",
+      step: "error",
+      message: "Приложение не перезапустилось вовремя.",
+      error: "Повторно запустите start_windows.bat. Перезагрузка Windows не требуется.",
+    };
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -66,20 +110,13 @@
       renderStatus(progress, {
         status: "running",
         step: "checking",
-        message: "Идёт обновление. Не закрывайте окно.",
+        message: "Идёт обновление. Приложение перезапустится автоматически.",
       });
 
-      var pollTimer = window.setInterval(function () {
-        pollStatus(progress).then(function (data) {
-          if (data && data.status !== "running") {
-            window.clearInterval(pollTimer);
-          }
-        }).catch(function () {});
-      }, 1500);
-
+      var scheduled = false;
       try {
         var body = new URLSearchParams(new FormData(form));
-        var response = await fetch(form.action, {
+        var result = await fetchJson(form.action, {
           method: "POST",
           headers: {
             "Accept": "application/json",
@@ -87,29 +124,30 @@
           },
           body: body.toString(),
         });
-        var result = await response.json();
-        window.clearInterval(pollTimer);
-        var finalStatus = await pollStatus(progress);
-        if (!finalStatus || finalStatus.status === "running") {
-          renderStatus(progress, {
-            status: result.ok ? "success" : "error",
-            step: result.ok ? "success" : "error",
-            message: result.message || result.error || "",
-            error: result.ok ? null : result.error,
-          });
-        }
+        scheduled = Boolean(result.ok && result.scheduled);
       } catch (error) {
-        window.clearInterval(pollTimer);
+        // A disconnect can race with the intentional backend stop; status polling decides the outcome.
+        scheduled = !error.httpStatus;
+      }
+
+      if (scheduled) {
+        var finalStatus = await waitForFinishedUpdate(progress);
+        renderStatus(progress, finalStatus);
+        if (finalStatus.status === "success") {
+          await delay(500);
+          window.location.replace("/legacy?tab=about&check_updates=1");
+          return;
+        }
+      } else {
         renderStatus(progress, {
           status: "error",
           step: "error",
-          message: "Не удалось выполнить обновление.",
-          error: String(error && error.message ? error.message : error),
+          message: "Не удалось запустить обновление.",
+          error: "Повторите попытку.",
         });
-      } finally {
-        if (button) {
-          button.disabled = false;
-        }
+      }
+      if (button) {
+        button.disabled = false;
       }
     });
   });

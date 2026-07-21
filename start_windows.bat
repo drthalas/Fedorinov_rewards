@@ -73,8 +73,12 @@ if errorlevel 1 (
 
 echo Запускаю Fedorinov Rewards Web Preview...
 echo Откройте: http://127.0.0.1:%APP_PORT%
-start "" "http://127.0.0.1:%APP_PORT%"
-".venv\Scripts\python.exe" -m uvicorn backend.app.main:app --host 127.0.0.1 --port %APP_PORT%
+".venv\Scripts\python.exe" "scripts\runtime_bootstrap.py" start --open-browser --wait
+if errorlevel 1 (
+    echo Не удалось запустить приложение. Подробности показаны выше.
+    pause
+    exit /b 1
+)
 
 echo Сервер остановлен.
 pause

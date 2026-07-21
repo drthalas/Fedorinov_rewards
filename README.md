@@ -403,6 +403,8 @@ On Windows:
 4. On first run, edit `.env` and set `REWARDS_DATA_DIR` to the local Rewards data folder.
 5. Run `start_windows.bat` again and open `http://127.0.0.1:8080`.
 
+The launcher keeps a single identity-managed backend. Running the same batch file again reuses the valid current instance instead of creating a duplicate. Updates stop only confirmed application-owned processes and reload the browser after the new version is ready.
+
 Windows preview defaults are now the working preview mode:
 
 ```text

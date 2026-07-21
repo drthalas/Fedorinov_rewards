@@ -97,8 +97,13 @@ Write-Host "Устанавливаю зависимости..."
 
 Write-Host "Запускаю Fedorinov Rewards Web Preview..."
 Write-Host "Откройте: http://127.0.0.1:$appPort"
-Start-Process "http://127.0.0.1:$appPort"
-& ".venv\Scripts\python.exe" -m uvicorn backend.app.main:app --host 127.0.0.1 --port $appPort
+& ".venv\Scripts\python.exe" "scripts\runtime_bootstrap.py" start --open-browser --wait
+if ($LASTEXITCODE -ne 0) {
+    $exitCode = $LASTEXITCODE
+    Write-Host "Не удалось запустить приложение. Подробности показаны выше."
+    Read-Host "Нажмите Enter для выхода"
+    exit $exitCode
+}
 
 Write-Host "Сервер остановлен."
 Read-Host "Нажмите Enter для выхода"

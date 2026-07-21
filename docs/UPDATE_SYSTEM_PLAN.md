@@ -34,7 +34,8 @@ Implemented one-click update flow:
 3. Create a backup of the current application folder.
 4. Preserve local configuration files, especially `.env`.
 5. Replace only application code, templates, scripts, and documentation.
-6. Show a clear result telling the user to restart the application manually.
+6. Use a separate bootstrap process to stop only identity-confirmed application backends.
+7. Start exactly one backend from the updated install root and verify its runtime identity.
 
 Stage 4B.1 adds visible progress while the update runs:
 
@@ -47,9 +48,11 @@ Stage 4B.1 adds visible progress while the update runs:
 
 The current status is stored locally in `updates/update_status.json` and exposed through `GET /updates/status`. A second update request is blocked while one update is already running.
 
-Automatic restart is deferred. The owner should close the `start_windows.bat` window and start it again after a successful update.
+The bootstrap registry is stored outside the install root and records PID, process start time, executable/command line, install root, port, version, and a random instance token atomically. A process is force-stopped only when the live process still matches that complete app-owned identity. An unrelated process that occupies the configured port is never terminated.
 
-If file replacement fails, the updater attempts to restore files from the application backup and returns a clear error.
+The stop phase uses a short bounded wait and one retry. After file installation, the bootstrap verifies `/runtime/identity` before the browser reloads. A failed start restores the application backup and starts exactly one backend of the previous version.
+
+If file replacement or verified startup fails, the updater attempts to restore files from the application backup, starts the previous version, and returns a clear error.
 
 The updater has two entry points:
 
