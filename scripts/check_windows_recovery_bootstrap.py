@@ -86,7 +86,8 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
     )
     output_path = marker.with_suffix(".cmd-output.bin")
     timed_out = False
-    with output_path.open("wb") as output_handle:
+    output_destination = Path(os.devnull) if shell_association else output_path
+    with output_destination.open("wb") as output_handle:
         process = subprocess.Popen(
             ["cmd.exe", "/d", "/c", str(wrapper)],
             stdin=subprocess.PIPE,
@@ -106,7 +107,7 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
                 check=False,
             )
             process.wait(timeout=10)
-    output = output_path.read_bytes()
+    output = b"" if shell_association else output_path.read_bytes()
     if shell_association and not marker.is_file():
         deadline = time.monotonic() + 10
         while time.monotonic() < deadline and not marker.is_file():
