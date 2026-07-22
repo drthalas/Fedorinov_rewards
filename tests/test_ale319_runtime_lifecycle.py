@@ -163,10 +163,11 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertEqual(identity["instance_token"], evidence.instance_token)
         self.assertEqual(identity["build_id"], evidence.build_id)
 
-    def test_backend_uses_build_scoped_read_only_bytecode_policy(self) -> None:
+    def test_backend_uses_writable_build_scoped_bytecode_cache(self) -> None:
         source = (ROOT / "backend" / "app" / "services" / "runtime_supervisor.py").read_text(encoding="utf-8")
         self.assertIn('"PYTHONPYCACHEPREFIX": str(self.registry_dir / "pycache" / build_id)', source)
-        self.assertIn('"PYTHONDONTWRITEBYTECODE": "1"', source)
+        self.assertIn('environment.pop("PYTHONDONTWRITEBYTECODE", None)', source)
+        self.assertNotIn('"PYTHONDONTWRITEBYTECODE": "1"', source)
 
     def test_two_confirmed_backends_are_forced_down_before_one_start(self) -> None:
         supervisor = self.supervisor()

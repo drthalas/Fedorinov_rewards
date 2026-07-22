@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 import sys
@@ -18,6 +19,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--install-root", required=True, type=Path)
     parser.add_argument("--instance-token", required=True)
     parser.add_argument("--state-path", required=True, type=Path)
+    parser.add_argument("--startup-path", required=True, type=Path)
     parser.add_argument("--expected-version", required=True)
     parser.add_argument("--expected-build-id", required=True)
     return parser
@@ -26,9 +28,6 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     install_root = args.install_root.resolve(strict=False)
-    if install_root != SCRIPT_ROOT:
-        raise SystemExit(f"Runtime install root mismatch: {install_root} != {SCRIPT_ROOT}")
-
     os.environ.update(
         {
             "APP_HOST": args.host,
@@ -40,39 +39,84 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     from backend.app.services.runtime_identity import register_current_runtime, remove_runtime_state, runtime_build_id
+    from backend.app.services.runtime_startup import RuntimeStartupReporter
     from backend.app.version import APP_VERSION
 
-    if APP_VERSION != args.expected_version:
-        raise SystemExit(f"Runtime version mismatch: {APP_VERSION} != {args.expected_version}")
-    build_id = runtime_build_id(install_root)
-    if build_id != args.expected_build_id:
-        raise SystemExit(f"Runtime build mismatch: {build_id} != {args.expected_build_id}")
-
-    record = register_current_runtime(
+    reporter = RuntimeStartupReporter(
+        path=args.startup_path,
+        instance_token=args.instance_token,
         install_root=install_root,
         host=args.host,
         port=args.port,
-        version=APP_VERSION,
-        build_id=build_id,
-        instance_token=args.instance_token,
-        state_path=args.state_path,
+        expected_version=args.expected_version,
+        expected_build_id=args.expected_build_id,
     )
+    record = None
+    failed = False
     try:
-        import uvicorn
+        reporter.stage("validating-install-root")
+        if install_root != SCRIPT_ROOT:
+            raise RuntimeError(f"Runtime install root mismatch: {install_root} != {SCRIPT_ROOT}")
 
+        reporter.stage("validating-version")
+        if APP_VERSION != args.expected_version:
+            raise RuntimeError(f"Runtime version mismatch: {APP_VERSION} != {args.expected_version}")
+
+        reporter.stage("validating-build")
+        build_id = runtime_build_id(install_root)
+        if build_id != args.expected_build_id:
+            raise RuntimeError(f"Runtime build mismatch: {build_id} != {args.expected_build_id}")
+
+        reporter.stage("registering-identity")
+        record = register_current_runtime(
+            install_root=install_root,
+            host=args.host,
+            port=args.port,
+            version=APP_VERSION,
+            build_id=build_id,
+            instance_token=args.instance_token,
+            state_path=args.state_path,
+        )
+
+        reporter.stage("loading-server")
+        import uvicorn
+        from backend.app.main import app
+
+        reporter.stage("binding-port")
         uvicorn.run(
-            "backend.app.main:app",
+            app,
             host=args.host,
             port=args.port,
             access_log=False,
             log_level="info",
         )
-    finally:
-        remove_runtime_state(
-            args.state_path,
-            pid=record.pid,
-            instance_token=record.instance_token,
+    except BaseException as exc:
+        failed = True
+        reporter.failed(exc)
+        print(
+            json.dumps(
+                {
+                    "event": "runtime-startup-failed",
+                    "error_type": exc.__class__.__name__,
+                    "error": str(exc) or repr(exc),
+                },
+                ensure_ascii=False,
+            ),
+            file=sys.stderr,
+            flush=True,
         )
+        raise
+    finally:
+        if failed:
+            reporter.stop()
+        else:
+            reporter.remove()
+        if record is not None:
+            remove_runtime_state(
+                args.state_path,
+                pid=record.pid,
+                instance_token=record.instance_token,
+            )
     return 0
 
 

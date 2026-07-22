@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -21,17 +22,31 @@ from .runtime_identity import (
     fetch_runtime_identity,
     inspect_legacy_runtime,
     inspect_runtime_record,
+    listener_pids,
     process_snapshot,
     read_runtime_records,
     runtime_build_id,
     runtime_registry_dir,
     runtime_state_path,
 )
+from .runtime_startup import read_runtime_startup, runtime_startup_path
 from ..version import APP_NAME
 
 
 class RuntimeLifecycleError(RuntimeError):
     pass
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _read_log_tail(path: Path, line_limit: int = 12) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return ""
+    return " | ".join(line.strip() for line in lines[-line_limit:] if line.strip())[-1800:]
 
 
 @dataclass(frozen=True)
@@ -60,6 +75,8 @@ class StartEvidence:
     termination_seconds: float
     port_release_seconds: float
     readiness_seconds: float
+    spawned_at: str | None = None
+    identity_seconds: float | None = None
     stopped: list[StopEvidence] = field(default_factory=list)
     log_path: str | None = None
     process: subprocess.Popen[bytes] | None = field(default=None, repr=False)
@@ -78,6 +95,8 @@ class StartEvidence:
             "termination_seconds": self.termination_seconds,
             "port_release_seconds": self.port_release_seconds,
             "readiness_seconds": self.readiness_seconds,
+            "spawned_at": self.spawned_at,
+            "identity_seconds": self.identity_seconds,
             "stopped": [evidence.__dict__ for evidence in self.stopped],
             "log_path": self.log_path,
         }
@@ -115,12 +134,14 @@ class RuntimeSupervisor:
         stop_timeout: float = 2.0,
         port_timeout: float = 2.0,
         ready_timeout: float = 5.0,
+        startup_timeout: float = 30.0,
     ) -> None:
         self.registry_dir = (registry_dir or runtime_registry_dir()).resolve(strict=False)
         self.python_executable = (python_executable or Path(sys.executable)).expanduser().absolute()
         self.stop_timeout = max(0.1, stop_timeout)
         self.port_timeout = max(0.1, port_timeout)
         self.ready_timeout = max(0.2, ready_timeout)
+        self.startup_timeout = max(self.ready_timeout, startup_timeout)
         self._children: dict[int, subprocess.Popen[bytes]] = {}
 
     def _reap_child(self, pid: int) -> None:
@@ -211,6 +232,7 @@ class RuntimeSupervisor:
             if not inspection.confirmed:
                 if inspection.reason in {"process-not-running", "process-start-time-mismatch"}:
                     self._remove_state(record.state_path)
+                    self._remove_state(runtime_startup_path(self.registry_dir, record.instance_token))
                     return StopEvidence(
                         record.pid,
                         record.process_start_marker,
@@ -227,6 +249,7 @@ class RuntimeSupervisor:
             self._force_kill_pid(record.pid)
             if self._wait_process_gone(record):
                 self._remove_state(record.state_path)
+                self._remove_state(runtime_startup_path(self.registry_dir, record.instance_token))
                 return StopEvidence(
                     record.pid,
                     record.process_start_marker,
@@ -307,7 +330,7 @@ class RuntimeSupervisor:
         return evidence
 
     def stop_all_confirmed(self) -> list[StopEvidence]:
-        with RuntimeRegistryLock(self.registry_dir, timeout=self.ready_timeout + 2.0):
+        with RuntimeRegistryLock(self.registry_dir, timeout=self.startup_timeout + 2.0):
             return self._stop_confirmed_locked(self.inspect_all())
 
     def _wait_ports_released(self, endpoints: set[tuple[str, int]]) -> float:
@@ -337,6 +360,7 @@ class RuntimeSupervisor:
             raise RuntimeLifecycleError(f"Runtime server script not found: {server_script}")
         token = secrets.token_hex(16)
         state_path = runtime_state_path(self.registry_dir, token)
+        startup_path = runtime_startup_path(self.registry_dir, token)
         log_dir = self.registry_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"backend-{token}.log"
@@ -353,6 +377,8 @@ class RuntimeSupervisor:
             token,
             "--state-path",
             str(state_path),
+            "--startup-path",
+            str(startup_path),
             "--expected-version",
             version,
             "--expected-build-id",
@@ -365,12 +391,46 @@ class RuntimeSupervisor:
                 "APP_PORT": str(port),
                 "APP_INSTALL_DIR": str(install_root),
                 "APP_RUNTIME_DIR": str(self.registry_dir),
+                "APP_RUNTIME_STARTUP_PATH": str(startup_path),
                 "PYTHONPYCACHEPREFIX": str(self.registry_dir / "pycache" / build_id),
-                "PYTHONDONTWRITEBYTECODE": "1",
+                "PYTHONUNBUFFERED": "1",
             }
         )
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         with log_path.open("ab", buffering=0) as output:
+            output.write(
+                (
+                    json.dumps(
+                        {
+                            "event": "runtime-spawn-request",
+                            "at": _now_iso(),
+                            "command": command,
+                            "cwd": str(install_root),
+                            "environment": {
+                                key: environment.get(key)
+                                for key in (
+                                    "APP_HOST",
+                                    "APP_PORT",
+                                    "APP_INSTALL_DIR",
+                                    "APP_RUNTIME_DIR",
+                                    "APP_RUNTIME_STARTUP_PATH",
+                                    "REWARDS_DATA_DIR",
+                                    "REWARDS_DB_PATH",
+                                    "READ_ONLY",
+                                    "WRITE_MODE",
+                                    "PYTHONPYCACHEPREFIX",
+                                    "PYTHONDONTWRITEBYTECODE",
+                                    "PYTHONUNBUFFERED",
+                                )
+                            },
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode("utf-8")
+            )
             process = subprocess.Popen(
                 command,
                 cwd=install_root,
@@ -381,8 +441,106 @@ class RuntimeSupervisor:
                 creationflags=creationflags,
                 start_new_session=False,
             )
+            output.write(
+                (
+                    json.dumps(
+                        {
+                            "event": "runtime-spawned",
+                            "at": _now_iso(),
+                            "pid": process.pid,
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    )
+                    + "\n"
+                ).encode("utf-8")
+            )
         self._children[process.pid] = process
         return process, token, state_path, log_path
+
+    @staticmethod
+    def _record_mismatches(
+        record: RuntimeRecord,
+        *,
+        process: subprocess.Popen[bytes],
+        state_path: Path,
+        install_root: Path,
+        host: str,
+        port: int,
+        version: str,
+        build_id: str,
+    ) -> list[str]:
+        expected = {
+            "pid": process.pid,
+            "state_path": str(state_path.resolve()),
+            "install_root": os.path.normcase(str(install_root.resolve())),
+            "host": host,
+            "port": port,
+            "version": version,
+            "build_id": build_id,
+        }
+        actual = {
+            "pid": record.pid,
+            "state_path": record.state_path,
+            "install_root": os.path.normcase(str(Path(record.install_root).resolve(strict=False))),
+            "host": record.host,
+            "port": record.port,
+            "version": record.version,
+            "build_id": record.build_id,
+        }
+        return [
+            f"{key}: expected={expected[key]!r}, actual={actual[key]!r}"
+            for key in expected
+            if expected[key] != actual[key]
+        ]
+
+    def _startup_failure(
+        self,
+        *,
+        category: str,
+        process: subprocess.Popen[bytes],
+        token: str,
+        state_path: Path,
+        startup_path: Path,
+        log_path: Path,
+        host: str,
+        port: int,
+        elapsed: float,
+        detail: str = "",
+    ) -> RuntimeLifecycleError:
+        startup = read_runtime_startup(startup_path)
+        records, invalid = read_runtime_records(self.registry_dir)
+        record = next((candidate for candidate in records if candidate.instance_token == token), None)
+        listeners = sorted(listener_pids(host, port)) if _port_has_listener(host, port) else []
+        stage = "startup-state-missing"
+        startup_error = ""
+        if startup is not None:
+            stage = startup.previous_stage if startup.stage == "failed" and startup.previous_stage else startup.stage
+            if startup.error_type or startup.error_message:
+                startup_error = f"{startup.error_type or 'Error'}: {startup.error_message or ''}".strip()
+        registry_status = "present" if record is not None else "absent"
+        if state_path in invalid:
+            registry_status = "invalid"
+        exit_code = process.poll()
+        log_tail = _read_log_tail(log_path)
+        pieces = [
+            f"category={category}",
+            f"PID={process.pid}",
+            f"exit_code={exit_code if exit_code is not None else 'running'}",
+            f"elapsed={elapsed:.3f}s",
+            f"stage={stage}",
+            f"port={host}:{port}",
+            f"listeners={listeners or 'none'}",
+            f"registry={registry_status}",
+            f"log={log_path}",
+        ]
+        if detail:
+            pieces.append(f"detail={detail}")
+        if startup_error:
+            pieces.append(f"child_error={startup_error}")
+        elif log_tail:
+            pieces.append(f"log_tail={log_tail}")
+        return RuntimeLifecycleError("Новый backend не запущен: " + "; ".join(pieces) + ".")
 
     def _wait_ready(
         self,
@@ -395,32 +553,144 @@ class RuntimeSupervisor:
         port: int,
         version: str,
         build_id: str,
+        log_path: Path | None = None,
     ) -> tuple[RuntimeRecord, float]:
         started = time.monotonic()
-        deadline = started + self.ready_timeout
-        last_reason = "identity endpoint did not respond"
-        while time.monotonic() < deadline:
+        hard_deadline = started + self.startup_timeout
+        progress_deadline = started + self.ready_timeout
+        startup_path = runtime_startup_path(self.registry_dir, token)
+        log_path = log_path or self.registry_dir / "logs" / f"backend-{token}.log"
+        last_heartbeat = 0.0
+        while True:
+            now = time.monotonic()
+            startup = read_runtime_startup(startup_path)
+            if startup is not None:
+                startup_mismatch = []
+                if startup.instance_token != token:
+                    startup_mismatch.append("instance_token")
+                if startup.pid != process.pid:
+                    startup_mismatch.append("pid")
+                if os.path.normcase(startup.install_root) != os.path.normcase(str(install_root.resolve())):
+                    startup_mismatch.append("install_root")
+                if startup.host != host or startup.port != port:
+                    startup_mismatch.append("endpoint")
+                if startup.expected_version != version or startup.expected_build_id != build_id:
+                    startup_mismatch.append("version/build")
+                if startup_mismatch:
+                    raise self._startup_failure(
+                        category="startup-state-mismatch",
+                        process=process,
+                        token=token,
+                        state_path=state_path,
+                        startup_path=startup_path,
+                        log_path=log_path,
+                        host=host,
+                        port=port,
+                        elapsed=now - started,
+                        detail=", ".join(startup_mismatch),
+                    )
+                if startup.heartbeat_monotonic > last_heartbeat:
+                    last_heartbeat = startup.heartbeat_monotonic
+                    progress_deadline = min(hard_deadline, now + self.ready_timeout)
+
             if process.poll() is not None:
-                raise RuntimeLifecycleError(f"Новый backend завершился до readiness (exit {process.returncode}).")
-            records, _invalid = read_runtime_records(self.registry_dir)
+                category = "port-bind-failure" if _port_has_listener(host, port) else "child-crash"
+                raise self._startup_failure(
+                    category=category,
+                    process=process,
+                    token=token,
+                    state_path=state_path,
+                    startup_path=startup_path,
+                    log_path=log_path,
+                    host=host,
+                    port=port,
+                    elapsed=now - started,
+                )
+
+            records, invalid = read_runtime_records(self.registry_dir)
+            if state_path in invalid:
+                raise self._startup_failure(
+                    category="registry-state-invalid",
+                    process=process,
+                    token=token,
+                    state_path=state_path,
+                    startup_path=startup_path,
+                    log_path=log_path,
+                    host=host,
+                    port=port,
+                    elapsed=now - started,
+                )
             record = next((candidate for candidate in records if candidate.instance_token == token), None)
             if record is not None:
-                inspection = inspect_runtime_record(record, health_timeout=0.15)
-                last_reason = inspection.reason
-                if (
-                    inspection.confirmed
-                    and inspection.healthy
-                    and record.pid == process.pid
-                    and record.host == host
-                    and record.port == port
-                    and record.version == version
-                    and record.build_id == build_id
-                    and os.path.normcase(record.install_root) == os.path.normcase(str(install_root.resolve()))
-                    and record.state_path == str(state_path.resolve())
-                ):
-                    return record, time.monotonic() - started
+                mismatches = self._record_mismatches(
+                    record,
+                    process=process,
+                    state_path=state_path,
+                    install_root=install_root,
+                    host=host,
+                    port=port,
+                    version=version,
+                    build_id=build_id,
+                )
+                if mismatches:
+                    raise self._startup_failure(
+                        category="registry-identity-mismatch",
+                        process=process,
+                        token=token,
+                        state_path=state_path,
+                        startup_path=startup_path,
+                        log_path=log_path,
+                        host=host,
+                        port=port,
+                        elapsed=now - started,
+                        detail=" | ".join(mismatches),
+                    )
+                identity = fetch_runtime_identity(host, port, timeout=0.15)
+                if identity is not None:
+                    inspection = inspect_runtime_record(record, health_timeout=0.2)
+                    if inspection.confirmed and inspection.healthy:
+                        return record, time.monotonic() - started
+                    if inspection.identity is not None:
+                        raise self._startup_failure(
+                            category="http-identity-mismatch",
+                            process=process,
+                            token=token,
+                            state_path=state_path,
+                            startup_path=startup_path,
+                            log_path=log_path,
+                            host=host,
+                            port=port,
+                            elapsed=now - started,
+                            detail=inspection.reason,
+                        )
+
+            if now >= hard_deadline:
+                raise self._startup_failure(
+                    category="slow-start-hard-limit",
+                    process=process,
+                    token=token,
+                    state_path=state_path,
+                    startup_path=startup_path,
+                    log_path=log_path,
+                    host=host,
+                    port=port,
+                    elapsed=now - started,
+                    detail=f"active startup exceeded {self.startup_timeout:.1f}s",
+                )
+            if now >= progress_deadline:
+                raise self._startup_failure(
+                    category="startup-stalled",
+                    process=process,
+                    token=token,
+                    state_path=state_path,
+                    startup_path=startup_path,
+                    log_path=log_path,
+                    host=host,
+                    port=port,
+                    elapsed=now - started,
+                    detail=f"no startup heartbeat within {self.ready_timeout:.1f}s",
+                )
             time.sleep(0.05)
-        raise RuntimeLifecycleError(f"Новый backend не подтвердил runtime identity за {self.ready_timeout:.1f} с: {last_reason}.")
 
     def start_or_reuse(
         self,
@@ -433,7 +703,7 @@ class RuntimeSupervisor:
         install_root = install_root.resolve(strict=False)
         version = expected_version or read_installed_version(install_root)
         build_id = runtime_build_id(install_root)
-        with RuntimeRegistryLock(self.registry_dir, timeout=self.ready_timeout + 2.0):
+        with RuntimeRegistryLock(self.registry_dir, timeout=self.startup_timeout + 2.0):
             detection_started = time.monotonic()
             inspections = self.inspect_all()
             desired = [
@@ -504,6 +774,7 @@ class RuntimeSupervisor:
                     f"Порт {host}:{port} занят {detail}. Посторонний процесс не был завершён."
                 )
 
+            spawned_at = _now_iso()
             process, token, state_path, log_path = self._spawn_backend(
                 install_root=install_root,
                 host=host,
@@ -521,6 +792,7 @@ class RuntimeSupervisor:
                     port=port,
                     version=version,
                     build_id=build_id,
+                    log_path=log_path,
                 )
                 # Readiness already proves the HTTP identity. Repeating that short
                 # network probe here can misclassify a transient timeout as a failed
@@ -555,6 +827,8 @@ class RuntimeSupervisor:
                 termination_seconds=termination_seconds,
                 port_release_seconds=port_release_seconds,
                 readiness_seconds=readiness_seconds,
+                spawned_at=spawned_at,
+                identity_seconds=readiness_seconds,
                 stopped=stopped,
                 log_path=str(log_path),
                 process=process,
