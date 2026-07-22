@@ -522,9 +522,15 @@ class RuntimeSupervisor:
                     version=version,
                     build_id=build_id,
                 )
-                after = [inspection for inspection in self.inspect_all() if inspection.confirmed]
-                if len(after) != 1 or after[0].record.instance_token != token or not after[0].healthy:
-                    raise RuntimeLifecycleError("После запуска не подтверждён ровно один backend приложения.")
+                # Readiness already proves the HTTP identity. Repeating that short
+                # network probe here can misclassify a transient timeout as a failed
+                # launch, so the final postcondition is process/registry identity.
+                after, invalid_after = read_runtime_records(self.registry_dir)
+                if process.poll() is not None or invalid_after or after != [record]:
+                    raise RuntimeLifecycleError(
+                        "После запуска не подтверждён ровно один backend приложения: "
+                        f"process_exit={process.poll()}, records={after}, invalid={invalid_after}."
+                    )
             except Exception:
                 if process.poll() is None:
                     process.kill()

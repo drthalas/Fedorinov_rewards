@@ -31,7 +31,9 @@ from backend.app.services.runtime_identity import (
     fetch_runtime_identity,
     fetch_version_identity,
     inspect_legacy_runtime,
+    listener_pids,
     process_snapshot,
+    read_runtime_records,
     runtime_build_id,
 )
 from backend.app.services.runtime_supervisor import RuntimeLifecycleError, RuntimeSupervisor
@@ -127,6 +129,39 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertLess(first.detection_seconds, 2.0)
         self.assertLess(first.readiness_seconds, 5.0)
         self.assertLess(second.detection_seconds, 2.0)
+
+    def test_start_does_not_repeat_health_probe_after_readiness(self) -> None:
+        supervisor = self.supervisor()
+        port = free_port()
+        original_wait_ready = supervisor._wait_ready
+        original_inspect_all = supervisor.inspect_all
+        readiness_complete = False
+        post_readiness_inspections = 0
+
+        def wait_ready(**kwargs):
+            nonlocal readiness_complete
+            result = original_wait_ready(**kwargs)
+            readiness_complete = True
+            return result
+
+        def inspect_all():
+            nonlocal post_readiness_inspections
+            if readiness_complete:
+                post_readiness_inspections += 1
+            return original_inspect_all()
+
+        with (
+            patch.object(supervisor, "_wait_ready", side_effect=wait_ready),
+            patch.object(supervisor, "inspect_all", side_effect=inspect_all),
+        ):
+            evidence = self.start(supervisor, port)
+
+        self.assertEqual(post_readiness_inspections, 0)
+        identity = fetch_runtime_identity("127.0.0.1", port)
+        self.assertIsNotNone(identity)
+        self.assertEqual(identity["pid"], evidence.pid)
+        self.assertEqual(identity["instance_token"], evidence.instance_token)
+        self.assertEqual(identity["build_id"], evidence.build_id)
 
     def test_backend_uses_build_scoped_read_only_bytecode_policy(self) -> None:
         source = (ROOT / "backend" / "app" / "services" / "runtime_supervisor.py").read_text(encoding="utf-8")
@@ -619,12 +654,14 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
             + "\n",
             encoding="utf-8",
         )
+        launcher_log_path = self.root / "launcher.log"
+        launcher_log = launcher_log_path.open("wb")
         launcher = subprocess.Popen(
             [sys.executable, str(self.install_root / "scripts" / "runtime_bootstrap.py"), "start", "--wait"],
             cwd=self.install_root,
             env=os.environ.copy(),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=launcher_log,
+            stderr=subprocess.STDOUT,
         )
         try:
             deadline = time.monotonic() + 8
@@ -657,22 +694,43 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
 
             deadline = time.monotonic() + 20
             new_identity = None
+            observed_identities: list[dict[str, object]] = []
             while time.monotonic() < deadline:
                 new_identity = fetch_runtime_identity("127.0.0.1", self.port, 0.15)
+                if new_identity and (not observed_identities or observed_identities[-1] != new_identity):
+                    observed_identities.append(new_identity)
                 if new_identity and new_identity.get("version") == "9.0.1":
                     break
                 time.sleep(0.1)
-            diagnostics = {
-                str(path.relative_to(self.root)): path.read_text(encoding="utf-8", errors="replace")
-                for path in sorted(self.root.rglob("*.log"))
-            }
-            diagnostics["request-result"] = json.dumps(scheduled_result, ensure_ascii=False)
-            status_path = self.install_root / "updates" / "update_status.json"
-            if status_path.is_file():
-                diagnostics[str(status_path.relative_to(self.root))] = status_path.read_text(
-                    encoding="utf-8", errors="replace"
+            if new_identity is None:
+                launcher_log.flush()
+                diagnostics = {
+                    str(path.relative_to(self.root)): path.read_text(encoding="utf-8", errors="replace")
+                    for path in sorted(self.root.rglob("*.log"))
+                }
+                diagnostics["request-result"] = json.dumps(scheduled_result, ensure_ascii=False)
+                diagnostics["launcher-returncode"] = json.dumps(launcher.poll())
+                old_snapshot = process_snapshot(int(old_identity["pid"]))
+                diagnostics["old-process"] = json.dumps(
+                    old_snapshot.__dict__ if old_snapshot is not None else None,
+                    ensure_ascii=False,
+                    default=str,
                 )
-            self.assertIsNotNone(new_identity, diagnostics)
+                records, invalid_records = read_runtime_records(self.registry)
+                diagnostics["observed-identities"] = json.dumps(
+                    observed_identities, ensure_ascii=False, default=str
+                )
+                diagnostics["listener-pids"] = json.dumps(sorted(listener_pids("127.0.0.1", self.port)))
+                diagnostics["registry-records"] = json.dumps(
+                    [record.__dict__ for record in records], ensure_ascii=False, default=str
+                )
+                diagnostics["invalid-registry-records"] = json.dumps([str(path) for path in invalid_records])
+                status_path = self.install_root / "updates" / "update_status.json"
+                if status_path.is_file():
+                    diagnostics[str(status_path.relative_to(self.root))] = status_path.read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+                self.fail(diagnostics)
             self.assertNotEqual(new_identity["pid"], old_identity["pid"])
             time.sleep(0.3)
             self.assertIsNone(launcher.poll())
@@ -683,6 +741,7 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
             if launcher.poll() is None:
                 launcher.terminate()
                 launcher.wait(timeout=3)
+            launcher_log.close()
 
     def test_live_old_backend_is_replaced_by_exact_new_version(self) -> None:
         old = self._start_old()
