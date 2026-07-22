@@ -232,7 +232,7 @@ def main(argv: list[str] | None = None) -> int:
     rendered = json.dumps(evidence, ensure_ascii=False, indent=2)
     if args.output:
         args.output.write_text(rendered + "\n", encoding="utf-8")
-    print(rendered)
+    sys.stdout.buffer.write(rendered.encode("utf-8") + b"\n")
     return 0
 
 
