@@ -68,6 +68,29 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.5
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-22.
+
+Тип: patch release.
+
+Состав:
+
+- Более предсказуемое создание и редактирование кавалеров и наград.
+- Строгая проверка четырёхзначного года рождения и корректная проверка номера награды.
+- Отключённые browser autocomplete-подсказки в рабочих формах.
+- Сохранённые улучшения фотографий, каталога и производительности на больших базах.
+- Надёжный single-instance handoff при обновлении: старый backend останавливается, затем запускается единственный backend новой версии.
+- Закреплённый dependency graph для воспроизводимой установки и обновления.
+
+Проверки:
+
+- Focused form/updater/runtime regression, full suite, compileall и JS syntax: PASS.
+- TEMP packaged Browser smoke, package safety и updater compatibility: PASS.
+- Реальные DB и media не изменялись.
+
 ## v2.0.4
 
 Статус: выпущено.

@@ -106,7 +106,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
             install_root=ROOT,
             host="127.0.0.1",
             port=port,
-            expected_version="2.0.4",
+            expected_version="2.0.5",
         )
 
     def test_clean_and_repeated_start_leave_one_backend(self) -> None:
@@ -122,7 +122,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertEqual(len(confirmed), 1)
         identity = fetch_runtime_identity("127.0.0.1", port)
         self.assertEqual(identity["pid"], first.pid)
-        self.assertEqual(identity["version"], "2.0.4")
+        self.assertEqual(identity["version"], "2.0.5")
         self.assertEqual(identity["build_id"], runtime_build_id(ROOT))
         self.assertEqual(identity["install_root"], str(ROOT))
         self.assertEqual(identity["instance_token"], first.instance_token)
@@ -183,7 +183,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                version="2.0.4",
+                version="2.0.5",
                 build_id=build_id,
             )
             supervisor._wait_ready(
@@ -193,7 +193,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                version="2.0.4",
+                version="2.0.5",
                 build_id=build_id,
             )
             spawned.append((process, process_snapshot(process.pid).start_marker))
@@ -222,7 +222,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 "command_line": snapshot.command_line,
                 "host": "127.0.0.1",
                 "port": free_port(),
-                "version": "2.0.4",
+                "version": "2.0.5",
                 "build_id": runtime_build_id(ROOT),
                 "instance_token": "a" * 32,
                 "created_at": "2026-07-21T00:00:00+00:00",
@@ -243,7 +243,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
 import json, sys
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        body = json.dumps({'app_name': 'Награды и награждённые', 'version': '2.0.4'}).encode()
+        body = json.dumps({'app_name': 'Награды и награждённые', 'version': '2.0.5'}).encode()
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', str(len(body)))
@@ -341,7 +341,7 @@ HTTPServer(('127.0.0.1', int(sys.argv[1])), Handler).serve_forever()
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                expected_version="2.0.4",
+                expected_version="2.0.5",
             )
             self.assertFalse(managed.reused)
             self.assertEqual(len(managed.stopped), 1)
