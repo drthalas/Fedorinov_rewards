@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 from zipfile import ZipFile
 
 
@@ -66,7 +67,7 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
     if os.name != "nt":
         raise RuntimeError("native cmd.exe gate requires Windows")
     wrapper = marker.parent / ("shell-association.cmd" if shell_association else "direct-call.cmd")
-    command = 'start "" /wait "%TARGET_BAT%"' if shell_association else 'call "%TARGET_BAT%"'
+    command = 'start "" "%TARGET_BAT%"' if shell_association else 'call "%TARGET_BAT%"'
     wrapper.write_bytes(
         (
             "@echo off\r\n"
@@ -106,6 +107,11 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
             )
             process.wait(timeout=10)
     output = output_path.read_bytes()
+    if shell_association and not marker.is_file():
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline and not marker.is_file():
+            time.sleep(0.1)
+        timed_out = not marker.is_file()
     decoded: dict[str, str] = {}
     for encoding in ("utf-8", "cp866", "cp1251"):
         decoded[encoding] = output.decode(encoding, errors="replace")[-6000:]
@@ -200,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
     windows_version = sys.getwindowsversion()
     with tempfile.TemporaryDirectory(prefix="ale327-windows-cmd-") as tmpdir:
         root = Path(tmpdir)
-        evidence = {
+        evidence: dict[str, object] = {
             "platform": sys.platform,
             "windows_version": {
                 "major": windows_version.major,
@@ -209,9 +215,14 @@ def main(argv: list[str] | None = None) -> int:
                 "platform": windows_version.platform,
                 "service_pack": windows_version.service_pack,
             },
-            "public_v206": inspect_public_failure(args.public_v206_recovery, root / "forensic"),
-            "corrective_v207": verify_corrective_bootstrap(args.corrective_recovery, root / "corrective"),
         }
+        evidence["public_v206"] = inspect_public_failure(args.public_v206_recovery, root / "forensic")
+        if args.output:
+            args.output.write_text(json.dumps(evidence, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        evidence["corrective_v207"] = verify_corrective_bootstrap(
+            args.corrective_recovery,
+            root / "corrective",
+        )
     rendered = json.dumps(evidence, ensure_ascii=False, indent=2)
     if args.output:
         args.output.write_text(rendered + "\n", encoding="utf-8")
