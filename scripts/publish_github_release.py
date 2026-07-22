@@ -26,7 +26,7 @@ def release_title(version: str = APP_VERSION) -> str:
 
 def release_assets(version: str = APP_VERSION) -> list[Path]:
     assets = [versioned_zip_path(version)]
-    if version == "2.0.6":
+    if version in {"2.0.6", "2.0.7"}:
         assets.append(recovery_zip_path(version))
     assets.append(latest_json_path())
     return assets

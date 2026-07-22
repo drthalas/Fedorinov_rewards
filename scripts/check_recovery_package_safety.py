@@ -15,15 +15,28 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from backend.app.services.update_archive_policy import validate_zip_members  # noqa: E402
 
 
-ROOT_FILES = {
-    "ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.6.bat",
-    "ИНСТРУКЦИЯ.txt",
+SUPPORTED_SOURCE_VERSIONS = {
+    "2.0.6": ["2.0.5"],
+    "2.0.7": ["2.0.5", "2.0.6"],
 }
-SERVICE_FILES = {
-    "service/recovery_v206.py",
-    "service/manifest.json",
-    "service/FedorinovRewards_WebPreview_v2.0.6.zip",
-}
+
+
+def expected_root_files(version: str) -> set[str]:
+    return {f"ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_{version}.bat", "ИНСТРУКЦИЯ.txt"}
+
+
+def expected_service_files(version: str) -> set[str]:
+    compact = version.replace(".", "")
+    return {
+        f"service/recovery_v{compact}.py",
+        "service/manifest.json",
+        f"service/FedorinovRewards_WebPreview_v{version}.zip",
+    }
+
+
+# Compatibility aliases for the immutable v2.0.6 package tests.
+ROOT_FILES = expected_root_files("2.0.6")
+SERVICE_FILES = expected_service_files("2.0.6")
 
 
 def _is_special(member: ZipInfo) -> bool:
@@ -32,14 +45,30 @@ def _is_special(member: ZipInfo) -> bool:
     return bool(file_type and not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)))
 
 
+def _validate_corrective_bootstrap(content: bytes) -> None:
+    if content.startswith((b"\xef\xbb\xbf", b"\xff\xfe", b"\xfe\xff")):
+        raise RuntimeError("corrective recovery bootstrap must not contain a BOM")
+    if not content.isascii():
+        raise RuntimeError("corrective recovery bootstrap must be ASCII-only")
+    if b"\r\n" not in content or content.replace(b"\r\n", b"").find(b"\n") >= 0:
+        raise RuntimeError("corrective recovery bootstrap must use CRLF only")
+    if b"\r" in content.replace(b"\r\n", b""):
+        raise RuntimeError("corrective recovery bootstrap contains a bare CR")
+    text = content.decode("ascii")
+    forbidden = ("chcp", "(", ")", "EnableDelayedExpansion", "powershell")
+    if any(value.casefold() in text.casefold() for value in forbidden):
+        raise RuntimeError("corrective recovery bootstrap contains parser-sensitive control flow")
+    required = ("%~dp0", "recovery_v207.py", "--service-dir", "exit /b")
+    if any(value not in text for value in required):
+        raise RuntimeError("corrective recovery bootstrap contract is incomplete")
+
+
 def check_recovery_package(path: Path) -> dict[str, object]:
     with ZipFile(path) as archive:
         if archive.testzip():
             raise RuntimeError("recovery ZIP has a corrupt member")
         members = [member for member in archive.infolist() if not member.is_dir()]
         names = {member.filename.replace("\\", "/") for member in members}
-        if names != ROOT_FILES | SERVICE_FILES:
-            raise RuntimeError(f"unexpected recovery members: {sorted(names ^ (ROOT_FILES | SERVICE_FILES))}")
         if any(
             name.startswith("/") or ".." in Path(name).parts or ":" in name.split("/", 1)[0]
             for name in names
@@ -50,9 +79,15 @@ def check_recovery_package(path: Path) -> dict[str, object]:
         manifest = json.loads(archive.read("service/manifest.json").decode("utf-8"))
         if manifest.get("schema") != 1 or manifest.get("application_id") != "fedorinov-rewards-recovery":
             raise RuntimeError("invalid recovery manifest identity")
-        if manifest.get("version") != "2.0.6" or manifest.get("supported_source_versions") != ["2.0.5"]:
+        version = str(manifest.get("version") or "")
+        if version not in SUPPORTED_SOURCE_VERSIONS:
+            raise RuntimeError("unsupported recovery version contract")
+        expected = expected_root_files(version) | expected_service_files(version)
+        if names != expected:
+            raise RuntimeError(f"unexpected recovery members: {sorted(names ^ expected)}")
+        if manifest.get("supported_source_versions") != SUPPORTED_SOURCE_VERSIONS[version]:
             raise RuntimeError("invalid recovery version contract")
-        nested_bytes = archive.read("service/FedorinovRewards_WebPreview_v2.0.6.zip")
+        nested_bytes = archive.read(f"service/FedorinovRewards_WebPreview_v{version}.zip")
         if len(nested_bytes) != int(manifest["package_size"]):
             raise RuntimeError("nested main package size mismatch")
         if hashlib.sha256(nested_bytes).hexdigest() != manifest["package_sha256"]:
@@ -67,6 +102,8 @@ def check_recovery_package(path: Path) -> dict[str, object]:
         ):
             if expected not in instruction:
                 raise RuntimeError(f"recovery instruction is missing: {expected}")
+        if version == "2.0.7":
+            _validate_corrective_bootstrap(archive.read("ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.7.bat"))
 
     from io import BytesIO
 

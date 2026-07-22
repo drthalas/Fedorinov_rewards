@@ -10,7 +10,13 @@ import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
 
-from scripts import build_recovery_package, check_recovery_package_safety, recovery_v206, runtime_server
+from scripts import (
+    build_recovery_package,
+    check_recovery_package_safety,
+    recovery_v206,
+    recovery_v207,
+    runtime_server,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -348,6 +354,92 @@ class Ale327RecoveryTests(unittest.TestCase):
                 {name for name in archive.namelist() if not name.endswith("/")},
                 check_recovery_package_safety.ROOT_FILES | check_recovery_package_safety.SERVICE_FILES,
             )
+
+    def test_v207_bootstrap_is_ascii_crlf_and_parser_minimal(self) -> None:
+        dist = self.root / "dist-v207"
+        dist.mkdir()
+        main_zip = dist / "FedorinovRewards_WebPreview_v2.0.7.zip"
+        with ZipFile(main_zip, "w") as archive:
+            archive.writestr(
+                "FedorinovRewards_WebPreview/backend/app/version.py",
+                f'APP_NAME = "{recovery_v207.PRODUCT_NAME}"\nAPP_VERSION = "2.0.7"\n',
+            )
+            archive.writestr(
+                "FedorinovRewards_WebPreview/backend/requirements.txt",
+                (ROOT / "backend/requirements.txt").read_bytes(),
+            )
+            archive.writestr("FedorinovRewards_WebPreview/start_windows.bat", "@echo off\n")
+        with patch.object(build_recovery_package, "DIST_ROOT", dist):
+            result = build_recovery_package.build_recovery_package("2.0.7", main_package=main_zip)
+        recovery_zip = Path(result["zip_path"])
+        safety = check_recovery_package_safety.check_recovery_package(recovery_zip)
+        self.assertTrue(safety["safe"])
+        with ZipFile(recovery_zip) as archive:
+            names = {name for name in archive.namelist() if not name.endswith("/")}
+            self.assertEqual(
+                names,
+                check_recovery_package_safety.expected_root_files("2.0.7")
+                | check_recovery_package_safety.expected_service_files("2.0.7"),
+            )
+            bootstrap = archive.read("ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.7.bat")
+            manifest = json.loads(archive.read("service/manifest.json"))
+        self.assertTrue(bootstrap.isascii())
+        self.assertFalse(bootstrap.startswith(b"\xef\xbb\xbf"))
+        self.assertEqual(bootstrap.count(b"\n"), bootstrap.count(b"\r\n"))
+        self.assertNotIn(b"(", bootstrap)
+        self.assertNotIn(b")", bootstrap)
+        self.assertNotIn(b"chcp", bootstrap.lower())
+        self.assertEqual(manifest["supported_source_versions"], ["2.0.5", "2.0.6"])
+
+    def test_v207_accepts_only_supported_recovery_sources(self) -> None:
+        for version in ("2.0.5", "2.0.6"):
+            install = self._install(f"supported-{version}")
+            (install.install_root / "backend/app/version.py").write_text(
+                f'APP_NAME = "{recovery_v207.PRODUCT_NAME}"\nAPP_VERSION = "{version}"\n',
+                encoding="utf-8",
+            )
+            candidate = recovery_v207.validate_installation(
+                install.install_root,
+                supported_versions=recovery_v207.SUPPORTED_SOURCE_VERSIONS,
+            )
+            self.assertIsNotNone(candidate)
+        unsupported = self._install("unsupported")
+        (unsupported.install_root / "backend/app/version.py").write_text(
+            f'APP_NAME = "{recovery_v207.PRODUCT_NAME}"\nAPP_VERSION = "2.0.4"\n',
+            encoding="utf-8",
+        )
+        self.assertIsNone(
+            recovery_v207.validate_installation(
+                unsupported.install_root,
+                supported_versions=recovery_v207.SUPPORTED_SOURCE_VERSIONS,
+            )
+        )
+
+    def test_v207_cancel_precedes_backup_and_all_mutation(self) -> None:
+        selected = self._install("cancel-before-mutation")
+        (selected.install_root / "backend/app/version.py").write_text(
+            f'APP_NAME = "{recovery_v207.PRODUCT_NAME}"\nAPP_VERSION = "2.0.6"\n',
+            encoding="utf-8",
+        )
+        selected = recovery_v207.validate_installation(
+            selected.install_root,
+            supported_versions=recovery_v207.SUPPORTED_SOURCE_VERSIONS,
+        )
+        self.assertIsNotNone(selected)
+        ui = ScriptedUI(confirmations=[False])
+        before = {
+            str(path.relative_to(selected.install_root)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in selected.install_root.rglob("*")
+            if path.is_file()
+        }
+        with self.assertRaises(recovery_v207.RecoveryCancelled):
+            recovery_v207.select_installation([selected], ui)
+        after = {
+            str(path.relative_to(selected.install_root)): hashlib.sha256(path.read_bytes()).hexdigest()
+            for path in selected.install_root.rglob("*")
+            if path.is_file()
+        }
+        self.assertEqual(after, before)
 
 
 if __name__ == "__main__":

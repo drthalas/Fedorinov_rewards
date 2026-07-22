@@ -139,11 +139,22 @@ class ReleasePackageTests(unittest.TestCase):
             ],
         )
 
-    def test_future_publication_does_not_require_one_time_v206_recovery_asset(self) -> None:
+    def test_v207_corrective_publication_requires_recovery_asset(self) -> None:
         assets = publish_github_release.release_assets("2.0.7")
         self.assertEqual(
             [path.name for path in assets],
-            ["FedorinovRewards_WebPreview_v2.0.7.zip", "latest.json"],
+            [
+                "FedorinovRewards_WebPreview_v2.0.7.zip",
+                "FedorinovRewards_Recovery_v2.0.7.zip",
+                "latest.json",
+            ],
+        )
+
+    def test_future_publication_does_not_require_recovery_asset_by_default(self) -> None:
+        assets = publish_github_release.release_assets("2.0.8")
+        self.assertEqual(
+            [path.name for path in assets],
+            ["FedorinovRewards_WebPreview_v2.0.8.zip", "latest.json"],
         )
 
     def test_manual_release_workflow_is_manual_and_safe_by_default(self) -> None:

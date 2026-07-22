@@ -1,0 +1,135 @@
+name: Windows Recovery Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/ale-327-windows-recovery-bootstrap
+
+permissions:
+  contents: read
+
+jobs:
+  native-windows-recovery:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pinned dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt
+          python -m pip check
+
+      - name: Download immutable public recovery inputs
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -UseBasicParsing `
+            -Uri "https://github.com/drthalas/Fedorinov_rewards/releases/download/v2.0.6/FedorinovRewards_Recovery_v2.0.6.zip" `
+            -OutFile "$env:RUNNER_TEMP\FedorinovRewards_Recovery_v2.0.6.zip"
+          Invoke-WebRequest -UseBasicParsing `
+            -Uri "https://github.com/drthalas/Fedorinov_rewards/releases/download/v2.0.5/FedorinovRewards_WebPreview_v2.0.5.zip" `
+            -OutFile "$env:RUNNER_TEMP\FedorinovRewards_WebPreview_v2.0.5.zip"
+
+      - name: Build corrective bootstrap fixture
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile
+          root = Path.cwd()
+          target = Path("dist/FedorinovRewards_WebPreview_v2.0.7.zip")
+          target.parent.mkdir(exist_ok=True)
+          with ZipFile(target, "w", ZIP_DEFLATED) as archive:
+              archive.writestr(
+                  "FedorinovRewards_WebPreview/backend/app/version.py",
+                  'APP_NAME = "Награды и награждённые"\nAPP_VERSION = "2.0.7"\nAPP_VERSION_DATE = "2026-07-22"\n',
+              )
+              archive.write(
+                  root / "backend/requirements.txt",
+                  "FedorinovRewards_WebPreview/backend/requirements.txt",
+              )
+              archive.write(
+                  root / "start_windows.bat",
+                  "FedorinovRewards_WebPreview/start_windows.bat",
+              )
+          '@ | python -
+          python scripts/build_recovery_package.py `
+            --version 2.0.7 `
+            --main-package dist/FedorinovRewards_WebPreview_v2.0.7.zip
+          python scripts/check_recovery_package_safety.py `
+            dist/FedorinovRewards_Recovery_v2.0.7.zip
+
+      - name: Native cmd parser and path matrix
+        shell: pwsh
+        run: |
+          python scripts/check_windows_recovery_bootstrap.py `
+            --public-v206-recovery "$env:RUNNER_TEMP\FedorinovRewards_Recovery_v2.0.6.zip" `
+            --corrective-recovery "dist\FedorinovRewards_Recovery_v2.0.7.zip" `
+            --output "windows-recovery-evidence.json"
+
+      - name: Focused recovery tests
+        shell: pwsh
+        run: |
+          python -m unittest tests.test_ale327_recovery tests.test_release_package tests.test_release_notification
+
+      - name: Detect final release source
+        id: release
+        shell: pwsh
+        run: |
+          $version = python -c "from backend.app.version import APP_VERSION; print(APP_VERSION)"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          if ($version -eq "2.0.7") {
+            "is_final=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "is_final=false" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Build exact final packages
+        if: steps.release.outputs.is_final == 'true'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist
+          python scripts/build_release_package.py --version 2.0.7
+          python scripts/build_recovery_package.py --version 2.0.7
+          python scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_v2.0.7.zip
+          python scripts/check_recovery_package_safety.py dist/FedorinovRewards_Recovery_v2.0.7.zip
+
+      - name: Exact public v2.0.5 compatibility - five cycles
+        if: steps.release.outputs.is_final == 'true'
+        shell: pwsh
+        run: |
+          python scripts/check_v205_v207_recovery_compatibility.py `
+            --public-v205 "$env:RUNNER_TEMP\FedorinovRewards_WebPreview_v2.0.5.zip" `
+            --candidate "dist\FedorinovRewards_WebPreview_v2.0.7.zip" `
+            --recovery "dist\FedorinovRewards_Recovery_v2.0.7.zip" `
+            --cycles 5 | Tee-Object -FilePath "windows-v205-v207-compatibility.json"
+
+      - name: Re-run native cmd gate on exact final recovery
+        if: steps.release.outputs.is_final == 'true'
+        shell: pwsh
+        run: |
+          python scripts/check_windows_recovery_bootstrap.py `
+            --public-v206-recovery "$env:RUNNER_TEMP\FedorinovRewards_Recovery_v2.0.6.zip" `
+            --corrective-recovery "dist\FedorinovRewards_Recovery_v2.0.7.zip" `
+            --output "windows-final-recovery-evidence.json"
+
+      - name: Upload native evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-recovery-gate-${{ github.sha }}
+          path: |
+            windows-recovery-evidence.json
+            windows-final-recovery-evidence.json
+            windows-v205-v207-compatibility.json
+            dist/FedorinovRewards_WebPreview_v2.0.7.zip
+            dist/FedorinovRewards_Recovery_v2.0.7.zip
+            dist/latest.json
+          if-no-files-found: warn

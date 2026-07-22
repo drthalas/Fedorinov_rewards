@@ -54,14 +54,14 @@ jobs:
         run: python3 scripts/build_release_package.py --version "${{ github.event.inputs.version }}"
 
       - name: Build recovery package
-        if: ${{ github.event.inputs.version == '2.0.6' }}
+        if: ${{ github.event.inputs.version == '2.0.6' || github.event.inputs.version == '2.0.7' }}
         run: python3 scripts/build_recovery_package.py --version "${{ github.event.inputs.version }}"
 
       - name: Safety check package
         run: python3 scripts/check_package_safety.py "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip"
 
       - name: Safety check recovery package
-        if: ${{ github.event.inputs.version == '2.0.6' }}
+        if: ${{ github.event.inputs.version == '2.0.6' || github.event.inputs.version == '2.0.7' }}
         run: python3 scripts/check_recovery_package_safety.py "dist/FedorinovRewards_Recovery_v${{ github.event.inputs.version }}.zip"
 
       - name: Validate latest.json
@@ -102,7 +102,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload recovery package artifact
-        if: ${{ github.event.inputs.version == '2.0.6' }}
+        if: ${{ github.event.inputs.version == '2.0.6' || github.event.inputs.version == '2.0.7' }}
         uses: actions/upload-artifact@v4
         with:
           name: FedorinovRewards-recovery-${{ github.event.inputs.version }}
@@ -135,7 +135,7 @@ jobs:
           if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
             PRERELEASE_FLAG="--prerelease"
           fi
-          if [ "${{ github.event.inputs.version }}" = "2.0.6" ]; then
+          if [ "${{ github.event.inputs.version }}" = "2.0.6" ] || [ "${{ github.event.inputs.version }}" = "2.0.7" ]; then
             RECOVERY_ASSET="dist/FedorinovRewards_Recovery_v${{ github.event.inputs.version }}.zip"
           fi
           gh release create "v${{ github.event.inputs.version }}" \

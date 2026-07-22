@@ -13,13 +13,24 @@ from zipfile import ZIP_DEFLATED, ZipFile
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DIST_ROOT = PROJECT_ROOT / "dist"
 RECOVERY_SOURCE_ROOT = PROJECT_ROOT / "recovery"
-SERVICE_SOURCE = PROJECT_ROOT / "scripts" / "recovery_v206.py"
 MAIN_PACKAGE_BASENAME = "FedorinovRewards_WebPreview"
 RECOVERY_PACKAGE_BASENAME = "FedorinovRewards_Recovery"
-USER_FILES = (
-    "ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.6.bat",
-    "ИНСТРУКЦИЯ.txt",
-)
+RECOVERY_CONFIGS = {
+    "2.0.6": {
+        "bootstrap_source": "ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.6.bat",
+        "instruction_source": "ИНСТРУКЦИЯ.txt",
+        "service_source": "recovery_v206.py",
+        "supported_source_versions": ["2.0.5"],
+        "normalize_bootstrap_crlf": False,
+    },
+    "2.0.7": {
+        "bootstrap_source": "ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_2.0.7.bat",
+        "instruction_source": "ИНСТРУКЦИЯ_2.0.7.txt",
+        "service_source": "recovery_v207.py",
+        "supported_source_versions": ["2.0.5", "2.0.6"],
+        "normalize_bootstrap_crlf": True,
+    },
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -38,9 +49,24 @@ def main_zip_path(version: str) -> Path:
     return DIST_ROOT / f"{MAIN_PACKAGE_BASENAME}_v{version}.zip"
 
 
+def _bootstrap_bytes(path: Path, *, normalize_crlf: bool) -> bytes:
+    content = path.read_bytes()
+    if not normalize_crlf:
+        return content
+    try:
+        text = content.decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise ValueError("The corrective recovery bootstrap must be ASCII-only.") from exc
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    if lines and not lines[-1]:
+        lines.pop()
+    return ("\r\n".join(lines) + "\r\n").encode("ascii")
+
+
 def build_recovery_package(version: str, *, main_package: Path | None = None) -> dict[str, object]:
-    if version != "2.0.6":
-        raise ValueError("This recovery package is intentionally scoped to v2.0.6.")
+    config = RECOVERY_CONFIGS.get(version)
+    if config is None:
+        raise ValueError(f"Recovery package configuration is missing for v{version}.")
     main_zip = (main_package or main_zip_path(version)).resolve(strict=False)
     if not main_zip.is_file():
         raise FileNotFoundError(f"main release package is missing: {main_zip}")
@@ -50,9 +76,20 @@ def build_recovery_package(version: str, *, main_package: Path | None = None) ->
         shutil.rmtree(service_root)
     (service_root / "service").mkdir(parents=True)
 
-    for filename in USER_FILES:
-        shutil.copy2(RECOVERY_SOURCE_ROOT / filename, service_root / filename)
-    shutil.copy2(SERVICE_SOURCE, service_root / "service" / SERVICE_SOURCE.name)
+    bootstrap_name = f"ВОССТАНОВИТЬ_И_ЗАПУСТИТЬ_{version}.bat"
+    bootstrap_source = RECOVERY_SOURCE_ROOT / str(config["bootstrap_source"])
+    (service_root / bootstrap_name).write_bytes(
+        _bootstrap_bytes(
+            bootstrap_source,
+            normalize_crlf=bool(config["normalize_bootstrap_crlf"]),
+        )
+    )
+    shutil.copy2(
+        RECOVERY_SOURCE_ROOT / str(config["instruction_source"]),
+        service_root / "ИНСТРУКЦИЯ.txt",
+    )
+    service_source = PROJECT_ROOT / "scripts" / str(config["service_source"])
+    shutil.copy2(service_source, service_root / "service" / service_source.name)
     shutil.copy2(main_zip, service_root / "service" / main_zip.name)
 
     manifest = {
@@ -63,7 +100,7 @@ def build_recovery_package(version: str, *, main_package: Path | None = None) ->
         "package_size": main_zip.stat().st_size,
         "package_sha256": sha256_file(main_zip),
         "requirements_sha256": sha256_file(requirements),
-        "supported_source_versions": ["2.0.5"],
+        "supported_source_versions": config["supported_source_versions"],
     }
     manifest_path = service_root / "service" / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -87,8 +124,8 @@ def build_recovery_package(version: str, *, main_package: Path | None = None) ->
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Build the one-time v2.0.6 recovery package.")
-    parser.add_argument("--version", default="2.0.6")
+    parser = argparse.ArgumentParser(description="Build a versioned Fedorinov Rewards recovery package.")
+    parser.add_argument("--version", default="2.0.7")
     parser.add_argument("--main-package", type=Path)
     args = parser.parse_args(argv)
     try:
