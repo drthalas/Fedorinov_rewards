@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -174,11 +173,18 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if os.name != "nt":
         parser.error("this gate must run under native Windows cmd.exe")
+    windows_version = sys.getwindowsversion()
     with tempfile.TemporaryDirectory(prefix="ale327-windows-cmd-") as tmpdir:
         root = Path(tmpdir)
         evidence = {
             "platform": sys.platform,
-            "windows_version": sys.getwindowsversion()._asdict(),
+            "windows_version": {
+                "major": windows_version.major,
+                "minor": windows_version.minor,
+                "build": windows_version.build,
+                "platform": windows_version.platform,
+                "service_pack": windows_version.service_pack,
+            },
             "public_v206": inspect_public_failure(args.public_v206_recovery, root / "forensic"),
             "corrective_v207": verify_corrective_bootstrap(args.corrective_recovery, root / "corrective"),
         }
