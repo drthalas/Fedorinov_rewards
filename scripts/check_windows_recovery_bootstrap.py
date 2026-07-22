@@ -67,7 +67,7 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
     if os.name != "nt":
         raise RuntimeError("native cmd.exe gate requires Windows")
     wrapper = marker.parent / ("shell-association.cmd" if shell_association else "direct-call.cmd")
-    command = 'start "" "%TARGET_BAT%"' if shell_association else 'call "%TARGET_BAT%"'
+    command = 'start "" "%TARGET_BAT%" >nul 2>nul' if shell_association else 'call "%TARGET_BAT%"'
     wrapper.write_bytes(
         (
             "@echo off\r\n"
@@ -112,9 +112,11 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
         while time.monotonic() < deadline and not marker.is_file():
             time.sleep(0.1)
         timed_out = not marker.is_file()
+    if shell_association and marker.is_file():
+        time.sleep(0.5)
     decoded: dict[str, str] = {}
     for encoding in ("utf-8", "cp866", "cp1251"):
-        decoded[encoding] = output.decode(encoding, errors="replace")[-6000:]
+        decoded[encoding] = output.decode(encoding, errors="replace")
     return {
         "codepage": codepage,
         "mode": "shell-association" if shell_association else "cmd-call",
@@ -123,8 +125,11 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
         "helper_reached": marker.is_file(),
         "cmd_parser_error": CMD_ERROR_MARKER in output,
         "output_sha256": sha256_bytes(output),
+        "output_bytes": len(output),
+        "output_hex": output[:10_000].hex(),
         "output_hex_tail": output[-1200:].hex(),
-        "decoded_tail": decoded,
+        "decoded": {encoding: value[:10_000] for encoding, value in decoded.items()},
+        "decoded_tail": {encoding: value[-6000:] for encoding, value in decoded.items()},
     }
 
 
