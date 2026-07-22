@@ -68,6 +68,30 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.7
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-22.
+
+Тип: corrective recovery patch.
+
+Состав:
+
+- Исправлен запуск recovery-архива в стандартном Windows `cmd.exe`.
+- Пользовательский BAT сведён к короткому ASCII-only bootstrap с Windows CRLF; основная логика восстановления выполняется app-owned helper.
+- Сохранены явный выбор установки, проверенный backup, rollback и защита DB/media.
+- Recovery поддерживает восстановление установок `v2.0.5` и `v2.0.6` без ручного переноса данных.
+- Предыдущий recovery-архив `v2.0.6` не заменяется; исправление публикуется отдельным immutable release.
+
+Проверки:
+
+- Exact public `v2.0.6` recovery failure воспроизведён на native Windows `cmd.exe`.
+- Native Windows parser/path/codepage gate, target selection, backup/install/rollback и повторный штатный запуск: PASS.
+- Exact public `v2.0.5` transition и corrective recovery на TEMP installations: PASS.
+- Full suite, compileall, JS syntax, package safety и packaged Browser smoke: PASS.
+- Реальные Owner/development DB и media не изменялись.
+
 ## v2.0.6
 
 Статус: выпущено.
