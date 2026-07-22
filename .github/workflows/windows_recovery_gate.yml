@@ -17,6 +17,8 @@ jobs:
   native-windows-recovery:
     runs-on: windows-latest
     timeout-minutes: 90
+    env:
+      PYTHONUTF8: "1"
     steps:
       - name: Checkout exact commit
         uses: actions/checkout@v4
