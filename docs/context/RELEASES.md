@@ -68,6 +68,29 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.6
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-22.
+
+Тип: production recovery patch.
+
+Состав:
+
+- Исправлен постоянный Windows startup timeout после `v2.0.5`.
+- Сохранена строгая runtime identity и single-instance проверка; active startup progress и no-progress timeout разделены.
+- Повторный запуск использует безопасный build-scoped pycache вне install tree.
+- Диагностика отличает slow start, crash, bind failure, registry mismatch и HTTP identity mismatch.
+- Для нерабочей `v2.0.5` применяется one-time recovery: новая папка, перенос только `.env`, запуск нового `.bat`.
+
+Проверки:
+
+- Focused Windows startup/handoff/rollback/single-instance/unrelated-port regression: PASS.
+- ALE-317 regressions, full suite, compileall и JS syntax: PASS.
+- TEMP packaged Browser smoke, package safety и `v2.0.5` recovery simulation: PASS.
+- Реальные Owner/development DB и media не изменялись.
+
 ## v2.0.5
 
 Статус: выпущено.

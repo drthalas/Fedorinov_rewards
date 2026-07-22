@@ -1,5 +1,25 @@
 # История изменений
 
+## v2.0.6
+
+Статус: выпущено.
+
+Дата релиза: 2026-07-22.
+
+Ключевые изменения:
+
+- Исправлен постоянный timeout запуска Windows-версии после обновления `v2.0.5`.
+- Backend с подтверждённым прогрессом получает ограниченное время на завершение первого запуска; зависший процесс по-прежнему останавливается по короткому timeout.
+- Внешний build-scoped pycache ускоряет повторные запуски и не изменяет файлы установки.
+- Добавлена точная диагностика slow start, crash, port bind и runtime identity mismatch без ослабления single-instance защиты.
+- Для не открывающейся `v2.0.5` зафиксирован безопасный one-time recovery через новую папку и перенос только `.env`.
+
+Проверки перед релизом:
+
+- Windows-style startup, crash, bind, handoff, rollback, single-instance и unrelated-port regression: PASS.
+- Full suite, compileall, JavaScript syntax и package safety: PASS.
+- TEMP packaged runtime, `v2.0.5` recovery simulation и real DB/media fingerprints: PASS.
+
 ## v2.0.5
 
 Статус: выпущено.
