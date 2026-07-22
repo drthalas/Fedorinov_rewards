@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from backend.app.services.runtime_identity import fetch_runtime_identity, runtime_build_id
 from backend.app.services.runtime_supervisor import RuntimeLifecycleError, RuntimeSupervisor
+from backend.app.version import APP_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -91,7 +92,7 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             install_root=install_root,
             host="127.0.0.1",
             port=port,
-            expected_version="2.0.6",
+            expected_version=APP_VERSION,
         )
 
     def test_delayed_windows_style_start_uses_progress_and_strict_identity(self) -> None:
@@ -142,7 +143,7 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
         self.assertIn("category=child-crash", message)
         self.assertIn("stage=validating-version", message)
         self.assertIn("registry=absent", message)
-        self.assertIn("Runtime version mismatch: 2.0.6 != 9.9.9", message)
+        self.assertIn(f"Runtime version mismatch: {APP_VERSION} != 9.9.9", message)
 
     def test_startup_crash_surfaces_exit_stage_traceback_and_log(self) -> None:
         install_root = self._copy_install("crash-install")
@@ -181,7 +182,7 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                version="2.0.6",
+                version=APP_VERSION,
                 build_id=build_id,
             )
             with self.assertRaises(RuntimeLifecycleError) as raised:
@@ -192,7 +193,7 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
                     install_root=install_root,
                     host="127.0.0.1",
                     port=port,
-                    version="2.0.6",
+                    version=APP_VERSION,
                     build_id=build_id,
                     log_path=log_path,
                 )

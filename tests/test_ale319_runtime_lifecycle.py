@@ -39,6 +39,7 @@ from backend.app.services.runtime_identity import (
 from backend.app.services.runtime_supervisor import RuntimeLifecycleError, RuntimeSupervisor
 from backend.app.services.supervised_update import run_supervised_update
 from backend.app.services.updater import UpdateError, UpdatePlan, read_update_status
+from backend.app.version import APP_VERSION
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -106,7 +107,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
             install_root=ROOT,
             host="127.0.0.1",
             port=port,
-            expected_version="2.0.6",
+            expected_version=APP_VERSION,
         )
 
     def test_clean_and_repeated_start_leave_one_backend(self) -> None:
@@ -122,7 +123,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertEqual(len(confirmed), 1)
         identity = fetch_runtime_identity("127.0.0.1", port)
         self.assertEqual(identity["pid"], first.pid)
-        self.assertEqual(identity["version"], "2.0.6")
+        self.assertEqual(identity["version"], APP_VERSION)
         self.assertEqual(identity["build_id"], runtime_build_id(ROOT))
         self.assertEqual(identity["install_root"], str(ROOT))
         self.assertEqual(identity["instance_token"], first.instance_token)
@@ -184,7 +185,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                version="2.0.6",
+                version=APP_VERSION,
                 build_id=build_id,
             )
             supervisor._wait_ready(
@@ -194,7 +195,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                version="2.0.6",
+                version=APP_VERSION,
                 build_id=build_id,
             )
             spawned.append((process, process_snapshot(process.pid).start_marker))
@@ -223,7 +224,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
                 "command_line": snapshot.command_line,
                 "host": "127.0.0.1",
                 "port": free_port(),
-                "version": "2.0.6",
+                "version": APP_VERSION,
                 "build_id": runtime_build_id(ROOT),
                 "instance_token": "a" * 32,
                 "created_at": "2026-07-21T00:00:00+00:00",
@@ -342,7 +343,7 @@ HTTPServer(('127.0.0.1', int(sys.argv[1])), Handler).serve_forever()
                 install_root=install_root,
                 host="127.0.0.1",
                 port=port,
-                expected_version="2.0.6",
+                expected_version=APP_VERSION,
             )
             self.assertFalse(managed.reused)
             self.assertEqual(len(managed.stopped), 1)
