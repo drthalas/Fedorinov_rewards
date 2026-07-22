@@ -8,7 +8,13 @@ import re
 import unittest
 
 from backend.app.services.update_archive_policy import SYSTEM_UI_ASSET_PATHS, forbidden_relative_reason
-from scripts import build_release_package, build_windows_preview_package, check_package_safety, publish_github_release
+from scripts import (
+    build_recovery_package,
+    build_release_package,
+    build_windows_preview_package,
+    check_package_safety,
+    publish_github_release,
+)
 from backend.app.version import APP_VERSION
 
 
@@ -103,13 +109,17 @@ class ReleasePackageTests(unittest.TestCase):
             tmp = Path(tmpdir)
             zip_path = tmp / f"FedorinovRewards_WebPreview_v{APP_VERSION}.zip"
             manifest_path = tmp / "latest.json"
+            recovery_path = tmp / f"FedorinovRewards_Recovery_v{APP_VERSION}.zip"
             notes_path = tmp / f"{APP_VERSION}.md"
             zip_path.write_bytes(b"zip")
+            recovery_path.write_bytes(b"recovery")
             manifest_path.write_text("{}", encoding="utf-8")
             notes_path.write_text("# notes\n", encoding="utf-8")
 
             with patch.object(publish_github_release, "versioned_zip_path", return_value=zip_path), patch.object(
                 publish_github_release, "latest_json_path", return_value=manifest_path
+            ), patch.object(
+                publish_github_release, "recovery_zip_path", return_value=recovery_path
             ), patch.object(publish_github_release, "release_notes_path", return_value=notes_path), patch.object(
                 publish_github_release, "_run_gh"
             ) as run_gh:
@@ -117,6 +127,24 @@ class ReleasePackageTests(unittest.TestCase):
 
             self.assertEqual(code, 0)
             run_gh.assert_not_called()
+
+    def test_v206_publication_requires_main_recovery_and_manifest_assets(self) -> None:
+        assets = publish_github_release.release_assets("2.0.6")
+        self.assertEqual(
+            [path.name for path in assets],
+            [
+                "FedorinovRewards_WebPreview_v2.0.6.zip",
+                "FedorinovRewards_Recovery_v2.0.6.zip",
+                "latest.json",
+            ],
+        )
+
+    def test_future_publication_does_not_require_one_time_v206_recovery_asset(self) -> None:
+        assets = publish_github_release.release_assets("2.0.7")
+        self.assertEqual(
+            [path.name for path in assets],
+            ["FedorinovRewards_WebPreview_v2.0.7.zip", "latest.json"],
+        )
 
     def test_manual_release_workflow_is_manual_and_safe_by_default(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "manual_release.yml").read_text(encoding="utf-8")
@@ -128,6 +156,9 @@ class ReleasePackageTests(unittest.TestCase):
         self.assertIn("publish == 'true'", workflow)
         self.assertIn("actions/upload-artifact", workflow)
         self.assertIn("gh release create", workflow)
+        self.assertIn("build_recovery_package.py", workflow)
+        self.assertIn("check_recovery_package_safety.py", workflow)
+        self.assertIn("FedorinovRewards_Recovery_v", workflow)
         self.assertIn("Input version", workflow)
         self.assertIn("APP_VERSION", workflow)
 

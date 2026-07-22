@@ -12,13 +12,14 @@
 - Backend с подтверждённым прогрессом получает ограниченное время на завершение первого запуска; зависший процесс по-прежнему останавливается по короткому timeout.
 - Внешний build-scoped pycache ускоряет повторные запуски и не изменяет файлы установки.
 - Добавлена точная диагностика slow start, crash, port bind и runtime identity mismatch без ослабления single-instance защиты.
-- Для не открывающейся `v2.0.5` зафиксирован безопасный one-time recovery через новую папку и перенос только `.env`.
+- Для не открывающейся `v2.0.5` добавлен отдельный recovery-архив: он проверяет выбранную установку, создаёт backup и сохраняет существующие DB/media без ручного переноса.
+- Новый runtime сохраняет обратную совместимость с точным launch contract публичного updater `v2.0.5`.
 
 Проверки перед релизом:
 
 - Windows-style startup, crash, bind, handoff, rollback, single-instance и unrelated-port regression: PASS.
 - Full suite, compileall, JavaScript syntax и package safety: PASS.
-- TEMP packaged runtime, `v2.0.5` recovery simulation и real DB/media fingerprints: PASS.
+- Exact public `v2.0.5` updater, recovery package, TEMP packaged runtime и real DB/media fingerprints: PASS.
 
 ## v2.0.5
 

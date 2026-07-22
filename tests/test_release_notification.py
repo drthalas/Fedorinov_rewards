@@ -159,6 +159,65 @@ class ReleaseNotificationTests(unittest.TestCase):
         send_message.assert_called_once()
         self.assertEqual(send_message.call_args.args[1], 2)
 
+    def test_recovery_dry_run_reports_exact_artifact_without_send(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            recovery = Path(tmpdir) / "FedorinovRewards_Recovery_v2.0.6.zip"
+            recovery.write_bytes(b"exact tested recovery")
+            with patch.object(self.sender.daily, "resolve_recipients", return_value=(1, [2])), \
+                patch.object(self.sender.daily, "send_message") as send_message, \
+                patch.object(self.sender.daily, "send_document") as send_document, \
+                patch(
+                    "sys.argv",
+                    [
+                        "send_release_notification.py",
+                        "--version",
+                        "2.0.6",
+                        "--recovery-zip",
+                        str(recovery),
+                        "--dry-run",
+                    ],
+                ):
+                result = self.sender.main()
+        self.assertEqual(result, 0)
+        send_message.assert_not_called()
+        send_document.assert_not_called()
+
+    def test_recovery_send_uses_document_once_per_recipient_and_logs_checksum(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            recovery = root / "FedorinovRewards_Recovery_v2.0.6.zip"
+            recovery.write_bytes(b"exact tested recovery")
+            log = root / "release_notifications.jsonl"
+            with patch.object(
+                self.sender.daily,
+                "merged_config",
+                return_value={"REPORT_PRIMARY_SEND_CONFIRMED": "true"},
+            ), patch.object(self.sender.daily, "resolve_recipients", return_value=(1, [2])), patch.object(
+                self.sender.daily, "resolve_token", return_value="TOKEN"
+            ), patch.object(self.sender.daily, "send_message") as send_message, patch.object(
+                self.sender.daily, "send_document", side_effect=["101", "102"]
+            ) as send_document, patch.object(self.sender, "LOG_PATH", log), patch(
+                "sys.argv",
+                [
+                    "send_release_notification.py",
+                    "--version",
+                    "2.0.6",
+                    "--recovery-zip",
+                    str(recovery),
+                    "--send",
+                ],
+            ):
+                result = self.sender.main()
+            entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            expected_sha = self.sender.hashlib.sha256(recovery.read_bytes()).hexdigest()
+        self.assertEqual(result, 0)
+        send_message.assert_not_called()
+        self.assertEqual(send_document.call_count, 2)
+        self.assertEqual(send_document.call_args_list[0].args[2], recovery.resolve())
+        self.assertEqual([item["message_id"] for item in entries], ["101", "102"])
+        self.assertTrue(all(item["artifact_name"] == recovery.name for item in entries))
+        self.assertTrue(all(item["artifact_sha256"] == expected_sha for item in entries))
+
 
 if __name__ == "__main__":
     unittest.main()

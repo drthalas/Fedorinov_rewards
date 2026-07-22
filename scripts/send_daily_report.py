@@ -8,6 +8,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import secrets
 import sys
 import urllib.error
 import urllib.parse
@@ -231,6 +232,51 @@ def send_message(token: str, chat_id: int, text: str) -> str:
         raise RuntimeError(type(exc).__name__) from exc
     if not data.get("ok"):
         raise RuntimeError(str(data.get("description") or "Telegram send failed"))
+    return str(data.get("result", {}).get("message_id", ""))
+
+
+def send_document(token: str, chat_id: int, document: Path, caption: str) -> str:
+    boundary = "----FedorinovRewards" + secrets.token_hex(16)
+    chunks: list[bytes] = []
+
+    def field(name: str, value: str) -> None:
+        chunks.extend(
+            [
+                f"--{boundary}\r\n".encode("ascii"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("ascii"),
+                value.encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+
+    field("chat_id", str(chat_id))
+    field("caption", caption)
+    chunks.extend(
+        [
+            f"--{boundary}\r\n".encode("ascii"),
+            (
+                'Content-Disposition: form-data; name="document"; '
+                f'filename="{document.name}"\r\n'
+            ).encode("utf-8"),
+            b"Content-Type: application/zip\r\n\r\n",
+            document.read_bytes(),
+            b"\r\n",
+            f"--{boundary}--\r\n".encode("ascii"),
+        ]
+    )
+    request = urllib.request.Request(
+        f"https://api.telegram.org/bot{token}/sendDocument",
+        data=b"".join(chunks),
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            data = json.loads(response.read().decode("utf-8"))
+    except urllib.error.URLError as exc:
+        raise RuntimeError(type(exc).__name__) from exc
+    if not data.get("ok"):
+        raise RuntimeError(str(data.get("description") or "Telegram document send failed"))
     return str(data.get("result", {}).get("message_id", ""))
 
 

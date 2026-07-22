@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from backend.app.version import APP_NAME, APP_VERSION  # noqa: E402
+from scripts.build_recovery_package import recovery_zip_path  # noqa: E402
 from scripts.build_release_package import latest_json_path, release_notes_path, versioned_zip_path  # noqa: E402
 
 
@@ -24,7 +25,11 @@ def release_title(version: str = APP_VERSION) -> str:
 
 
 def release_assets(version: str = APP_VERSION) -> list[Path]:
-    return [versioned_zip_path(version), latest_json_path()]
+    assets = [versioned_zip_path(version)]
+    if version == "2.0.6":
+        assets.append(recovery_zip_path(version))
+    assets.append(latest_json_path())
+    return assets
 
 
 def _run_gh(args: list[str]) -> subprocess.CompletedProcess[str]:

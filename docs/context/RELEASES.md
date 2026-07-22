@@ -82,13 +82,14 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 - Сохранена строгая runtime identity и single-instance проверка; active startup progress и no-progress timeout разделены.
 - Повторный запуск использует безопасный build-scoped pycache вне install tree.
 - Диагностика отличает slow start, crash, bind failure, registry mismatch и HTTP identity mismatch.
-- Для нерабочей `v2.0.5` применяется one-time recovery: новая папка, перенос только `.env`, запуск нового `.bat`.
+- Runtime server принимает как новый явный startup-path, так и точный legacy argv публичного updater `v2.0.5`.
+- Для нерабочей `v2.0.5` применяется отдельный recovery ZIP с подтверждением выбранной установки, проверенным backup и автоматическим сохранением DB/media.
 
 Проверки:
 
 - Focused Windows startup/handoff/rollback/single-instance/unrelated-port regression: PASS.
 - ALE-317 regressions, full suite, compileall и JS syntax: PASS.
-- TEMP packaged Browser smoke, package safety и `v2.0.5` recovery simulation: PASS.
+- Exact public `v2.0.5` updater, recovery package, TEMP packaged Browser smoke и package safety: PASS.
 - Реальные Owner/development DB и media не изменялись.
 
 ## v2.0.5

@@ -53,8 +53,16 @@ jobs:
       - name: Build release package
         run: python3 scripts/build_release_package.py --version "${{ github.event.inputs.version }}"
 
+      - name: Build recovery package
+        if: ${{ github.event.inputs.version == '2.0.6' }}
+        run: python3 scripts/build_recovery_package.py --version "${{ github.event.inputs.version }}"
+
       - name: Safety check package
         run: python3 scripts/check_package_safety.py "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip"
+
+      - name: Safety check recovery package
+        if: ${{ github.event.inputs.version == '2.0.6' }}
+        run: python3 scripts/check_recovery_package_safety.py "dist/FedorinovRewards_Recovery_v${{ github.event.inputs.version }}.zip"
 
       - name: Validate latest.json
         run: |
@@ -93,6 +101,14 @@ jobs:
             dist/latest.json
           if-no-files-found: error
 
+      - name: Upload recovery package artifact
+        if: ${{ github.event.inputs.version == '2.0.6' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: FedorinovRewards-recovery-${{ github.event.inputs.version }}
+          path: dist/FedorinovRewards_Recovery_v${{ github.event.inputs.version }}.zip
+          if-no-files-found: error
+
       - name: Dry-run summary
         if: ${{ github.event.inputs.publish != 'true' }}
         run: |
@@ -115,14 +131,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           PRERELEASE_FLAG=""
+          RECOVERY_ASSET=""
           if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
             PRERELEASE_FLAG="--prerelease"
+          fi
+          if [ "${{ github.event.inputs.version }}" = "2.0.6" ]; then
+            RECOVERY_ASSET="dist/FedorinovRewards_Recovery_v${{ github.event.inputs.version }}.zip"
           fi
           gh release create "v${{ github.event.inputs.version }}" \
             --title "Награды и награждённые v${{ github.event.inputs.version }}" \
             --notes-file "release_notes/${{ github.event.inputs.version }}.md" \
             $PRERELEASE_FLAG \
             "dist/FedorinovRewards_WebPreview_v${{ github.event.inputs.version }}.zip" \
+            $RECOVERY_ASSET \
             "dist/latest.json"
 
       - name: Telegram notification instructions
