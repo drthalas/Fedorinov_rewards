@@ -83,23 +83,37 @@ def _run_cmd_batch(batch: Path, marker: Path, *, codepage: int, shell_associatio
             "TARGET_BAT": str(batch),
         }
     )
-    completed = subprocess.run(
-        ["cmd.exe", "/d", "/c", str(wrapper)],
-        input=b"\r\n" * 32,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        env=environment,
-        timeout=90,
-        check=False,
-    )
-    output = completed.stdout
+    output_path = marker.with_suffix(".cmd-output.bin")
+    timed_out = False
+    with output_path.open("wb") as output_handle:
+        process = subprocess.Popen(
+            ["cmd.exe", "/d", "/c", str(wrapper)],
+            stdin=subprocess.PIPE,
+            stdout=output_handle,
+            stderr=subprocess.STDOUT,
+            env=environment,
+        )
+        try:
+            process.communicate(input=b"\r\n" * 32, timeout=20)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            subprocess.run(
+                ["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                check=False,
+            )
+            process.wait(timeout=10)
+    output = output_path.read_bytes()
     decoded: dict[str, str] = {}
     for encoding in ("utf-8", "cp866", "cp1251"):
         decoded[encoding] = output.decode(encoding, errors="replace")[-6000:]
     return {
         "codepage": codepage,
         "mode": "shell-association" if shell_association else "cmd-call",
-        "returncode": completed.returncode,
+        "returncode": process.returncode,
+        "timed_out": timed_out,
         "helper_reached": marker.is_file(),
         "cmd_parser_error": CMD_ERROR_MARKER in output,
         "output_sha256": sha256_bytes(output),
@@ -150,7 +164,12 @@ def verify_corrective_bootstrap(recovery: Path, root: Path) -> dict[str, object]
             result = _run_cmd_batch(batch, marker, codepage=codepage, shell_association=False)
             result["path"] = str(location)
             result["batch"] = metadata
-            if result["returncode"] != 0 or not result["helper_reached"] or result["cmd_parser_error"]:
+            if (
+                result["timed_out"]
+                or result["returncode"] != 0
+                or not result["helper_reached"]
+                or result["cmd_parser_error"]
+            ):
                 raise RuntimeError(f"corrective cmd bootstrap failed: {result}")
             scenarios.append(result)
 
@@ -159,7 +178,12 @@ def verify_corrective_bootstrap(recovery: Path, root: Path) -> dict[str, object]
         result = _run_cmd_batch(batch, marker, codepage=866, shell_association=True)
         result["path"] = str(location)
         result["batch"] = metadata
-        if result["returncode"] != 0 or not result["helper_reached"] or result["cmd_parser_error"]:
+        if (
+            result["timed_out"]
+            or result["returncode"] != 0
+            or not result["helper_reached"]
+            or result["cmd_parser_error"]
+        ):
             raise RuntimeError(f"corrective shell-association bootstrap failed: {result}")
         scenarios.append(result)
     return {"scenarios": scenarios, "passes": len(scenarios)}
