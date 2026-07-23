@@ -321,6 +321,42 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             runtime_identity.PROCESS_QUERY_TIMEOUT_SECONDS,
         )
 
+    def test_windows_current_process_identity_avoids_powershell_cim(self) -> None:
+        snapshot = runtime_identity.ProcessSnapshot(
+            pid=os.getpid(),
+            start_marker="/Date(1784786473577)/",
+            executable=r"C:\Python311\python.exe",
+            command_line=r'"C:\Python311\python.exe" scripts\runtime_server.py',
+        )
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity, "_current_windows_process_snapshot", return_value=snapshot),
+            patch.object(
+                runtime_identity,
+                "process_snapshot",
+                side_effect=AssertionError("self-registration must not launch PowerShell/CIM"),
+            ),
+        ):
+            result = runtime_identity.current_process_snapshot()
+
+        self.assertEqual(result, snapshot)
+
+    def test_windows_native_marker_matches_powershell_json_epoch_format(self) -> None:
+        unix_milliseconds = 1_784_786_473_577
+        filetime = (
+            runtime_identity.WINDOWS_FILETIME_UNIX_EPOCH
+            + unix_milliseconds * 10_000
+            + 9_999
+        )
+
+        marker = runtime_identity._windows_filetime_start_marker(
+            filetime >> 32,
+            filetime & 0xFFFFFFFF,
+        )
+
+        self.assertEqual(marker, f"/Date({unix_milliseconds})/")
+
     def test_windows_listener_lookup_uses_same_bounded_query_budget(self) -> None:
         with (
             patch.object(runtime_identity.os, "name", "nt"),

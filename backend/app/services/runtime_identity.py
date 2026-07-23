@@ -25,6 +25,7 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PROCESS_QUERY_TIMEOUT_SECONDS = 1.5
 # A cold PowerShell + CIM startup can exceed the generic process-query bound.
 WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS = 3.0
+WINDOWS_FILETIME_UNIX_EPOCH = 116_444_736_000_000_000
 BUILD_ID_EXTRA_FILES = (
     Path("backend/requirements.txt"),
     Path("scripts/runtime_bootstrap.py"),
@@ -241,6 +242,64 @@ def process_snapshot(pid: int) -> ProcessSnapshot | None:
     )
 
 
+def _windows_filetime_start_marker(high: int, low: int) -> str:
+    filetime = (int(high) << 32) | int(low)
+    unix_milliseconds = (filetime - WINDOWS_FILETIME_UNIX_EPOCH) // 10_000
+    return f"/Date({unix_milliseconds})/"
+
+
+def _current_windows_process_snapshot() -> ProcessSnapshot | None:
+    import ctypes
+    from ctypes import wintypes
+
+    class FileTime(ctypes.Structure):
+        _fields_ = (("low", wintypes.DWORD), ("high", wintypes.DWORD))
+
+    try:
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        kernel32.GetProcessTimes.argtypes = (
+            wintypes.HANDLE,
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+            ctypes.POINTER(FileTime),
+        )
+        kernel32.GetProcessTimes.restype = wintypes.BOOL
+        kernel32.GetCommandLineW.argtypes = ()
+        kernel32.GetCommandLineW.restype = wintypes.LPWSTR
+
+        creation = FileTime()
+        exit_time = FileTime()
+        kernel_time = FileTime()
+        user_time = FileTime()
+        if not kernel32.GetProcessTimes(
+            kernel32.GetCurrentProcess(),
+            ctypes.byref(creation),
+            ctypes.byref(exit_time),
+            ctypes.byref(kernel_time),
+            ctypes.byref(user_time),
+        ):
+            return None
+        command_line = str(kernel32.GetCommandLineW() or "")
+    except (AttributeError, OSError, TypeError, ValueError):
+        return None
+    if not command_line:
+        return None
+    return ProcessSnapshot(
+        pid=os.getpid(),
+        start_marker=_windows_filetime_start_marker(creation.high, creation.low),
+        executable=str(Path(sys.executable).resolve()),
+        command_line=command_line,
+    )
+
+
+def current_process_snapshot() -> ProcessSnapshot | None:
+    if os.name == "nt":
+        return _current_windows_process_snapshot()
+    return process_snapshot(os.getpid())
+
+
 def register_current_runtime(
     *,
     install_root: Path,
@@ -251,7 +310,7 @@ def register_current_runtime(
     instance_token: str,
     state_path: Path,
 ) -> RuntimeRecord:
-    snapshot = process_snapshot(os.getpid())
+    snapshot = current_process_snapshot()
     if snapshot is None:
         raise RuntimeIdentityError("Cannot inspect the backend process being registered.")
     record = RuntimeRecord(
