@@ -22,6 +22,9 @@ RUNTIME_STATE_SCHEMA = 1
 TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 BUILD_ID_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
+PROCESS_QUERY_TIMEOUT_SECONDS = 1.5
+# A cold PowerShell + CIM startup can exceed the generic process-query bound.
+WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS = 3.0
 BUILD_ID_EXTRA_FILES = (
     Path("backend/requirements.txt"),
     Path("scripts/runtime_bootstrap.py"),
@@ -178,9 +181,13 @@ def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def _run_process_query(command: list[str]) -> str | None:
+def _run_process_query(
+    command: list[str],
+    *,
+    timeout: float = PROCESS_QUERY_TIMEOUT_SECONDS,
+) -> str | None:
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=1.5, check=False)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
     except (OSError, subprocess.SubprocessError):
         return None
     if result.returncode != 0:
@@ -201,7 +208,10 @@ def process_snapshot(pid: int) -> ProcessSnapshot | None:
             'if ($null -eq $p) { exit 3 }; '
             '$p | Select-Object ProcessId,CreationDate,ExecutablePath,CommandLine | ConvertTo-Json -Compress'
         )
-        raw = _run_process_query([powershell, "-NoProfile", "-NonInteractive", "-Command", expression])
+        raw = _run_process_query(
+            [powershell, "-NoProfile", "-NonInteractive", "-Command", expression],
+            timeout=WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+        )
         if not raw:
             return None
         try:
@@ -350,7 +360,10 @@ def listener_pids(host: str, port: int) -> set[int]:
             f"@(Get-NetTCPConnection -State Listen -LocalPort {port} -ErrorAction SilentlyContinue "
             "| Select-Object -ExpandProperty OwningProcess -Unique) | ConvertTo-Json -Compress"
         )
-        raw = _run_process_query([powershell, "-NoProfile", "-NonInteractive", "-Command", expression])
+        raw = _run_process_query(
+            [powershell, "-NoProfile", "-NonInteractive", "-Command", expression],
+            timeout=WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+        )
         if not raw:
             return set()
         try:

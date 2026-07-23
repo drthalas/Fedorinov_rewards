@@ -5,12 +5,14 @@ import os
 from pathlib import Path
 import shutil
 import socket
+import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import time
 import unittest
 from unittest.mock import patch
 
+from backend.app.services import runtime_identity
 from backend.app.services.runtime_identity import fetch_runtime_identity, runtime_build_id
 from backend.app.services.runtime_supervisor import RuntimeLifecycleError, RuntimeSupervisor
 from backend.app.version import APP_VERSION
@@ -284,6 +286,53 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
 
         self.assertIsNotNone(stopped)
         self.assertFalse(startup_path.exists())
+
+    def test_windows_process_snapshot_allows_measured_cold_cim_start(self) -> None:
+        payload = json.dumps(
+            {
+                "ProcessId": 4321,
+                "CreationDate": "20260723020405.123456-420",
+                "ExecutablePath": r"C:\Python311\python.exe",
+                "CommandLine": r'"C:\Python311\python.exe" scripts\runtime_server.py',
+            }
+        )
+        observed_timeouts: list[float] = []
+
+        def simulated_cold_query(*args, timeout: float, **kwargs):
+            observed_timeouts.append(timeout)
+            if timeout < 1.623:
+                raise subprocess.TimeoutExpired(args[0], timeout)
+            return subprocess.CompletedProcess(args[0], 0, stdout=payload, stderr="")
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(runtime_identity.subprocess, "run", side_effect=simulated_cold_query),
+        ):
+            snapshot = runtime_identity.process_snapshot(4321)
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.pid, 4321)
+        self.assertEqual(snapshot.executable, r"C:\Python311\python.exe")
+        self.assertEqual(observed_timeouts, [runtime_identity.WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS])
+        self.assertGreater(
+            runtime_identity.WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+            runtime_identity.PROCESS_QUERY_TIMEOUT_SECONDS,
+        )
+
+    def test_windows_listener_lookup_uses_same_bounded_query_budget(self) -> None:
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(runtime_identity, "_run_process_query", return_value="[4321]") as query,
+        ):
+            listeners = runtime_identity.listener_pids("127.0.0.1", 8080)
+
+        self.assertEqual(listeners, {4321})
+        self.assertEqual(
+            query.call_args.kwargs["timeout"],
+            runtime_identity.WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+        )
 
 
 if __name__ == "__main__":
