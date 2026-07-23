@@ -51,6 +51,7 @@ def _resolve_runtime_paths(state_path: Path, startup_path: Path | None, instance
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    legacy_runtime_contract = args.startup_path is None
     install_root = args.install_root.resolve(strict=False)
     state_path, startup_path = _resolve_runtime_paths(
         args.state_path,
@@ -106,6 +107,7 @@ def main(argv: list[str] | None = None) -> int:
             build_id=build_id,
             instance_token=args.instance_token,
             state_path=state_path,
+            prepare_legacy_inspection=os.name == "nt" and legacy_runtime_contract,
         )
 
         reporter.stage("loading-server")

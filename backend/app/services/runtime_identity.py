@@ -300,6 +300,20 @@ def current_process_snapshot() -> ProcessSnapshot | None:
     return process_snapshot(os.getpid())
 
 
+def prepare_legacy_windows_process_inspection(expected: ProcessSnapshot) -> None:
+    observed = process_snapshot(expected.pid)
+    if observed is None:
+        raise RuntimeIdentityError("Legacy Windows process inspection did not become ready.")
+    if observed.start_marker != expected.start_marker or observed.command_line != expected.command_line:
+        raise RuntimeIdentityError("Legacy Windows process inspection returned a different process identity.")
+    if (
+        expected.executable
+        and observed.executable
+        and _normalized_path(observed.executable) != _normalized_path(expected.executable)
+    ):
+        raise RuntimeIdentityError("Legacy Windows process inspection returned a different executable.")
+
+
 def register_current_runtime(
     *,
     install_root: Path,
@@ -309,10 +323,13 @@ def register_current_runtime(
     build_id: str,
     instance_token: str,
     state_path: Path,
+    prepare_legacy_inspection: bool = False,
 ) -> RuntimeRecord:
     snapshot = current_process_snapshot()
     if snapshot is None:
         raise RuntimeIdentityError("Cannot inspect the backend process being registered.")
+    if prepare_legacy_inspection:
+        prepare_legacy_windows_process_inspection(snapshot)
     record = RuntimeRecord(
         application_id=APPLICATION_ID,
         schema=RUNTIME_STATE_SCHEMA,

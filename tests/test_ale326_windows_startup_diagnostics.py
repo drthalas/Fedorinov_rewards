@@ -357,6 +357,39 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
 
         self.assertEqual(marker, f"/Date({unix_milliseconds})/")
 
+    def test_legacy_windows_probe_requires_the_same_process_identity(self) -> None:
+        expected = runtime_identity.ProcessSnapshot(
+            pid=4321,
+            start_marker="/Date(1784786473577)/",
+            executable=r"C:\Python311\python.exe",
+            command_line=r'"C:\Python311\python.exe" scripts\runtime_server.py',
+        )
+
+        with patch.object(runtime_identity, "process_snapshot", return_value=expected) as query:
+            runtime_identity.prepare_legacy_windows_process_inspection(expected)
+
+        query.assert_called_once_with(expected.pid)
+
+    def test_legacy_windows_probe_rejects_identity_mismatch(self) -> None:
+        expected = runtime_identity.ProcessSnapshot(
+            pid=4321,
+            start_marker="/Date(1784786473577)/",
+            executable=r"C:\Python311\python.exe",
+            command_line=r'"C:\Python311\python.exe" scripts\runtime_server.py',
+        )
+        mismatched = runtime_identity.ProcessSnapshot(
+            pid=4321,
+            start_marker="/Date(1784786473578)/",
+            executable=expected.executable,
+            command_line=expected.command_line,
+        )
+
+        with (
+            patch.object(runtime_identity, "process_snapshot", return_value=mismatched),
+            self.assertRaises(runtime_identity.RuntimeIdentityError),
+        ):
+            runtime_identity.prepare_legacy_windows_process_inspection(expected)
+
     def test_windows_listener_lookup_uses_same_bounded_query_budget(self) -> None:
         with (
             patch.object(runtime_identity.os, "name", "nt"),

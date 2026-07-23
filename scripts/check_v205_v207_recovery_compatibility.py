@@ -89,6 +89,14 @@ supervisor = RuntimeSupervisor(
     ready_timeout=8,
 )
 before = data_snapshot()
+old_setup_query_attempts = 0
+old_setup_snapshot = None
+for old_setup_query_attempts in range(1, 4):
+    old_setup_snapshot = process_snapshot(os.getpid())
+    if old_setup_snapshot is not None:
+        break
+if old_setup_snapshot is None:
+    raise AssertionError("exact public v2.0.5 process inspection did not become ready")
 old = supervisor.start_or_reuse(
     install_root=install_root,
     host="127.0.0.1",
@@ -138,7 +146,12 @@ except UpdateError as exc:
     if len(healthy) != 1 or healthy[0].record.pid != identity["pid"]:
         raise AssertionError("rollback did not leave exactly one healthy v2.0.5 backend")
     supervisor.stop_all_confirmed()
-    print(json.dumps({"ok": True, "rollback": True, "identity": identity}, ensure_ascii=False))
+    print(json.dumps({
+        "ok": True,
+        "rollback": True,
+        "identity": identity,
+        "public_v205_setup_query_attempts": old_setup_query_attempts,
+    }, ensure_ascii=False))
     raise SystemExit(0)
 
 if forced_failure:
@@ -174,6 +187,7 @@ print(json.dumps({
     "repeat": repeat_evidence,
     "backup_path": result.get("backup_path"),
     "data": before,
+    "public_v205_setup_query_attempts": old_setup_query_attempts,
 }, ensure_ascii=False))
 '''
 
