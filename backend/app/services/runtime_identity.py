@@ -25,6 +25,8 @@ LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PROCESS_QUERY_TIMEOUT_SECONDS = 1.5
 # A cold PowerShell + CIM startup can exceed the generic process-query bound.
 WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS = 3.0
+WINDOWS_PROCESS_QUERY_ATTEMPTS = 3
+WINDOWS_PROCESS_FALLBACK_ATTEMPTS = 1
 WINDOWS_FILETIME_UNIX_EPOCH = 116_444_736_000_000_000
 BUILD_ID_EXTRA_FILES = (
     Path("backend/requirements.txt"),
@@ -132,6 +134,38 @@ def _normalized_path(value: str | Path) -> str:
     return os.path.normcase(resolved)
 
 
+def _windows_venv_spawn_target(python_executable: Path) -> tuple[Path, dict[str, str]]:
+    target = python_executable.expanduser().absolute()
+    config_path = target.parent.parent / "pyvenv.cfg"
+    try:
+        config = {
+            key.strip().casefold(): value.strip()
+            for line in config_path.read_text(encoding="utf-8").splitlines()
+            if "=" in line
+            for key, value in (line.split("=", 1),)
+        }
+        base_value = config.get("executable", "")
+        if base_value:
+            base = Path(base_value).expanduser()
+        else:
+            home = Path(config["home"]).expanduser()
+            base = home / "python.exe"
+        if not base.is_absolute():
+            base = config_path.parent / base
+        base = base.absolute()
+    except (KeyError, OSError, UnicodeError, ValueError):
+        return target, {}
+
+    if not base.is_file() or _normalized_path(base) == _normalized_path(target):
+        return target, {}
+    return base, {"__PYVENV_LAUNCHER__": str(target)}
+
+
+def python_spawn_target(python_executable: Path) -> tuple[Path, dict[str, str]]:
+    target = python_executable.expanduser().absolute()
+    return _windows_venv_spawn_target(target) if os.name == "nt" else (target, {})
+
+
 def runtime_build_id(install_root: Path) -> str:
     root = install_root.resolve(strict=False)
     digest = hashlib.sha256()
@@ -187,14 +221,29 @@ def _run_process_query(
     *,
     timeout: float = PROCESS_QUERY_TIMEOUT_SECONDS,
 ) -> str | None:
+    returncode, value = _run_process_query_result(command, timeout=timeout)
+    return value if returncode == 0 else None
+
+
+def _run_process_query_result(
+    command: list[str],
+    *,
+    timeout: float = PROCESS_QUERY_TIMEOUT_SECONDS,
+    encoding: str | None = None,
+) -> tuple[int | None, str | None]:
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding=encoding,
+            timeout=timeout,
+            check=False,
+        )
     except (OSError, subprocess.SubprocessError):
-        return None
-    if result.returncode != 0:
-        return None
+        return None, None
     value = result.stdout.strip()
-    return value or None
+    return result.returncode, value or None
 
 
 def process_snapshot(pid: int) -> ProcessSnapshot | None:
@@ -204,27 +253,48 @@ def process_snapshot(pid: int) -> ProcessSnapshot | None:
         powershell = shutil.which("powershell.exe") or shutil.which("powershell")
         if not powershell:
             return None
-        expression = (
-            f'$p = Get-CimInstance Win32_Process -Filter "ProcessId = {pid}"; '
+        output_encoding = '[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); '
+        cim_expression = output_encoding + (
+            '$ErrorActionPreference = "Stop"; '
+            f'try {{ $p = Get-CimInstance Win32_Process -Filter "ProcessId = {pid}" }} catch {{ exit 4 }}; '
             'if ($null -eq $p) { exit 3 }; '
             '$p | Select-Object ProcessId,CreationDate,ExecutablePath,CommandLine | ConvertTo-Json -Compress'
         )
-        raw = _run_process_query(
-            [powershell, "-NoProfile", "-NonInteractive", "-Command", expression],
-            timeout=WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+        wmi_expression = output_encoding + (
+            '$ErrorActionPreference = "Stop"; '
+            f'try {{ $p = Get-WmiObject Win32_Process -Filter "ProcessId = {pid}" }} catch {{ exit 4 }}; '
+            'if ($null -eq $p) { exit 3 }; '
+            '$p | Select-Object ProcessId,CreationDate,ExecutablePath,CommandLine | ConvertTo-Json -Compress'
         )
-        if not raw:
-            return None
-        try:
-            value = json.loads(raw)
-            return ProcessSnapshot(
-                pid=int(value["ProcessId"]),
-                start_marker=str(value["CreationDate"]),
-                executable=str(value.get("ExecutablePath") or ""),
-                command_line=str(value.get("CommandLine") or ""),
-            )
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-            return None
+        queries = (
+            (cim_expression, WINDOWS_PROCESS_QUERY_ATTEMPTS),
+            (wmi_expression, WINDOWS_PROCESS_FALLBACK_ATTEMPTS),
+        )
+        for expression, attempts in queries:
+            command = [powershell, "-NoProfile", "-NonInteractive", "-Command", expression]
+            for _attempt in range(attempts):
+                returncode, raw = _run_process_query_result(
+                    command,
+                    timeout=WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
+                    encoding="utf-8",
+                )
+                if returncode == 3:
+                    return None
+                if returncode is None:
+                    break
+                if returncode != 0 or not raw:
+                    continue
+                try:
+                    value = json.loads(raw)
+                    return ProcessSnapshot(
+                        pid=int(value["ProcessId"]),
+                        start_marker=str(value["CreationDate"]),
+                        executable=str(value.get("ExecutablePath") or ""),
+                        command_line=str(value.get("CommandLine") or ""),
+                    )
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                    continue
+        return None
 
     process_status = _run_process_query(["ps", "-p", str(pid), "-o", "stat="])
     if process_status and process_status.startswith("Z"):
@@ -268,13 +338,21 @@ def _current_windows_process_snapshot() -> ProcessSnapshot | None:
         kernel32.GetProcessTimes.restype = wintypes.BOOL
         kernel32.GetCommandLineW.argtypes = ()
         kernel32.GetCommandLineW.restype = wintypes.LPWSTR
+        kernel32.QueryFullProcessImageNameW.argtypes = (
+            wintypes.HANDLE,
+            wintypes.DWORD,
+            wintypes.LPWSTR,
+            ctypes.POINTER(wintypes.DWORD),
+        )
+        kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
 
         creation = FileTime()
         exit_time = FileTime()
         kernel_time = FileTime()
         user_time = FileTime()
+        process_handle = kernel32.GetCurrentProcess()
         if not kernel32.GetProcessTimes(
-            kernel32.GetCurrentProcess(),
+            process_handle,
             ctypes.byref(creation),
             ctypes.byref(exit_time),
             ctypes.byref(kernel_time),
@@ -282,14 +360,24 @@ def _current_windows_process_snapshot() -> ProcessSnapshot | None:
         ):
             return None
         command_line = str(kernel32.GetCommandLineW() or "")
+        image_buffer = ctypes.create_unicode_buffer(32_768)
+        image_length = wintypes.DWORD(len(image_buffer))
+        if not kernel32.QueryFullProcessImageNameW(
+            process_handle,
+            0,
+            image_buffer,
+            ctypes.byref(image_length),
+        ):
+            return None
+        executable = image_buffer.value
     except (AttributeError, OSError, TypeError, ValueError):
         return None
-    if not command_line:
+    if not command_line or not executable:
         return None
     return ProcessSnapshot(
         pid=os.getpid(),
         start_marker=_windows_filetime_start_marker(creation.high, creation.low),
-        executable=str(Path(sys.executable).resolve()),
+        executable=executable,
         command_line=command_line,
     )
 
@@ -584,18 +672,40 @@ def _identity_matches(record: RuntimeRecord, value: dict[str, Any] | None) -> bo
 def inspect_runtime_record(record: RuntimeRecord, health_timeout: float = 0.2) -> RuntimeInspection:
     snapshot = process_snapshot(record.pid)
     if snapshot is None:
+        identity = fetch_runtime_identity(record.host, record.port, timeout=health_timeout)
+        if _identity_matches(record, identity):
+            return RuntimeInspection(
+                record,
+                None,
+                False,
+                True,
+                "process-inspection-unavailable",
+                identity,
+            )
         return RuntimeInspection(record, None, False, False, "process-not-running")
+
+    def mismatch(reason: str) -> RuntimeInspection:
+        identity = fetch_runtime_identity(record.host, record.port, timeout=health_timeout)
+        return RuntimeInspection(
+            record,
+            snapshot,
+            False,
+            _identity_matches(record, identity),
+            reason,
+            identity,
+        )
+
     if snapshot.start_marker != record.process_start_marker:
-        return RuntimeInspection(record, snapshot, False, False, "process-start-time-mismatch")
+        return mismatch("process-start-time-mismatch")
     if snapshot.command_line != record.command_line:
-        return RuntimeInspection(record, snapshot, False, False, "command-line-mismatch")
+        return mismatch("command-line-mismatch")
     if record.executable and snapshot.executable and _normalized_path(snapshot.executable) != _normalized_path(record.executable):
-        return RuntimeInspection(record, snapshot, False, False, "executable-mismatch")
+        return mismatch("executable-mismatch")
 
     command = snapshot.command_line
     required_markers = ("runtime_server.py", record.instance_token, record.install_root, str(record.port))
     if any(marker not in command for marker in required_markers):
-        return RuntimeInspection(record, snapshot, False, False, "app-owned-command-marker-mismatch")
+        return mismatch("app-owned-command-marker-mismatch")
 
     identity = fetch_runtime_identity(record.host, record.port, timeout=health_timeout)
     healthy = _identity_matches(record, identity)

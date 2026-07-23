@@ -23,6 +23,7 @@ from .runtime_identity import (
     inspect_legacy_runtime,
     inspect_runtime_record,
     listener_pids,
+    python_spawn_target,
     process_snapshot,
     read_runtime_records,
     runtime_build_id,
@@ -34,7 +35,9 @@ from ..version import APP_NAME
 
 
 class RuntimeLifecycleError(RuntimeError):
-    pass
+    def __init__(self, message: str, *, category: str | None = None) -> None:
+        super().__init__(message)
+        self.category = category
 
 
 def _now_iso() -> str:
@@ -167,12 +170,32 @@ class RuntimeSupervisor:
         for record in records:
             inspection = inspect_runtime_record(record)
             inspections.append(inspection)
-            if not inspection.confirmed:
+            if not inspection.confirmed and not inspection.healthy:
                 self._remove_state(record.state_path)
         return inspections
 
     @staticmethod
+    def _record_matches_requested_runtime(
+        record: RuntimeRecord,
+        *,
+        install_root: Path,
+        host: str,
+        port: int,
+        version: str,
+        build_id: str,
+    ) -> bool:
+        return (
+            os.path.normcase(str(Path(record.install_root).resolve(strict=False)))
+            == os.path.normcase(str(install_root.resolve(strict=False)))
+            and record.host == host
+            and record.port == port
+            and record.version == version
+            and record.build_id == build_id
+        )
+
+    @classmethod
     def _matches_requested_runtime(
+        cls,
         inspection: RuntimeInspection,
         *,
         install_root: Path,
@@ -181,16 +204,17 @@ class RuntimeSupervisor:
         version: str,
         build_id: str,
     ) -> bool:
-        record = inspection.record
         return (
             inspection.confirmed
             and inspection.healthy
-            and os.path.normcase(str(Path(record.install_root).resolve(strict=False)))
-            == os.path.normcase(str(install_root.resolve(strict=False)))
-            and record.host == host
-            and record.port == port
-            and record.version == version
-            and record.build_id == build_id
+            and cls._record_matches_requested_runtime(
+                inspection.record,
+                install_root=install_root,
+                host=host,
+                port=port,
+                version=version,
+                build_id=build_id,
+            )
         )
 
     @staticmethod
@@ -217,8 +241,8 @@ class RuntimeSupervisor:
     def _wait_process_gone(self, record: RuntimeRecord) -> bool:
         deadline = time.monotonic() + self.stop_timeout
         while time.monotonic() < deadline:
-            snapshot = process_snapshot(record.pid)
-            if snapshot is None or snapshot.start_marker != record.process_start_marker:
+            inspection = inspect_runtime_record(record, health_timeout=0.05)
+            if inspection.reason in {"process-not-running", "process-start-time-mismatch"}:
                 self._reap_child(record.pid)
                 return True
             time.sleep(0.04)
@@ -364,8 +388,9 @@ class RuntimeSupervisor:
         log_dir = self.registry_dir / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"backend-{token}.log"
+        spawn_python, spawn_environment = python_spawn_target(self.python_executable)
         command = [
-            str(self.python_executable),
+            str(spawn_python),
             str(server_script),
             "--host",
             host,
@@ -385,6 +410,7 @@ class RuntimeSupervisor:
             build_id,
         ]
         environment = os.environ.copy()
+        environment.pop("__PYVENV_LAUNCHER__", None)
         environment.update(
             {
                 "APP_HOST": host,
@@ -396,6 +422,7 @@ class RuntimeSupervisor:
                 "PYTHONUNBUFFERED": "1",
             }
         )
+        environment.update(spawn_environment)
         environment.pop("PYTHONDONTWRITEBYTECODE", None)
         creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
         with log_path.open("ab", buffering=0) as output:
@@ -422,6 +449,7 @@ class RuntimeSupervisor:
                                     "PYTHONPYCACHEPREFIX",
                                     "PYTHONDONTWRITEBYTECODE",
                                     "PYTHONUNBUFFERED",
+                                    "__PYVENV_LAUNCHER__",
                                 )
                             },
                         },
@@ -718,6 +746,28 @@ class RuntimeSupervisor:
                     build_id=build_id,
                 )
             ]
+            indeterminate = [
+                inspection
+                for inspection in inspections
+                if not inspection.confirmed and inspection.healthy
+            ]
+            if indeterminate:
+                requested = any(
+                    self._record_matches_requested_runtime(
+                        inspection.record,
+                        install_root=install_root,
+                        host=host,
+                        port=port,
+                        version=version,
+                        build_id=build_id,
+                    )
+                    for inspection in indeterminate
+                )
+                detail = "запрошенного backend" if requested else "другого app-owned backend"
+                raise RuntimeLifecycleError(
+                    f"Windows временно не подтвердил PID {detail}; registry сохранён, новый backend не запускался.",
+                    category="process-inspection-transient",
+                )
             confirmed = [inspection for inspection in inspections if inspection.confirmed]
             desired_port_owned = any(
                 inspection.record.host == host and inspection.record.port == port for inspection in confirmed

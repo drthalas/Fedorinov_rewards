@@ -12,6 +12,11 @@ SCRIPT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_ROOT))
 
 
+def _preload_legacy_server() -> None:
+    import uvicorn  # noqa: F401
+    from backend.app.main import app  # noqa: F401
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run one identity-managed Fedorinov Rewards backend.")
     parser.add_argument("--host", required=True)
@@ -97,6 +102,10 @@ def main(argv: list[str] | None = None) -> int:
         build_id = runtime_build_id(install_root)
         if build_id != args.expected_build_id:
             raise RuntimeError(f"Runtime build mismatch: {build_id} != {args.expected_build_id}")
+
+        if legacy_runtime_contract:
+            reporter.stage("preloading-legacy-server")
+            _preload_legacy_server()
 
         reporter.stage("registering-identity")
         record = register_current_runtime(

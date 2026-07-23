@@ -27,6 +27,7 @@ from backend.app.main import app
 from backend.app.services.runtime_identity import (
     APPLICATION_ID,
     RUNTIME_STATE_SCHEMA,
+    ProcessSnapshot,
     atomic_write_json,
     fetch_runtime_identity,
     fetch_version_identity,
@@ -130,6 +131,64 @@ class RuntimeLifecycleTests(unittest.TestCase):
         self.assertLess(first.detection_seconds, 2.0)
         self.assertLess(first.readiness_seconds, 5.0)
         self.assertLess(second.detection_seconds, 2.0)
+
+    def test_transient_process_inspection_keeps_live_registry_and_blocks_second_spawn(self) -> None:
+        supervisor = self.supervisor()
+        port = free_port()
+        running = self.start(supervisor, port)
+        records, invalid = read_runtime_records(self.registry)
+        self.assertEqual(invalid, [])
+        self.assertEqual(len(records), 1)
+        state_path = Path(records[0].state_path)
+
+        with patch("backend.app.services.runtime_identity.process_snapshot", return_value=None):
+            inspection = supervisor.inspect_all()[0]
+            self.assertFalse(inspection.confirmed)
+            self.assertTrue(inspection.healthy)
+            self.assertEqual(inspection.reason, "process-inspection-unavailable")
+            self.assertTrue(state_path.is_file())
+            with patch.object(supervisor, "_spawn_backend") as spawn:
+                with self.assertRaisesRegex(RuntimeLifecycleError, "registry сохранён") as raised:
+                    self.start(supervisor, port)
+            spawn.assert_not_called()
+            self.assertEqual(raised.exception.category, "process-inspection-transient")
+
+        identity = fetch_runtime_identity("127.0.0.1", port)
+        self.assertEqual(identity["pid"], running.pid)
+        self.assertEqual(identity["instance_token"], running.instance_token)
+
+    def test_exact_http_identity_preserves_registry_during_transient_command_line_mismatch(self) -> None:
+        supervisor = self.supervisor()
+        port = free_port()
+        running = self.start(supervisor, port)
+        records, invalid = read_runtime_records(self.registry)
+        self.assertEqual(invalid, [])
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        snapshot = process_snapshot(record.pid)
+        self.assertIsNotNone(snapshot)
+        mismatched = ProcessSnapshot(
+            pid=snapshot.pid,
+            start_marker=snapshot.start_marker,
+            executable=snapshot.executable,
+            command_line=snapshot.command_line + " ",
+        )
+
+        with patch("backend.app.services.runtime_identity.process_snapshot", return_value=mismatched):
+            inspection = supervisor.inspect_all()[0]
+            self.assertFalse(inspection.confirmed)
+            self.assertTrue(inspection.healthy)
+            self.assertEqual(inspection.reason, "command-line-mismatch")
+            self.assertTrue(Path(record.state_path).is_file())
+            with patch.object(supervisor, "_spawn_backend") as spawn:
+                with self.assertRaises(RuntimeLifecycleError) as raised:
+                    self.start(supervisor, port)
+            spawn.assert_not_called()
+            self.assertEqual(raised.exception.category, "process-inspection-transient")
+
+        identity = fetch_runtime_identity("127.0.0.1", port)
+        self.assertEqual(identity["pid"], running.pid)
+        self.assertEqual(identity["instance_token"], running.instance_token)
 
     def test_start_does_not_repeat_health_probe_after_readiness(self) -> None:
         supervisor = self.supervisor()

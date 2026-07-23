@@ -12,6 +12,24 @@ import webbrowser
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
+PROCESS_INSPECTION_RETRY_ATTEMPTS = 3
+
+
+def _machine_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True)
+
+
+def _start_or_reuse_with_retry(supervisor, **kwargs):
+    from backend.app.services.runtime_supervisor import RuntimeLifecycleError
+
+    for attempt in range(PROCESS_INSPECTION_RETRY_ATTEMPTS):
+        try:
+            return supervisor.start_or_reuse(**kwargs)
+        except RuntimeLifecycleError as exc:
+            retryable = exc.category == "process-inspection-transient"
+            if not retryable or attempt + 1 >= PROCESS_INSPECTION_RETRY_ATTEMPTS:
+                raise
+    raise AssertionError("unreachable")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -37,7 +55,8 @@ def _start(open_browser: bool, wait: bool) -> int:
     settings = get_settings()
     supervisor = RuntimeSupervisor()
     try:
-        evidence = supervisor.start_or_reuse(
+        evidence = _start_or_reuse_with_retry(
+            supervisor,
             install_root=settings.app_install_dir,
             host=settings.app_host,
             port=settings.app_port,
@@ -47,7 +66,7 @@ def _start(open_browser: bool, wait: bool) -> int:
         print(f"Не удалось запустить приложение: {exc}", file=sys.stderr)
         return 1
 
-    print(json.dumps(evidence.as_dict(), ensure_ascii=False, sort_keys=True))
+    print(_machine_json(evidence.as_dict()))
     url = f"http://{settings.app_host}:{settings.app_port}"
     if open_browser:
         webbrowser.open(url)
@@ -118,7 +137,7 @@ def _update(requester_pid: int) -> int:
         else:
             print(f"Не удалось завершить обновление: {message}", file=sys.stderr)
         return 1
-    print(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    print(_machine_json(result))
     return 0
 
 

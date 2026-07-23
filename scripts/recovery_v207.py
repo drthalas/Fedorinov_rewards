@@ -160,13 +160,15 @@ class ConsoleUI:
                 result = subprocess.run(
                     [powershell, "-NoProfile", "-STA", "-Command", expression],
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     capture_output=True,
                     timeout=120,
                     check=False,
                 )
                 selected = result.stdout.strip()
-                if result.returncode == 0 and selected:
-                    return Path(selected)
+                if result.returncode == 0:
+                    return Path(selected) if selected else None
         try:
             import tkinter
             from tkinter import filedialog
@@ -711,6 +713,37 @@ def _target_python(install_root: Path) -> Path:
     return next((path for path in candidates if path.is_file()), Path(sys.executable))
 
 
+def _windows_runtime_python_spawn(python_executable: Path) -> tuple[Path, dict[str, str]]:
+    target = python_executable.expanduser().absolute()
+    config_path = target.parent.parent / "pyvenv.cfg"
+    try:
+        config = {
+            key.strip().casefold(): value.strip()
+            for line in config_path.read_text(encoding="utf-8").splitlines()
+            if "=" in line
+            for key, value in (line.split("=", 1),)
+        }
+        base_value = config.get("executable", "")
+        if base_value:
+            base = Path(base_value).expanduser()
+        else:
+            base = Path(config["home"]).expanduser() / "python.exe"
+        if not base.is_absolute():
+            base = config_path.parent / base
+        base = base.absolute()
+    except (KeyError, OSError, UnicodeError, ValueError):
+        return target, {}
+
+    if not base.is_file() or _normalized_path(base) == _normalized_path(target):
+        return target, {}
+    return base, {"__PYVENV_LAUNCHER__": str(target)}
+
+
+def _runtime_python_spawn(python_executable: Path) -> tuple[Path, dict[str, str]]:
+    target = python_executable.expanduser().absolute()
+    return _windows_runtime_python_spawn(target) if os.name == "nt" else (target, {})
+
+
 def _run_internal_stop(candidate: InstallationCandidate, registry_dir: Path) -> dict[str, object]:
     command = [
         str(_target_python(candidate.install_root)),
@@ -726,9 +759,19 @@ def _run_internal_stop(candidate: InstallationCandidate, registry_dir: Path) -> 
         {
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONPYCACHEPREFIX": str(registry_dir / "pycache" / "recovery-stop"),
+            "PYTHONUTF8": "1",
         }
     )
-    result = subprocess.run(command, env=environment, text=True, capture_output=True, timeout=30, check=False)
+    result = subprocess.run(
+        command,
+        env=environment,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        timeout=30,
+        check=False,
+    )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout).strip().splitlines()
         raise RecoveryError(detail[-1] if detail else "Не удалось безопасно остановить backend выбранной установки.")
@@ -774,7 +817,7 @@ def _internal_stop(install_root: Path, registry_dir: Path) -> int:
                 "untouched_other_backends": untouched_other,
                 "invalid_records": len(invalid),
             },
-            ensure_ascii=False,
+            ensure_ascii=True,
         )
     )
     return 0
@@ -792,11 +835,14 @@ def _runtime_build_id(install_root: Path) -> str:
     ]
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONUTF8"] = "1"
     result = subprocess.run(
         command,
         cwd=install_root,
         env=environment,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         timeout=30,
         check=False,
@@ -824,6 +870,7 @@ def _runtime_environment(
             "PYTHONDONTWRITEBYTECODE": "1",
             "PYTHONPYCACHEPREFIX": str(registry_dir / "pycache" / build_id),
             "PYTHONUNBUFFERED": "1",
+            "PYTHONUTF8": "1",
         }
     )
     return environment
@@ -916,8 +963,9 @@ def start_runtime(
     log_dir = registry_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"recovery-backend-{token}.log"
+    spawn_python, spawn_environment = _runtime_python_spawn(_target_python(candidate.install_root))
     command = [
-        str(_target_python(candidate.install_root)),
+        str(spawn_python),
         str(candidate.install_root / "scripts" / "runtime_server.py"),
         "--host",
         candidate.host,
@@ -934,6 +982,8 @@ def start_runtime(
         command.extend(["--startup-path", str(startup_path)])
     command.extend(["--expected-version", expected_version, "--expected-build-id", build_id])
     environment = _runtime_environment(candidate, registry_dir, build_id=build_id)
+    environment.pop("__PYVENV_LAUNCHER__", None)
+    environment.update(spawn_environment)
     environment["APP_RUNTIME_STATE_PATH"] = str(state_path)
     if startup_path is not None:
         environment["APP_RUNTIME_STARTUP_PATH"] = str(startup_path)
@@ -1019,12 +1069,16 @@ def verify_repeat_launch(candidate: InstallationCandidate, registry_dir: Path, r
         cwd=candidate.install_root,
         env=_runtime_environment(candidate, registry_dir, build_id=runtime.build_id),
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         timeout=60,
         check=False,
     )
     if result.returncode != 0:
-        raise RecoveryError("Повторный штатный запуск завершился ошибкой.")
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        suffix = f": {detail[-1]}" if detail else ""
+        raise RecoveryError(f"Повторный штатный запуск завершился ошибкой{suffix}.")
     try:
         evidence = json.loads(result.stdout.splitlines()[-1])
     except (IndexError, json.JSONDecodeError) as exc:
@@ -1045,24 +1099,75 @@ def verify_repeat_launch(candidate: InstallationCandidate, registry_dir: Path, r
 
 
 def _stop_started_runtime(candidate: InstallationCandidate, registry_dir: Path, runtime: StartedRuntime | None) -> None:
+    stop_error: RecoveryError | None = None
     try:
         _run_internal_stop(candidate, registry_dir)
+    except RecoveryError as exc:
+        stop_error = exc
+
+    if runtime is None or runtime.process is None:
+        if stop_error is not None:
+            raise stop_error
         return
-    except RecoveryError:
-        if runtime is None or runtime.process is None or runtime.process.poll() is not None:
-            raise
-        identity = _fetch_identity(runtime.host, runtime.port)
-        if identity is None or _identity_mismatches(
-            identity,
-            pid=runtime.pid,
-            token=runtime.instance_token,
-            version=runtime.version,
-            build_id=runtime.build_id,
-            candidate=candidate,
-        ):
-            raise
-        runtime.process.kill()
-        runtime.process.wait(timeout=5)
+    if runtime.process.poll() is not None:
+        return
+
+    identity = _fetch_identity(runtime.host, runtime.port)
+    if identity is not None and _identity_mismatches(
+        identity,
+        pid=runtime.pid,
+        token=runtime.instance_token,
+        version=runtime.version,
+        build_id=runtime.build_id,
+        candidate=candidate,
+    ):
+        if stop_error is not None:
+            raise stop_error
+        raise RecoveryError("Работающий backend изменил identity; fallback-остановка не выполнялась.")
+
+    _terminate_spawned_process(runtime.process)
+    if runtime.process.poll() is None:
+        raise RecoveryError("Точный запущенный backend не завершился перед rollback.")
+    identity = _fetch_identity(runtime.host, runtime.port)
+    if identity is not None and not _identity_mismatches(
+        identity,
+        pid=runtime.pid,
+        token=runtime.instance_token,
+        version=runtime.version,
+        build_id=runtime.build_id,
+        candidate=candidate,
+    ):
+        raise RecoveryError("Точный runtime identity остался доступен после остановки перед rollback.")
+
+
+def _start_restored_runtime(
+    candidate: InstallationCandidate,
+    registry_dir: Path,
+    *,
+    start_fn: Callable[..., StartedRuntime],
+) -> StartedRuntime:
+    attempts = 3 if candidate.version == "2.0.5" else 1
+    last_error: RecoveryError | None = None
+    for _attempt in range(attempts):
+        try:
+            return start_fn(
+                candidate,
+                registry_dir,
+                expected_version=candidate.version,
+                include_startup_path=False,
+            )
+        except RecoveryError as exc:
+            last_error = exc
+            retryable = (
+                candidate.version == "2.0.5"
+                and "child-crash" in str(exc)
+                and "Cannot inspect the backend process being registered." in str(exc)
+                and not _port_has_listener(candidate.host, candidate.port)
+            )
+            if not retryable:
+                raise
+    assert last_error is not None
+    raise last_error
 
 
 def write_installation_pointer(candidate: InstallationCandidate, version: str) -> Path:
@@ -1168,11 +1273,10 @@ def run_recovery_transaction(
             restored_name, restored_version = _version_metadata(candidate.install_root / "backend/app/version.py")
             if restored_name != PRODUCT_NAME or restored_version != candidate.version:
                 raise RecoveryError("Восстановленная версия не совпадает с исходной.")
-            old_runtime = start_fn(
+            old_runtime = _start_restored_runtime(
                 candidate,
                 registry,
-                expected_version=candidate.version,
-                include_startup_path=False,
+                start_fn=start_fn,
             )
         except Exception as start_exc:
             rollback_errors.append(f"restart: {start_exc}")

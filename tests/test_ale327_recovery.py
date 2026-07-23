@@ -10,11 +10,13 @@ import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
 
+from backend.app.services.runtime_supervisor import RuntimeLifecycleError
 from scripts import (
     build_recovery_package,
     check_recovery_package_safety,
     recovery_v206,
     recovery_v207,
+    runtime_bootstrap,
     runtime_server,
 )
 
@@ -135,6 +137,17 @@ class Ale327RecoveryTests(unittest.TestCase):
         self.assertEqual(resolved_state, state.resolve(strict=False))
         self.assertEqual(startup, (registry / f"startup-{token}.json").resolve(strict=False))
 
+    def test_public_v205_legacy_runtime_preloads_before_identity_publication(self) -> None:
+        source = (ROOT / "scripts/runtime_server.py").read_text(encoding="utf-8")
+
+        preload = source.index('reporter.stage("preloading-legacy-server")')
+        register = source.index('reporter.stage("registering-identity")')
+        regular_load = source.index('reporter.stage("loading-server")')
+
+        self.assertLess(preload, register)
+        self.assertLess(register, regular_load)
+        self.assertIn("if legacy_runtime_contract:", source[preload - 80:preload])
+
     def test_runtime_paths_reject_wrong_state_or_explicit_startup(self) -> None:
         token = "a" * 32
         registry = self.root / "runtime"
@@ -204,6 +217,21 @@ class Ale327RecoveryTests(unittest.TestCase):
         ui = ScriptedUI(folder=candidate.install_root, confirmations=[True])
         selected = recovery_v206.select_installation([], ui)
         self.assertEqual(selected.install_root, candidate.install_root)
+
+    def test_v207_native_picker_cancel_does_not_open_second_dialog(self) -> None:
+        completed = recovery_v207.subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+        with (
+            patch.object(recovery_v207.os, "name", "nt"),
+            patch.object(recovery_v207.shutil, "which", return_value="powershell.exe"),
+            patch.object(recovery_v207.subprocess, "run", return_value=completed) as run,
+        ):
+            selected = recovery_v207.ConsoleUI().pick_folder()
+
+        self.assertIsNone(selected)
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "replace")
 
     def test_program_install_rejects_symlink_destination(self) -> None:
         selected = self._install("symlink-install")
@@ -440,6 +468,229 @@ class Ale327RecoveryTests(unittest.TestCase):
             if path.is_file()
         }
         self.assertEqual(after, before)
+
+    def test_runtime_bootstrap_machine_json_is_cp1252_safe_and_round_trips_cyrillic(self) -> None:
+        payload = {"install_root": r"C:\Users\Alex\Desktop\Проверка восстановления"}
+
+        encoded = runtime_bootstrap._machine_json(payload)
+
+        encoded.encode("cp1252")
+        self.assertTrue(encoded.isascii())
+        self.assertEqual(json.loads(encoded), payload)
+
+    def test_runtime_bootstrap_retries_only_typed_process_inspection_transient(self) -> None:
+        expected = object()
+
+        class FakeSupervisor:
+            calls = 0
+
+            def start_or_reuse(self, **_kwargs):
+                self.calls += 1
+                if self.calls < runtime_bootstrap.PROCESS_INSPECTION_RETRY_ATTEMPTS:
+                    raise RuntimeLifecycleError(
+                        "strict HTTP identity healthy; Windows inspection transient",
+                        category="process-inspection-transient",
+                    )
+                return expected
+
+        supervisor = FakeSupervisor()
+        result = runtime_bootstrap._start_or_reuse_with_retry(
+            supervisor,
+            install_root=self.root,
+            host="127.0.0.1",
+            port=18080,
+            expected_version="2.0.7",
+        )
+
+        self.assertIs(result, expected)
+        self.assertEqual(supervisor.calls, runtime_bootstrap.PROCESS_INSPECTION_RETRY_ATTEMPTS)
+
+    def test_v207_recovery_uses_base_process_without_losing_venv_identity(self) -> None:
+        venv_root = self.root / "Windows recovery venv"
+        venv_python = venv_root / "Scripts" / "python.exe"
+        base_python = self.root / "Python311" / "python.exe"
+        venv_python.parent.mkdir(parents=True)
+        base_python.parent.mkdir(parents=True)
+        venv_python.touch()
+        base_python.touch()
+        (venv_root / "pyvenv.cfg").write_text(
+            f"home = {base_python.parent}\n"
+            "include-system-site-packages = false\n"
+            "version = 3.11.9\n"
+            f"executable = {base_python}\n",
+            encoding="utf-8",
+        )
+
+        executable, environment = recovery_v207._windows_runtime_python_spawn(venv_python)
+
+        self.assertEqual(executable, base_python.absolute())
+        self.assertEqual(environment, {"__PYVENV_LAUNCHER__": str(venv_python.absolute())})
+
+    def test_v207_stop_verifies_live_child_after_empty_internal_stop(self) -> None:
+        selected = self._install("empty-internal-stop")
+
+        class FakeProcess:
+            pid = 9123
+            returncode = None
+            terminated = False
+
+            def poll(self):
+                return self.returncode
+
+            def terminate(self):
+                self.terminated = True
+                self.returncode = -15
+
+            def kill(self):
+                self.returncode = -9
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        process = FakeProcess()
+        runtime = recovery_v207.StartedRuntime(
+            pid=process.pid,
+            instance_token="a" * 32,
+            version="2.0.7",
+            build_id="b" * 64,
+            install_root=str(selected.install_root),
+            host=selected.host,
+            port=selected.port,
+            state_path=self.root / "state.json",
+            startup_path=self.root / "startup.json",
+            log_path=self.root / "runtime.log",
+            process=process,
+        )
+        identity = {
+            "pid": runtime.pid,
+            "instance_token": runtime.instance_token,
+            "version": runtime.version,
+            "build_id": runtime.build_id,
+            "install_root": runtime.install_root,
+            "host": runtime.host,
+            "port": runtime.port,
+        }
+
+        with patch.object(recovery_v207, "_run_internal_stop", return_value={"stopped": []}), patch.object(
+            recovery_v207, "_fetch_identity", side_effect=[identity, None]
+        ):
+            recovery_v207._stop_started_runtime(selected, self.root / "runtime", runtime)
+
+        self.assertTrue(process.terminated)
+        self.assertEqual(process.poll(), -15)
+
+    def test_v207_stop_does_not_kill_child_when_http_identity_changed(self) -> None:
+        selected = self._install("mismatched-stop-identity")
+
+        class FakeProcess:
+            pid = 9124
+            returncode = None
+            terminated = False
+
+            def poll(self):
+                return self.returncode
+
+            def terminate(self):
+                self.terminated = True
+
+            def kill(self):
+                self.terminated = True
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+        process = FakeProcess()
+        runtime = recovery_v207.StartedRuntime(
+            pid=process.pid,
+            instance_token="a" * 32,
+            version="2.0.7",
+            build_id="b" * 64,
+            install_root=str(selected.install_root),
+            host=selected.host,
+            port=selected.port,
+            state_path=self.root / "state.json",
+            startup_path=self.root / "startup.json",
+            log_path=self.root / "runtime.log",
+            process=process,
+        )
+        mismatched = {
+            "pid": runtime.pid + 1,
+            "instance_token": runtime.instance_token,
+            "version": runtime.version,
+            "build_id": runtime.build_id,
+            "install_root": runtime.install_root,
+            "host": runtime.host,
+            "port": runtime.port,
+        }
+
+        with patch.object(recovery_v207, "_run_internal_stop", return_value={"stopped": []}), patch.object(
+            recovery_v207, "_fetch_identity", return_value=mismatched
+        ), self.assertRaisesRegex(recovery_v207.RecoveryError, "identity"):
+            recovery_v207._stop_started_runtime(selected, self.root / "runtime", runtime)
+
+        self.assertFalse(process.terminated)
+
+    def test_v207_rollback_retries_only_public_v205_self_inspection_crash(self) -> None:
+        selected = self._install("v205-self-inspection-retry")
+        restored = self._runtime(selected, "2.0.5")
+        attempts = 0
+
+        def start_fn(*_args, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                raise recovery_v207.RecoveryError(
+                    "Новая версия не запустилась: child-crash; "
+                    "Cannot inspect the backend process being registered."
+                )
+            return restored
+
+        with patch.object(recovery_v207, "_port_has_listener", return_value=False):
+            result = recovery_v207._start_restored_runtime(
+                selected,
+                self.root / "runtime",
+                start_fn=start_fn,
+            )
+
+        self.assertIs(result, restored)
+        self.assertEqual(attempts, 3)
+
+    def test_v207_rollback_does_not_retry_other_child_crash(self) -> None:
+        selected = self._install("other-child-crash")
+        attempts = 0
+
+        def start_fn(*_args, **_kwargs):
+            nonlocal attempts
+            attempts += 1
+            raise recovery_v207.RecoveryError("Новая версия не запустилась: child-crash; import failed")
+
+        with patch.object(recovery_v207, "_port_has_listener", return_value=False), self.assertRaisesRegex(
+            recovery_v207.RecoveryError, "import failed"
+        ):
+            recovery_v207._start_restored_runtime(
+                selected,
+                self.root / "runtime",
+                start_fn=start_fn,
+            )
+
+        self.assertEqual(attempts, 1)
+
+    def test_v207_repeat_launch_decodes_utf8_failure_without_masking_it(self) -> None:
+        selected = self._install("utf8-repeat-failure")
+        runtime = self._runtime(selected, "2.0.7")
+        completed = recovery_v207.subprocess.CompletedProcess(
+            [],
+            1,
+            stdout="",
+            stderr="Не удалось строго подтвердить runtime",
+        )
+
+        with patch.object(recovery_v207.subprocess, "run", return_value=completed) as run:
+            with self.assertRaisesRegex(recovery_v207.RecoveryError, "строго подтвердить runtime"):
+                recovery_v207.verify_repeat_launch(selected, self.root / "runtime", runtime)
+
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
+        self.assertEqual(run.call_args.kwargs["errors"], "replace")
 
 
 if __name__ == "__main__":

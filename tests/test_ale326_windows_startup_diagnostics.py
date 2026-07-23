@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 from pathlib import Path
@@ -10,7 +11,7 @@ import sys
 from tempfile import TemporaryDirectory
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from backend.app.services import runtime_identity
 from backend.app.services import runtime_startup
@@ -253,15 +254,15 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             '        reporter.stage("binding-port")'
         )
         self._replace_server_source(install_root, marker, replacement)
-        supervisor = self._supervisor(ready_timeout=0.2, startup_timeout=0.65)
+        supervisor = self._supervisor(ready_timeout=0.5, startup_timeout=0.9)
         started = time.monotonic()
 
         with self.assertRaises(RuntimeLifecycleError) as raised:
             self._start(supervisor, install_root, free_port())
 
         elapsed = time.monotonic() - started
-        self.assertGreaterEqual(elapsed, 0.6)
-        self.assertLess(elapsed, 1.5)
+        self.assertGreaterEqual(elapsed, 0.85)
+        self.assertLess(elapsed, 1.8)
         self.assertIn("category=slow-start-hard-limit", str(raised.exception))
         self.assertIn("stage=loading-server", str(raised.exception))
 
@@ -320,6 +321,172 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             runtime_identity.WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
             runtime_identity.PROCESS_QUERY_TIMEOUT_SECONDS,
         )
+
+    def test_windows_process_snapshot_retries_only_transient_cim_failure(self) -> None:
+        payload = json.dumps(
+            {
+                "ProcessId": 4321,
+                "CreationDate": "20260723020405.123456-420",
+                "ExecutablePath": r"C:\Python311\python.exe",
+                "CommandLine": r'"C:\Python311\python.exe" scripts\runtime_server.py',
+            }
+        )
+        outcomes = [
+            subprocess.CompletedProcess([], 4, stdout="", stderr="Invalid class"),
+            subprocess.CompletedProcess([], 0, stdout=payload, stderr=""),
+        ]
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(runtime_identity.subprocess, "run", side_effect=outcomes) as query,
+        ):
+            snapshot = runtime_identity.process_snapshot(4321)
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.pid, 4321)
+        self.assertEqual(query.call_count, 2)
+        self.assertIn('$ErrorActionPreference = "Stop"', query.call_args_list[0].args[0][-1])
+
+    def test_windows_process_snapshot_does_not_retry_definitive_absence(self) -> None:
+        missing = subprocess.CompletedProcess([], 3, stdout="", stderr="")
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(runtime_identity.subprocess, "run", return_value=missing) as query,
+        ):
+            snapshot = runtime_identity.process_snapshot(4321)
+
+        self.assertIsNone(snapshot)
+        query.assert_called_once()
+
+    def test_windows_process_snapshot_uses_wmi_after_cim_provider_failures(self) -> None:
+        payload = json.dumps(
+            {
+                "ProcessId": 4321,
+                "CreationDate": "20260723020405.123456-420",
+                "ExecutablePath": r"C:\Python311\python.exe",
+                "CommandLine": r'"C:\Python311\python.exe" scripts\runtime_server.py',
+            }
+        )
+        outcomes = [
+            *[
+                subprocess.CompletedProcess([], 4, stdout="", stderr="Invalid class")
+                for _ in range(runtime_identity.WINDOWS_PROCESS_QUERY_ATTEMPTS)
+            ],
+            subprocess.CompletedProcess([], 0, stdout=payload, stderr=""),
+        ]
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(runtime_identity.subprocess, "run", side_effect=outcomes) as query,
+        ):
+            snapshot = runtime_identity.process_snapshot(4321)
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.pid, 4321)
+        self.assertEqual(
+            query.call_count,
+            runtime_identity.WINDOWS_PROCESS_QUERY_ATTEMPTS
+            + runtime_identity.WINDOWS_PROCESS_FALLBACK_ATTEMPTS,
+        )
+        self.assertIn("Get-WmiObject", query.call_args.args[0][-1])
+
+    def test_windows_process_snapshot_preserves_cyrillic_command_line(self) -> None:
+        command_line = (
+            r'C:\Python311\python.exe "C:\Users\Alex\Desktop\Проверка восстановления'
+            r'\scripts\runtime_server.py"'
+        )
+        payload = json.dumps(
+            {
+                "ProcessId": 4321,
+                "CreationDate": "20260723020405.123456-420",
+                "ExecutablePath": r"C:\Python311\python.exe",
+                "CommandLine": command_line,
+            },
+            ensure_ascii=False,
+        )
+
+        with (
+            patch.object(runtime_identity.os, "name", "nt"),
+            patch.object(runtime_identity.shutil, "which", return_value=r"C:\Windows\powershell.exe"),
+            patch.object(
+                runtime_identity.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout=payload, stderr=""),
+            ) as query,
+        ):
+            snapshot = runtime_identity.process_snapshot(4321)
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.command_line, command_line)
+        self.assertEqual(query.call_args.kwargs["encoding"], "utf-8")
+        self.assertIn("[Console]::OutputEncoding", query.call_args.args[0][-1])
+
+    def test_current_windows_snapshot_records_actual_process_image(self) -> None:
+        kernel32 = MagicMock()
+        kernel32.GetCurrentProcess.return_value = 123
+        kernel32.GetCommandLineW.return_value = (
+            r'"C:\Python311\python.exe" C:\App\scripts\runtime_server.py'
+        )
+
+        def get_process_times(_handle, creation, _exit_time, _kernel_time, _user_time):
+            creation._obj.low = 123
+            creation._obj.high = 456
+            return True
+
+        def query_process_image(_handle, _flags, image_buffer, image_length):
+            image_buffer.value = r"C:\Python311\python.exe"
+            image_length._obj.value = len(image_buffer.value)
+            return True
+
+        kernel32.GetProcessTimes.side_effect = get_process_times
+        kernel32.QueryFullProcessImageNameW.side_effect = query_process_image
+
+        with (
+            patch.object(ctypes, "WinDLL", return_value=kernel32, create=True),
+            patch.object(runtime_identity.os, "getpid", return_value=4321),
+            patch.object(runtime_identity.sys, "executable", r"C:\App\.venv\Scripts\python.exe"),
+        ):
+            snapshot = runtime_identity._current_windows_process_snapshot()
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(snapshot.pid, 4321)
+        self.assertEqual(snapshot.executable, r"C:\Python311\python.exe")
+        self.assertNotEqual(snapshot.executable, runtime_identity.sys.executable)
+
+    def test_windows_venv_backend_spawn_uses_base_process_with_venv_identity(self) -> None:
+        venv_root = self.root / "Windows venv с пробелами"
+        venv_python = venv_root / "Scripts" / "python.exe"
+        base_python = self.root / "Python311" / "python.exe"
+        venv_python.parent.mkdir(parents=True)
+        base_python.parent.mkdir(parents=True)
+        venv_python.touch()
+        base_python.touch()
+        (venv_root / "pyvenv.cfg").write_text(
+            f"home = {base_python.parent}\n"
+            "include-system-site-packages = false\n"
+            "version = 3.11.9\n"
+            f"executable = {base_python}\n",
+            encoding="utf-8",
+        )
+
+        executable, environment = runtime_identity._windows_venv_spawn_target(venv_python)
+
+        self.assertEqual(executable, base_python.absolute())
+        self.assertEqual(environment, {"__PYVENV_LAUNCHER__": str(venv_python.absolute())})
+
+    def test_windows_venv_backend_spawn_falls_back_for_invalid_config(self) -> None:
+        venv_python = self.root / "incomplete-venv" / "Scripts" / "python.exe"
+        venv_python.parent.mkdir(parents=True)
+        venv_python.touch()
+
+        executable, environment = runtime_identity._windows_venv_spawn_target(venv_python)
+
+        self.assertEqual(executable, venv_python.absolute())
+        self.assertEqual(environment, {})
 
     def test_windows_current_process_identity_avoids_powershell_cim(self) -> None:
         snapshot = runtime_identity.ProcessSnapshot(
