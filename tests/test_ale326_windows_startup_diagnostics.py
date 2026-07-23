@@ -13,6 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from backend.app.services import runtime_identity
+from backend.app.services import runtime_startup
 from backend.app.services.runtime_identity import fetch_runtime_identity, runtime_build_id
 from backend.app.services.runtime_supervisor import RuntimeLifecycleError, RuntimeSupervisor
 from backend.app.version import APP_VERSION
@@ -333,6 +334,31 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             query.call_args.kwargs["timeout"],
             runtime_identity.WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS,
         )
+
+    def test_windows_startup_state_retries_transient_replace_denial(self) -> None:
+        real_replace = os.replace
+        attempts = 0
+
+        def transient_replace(source, destination):
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                error = PermissionError("controlled Windows sharing denial")
+                error.winerror = 5
+                raise error
+            real_replace(source, destination)
+
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "startup-token.json"
+            with (
+                patch.object(runtime_startup.os, "name", "nt"),
+                patch.object(runtime_startup.os, "replace", side_effect=transient_replace),
+            ):
+                runtime_startup._write_transient_json(path, {"stage": "binding-port"})
+
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"stage": "binding-port"})
+            self.assertEqual(attempts, 3)
+            self.assertFalse(any(path.parent.glob(".startup-token.json.*.tmp")))
 
 
 if __name__ == "__main__":

@@ -13,6 +13,9 @@ from .runtime_identity import TOKEN_PATTERN, fetch_runtime_identity
 
 STARTUP_STATE_SCHEMA = 1
 STARTUP_HEARTBEAT_SECONDS = 0.25
+WINDOWS_REPLACE_TIMEOUT_SECONDS = 0.5
+WINDOWS_REPLACE_RETRY_SECONDS = 0.01
+WINDOWS_TRANSIENT_REPLACE_ERRORS = {5, 32, 33}
 
 
 def _now_iso() -> str:
@@ -92,7 +95,25 @@ def _write_transient_json(path: Path, value: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(value, ensure_ascii=False, sort_keys=True), encoding="utf-8")
-    os.replace(temporary, path)
+    deadline = time.monotonic() + WINDOWS_REPLACE_TIMEOUT_SECONDS
+    try:
+        while True:
+            try:
+                os.replace(temporary, path)
+                return
+            except PermissionError as exc:
+                if (
+                    os.name != "nt"
+                    or getattr(exc, "winerror", None) not in WINDOWS_TRANSIENT_REPLACE_ERRORS
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(WINDOWS_REPLACE_RETRY_SECONDS)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
 
 
 class RuntimeStartupReporter:
