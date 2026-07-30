@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "full_dataset_baseline.py"
@@ -14,6 +15,22 @@ SPEC.loader.exec_module(MODULE)
 
 
 class FullDatasetBaselineTests(unittest.TestCase):
+    def test_timed_request_records_windows_connection_reset(self):
+        with patch.object(
+            MODULE.urllib.request,
+            "urlopen",
+            side_effect=ConnectionResetError(10054, "connection reset"),
+        ):
+            result = MODULE.timed_request(
+                "http://127.0.0.1:18188",
+                "/legacy?tab=rewards",
+                1,
+            )
+
+        self.assertIsNone(result["status"])
+        self.assertEqual(result["bytes"], 0)
+        self.assertEqual(result["error"], "ConnectionResetError")
+
     def test_fixture_targets_do_not_expose_private_values(self):
         with tempfile.TemporaryDirectory() as temp:
             db_path = Path(temp) / "fixture.sqlite"

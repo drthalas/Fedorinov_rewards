@@ -89,7 +89,7 @@ def timed_request(base_url: str, route: str, timeout: float) -> dict[str, Any]:
                 "bytes": len(body),
                 "error": None,
             }
-    except (urllib.error.URLError, TimeoutError) as error:
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
         return {
             "seconds": round(time.perf_counter() - started, 6),
             "status": None,
