@@ -7,16 +7,17 @@ physical Windows acceptance host. Machine-local evidence lives under
 ## Identity
 
 - Host alias from the Mac mini: `fedorinov-win-gate`
+- Stable LAN name used by the alias: `copew-04c68047f.local`
 - Hostname: `COPEW-04C68047F`
 - Hardware: HP EliteBook 745 G6
 - Architecture: x64
 - CPU: AMD Ryzen 5 PRO 3500U, 8 logical processors
 - Memory: approximately 7.43 GiB
 - Storage: 256 GB WDC PC SN520 SSD, NTFS, SMART status `OK`
-- Network: trusted RFC1918 Ethernet LAN, current host address `192.168.1.86`
+- Network: trusted RFC1918 Ethernet LAN; the DHCP address may change
 
-The IP address is operational configuration, not an internet-facing endpoint.
-Confirm it before a release gate because DHCP may change it.
+The SSH alias uses the mDNS hostname rather than a fixed DHCP address. The
+ED25519 fingerprint remains the authoritative host identity.
 
 ## Windows
 
@@ -56,6 +57,9 @@ automation is not considered configured until a native login has been verified.
 - No system protection was disabled for ALE-329.
 - SSH and RDP are reachable on the trusted local network. External router
   exposure was not configured and must remain disabled.
+- After reboot, passwordless SSH, both automatic services, and both listeners
+  returned successfully. The current-public package also passed a fresh
+  post-reboot launch and synthetic data smoke.
 
 ## Test tooling
 
@@ -78,7 +82,6 @@ automation is not considered configured until a native login has been verified.
 - Native Windows prompts, Explorer double-click, browser launch, and folder
   picker acceptance require an RDP session and are recorded separately for each
   release candidate.
-- On the first ALE-329 reboot check, Ethernet did not restore its DHCP address
-  and fell back to an APIPA address. Neither SSH nor RDP returned. The host is
-  not a ready physical gate until the LAN lease is made stable and both channels
-  pass after another reboot.
+- The DHCP address changed during the reboot check. Access remained recoverable
+  by the stable mDNS hostname; scripts and operator instructions must not depend
+  on a numeric LAN address.
