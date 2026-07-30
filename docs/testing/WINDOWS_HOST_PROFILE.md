@@ -43,7 +43,9 @@ ED25519 fingerprint remains the authoritative host identity.
 The primary unattended channel is SSH key authentication. RDP plus the dedicated
 test account password is the intended headed fallback. The password is not
 stored in this repository, Linear, scripts, or evidence. Keychain-backed RDP
-automation is not considered configured until a native login has been verified.
+access is configured on the Mac mini. The launcher reads the credential from
+the login Keychain, passes it through standard input, and pins the verified RDP
+certificate SHA256 instead of disabling certificate validation.
 
 ## Security posture
 
@@ -60,6 +62,9 @@ automation is not considered configured until a native login has been verified.
 - After reboot, passwordless SSH, both automatic services, and both listeners
   returned successfully. The current-public package also passed a fresh
   post-reboot launch and synthetic data smoke.
+- After the existing local console session was signed out, Keychain-backed RDP
+  authentication created an active `codex` desktop session. A second connection
+  reattached to the same account without Owner setup or password entry.
 
 ## Test tooling
 
@@ -78,7 +83,8 @@ automation is not considered configured until a native login has been verified.
 - Kaspersky firewall rule scope is centrally managed and cannot be proven or
   narrowed from project scripts without changing security policy.
 - The test account password still follows the host's account policy. SSH keys
-  remain the durable primary access mechanism.
+  remain the durable primary access mechanism. The RDP credential is stored only
+  in the Mac mini login Keychain under service `fedorinov-win-gate-rdp`.
 - Native Windows prompts, Explorer double-click, browser launch, and folder
   picker acceptance require an RDP session and are recorded separately for each
   release candidate.

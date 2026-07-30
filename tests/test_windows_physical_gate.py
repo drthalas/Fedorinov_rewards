@@ -19,6 +19,7 @@ class WindowsPhysicalGateContractTests(unittest.TestCase):
             "Invoke-WindowsPhysicalGate.ps1",
             "Start-WindowsGateRun.ps1",
             "Stop-WindowsGateRun.ps1",
+            "Open-WindowsGateRdp.sh",
         }
         self.assertEqual(expected, {path.name for path in SCRIPTS.iterdir() if path.is_file()})
 
@@ -80,6 +81,14 @@ class WindowsPhysicalGateContractTests(unittest.TestCase):
             source = path.read_text(encoding="utf-8")
             self.assertNotIn("BEGIN OPENSSH PRIVATE KEY", source)
             self.assertNotRegex(source, re.compile(r"password\s*=\s*['\"][^'\"]+", re.IGNORECASE))
+
+    def test_rdp_launcher_uses_keychain_stdin_and_certificate_pin(self) -> None:
+        source = (SCRIPTS / "Open-WindowsGateRdp.sh").read_text(encoding="utf-8")
+        self.assertIn("security find-generic-password", source)
+        self.assertIn("/args-from:stdin", source)
+        self.assertIn("/cert:fingerprint:sha256:", source)
+        self.assertNotIn("/cert:ignore", source)
+        self.assertNotRegex(source, re.compile(r"/p:[^$\"\n]+"))
 
 
 if __name__ == "__main__":

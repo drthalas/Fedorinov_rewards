@@ -153,6 +153,17 @@ other broad process termination.
 
 Use RDP after automated checks and test the same accepted bytes:
 
+```bash
+scripts/windows-gate/Open-WindowsGateRdp.sh
+```
+
+The Mac launcher uses the stable mDNS hostname, retrieves the dedicated test
+credential from the login Keychain, sends it to FreeRDP through standard input,
+and pins the audited RDP certificate. It never places the password in the
+repository or process command line. An already active different Windows console
+user can cause Windows to require an interactive takeover confirmation; sign
+out that test-only console session before starting unattended RDP.
+
 1. Extract the candidate under Desktop and double-click its normal BAT.
 2. Repeat under Downloads, a path with spaces, and a Cyrillic path.
 3. Confirm visible command-window behavior and browser launch.
@@ -172,9 +183,9 @@ process starts, and direct HTTP calls do not replace them.
 ## Recovery access
 
 1. Primary: `ssh fedorinov-win-gate` using the dedicated key.
-2. Fallback: RDP with NLA and the dedicated test account credential. When
-   unattended RDP is required, store it only in the Mac mini Keychain and verify
-   a native login before claiming the fallback is ready.
+2. Fallback: run `scripts/windows-gate/Open-WindowsGateRdp.sh`. NLA, the pinned
+   RDP certificate, and the dedicated credential from the Mac mini login
+   Keychain remain required.
 3. If SSH fails but RDP works, verify `sshd` is Running/Automatic and the
    administrator authorized-key ACL before restarting only `sshd`.
 4. If RDP fails but SSH works, verify `TermService`, NLA, the listener, and the
