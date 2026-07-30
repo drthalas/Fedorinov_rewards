@@ -26,6 +26,7 @@
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
+- Для routine/destructive checks использовать `synthetic-small`. Приватный persistent profile `sergey-full` применять только для релевантных heavy performance и exact-candidate release confidence задач по `docs/testing/FULL_DATASET_FIXTURE.md`; его данные, paths, file names и private manifest нельзя коммитить или загружать.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 

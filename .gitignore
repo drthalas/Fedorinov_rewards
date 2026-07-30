@@ -34,6 +34,8 @@ Rewards_backup_*.zip
 dist/
 FedorinovRewards_WebPreview*.zip
 *.preview.zip
+sergey-full/
+*.private-fixture.json
 
 !data/.gitkeep
 !data/README.md
