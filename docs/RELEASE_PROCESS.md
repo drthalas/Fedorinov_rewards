@@ -1,5 +1,8 @@
 # Release Process
 
+Обязательный порядок тестовых контуров и pre-publication policy определены в
+[`docs/testing/RELEASE_GATE_WORKFLOW.md`](testing/RELEASE_GATE_WORKFLOW.md).
+
 ## Overview
 
 Each public GitHub Release should contain two assets:
@@ -42,6 +45,10 @@ dist/latest.json
 
 `latest.json` contains version, release date, public ZIP URL, SHA256, and notes.
 
+Record the candidate filename, release commit, byte size, and SHA256 before
+transferring it to the Physical Windows Gate. Publication must use those exact
+accepted bytes.
+
 ## Safety check
 
 ```sh
@@ -66,9 +73,27 @@ The ZIP must not contain:
 
 ## Dry-run publication
 
+Run the applicable Mac/Linux and Windows VM gates before preparing the final
+candidate. After package safety, test the exact candidate on the Physical
+Windows Gate before creating a public tag, GitHub Release, `latest.json`, or
+Telegram notification.
+
+The physical gate covers real Explorer/double-click behavior, the normal BAT,
+browser UX, updater/recovery, data fingerprints, single-backend identity, and
+rollback according to release scope. A VM PASS does not replace this gate.
+
 ### GitHub Actions
 
-Recommended release path:
+The existing workflow builds fresh bytes on every invocation. A separate
+`publish=false` run followed by `publish=true` is eligible only when SHA256
+evidence proves that the publish run produced the exact artifact already
+accepted on the physical gate. Do not assume reproducibility.
+
+If exact byte parity cannot be established, use the local path that publishes
+the already accepted `dist` artifact or stop and create a pipeline follow-up
+issue. Do not publish first to make the artifact available for testing.
+
+GitHub Actions path:
 
 1. Push the committed version to `main`.
 2. Open GitHub -> Actions -> Manual Release.
@@ -114,7 +139,12 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The separate bootstrap downloads and verifies the ZIP, creates an application backup, stops only identity-confirmed application backends, preserves `.env`, replaces application files, and starts exactly one verified backend from the updated install root.
 
-Before publishing a release that contains runtime-lifecycle changes, run the packaged test on native Windows. The gate must prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend.
+Before every publication, run the exact candidate through the required Physical
+Windows Gate. Scope determines the depth, but updater/recovery or
+runtime-lifecycle changes must prove that old PIDs are dead, one backend remains,
+`/runtime/identity` matches the release version and install root, a repeated
+launcher does not create a duplicate, an unrelated port owner is untouched, and
+rollback restores one valid old backend.
 
 ## Telegram release notification
 
@@ -159,11 +189,15 @@ Dry-run prints the tag, title, notes path, and assets without creating a GitHub 
 
 ## Local publish release
 
-Manual local publication is still available, but GitHub Actions is preferred. Local publication uses local GitHub CLI authentication on the developer machine:
+Manual local publication uses local GitHub CLI authentication on the developer
+machine:
 
 ```sh
 python3 scripts/publish_github_release.py
 ```
+
+For an exact candidate accepted before publication, this local path is the
+current usable path when it publishes the same verified files from `dist`.
 
 If `gh` is missing or not authenticated, run `gh auth login` locally. Do not paste or commit GitHub tokens into project files.
 

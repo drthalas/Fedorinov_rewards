@@ -50,7 +50,8 @@ Linear project:
 Дальше читать только релевантные context-файлы:
 
 - product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
-- release: `RELEASES.md`, `CHANGELOG.md`;
+- release: `RELEASES.md`, `CHANGELOG.md`,
+  `../testing/RELEASE_GATE_WORKFLOW.md`;
 - process/docs/merge/diagnostic: соответствующие process/release-файлы.
 
 Для T0/T1 не перечитывать всю историю проекта без необходимости. Перед изменениями проверить branch, clean working tree, base/head и ограничения задачи.
@@ -125,7 +126,34 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
-После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
+Постоянная release-цепочка:
+
+```text
+Feature branch
+  -> Mac/Linux tests
+  -> Windows VM branch-level/pre-merge checks
+  -> merge/release candidate
+  -> Physical Windows Gate on exact candidate bytes
+  -> GitHub Release / latest.json / Telegram / user update availability
+```
+
+Windows VM используется для быстрых Windows-specific проверок и repeated loops.
+Physical Windows Gate используется для production-like acceptance exact
+candidate с реальным Explorer/BAT/browser, updater/recovery, data fingerprints,
+single-backend lifecycle и rollback. VM PASS не заменяет physical PASS.
+
+Пользователь не должен быть первым реальным тестировщиком updater/recovery.
+Публикация до первого physical Windows test запрещена. Если gate недоступен,
+Codex явно перечисляет непроверенный delta, причину, residual risk и exact
+follow-up plan; отсутствие physical acceptance или byte parity блокирует
+публикацию.
+
+Полная policy: `docs/testing/RELEASE_GATE_WORKFLOW.md`.
+
+После релиза обновить release evidence. Отдельная post-publication Owner QA
+может проверять обычное пользовательское обновление и новые функции, но не
+заменяет обязательный pre-publication Physical Windows Gate. После Owner
+acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
 ## Timing telemetry
 

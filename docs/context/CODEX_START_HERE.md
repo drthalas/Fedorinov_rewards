@@ -9,7 +9,8 @@
 Не перечитывать всю историю проекта для T0/T1 без необходимости. Остальные context-файлы читать по релевантности:
 
 - product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
-- release: `RELEASES.md`, `CHANGELOG.md`;
+- release: `RELEASES.md`, `CHANGELOG.md`,
+  `../testing/RELEASE_GATE_WORKFLOW.md`;
 - process/docs/merge/diagnostic: только нужные process/release-файлы, прежде всего `LINEAR_PROCESS.md`.
 
 ## Приоритет и безопасность
@@ -26,8 +27,14 @@
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
+- Для release соблюдать постоянную цепочку Mac/Linux -> Windows VM -> exact
+  candidate на Physical Windows Gate -> publication. GitHub Release,
+  `latest.json`, Telegram и user update availability разрешены только после
+  physical PASS тех же bytes.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
+Роли тестовых контуров и pre-publication gates:
+`docs/testing/RELEASE_GATE_WORKFLOW.md`.
 
 ## Шаблон запуска
 

@@ -2,7 +2,11 @@
 
 ## Общий процесс
 
-1. Убедиться, что Hermes QA PASS.
+Постоянная схема контуров описана в
+[`docs/testing/RELEASE_GATE_WORKFLOW.md`](../testing/RELEASE_GATE_WORKFLOW.md).
+
+1. Убедиться, что приняты feature и controlled merge, а обязательные
+   Mac/Linux и Windows VM gates прошли.
 2. Поднять `APP_VERSION` в `backend/app/version.py`.
 3. Создать или обновить `release_notes/X.Y.Z.md`.
 4. Обновить docs/context при необходимости.
@@ -19,22 +23,29 @@ python3 scripts/build_release_package.py
 python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_vX.Y.Z.zip
 ```
 
-8. Выполнить publish dry-run:
+8. Зафиксировать release commit, filename, size и SHA256 candidate.
+9. Проверить exact candidate на Physical Windows Gate до публикации.
+10. Подтвердить, что publish path использует те же bytes.
+11. Выполнить publish dry-run:
 
 ```sh
 python3 scripts/publish_github_release.py --dry-run
 ```
 
-9. Опубликовать через Manual Release workflow или обновить существующие assets, если это явно разрешено.
-10. Проверить public `latest.json`:
+12. Опубликовать exact accepted artifact через явно разрешённый release path.
+13. Проверить public `latest.json`:
 
 ```sh
 curl -fsS -L https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
-11. Только после успешного public `latest.json` отправить Telegram notification.
-12. Обновить Linear release issue.
-13. Перевести owner testing issue в проверку владельцем.
+14. Проверить public ZIP size/SHA against accepted candidate.
+15. Только после успешной public verification отправить Telegram notification.
+16. Обновить Linear release issue.
+
+Если Physical Windows Gate или byte parity недоступны, release остаётся
+заблокированным. Отчёт должен назвать непроверенный шаг, причину, residual risk
+и exact follow-up plan.
 
 ## Если release уже существует
 
