@@ -23,8 +23,9 @@ marked suspended. Although UTM is configured to keep running after its last
 window closes, the current audit observed the VM stop when the console window
 was closed. Keep the console open or minimized during normal use. The
 identity-scoped Mac watchdog checks the exact VM every 60 seconds and restored
-it in 31 seconds during the controlled test; this is recovery through a guest
-restart, not continuous execution.
+it to `started` in 26 seconds during the post-reboot controlled test. Key-based
+SSH returned after 36 seconds. This is recovery through a guest restart, not
+continuous execution.
 
 Guest AC sleep is disabled:
 
@@ -171,6 +172,10 @@ A VM reboot gate is PASS only when all of these succeed after the same reboot:
 6. A TEMP application runtime can start and return strict runtime identity.
 
 Console visibility alone is not headless access evidence.
+
+The full Mac reboot gate passed with the same VM UUID, automatic Windows boot,
+`sshd` in `Running/Automatic`, and key-based SSH before any manual Mac login.
+The subsequent 30-minute idle gate preserved the Mac and VM boot identities.
 
 ## Idle gate
 

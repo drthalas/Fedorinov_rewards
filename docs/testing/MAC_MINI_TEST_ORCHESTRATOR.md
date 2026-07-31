@@ -4,8 +4,10 @@ The Mac mini is the development and test-control host. It must remain reachable
 without an active local display, keep the UTM Windows VM running, and expose
 only the remote services needed for project work.
 
-This runbook does not authorize weakening macOS authentication, enabling
-automatic login, or storing credentials in the repository.
+The Owner has explicitly authorized automatic login for this dedicated,
+physically restricted headless test server. This authorization does not extend
+to other macOS security changes or storing credentials in the repository,
+documentation, scripts, logs, or Linear.
 
 ## Access model
 
@@ -29,8 +31,9 @@ The current AC power profile has:
 - TCP keepalive enabled;
 - Power Nap enabled.
 
-Remote Login and Screen Sharing are enabled. Automatic login is disabled and
-the screen-lock delay is immediate. The system does not currently restart
+Remote Login and Screen Sharing are enabled. FileVault is off, and supported
+macOS automatic login is enabled for the dedicated `hermes` user. The
+screen-lock delay remains immediate. The system does not currently restart
 automatically after a power interruption.
 
 Idle sleep and automatic display blanking are additionally prevented by a
@@ -41,9 +44,9 @@ user LaunchAgent:
 ```
 
 It keeps `/usr/bin/caffeinate -dimsu` running with `RunAtLoad` and
-`KeepAlive`. This preserves the existing password, immediate manual-lock
-policy, and disabled automatic login. It prevents an active GUI session from
-becoming unavailable solely because of idle sleep or display sleep.
+`KeepAlive`. This preserves the existing password and immediate manual-lock
+policy. It prevents the automatically loaded GUI session from becoming
+unavailable solely because of idle sleep or display sleep.
 
 Verify the state without changing it:
 
@@ -54,22 +57,25 @@ launchctl print-disabled system
 launchctl print gui/$(id -u)/com.fedorinov.keep-awake
 nc -G 3 -zv localhost 22
 nc -G 3 -zv localhost 5900
+fdesetup status
 sysadminctl -autologin status
 sysadminctl -screenLock status
 ```
 
-Do not enable automatic login or weaken screen-lock policy as part of ordinary
-test setup. Those are explicit Owner security decisions.
+Expected identity is `Automatic login user: hermes` with `FileVault is Off`.
+The system-managed `/etc/kcpassword` may be checked only for existence,
+ownership, mode, and size. Never read, copy, log, or commit its contents.
+Do not change automatic login or weaken screen-lock policy as part of ordinary
+test setup. Those remain explicit Owner security decisions.
 
 Expected `pmset -g assertions` evidence includes persistent
 `PreventUserIdleSystemSleep`, `PreventUserIdleDisplaySleep`, and
 `PreventSystemSleep` assertions owned by `caffeinate`.
 
-The controlled idle gate kept these assertions active for 30 minutes. After
-the interval, macOS SSH and Screen Sharing were reachable from the trusted
-physical Windows host, and the Windows VM remained reachable by key-based SSH.
-This proves idle continuity within the current logged-in boot, not unattended
-recovery across a full Mac reboot.
+The post-reboot controlled idle gate kept these assertions active for 30
+minutes. Mac boot identity and console user did not change, the VM boot
+identity did not change, and the Windows VM remained reachable by key-based
+SSH.
 
 ## UTM startup after login
 
@@ -102,33 +108,51 @@ exit code `0`, and the project VM in `started` state.
 
 `KeepRunningAfterLastWindowClosed` is configured, but the current audit
 observed the VM transition to `Stopped` after the console window was closed.
-The watchdog restored the exact project VM to `started` in 31 seconds during
-the controlled close test, and key-based SSH returned after Windows boot.
+In the post-reboot controlled test, the watchdog restored the exact project VM
+to `started` in 26 seconds, and key-based SSH returned after 36 seconds.
 Keep the console open or minimized during normal use to avoid an unnecessary
 guest reboot. Treat the watchdog as recovery, not as proof that UTM keeps the
 guest alive after the last window closes.
 
-## Reboot boundary
+## Full reboot autonomy
 
 The LaunchAgent starts UTM after the `hermes` GUI login session exists. It does
-not create that login session.
+not create that login session; supported macOS automatic login now creates it
+after boot.
 
-Because automatic login is disabled, an unattended full Mac reboot currently
-stops at the macOS login window. Remote Login may still provide a command
-channel, but the GUI UTM VM cannot be claimed as automatically restored until a
-post-reboot login and VM-start check has passed.
+The controlled full reboot gate passed without manual login:
 
-The immediate screen lock also blocks GUI automation, including the UTM
-console, after the session locks. Disabling or delaying that lock would weaken
-the current security policy and requires a separate explicit Owner decision.
+1. macOS acquired a new boot identity;
+2. `/dev/console` reported `hermes`;
+3. `sysadminctl` reported `Automatic login user: hermes`;
+4. keep-awake and the UTM watchdog loaded through `RunAtLoad`;
+5. the exact VM UUID reached `started`;
+6. VM OpenSSH returned with the expected hostname and automatic `sshd`;
+7. Mac SSH and Screen Sharing were reachable from the VM;
+8. the physical Windows gate was reachable by its pinned SSH identity when its
+   network was available.
 
-Do not report the Mac reboot gate as PASS while this boundary remains. Options
-requiring an Owner decision are:
+No Owner login or unlock was performed after the reboot.
 
-1. retain the secure login boundary and arrange an Owner login after reboot;
-2. approve a dedicated always-on test account and its security policy;
-3. replace GUI-session UTM startup with a supported system-level virtualization
-   service.
+Automatic login reduces physical security because a person with access to the
+Mac can obtain the `hermes` session after boot. The Owner accepted this tradeoff
+for the dedicated physically restricted server. Manual screen lock still
+requires normal authentication; do not disable it.
+
+For a phone-triggered readiness check:
+
+```bash
+ssh <mac-mini-host> 'stat -f "%Su" /dev/console'
+ssh <mac-mini-host> \
+  'launchctl print gui/501/com.fedorinov.keep-awake'
+ssh <mac-mini-host> '/opt/homebrew/bin/utmctl list'
+ssh <mac-mini-host> \
+  'ssh -o BatchMode=yes fedorinov-win-vm "whoami"'
+```
+
+To disable automatic login, use System Settings > Users & Groups >
+Automatically log in as > Off and authorize the change interactively. Do not
+manually edit or copy `/etc/kcpassword`.
 
 ## Power-loss recovery
 
@@ -143,7 +167,7 @@ For a 30-60 minute idle check:
 1. Record Mac boot time, UTM PID, VM PID, and VM state.
 2. Minimize the UTM window. Closing the last console intentionally tests the
    watchdog and causes a guest restart on the audited UTM version.
-3. Leave the host idle for at least 60 minutes.
+3. Leave the host idle for at least 30 minutes.
 4. Reconnect through SSH and Screen Sharing.
 5. Verify that the PIDs are still present and the VM channel responds.
 6. Record `pmset -g assertions` and unexpected wake/sleep events.

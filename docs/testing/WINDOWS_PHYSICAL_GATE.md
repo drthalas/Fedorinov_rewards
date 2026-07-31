@@ -13,6 +13,11 @@ will be published.
 The Mac SSH alias uses a dedicated key. Passwords and private keys remain in
 machine-local credential storage and must never be committed.
 
+After a Mac orchestrator reboot, test both the SSH alias and its pinned trusted
+LAN address. A sleeping or disconnected physical laptop is `UNAVAILABLE`, not
+a PASS; retry when the network returns and require the same pinned host
+identity before running a release gate.
+
 Current required service state:
 
 - `sshd`: `Running`, `Automatic`;
