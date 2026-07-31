@@ -22,8 +22,35 @@ Current required service state:
 
 - `sshd`: `Running`, `Automatic`;
 - `TermService`: `Running`, `Automatic`;
-- TCP/22 and TCP/3389 reachable only on the trusted test network;
-- AC and battery standby disabled during a gate run.
+- Windows Firewall enabled for every profile;
+- TCP/22, TCP/3389, UDP/3389, and diagnostic ICMP echo allowed only from the
+  trusted LAN on the active `Private` profile;
+- previous broad SSH/RDP rules disabled;
+- RDP Network Level Authentication enabled;
+- AC standby, hybrid sleep, and hibernation disabled;
+- AC lid-close action set to `Do nothing`;
+- DC standby retained as a battery safety fallback;
+- password-on-wake retained.
+
+The physical gate is unattended only while connected to AC power. Closing the
+lid must not suspend it on AC. Do not disable the DC safety timeout merely to
+extend unattended availability after mains power is lost.
+
+The accepted power-policy commands are:
+
+```powershell
+powercfg /setacvalueindex scheme_current sub_sleep standbyidle 0
+powercfg /setacvalueindex scheme_current sub_sleep hibernateidle 0
+powercfg /setacvalueindex scheme_current sub_sleep hybridsleep 0
+powercfg /setacvalueindex scheme_current sub_buttons lidaction 0
+powercfg /setactive scheme_current
+powercfg /hibernate off
+```
+
+The active physical adapter must report `WakeOnMagicPacket=Enabled` and
+`WakeOnPattern=Enabled`. If the driver reports selective suspend or
+sleep-on-disconnect as unsupported, record that as the effective protection;
+do not edit undocumented device registry values.
 
 Verify:
 
@@ -32,6 +59,11 @@ ssh -o BatchMode=yes fedorinov-win-gate \
   "powershell.exe -NoProfile -Command \"hostname; whoami; Get-Service sshd,TermService\""
 nc -G 3 -zv <physical-gate-host> 3389
 ```
+
+ICMP is diagnostic evidence only. Some trusted WLAN or endpoint policies may
+drop echo even when the host rule is correct. SSH plus the RDP listener and
+service identity remain the authoritative unattended-access gate; never widen
+SSH/RDP firewall scope to compensate for missing ping replies.
 
 ## Release gate
 
@@ -69,6 +101,11 @@ After a Windows reboot:
 For the idle gate, leave the laptop untouched for 30-60 minutes and repeat both
 SSH and RDP probes. A screen lock is acceptable; sleep or loss of both remote
 channels is not.
+
+For rollback after the laptop stops serving as a dedicated AC-powered gate,
+restore a finite AC standby timeout and re-enable hibernation through the
+normal Windows power policy. Do not roll back by disabling Windows Firewall or
+reenabling broad `Any` SSH/RDP rules.
 
 ## Recovery access
 
