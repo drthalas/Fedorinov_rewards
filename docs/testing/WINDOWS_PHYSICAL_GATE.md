@@ -94,3 +94,29 @@ Commit generic scripts and documentation only. Keep these machine-local:
 
 Do not upload Owner or Sergey data to GitHub, Linear, CI artifacts, or external
 cloud storage.
+
+## Full performance fixture
+
+The physical gate keeps one local NTFS `sergey-full` fixture:
+
+```text
+C:\FedorinovGate\Data\sergey-full\master
+C:\FedorinovGate\Data\sergey-full\state
+```
+
+Use the exact candidate artifact with a DB-only writable run under
+`state\runs\<run-id>`. The full media tree remains shared and read-only. Media
+uploads, replacements, destructive entity tests, broad cleanup, and orphan
+scans remain restricted to `synthetic-small`.
+
+After initial materialization and verification, remove the Windows transport
+archive and temporary extraction directory. Keep only one current packaged
+baseline run when it is required for smoke; old candidate/rehearsal runs and
+their browser profiles are stale artifacts. Before deleting any candidate,
+confirm that it is inside the dedicated gate root, is not active, and is not
+the only healthy fixture or current release-candidate evidence.
+
+Reset means copying only the verified baseline SQLite file to the named run DB,
+then checking its SHA, `integrity_check`, and foreign keys. It never means
+recopying or mirroring the full media tree. See
+[FULL_DATASET_FIXTURE.md](FULL_DATASET_FIXTURE.md).

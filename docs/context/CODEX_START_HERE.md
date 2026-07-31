@@ -10,6 +10,8 @@
 
 - product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
 - release: `RELEASES.md`, `CHANGELOG.md`;
+- Windows/performance fixture: `docs/testing/FULL_DATASET_FIXTURE.md` and the
+  relevant VM/physical gate runbook;
 - process/docs/merge/diagnostic: только нужные process/release-файлы, прежде всего `LINEAR_PROCESS.md`.
 
 ## Приоритет и безопасность

@@ -202,6 +202,27 @@ and confirm that the dedicated host key still matches.
 If no verified snapshot exists, stop and repair the current VM through SSH or
 the UTM console. Do not improvise a destructive reset.
 
+## Full performance fixture
+
+The persistent `sergey-full` fixture uses the normalized layout documented in
+[FULL_DATASET_FIXTURE.md](FULL_DATASET_FIXTURE.md). On the VM it has exactly
+one local NTFS media tree:
+
+```text
+C:\FedorinovGate\Data\sergey-full\master
+C:\FedorinovGate\Data\sergey-full\state
+```
+
+The application reads media from `master` and uses only a DB copy under
+`state\runs\<run-id>`. Do not create a second full media tree for a run. Before
+and after a relevant performance comparison, verify the master fingerprint,
+SQLite integrity, foreign keys, and the selected run DB baseline SHA.
+
+Transport ZIPs, temporary extraction directories, generated logs, and stale
+runs are not persistent fixture components. Delete them only after the master
+and baseline DB have passed verification and no process references the target.
+Never delete `master` or the only healthy `state\baseline` copy.
+
 ## Safety
 
 - Use only TEMP DB/media for write tests.

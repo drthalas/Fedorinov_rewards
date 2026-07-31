@@ -33,8 +33,8 @@ The current AC power profile has:
 
 Remote Login and Screen Sharing are enabled. FileVault is off, and supported
 macOS automatic login is enabled for the dedicated `hermes` user. The
-screen-lock delay remains immediate. The system does not currently restart
-automatically after a power interruption.
+screen-lock delay remains immediate. Supported macOS power recovery is
+enabled: the Mac automatically restarts after a power interruption.
 
 Idle sleep and automatic display blanking are additionally prevented by a
 user LaunchAgent:
@@ -156,9 +156,32 @@ manually edit or copy `/etc/kcpassword`.
 
 ## Power-loss recovery
 
-`autorestart` and `autorestartatconnect` are currently disabled. Enabling either
-requires an administrator action and must be reviewed separately. A UPS is the
-preferred protection against short power interruptions.
+System Settings > Energy is set to **After a power failure**. The corresponding
+supported power-management state is:
+
+```text
+autorestart 1
+autorestartatconnect 0
+```
+
+Verify without changing it:
+
+```bash
+pmset -g custom | grep -E 'autorestart|autorestartatconnect'
+```
+
+To configure the same supported setting from an authorized administrator
+session:
+
+```bash
+sudo pmset -a autorestart 1
+```
+
+`autorestartatconnect` remains disabled because reconnecting AC is not the
+selected policy. Do not simulate a power loss by pulling power during routine
+QA. A physical power-loss test requires separate Owner authorization and a
+verified backup; normal reboot evidence does not prove the electrical recovery
+path. A UPS remains the preferred protection against short interruptions.
 
 ## Idle check
 
