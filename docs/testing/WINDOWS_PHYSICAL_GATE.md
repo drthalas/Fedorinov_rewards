@@ -205,9 +205,17 @@ C:\FedorinovGate\Data\sergey-full\state
 ```
 
 Use the exact candidate artifact with a DB-only writable run under
-`state\runs\<run-id>`. The full media tree remains shared and read-only. Media
-uploads, replacements, destructive entity tests, broad cleanup, and orphan
-scans remain restricted to `synthetic-small`.
+`state\runs\<run-id>`. The physical full media tree is a single mutable,
+expendable working copy backed by the immutable canonical ZIP on the Mac mini.
+The application account may have inheritable `Modify` on the physical data and
+state roots so the public package can exercise complete CRUD and managed-media
+flows. Do not apply this ACL policy to the VM fixture automatically.
+
+Before and after a full-write run, record opaque DB/media fingerprints and
+check SQLite integrity, foreign keys, live references, operation-scoped
+candidate/orphan paths, and quarantine state. Do not run global orphan cleanup
+or broad unrelated scans against the private tree, and do not remove operation
+receipts needed for idempotency.
 
 After initial materialization and verification, remove the Windows transport
 archive and temporary extraction directory. Keep only one current packaged
@@ -216,7 +224,10 @@ their browser profiles are stale artifacts. Before deleting any candidate,
 confirm that it is inside the dedicated gate root, is not active, and is not
 the only healthy fixture or current release-candidate evidence.
 
-Reset means copying only the verified baseline SQLite file to the named run DB,
-then checking its SHA, `integrity_check`, and foreign keys. It never means
-recopying or mirroring the full media tree. See
+Copying the verified baseline SQLite file resets metadata only; it does not
+undo media writes. A full physical reset requires explicit Owner approval and
+controlled replacement of the same working root from the verified Mac ZIP.
+Stop only the confirmed app-owned backend, verify archive identity and free
+space, avoid a second full media tree, restore to the exact gate path, verify
+DB/media health, reapply the narrow working ACL, and launch a fresh run DB. See
 [FULL_DATASET_FIXTURE.md](FULL_DATASET_FIXTURE.md).

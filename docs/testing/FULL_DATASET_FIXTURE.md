@@ -4,7 +4,9 @@
 
 `sergey-full` is a persistent private performance and release-confidence
 fixture. `synthetic-small` remains the default for routine functional,
-destructive, and media-write tests.
+destructive, and failure-safety tests. The physical Windows gate also has an
+Owner-authorized mutable `sergey-full` working copy for production-like CRUD
+and managed-media acceptance.
 
 The full fixture contains private data. Never commit, upload, attach, quote, or
 publish its file names, records, comments, links, photographs, manifests, or
@@ -26,11 +28,12 @@ The Mac mini does not retain an extracted full master after both Windows
 fixtures pass full verification. The canonical ZIP is read-only and is the
 only Mac-side full copy.
 
-Each Windows fixture has this layout:
+Each Windows fixture has this layout. The directory name `master` is retained
+for compatibility, but its mutability differs by contour:
 
 ```text
 sergey-full\
-  master\                  protected DB and media snapshot
+  master\                  single full DB and media tree
   state\
     baseline\              verified baseline SQLite copy
     runs\<run-id>\database\MyDatabase.sqlite
@@ -38,7 +41,9 @@ sergey-full\
 
 There is one full media tree per Windows machine. A run copies only SQLite and
 references media from `master`; it must not clone, mirror, or hard-link a
-second full media tree.
+second full media tree. On the VM, `master` remains a protected fixture. On the
+physical gate, `master` is the mutable, expendable working media tree; the Mac
+ZIP is its immutable recovery source.
 
 The accepted opaque snapshot identity is:
 
@@ -74,11 +79,13 @@ from the accepted fixture.
 The canonical ZIP check must validate its expected SHA and central directory.
 The Windows check must read the full tree after initial materialization, after
 storage cleanup, and whenever corruption is suspected. Quick DB/media-count
-checks are sufficient between unchanged read-only runs.
+checks are sufficient between unchanged VM runs. Physical full-write runs must
+record a pre-run fingerprint and perform post-run DB integrity, foreign-key,
+live-reference, candidate/orphan, and quarantine checks.
 
 ## Run and reset
 
-For a writable metadata smoke:
+For a VM writable-metadata smoke:
 
 1. verify the master and `state\baseline` DB;
 2. select an ASCII run ID;
@@ -94,6 +101,24 @@ Reset repeats steps 3-5. It does not delete media and does not use
 `robocopy /MIR`, recursive synchronization, orphan cleanup, or a full-tree
 copy. Use `synthetic-small` for upload, replacement, entity deletion, rollback,
 and failure-safety tests.
+
+For an Owner-authorized physical full-write run:
+
+1. verify the Mac archive identity and physical working-tree health;
+2. copy only the baseline SQLite file to a named run DB;
+3. point `REWARDS_DATA_DIR` to the existing physical `master` tree and
+   `REWARDS_DB_PATH` to that run DB;
+4. grant the application account inheritable `Modify` only on the physical
+   working data and state roots;
+5. run CRUD/media checks and then verify SQLite integrity, foreign keys, live
+   media references, quarantine state, and operation-scoped candidate/orphan
+   paths;
+6. retain operation receipts required by idempotency; do not treat them as
+   user media or delete them with a global scan.
+
+A DB-only reset does not reverse media mutations. Once a physical run writes
+managed media, return to the accepted snapshot only with the full recovery
+procedure below. Never create a second full media tree merely to reset a run.
 
 ## Cleanup
 
@@ -133,11 +158,20 @@ storage.
 
 ## Recovery
 
-If a Windows master is unhealthy, preserve it and stop. Restore only from the
-canonical archive after verifying archive SHA, destination free space, and path
-safety. Materialize locally on NTFS, verify the full extracted fingerprint,
-protect the master, create a DB-only baseline, and delete only the temporary
-transport archive.
+If a Windows fixture is unhealthy, preserve evidence and stop. Restore only
+from the canonical archive after explicit Owner authorization and after
+verifying archive SHA, destination free space, active-process identity, and
+path safety. Stop only the confirmed app-owned backend. Replace only the exact
+physical working root, extract directly to that same NTFS location without
+retaining another full copy, and verify the accepted tree fingerprint, SQLite
+integrity, foreign keys, and an image decode sample. Reapply the application
+account's inheritable `Modify` ACL, create a fresh DB-only run, launch the
+public package, and smoke DB/media reads and writes. Never use an ambiguous
+path, `robocopy /MIR`, or global orphan cleanup.
+
+The physical ACL before a policy change and its exact rollback commands belong
+in machine-local gate state, not in Git or Linear. The VM fixture remains
+protected unless a separate Owner authorization changes its policy.
 
 If the Mac archive is unhealthy or missing, do not treat either Windows
 working copy as disposable. Report the condition and obtain an Owner-approved
