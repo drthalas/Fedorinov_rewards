@@ -82,7 +82,7 @@ def _fully_unquote(value: str) -> str:
     return decoded
 
 
-def normalize_managed_image_path(
+def _normalize_managed_image_path_lexically(
     settings: Settings,
     raw_path: object,
     *,
@@ -100,7 +100,7 @@ def normalize_managed_image_path(
 
     if candidate.is_absolute():
         try:
-            candidate = candidate.resolve().relative_to(settings.rewards_data_dir.resolve())
+            candidate = candidate.relative_to(settings.rewards_data_dir)
         except ValueError as exc:
             raise MediaLifecycleError("Изображение находится вне каталога данных.") from exc
 
@@ -111,7 +111,22 @@ def normalize_managed_image_path(
     if candidate.suffix.lower() not in MANAGED_IMAGE_EXTENSIONS:
         raise MediaLifecycleError("Недопустимый тип управляемого изображения.")
 
-    relative_path = candidate.as_posix()
+    return candidate.as_posix()
+
+
+def normalize_managed_image_path(
+    settings: Settings,
+    raw_path: object,
+    *,
+    allowed_roots: frozenset[str] = MANAGED_IMAGE_ROOTS,
+) -> str:
+    relative_path = _normalize_managed_image_path_lexically(
+        settings,
+        raw_path,
+        allowed_roots=allowed_roots,
+    )
+    candidate = Path(relative_path)
+
     root = (settings.rewards_data_dir / candidate.parts[0]).resolve()
     lexical_target = settings.rewards_data_dir / candidate
     current = settings.rewards_data_dir.resolve()
@@ -174,7 +189,7 @@ def managed_image_reference_counts_in_connection(
             if (field.table, int(row["row_id"])) in excluded:
                 continue
             try:
-                candidate = normalize_managed_image_path(settings, row["media_path"])
+                candidate = _normalize_managed_image_path_lexically(settings, row["media_path"])
             except MediaLifecycleError:
                 continue
             if candidate in counts:
@@ -189,13 +204,14 @@ def managed_image_reference_count_in_connection(
     *,
     excluded_rows: tuple[MediaReferenceExclusion, ...] = (),
 ) -> int:
-    normalized_path = normalize_managed_image_path(settings, raw_path)
-    return managed_image_reference_counts_in_connection(
+    normalized_path = _normalize_managed_image_path_lexically(settings, raw_path)
+    counts = managed_image_reference_counts_in_connection(
         connection,
         settings,
-        (normalized_path,),
+        (raw_path,),
         excluded_rows=excluded_rows,
-    )[normalized_path]
+    )
+    return counts[normalized_path]
 
 
 def _reference_count(connection, settings: Settings, normalized_path: str) -> int:
@@ -203,11 +219,10 @@ def _reference_count(connection, settings: Settings, normalized_path: str) -> in
 
 
 def managed_image_reference_count(settings: Settings, raw_path: object) -> int:
-    normalized_path = normalize_managed_image_path(settings, raw_path)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         connection.execute("begin immediate")
         try:
-            count = _reference_count(connection, settings, normalized_path)
+            count = managed_image_reference_count_in_connection(connection, settings, raw_path)
             connection.commit()
         except Exception:
             connection.rollback()

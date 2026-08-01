@@ -360,6 +360,13 @@
     form.append("photo_field", button.getAttribute("data-photo-field") || "");
     form.append("return_url", returnUrl);
     form.append("file", image.blob, "clipboard.jpg");
+    var writeForm = button.closest("form[data-write-feedback]");
+    var writeFeedback = window.FedorinovWriteFeedback;
+    if (writeForm && writeFeedback && typeof writeFeedback.begin === "function") {
+      if (!writeFeedback.begin(writeForm, button, "Сохраняем фото…")) {
+        throw new Error("Сохранение фотографии уже выполняется.");
+      }
+    }
     rememberPendingClipboardImage(image, ["status=photo_updated", "media_cleanup=failed"]);
     var response;
     try {
@@ -370,20 +377,27 @@
       });
     } catch (error) {
       clearPendingClipboardImage(image.fingerprint);
+      if (writeForm && writeFeedback && typeof writeFeedback.finish === "function") {
+        writeFeedback.finish(writeForm, { state: "error", message: "Не удалось сохранить фотографию." });
+      }
       throw error;
     }
     if (!response.ok) {
-      var text = await response.text();
       clearPendingClipboardImage(image.fingerprint);
-      throw new Error(text || "Не удалось сохранить фото из буфера.");
+      if (writeForm && writeFeedback && typeof writeFeedback.finish === "function") {
+        writeFeedback.finish(writeForm, { state: "error", message: "Не удалось сохранить фотографию." });
+      }
+      throw new Error("Не удалось сохранить фото из буфера.");
     }
     var responseUrl = new URL(response.url, window.location.href);
     if (!response.redirected || !urlHasSuccessMarker(responseUrl, ["status=photo_updated", "media_cleanup=failed"])) {
       clearPendingClipboardImage(image.fingerprint);
+      if (writeForm && writeFeedback && typeof writeFeedback.finish === "function") {
+        writeFeedback.finish(writeForm, { state: "error", message: "Не удалось подтвердить сохранение фото." });
+      }
       throw new Error("Не удалось подтвердить сохранение фото из буфера.");
     }
     consumePendingClipboardImage(image.fingerprint);
-    endClipboardFeedback(button);
     var target = new URL(returnUrl, window.location.href);
     if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
       window.history.replaceState(null, "", target.pathname + target.search + target.hash);
@@ -420,7 +434,7 @@
       if (input.files && input.files.length) {
         rememberPhotoInteraction(button);
         clearSourceError(button);
-        if (input.form) input.form.submit();
+        if (input.form) input.form.requestSubmit();
       } else {
         clearSourceError(button);
         restorePhotoInteraction();

@@ -17,7 +17,7 @@
   <div class="person-edit-main">
 {% endif %}
 
-<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form>
+<form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form data-write-feedback data-write-pending-label="Сохраняем…">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Основные данные</legend>

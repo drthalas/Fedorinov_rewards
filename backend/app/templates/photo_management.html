@@ -18,7 +18,7 @@
       </div>
       <p class="photo-manage-label">{{ photo.label }}</p>
       <div class="photo-manage-actions">
-        <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data">
+        <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data" data-write-feedback data-write-pending-label="Сохраняем фото…">
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
@@ -82,12 +82,12 @@
           >
         </form>
         {% if has_media_path(photo.path) %}
-        <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота?');">
+        <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота?');" data-write-feedback data-write-pending-label="Удаляем…">
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
           <input type="hidden" name="return_url" value="{{ photo_return_url }}">
-          <button class="mini-button danger photo-icon-button" type="submit" title="Удалить фотографию" aria-label="Удалить фотографию: {{ photo.label }}">×</button>
+          <button class="mini-button danger photo-icon-button" type="submit" title="Удалить фотографию" aria-label="Удалить фотографию: {{ photo.label }}" data-write-compact="true">×</button>
         </form>
         {% endif %}
         {% if photo_entity_type not in ('person', 'reward') %}

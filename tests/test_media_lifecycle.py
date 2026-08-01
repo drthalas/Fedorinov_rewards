@@ -147,6 +147,29 @@ class MediaLifecycleTests(unittest.TestCase):
         self.assertEqual(final.status, "deleted")
         self.assertFalse(shared_file.exists())
 
+    def test_reference_scan_validates_target_on_filesystem_once_not_every_database_row(self) -> None:
+        target_path = "Source/1/target.jpg"
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("update person set person_foto = ? where id = 1", (target_path,))
+            connection.executemany(
+                "insert into person (id, main_foto) values (?, ?)",
+                ((row_id, f"Source/{row_id}/unrelated.jpg") for row_id in range(2, 1002)),
+            )
+
+        original_is_symlink = Path.is_symlink
+        filesystem_checks = 0
+
+        def counted_is_symlink(path: Path) -> bool:
+            nonlocal filesystem_checks
+            filesystem_checks += 1
+            return original_is_symlink(path)
+
+        with patch.object(Path, "is_symlink", counted_is_symlink):
+            count = managed_image_reference_count(self.settings(), target_path)
+
+        self.assertEqual(count, 1)
+        self.assertLessEqual(filesystem_checks, len(Path(target_path).parts) + 1)
+
     def test_replace_deletes_unreferenced_old_file_and_preserves_neighbor(self) -> None:
         old_path = "Source/1/old.jpg"
         neighbor_path = "Source/1/neighbor.jpg"

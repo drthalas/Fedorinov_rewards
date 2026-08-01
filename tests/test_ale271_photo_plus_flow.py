@@ -80,7 +80,7 @@ class Ale271PhotoPlusFlowTests(unittest.TestCase):
         self.assertIn("restorePhotoInteraction()", cancel_handler)
         self.assertNotIn("photoPlusMode", cancel_handler)
         change_handler = picker.split("function onChange()", 1)[1].split('input.addEventListener("cancel"', 1)[0]
-        self.assertIn("input.form.submit()", change_handler)
+        self.assertIn("input.form.requestSubmit()", change_handler)
 
     def test_rank_rechecks_clipboard_after_picker_cancel(self) -> None:
         script = self.read("backend/app/static/guide_image_preview.js")
