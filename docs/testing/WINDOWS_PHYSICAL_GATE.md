@@ -22,6 +22,8 @@ Current required service state:
 
 - `sshd`: `Running`, `Automatic`;
 - `TermService`: `Running`, `Automatic`;
+- on the dedicated physical gate only, `CcmExec` and `SccmLauncher`:
+  `Stopped`, `Disabled`, under explicit Owner authorization;
 - Windows Firewall enabled for every profile;
 - TCP/22, TCP/3389, UDP/3389, and diagnostic ICMP echo allowed only from the
   trusted LAN on the active `Private` profile;
@@ -29,23 +31,66 @@ Current required service state:
 - RDP Network Level Authentication enabled;
 - AC standby, hybrid sleep, and hibernation disabled;
 - AC lid-close action set to `Do nothing`;
+- AC unattended sleep disabled;
+- automatic screen saver and inactivity lock disabled for the gate accounts;
+- display timeout may remain enabled;
 - DC standby retained as a battery safety fallback;
-- password-on-wake retained.
+- password protection remains in force after a manual lock.
+
+The SCCM client remains installed. Do not disable any other SCCM component and
+do not disable Kaspersky, BI.Zone, Windows Firewall, UAC, SSH, or RDP. If
+`CcmExec` or `SccmLauncher` returns to `Running`/`Automatic`, or another SCCM
+component starts enforcing the old power or screen-saver policy, stop the gate
+and collect evidence. Removing the SCCM client requires new Owner approval.
+
+The recorded drift source was Microsoft Configuration Manager, confirmed by
+`CCM_PowerConfig`, `PwrMgmt.log`, and the SCCM user-logon package that restored
+the screen saver. Local GPO, domain/Entra/MDM enrollment, scheduled tasks,
+HP utilities, Kaspersky, and BI.Zone were audited and did not own these values.
+Do not repeat broad policy changes when diagnosing a recurrence: first prove
+which component changed the effective value and timestamp it against SCCM
+policy activity.
 
 The physical gate is unattended only while connected to AC power. Closing the
 lid must not suspend it on AC. Do not disable the DC safety timeout merely to
 extend unattended availability after mains power is lost.
 
-The accepted power-policy commands are:
+The physical gate uses the dedicated plan `Fedorinov Physical Gate Always On`
+with GUID `a1e34300-4c3a-4d18-8430-000000000001`. Its accepted AC settings are:
 
 ```powershell
-powercfg /setacvalueindex scheme_current sub_sleep standbyidle 0
-powercfg /setacvalueindex scheme_current sub_sleep hibernateidle 0
-powercfg /setacvalueindex scheme_current sub_sleep hybridsleep 0
-powercfg /setacvalueindex scheme_current sub_buttons lidaction 0
-powercfg /setactive scheme_current
+$plan = 'a1e34300-4c3a-4d18-8430-000000000001'
+$sleep = '238c9fa8-0aad-41ed-83f4-97be242c8f20'
+$unattended = '7bc4a2f9-d8fc-4469-b07b-33eb785aaca0'
+powercfg /setacvalueindex $plan sub_sleep standbyidle 0
+powercfg /setacvalueindex $plan sub_sleep hibernateidle 0
+powercfg /setacvalueindex $plan sub_sleep hybridsleep 0
+powercfg /setacvalueindex $plan $sleep $unattended 0
+powercfg /setacvalueindex $plan sub_buttons lidaction 0
+powercfg /setactive $plan
 powercfg /hibernate off
 ```
+
+The machine-local corrective state and rollback are kept outside the
+repository:
+
+```text
+C:\FedorinovGate\State\ale343-power-policy
+```
+
+The state directory contains the pre-change JSON snapshot, exported original
+power plan, and rollback script. To restore the exact recorded service startup
+types/states, screen-saver values, inactivity policy, original active plan,
+and hibernation state, run from an elevated terminal:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
+  C:\FedorinovGate\State\ale343-power-policy\ROLLBACK.ps1
+```
+
+Rollback must report `ALE343_ROLLBACK_COMPLETE`. Verify the restored values
+before allowing SCCM to manage the laptop again. Do not use rollback as a
+reason to weaken firewall or endpoint protection.
 
 The active physical adapter must report `WakeOnMagicPacket=Enabled` and
 `WakeOnPattern=Enabled`. If the driver reports selective suspend or
@@ -98,14 +143,32 @@ After a Windows reboot:
 3. Verify TCP/3389 and complete an RDP login.
 4. Confirm the expected test account and clean application state.
 
-For the idle gate, leave the laptop untouched for 30-60 minutes and repeat both
-SSH and RDP probes. A screen lock is acceptable; sleep or loss of both remote
-channels is not.
+For the idle gate, keep an authenticated RDP session open and leave the laptop
+untouched for at least 90 minutes on AC. Do not poll the host during the idle
+interval. Use a host-local `SYSTEM` collector to record the active power plan,
+AC values, service state, session state, sleep events, lock events, and SCCM
+power-log metadata. After the full interval, require:
+
+- no sleep or hibernate event;
+- no automatic lock event and the same RDP session still active;
+- unchanged dedicated power plan and AC values;
+- `CcmExec` and `SccmLauncher` still stopped and disabled;
+- `sshd` and `TermService` still running and automatic;
+- SSH authentication, RDP authentication, and ICMP response from the trusted
+  LAN;
+- no renewed SCCM power-log activity.
+
+Also verify persistence after `gpupdate /force`, reboot, sign-out/sign-in, and
+manual lock/unlock. Check across the former SCCM enforcement windows near
+09:00 and 17:00 local time, or use a controlled SCCM policy trigger while both
+authorized services are disabled. A blocked trigger plus unchanged plan and
+unchanged `PwrMgmt.log` is acceptable evidence; it does not authorize deleting
+or modifying the SCCM client.
 
 For rollback after the laptop stops serving as a dedicated AC-powered gate,
-restore a finite AC standby timeout and re-enable hibernation through the
-normal Windows power policy. Do not roll back by disabling Windows Firewall or
-reenabling broad `Any` SSH/RDP rules.
+use the recorded machine-local `ROLLBACK.ps1`; do not invent replacement
+defaults. Do not roll back by disabling Windows Firewall or reenabling broad
+`Any` SSH/RDP rules.
 
 ## Recovery access
 
