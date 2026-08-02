@@ -46,9 +46,23 @@ class Ale346TransitionLifecycleTests(unittest.TestCase):
         legacy_base = (ROOT / "backend/app/templates/legacy_base.html").read_text(encoding="utf-8")
         legacy = (ROOT / "backend/app/static/legacy_rewards.js").read_text(encoding="utf-8")
         styles = (ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8")
+        curtain = (ROOT / "backend/app/templates/_document_transition_curtain.html").read_text(encoding="utf-8")
+        document_transition = (ROOT / "backend/app/static/document_transition.js").read_text(encoding="utf-8")
 
         self.assertIn("transition_lifecycle.js", base)
         self.assertIn("transition_lifecycle.js", legacy_base)
+        self.assertIn('class="document-loading"', base)
+        self.assertIn('class="document-loading"', legacy_base)
+        self.assertIn("_document_transition_curtain.html", base)
+        self.assertIn("_document_transition_curtain.html", legacy_base)
+        self.assertIn("document_transition.js", base)
+        self.assertIn("document_transition.js", legacy_base)
+        self.assertIn("data-document-transition-curtain", curtain)
+        self.assertIn("DOMContentLoaded", document_transition)
+        self.assertIn("requestAnimationFrame", document_transition)
+        self.assertNotIn("setTimeout", document_transition)
+        self.assertIn("html:not(.document-loading) .document-transition-curtain", styles)
+        self.assertIn("cavaliers-empty-state-awards-optimized.jpg", styles)
         self.assertIn("@view-transition", styles)
         self.assertIn("navigation: auto", styles)
         self.assertIn("legacy-workspace-state", styles)
@@ -57,6 +71,73 @@ class Ale346TransitionLifecycleTests(unittest.TestCase):
         self.assertIn('row.addEventListener("click", (event) => {\n        event.preventDefault();\n        showLoadingState();', legacy)
         self.assertIn("saveLegacyState", legacy)
         self.assertIn('window.addEventListener("pageshow", resetDeleteSubmissions)', (ROOT / "backend/app/static/confirm_submit.js").read_text(encoding="utf-8"))
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_document_curtain_remains_until_dom_ready_and_next_frame(self) -> None:
+        script_path = ROOT / "backend/app/static/document_transition.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const documentListeners = {};
+const windowListeners = {};
+const frames = [];
+const events = [];
+
+const root = {
+  classList: {
+    values: new Set(["document-loading"]),
+    remove(value) { this.values.delete(value); },
+    contains(value) { return this.values.has(value); },
+  },
+  dataset: {},
+};
+
+global.CustomEvent = class { constructor(type) { this.type = type; } };
+global.document = {
+  readyState: "loading",
+  documentElement: root,
+  addEventListener(type, callback) { documentListeners[type] = callback; },
+  dispatchEvent(event) { events.push(event.type); },
+};
+global.window = global;
+window.addEventListener = (type, callback) => { windowListeners[type] = callback; };
+window.requestAnimationFrame = (callback) => { frames.push(callback); };
+
+eval(source);
+const beforeReady = root.classList.contains("document-loading");
+documentListeners.DOMContentLoaded();
+const afterDomReady = root.classList.contains("document-loading");
+frames.shift()();
+const afterFrame = root.classList.contains("document-loading");
+
+process.stdout.write(JSON.stringify({
+  beforeReady,
+  afterDomReady,
+  afterFrame,
+  ready: root.dataset.documentReady,
+  events,
+}));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale346_document_transition_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(runner_path), str(script_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {
+                "beforeReady": True,
+                "afterDomReady": True,
+                "afterFrame": False,
+                "ready": "true",
+                "events": ["document-transition:ready"],
+            },
+        )
 
     def test_open_folder_ajax_keeps_redirect_fallback_and_returns_entity_notice(self) -> None:
         settings = SimpleNamespace(rewards_db_path=Path("/tmp/ale346-test.sqlite"))

@@ -177,7 +177,7 @@ eval(source);
 
         self.assertIn("person_form_validation.js", base)
         self.assertIn("form_behavior.js", base)
-        self.assertIn('STATIC_ASSET_VERSION = "20260801-ale346-transition-lifecycle-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260802-ale346-document-continuity-2"', templates)
 
 
 if __name__ == "__main__":
