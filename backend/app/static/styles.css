@@ -84,16 +84,6 @@ html:not(.document-loading) .document-transition-curtain {
   border-top-color: #d5ad6d;
 }
 
-@view-transition {
-  navigation: auto;
-}
-
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 120ms;
-  animation-timing-function: ease-out;
-}
-
 a {
   color: #0f766e;
   text-decoration: none;
