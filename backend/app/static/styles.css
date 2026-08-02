@@ -1,3 +1,8 @@
+html {
+  min-height: 100%;
+  background: #e9edf2;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,6 +12,16 @@ body {
   font-family: Arial, sans-serif;
   color: #1f2933;
   background: #f7f8fa;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 120ms;
+  animation-timing-function: ease-out;
 }
 
 a {
@@ -2192,11 +2207,19 @@ th {
 }
 
 .legacy-person-workspace {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
+}
+
+.legacy-workspace-state {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
 }
 
 .legacy-loading-state,

@@ -16,6 +16,9 @@ function internalFallback(value) {
 
 function goBackOrFallback(fallback) {
   const target = internalFallback(fallback);
+  if (window.FedorinovTransitionLifecycle) {
+    window.FedorinovTransitionLifecycle.beginNavigation("Возвращаемся…");
+  }
   const referrer = document.referrer || "";
   const hasInternalHistory = window.history.length > 1 && referrer.startsWith(window.location.origin);
   if (hasInternalHistory) {
@@ -53,5 +56,8 @@ document.addEventListener("keydown", (event) => {
   }
 
   event.preventDefault();
+  if (window.FedorinovTransitionLifecycle) {
+    window.FedorinovTransitionLifecycle.beginNavigation("Возвращаемся…");
+  }
   window.location.href = internalFallback(href);
 });

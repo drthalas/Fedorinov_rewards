@@ -10,7 +10,7 @@
 </header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
 {% set has_rank_image = rank.image_path and media_exists(rank.image_path) %}
-<form class="edit-form guide-form-card rank-guide-form" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/ranks/new{% else %}/guides/ranks/{{ rank.id }}/edit{% endif %}" autocomplete="off" data-managed-validation>
+<form class="edit-form guide-form-card rank-guide-form" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/ranks/new{% else %}/guides/ranks/{{ rank.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-write-feedback data-write-pending-label="Сохраняем…">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <label>
     <span>Название <span class="required-marker" aria-hidden="true">*</span></span>

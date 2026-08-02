@@ -10,7 +10,7 @@
 <section class="notice notice-error">{{ error }}</section>
 {% endif %}
 
-<form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/marks/new{% else %}/marks/{{ mark.id }}/edit{% endif %}" autocomplete="off" data-managed-validation>
+<form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/marks/new{% else %}/marks/{{ mark.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-write-feedback data-write-pending-label="Сохраняем…">
   <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
   {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">

@@ -29,11 +29,15 @@
       return;
     }
     target.setAttribute("aria-busy", className === "legacy-loading-state" ? "true" : "false");
-    const state = document.createElement("div");
-    state.className = className;
+    let state = target.querySelector(":scope > [data-legacy-workspace-state]");
+    if (!state) {
+      state = document.createElement("div");
+      state.dataset.legacyWorkspaceState = "true";
+      target.append(state);
+    }
+    state.className = `legacy-workspace-state ${className}`;
     state.setAttribute("role", role || "status");
     state.textContent = text;
-    target.replaceChildren(state);
   };
 
   const showLoadingState = () => showWorkspaceState("legacy-loading-state", LOADING_TEXT, "status");
@@ -125,6 +129,9 @@
         window.history.pushState({ legacyRewardsUrl: url }, "", url);
       }
       restoreSelectionFromLocation();
+      if (window.FedorinovTransitionLifecycle) {
+        window.FedorinovTransitionLifecycle.saveLegacyState();
+      }
     } catch (error) {
       if (error && error.name === "AbortError" && !timedOut) {
         return;
@@ -402,6 +409,10 @@
       });
     };
 
+    if (quickSearch && quickSearch.value) {
+      applyPersonSearch();
+    }
+
     if (quickSearch && quickSearch.dataset.legacyRewardsBound !== "true") {
       quickSearch.dataset.legacyRewardsBound = "true";
       quickSearch.addEventListener("input", applyPersonSearch);
@@ -426,6 +437,7 @@
       row.dataset.legacyRewardsBound = "true";
       row.addEventListener("click", (event) => {
         event.preventDefault();
+        showLoadingState();
         if (keyboardNavigateTimer) {
           window.clearTimeout(keyboardNavigateTimer);
           keyboardNavigateTimer = null;
@@ -454,6 +466,9 @@
         if (clickTimer) {
           window.clearTimeout(clickTimer);
           clickTimer = null;
+        }
+        if (window.FedorinovTransitionLifecycle) {
+          window.FedorinovTransitionLifecycle.beginNavigation("Открываем карточку…");
         }
         window.location.href = row.dataset.detailUrl;
       });

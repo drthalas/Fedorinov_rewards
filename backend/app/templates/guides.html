@@ -27,7 +27,7 @@
       <div class="tree-actions">
         {% if node.level < 3 %}<a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level + 1 }}/new?parent_id={{ node.id }}&return_to={{ guides_self|urlencode }}">Добавить дочерний</a>{% endif %}
         <a data-guide-action data-guide-focus="{{ node.guide_key }}" href="/guides/levels/{{ node.level }}/{{ node.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" data-confirm-submit="guide-delete" data-confirm-preview-url="/delete-preflight/guide_level_{{ node.level }}/{{ node.id }}" data-delete-entity-type="guide_level_{{ node.level }}" data-delete-entity-id="{{ node.id }}" data-confirm-title="Удаление элемента справочника" data-confirm-message="Удалить элемент справочника?" data-confirm-blocked="false">
+        <form data-guide-action data-guide-focus="{{ node.guide_key }}" method="post" action="/guides/levels/{{ node.level }}/{{ node.id }}/delete" data-confirm-submit="guide-delete" data-confirm-preview-url="/delete-preflight/guide_level_{{ node.level }}/{{ node.id }}" data-delete-entity-type="guide_level_{{ node.level }}" data-delete-entity-id="{{ node.id }}" data-confirm-title="Удаление элемента справочника" data-confirm-message="Удалить элемент справочника?" data-confirm-blocked="false" data-write-feedback data-write-pending-label="Удаляем…">
           <input type="hidden" name="confirm" value="">
           <input type="hidden" name="delete_operation_id" value="">
           <input type="hidden" name="return_to" value="{{ guides_self }}">
@@ -73,7 +73,7 @@
         {% if settings.write_mode %}
         <span class="tree-actions">
           <a data-guide-action href="/guides/ranks/{{ rank.id }}/edit?return_to={{ guides_self|urlencode }}">Изменить</a>
-          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" data-confirm-submit="rank-delete" data-confirm-preview-url="/delete-preflight/rank/{{ rank.id }}" data-delete-entity-type="rank" data-delete-entity-id="{{ rank.id }}" data-confirm-title="Удаление звания / специальности" data-confirm-message="Удалить звание/специальность?" data-confirm-blocked="false">
+          <form method="post" action="/guides/ranks/{{ rank.id }}/delete" data-confirm-submit="rank-delete" data-confirm-preview-url="/delete-preflight/rank/{{ rank.id }}" data-delete-entity-type="rank" data-delete-entity-id="{{ rank.id }}" data-confirm-title="Удаление звания / специальности" data-confirm-message="Удалить звание/специальность?" data-confirm-blocked="false" data-write-feedback data-write-pending-label="Удаляем…">
             <input type="hidden" name="confirm" value="">
             <input type="hidden" name="delete_operation_id" value="">
             <input type="hidden" name="return_to" value="{{ guides_self }}">

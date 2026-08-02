@@ -17,8 +17,22 @@ function setDeleteConfirmation(form, confirmed) {
 
 function disableDeleteSubmitters(form) {
   form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((control) => {
+    if (!control.disabled) {
+      control.dataset.deleteDisabledBySubmit = "true";
+    }
     control.disabled = true;
     control.setAttribute("aria-disabled", "true");
+  });
+}
+
+function resetDeleteSubmissions() {
+  document.querySelectorAll("form[data-delete-submitting]").forEach((form) => {
+    delete form.dataset.deleteSubmitting;
+    form.querySelectorAll('[data-delete-disabled-by-submit="true"]').forEach((control) => {
+      control.disabled = false;
+      control.removeAttribute("aria-disabled");
+      delete control.dataset.deleteDisabledBySubmit;
+    });
   });
 }
 
@@ -249,7 +263,9 @@ document.addEventListener(
     if (form.dataset.deleteConfirmed === "true") {
       delete form.dataset.deleteConfirmed;
       form.dataset.deleteSubmitting = "true";
-      disableDeleteSubmitters(form);
+      if (!form.matches("[data-write-feedback]")) {
+        disableDeleteSubmitters(form);
+      }
       return;
     }
 
@@ -351,3 +367,5 @@ document.addEventListener("close", (event) => {
   activeDeleteSubmitter = null;
   activeDeleteTrigger = null;
 }, true);
+
+window.addEventListener("pageshow", resetDeleteSubmissions);

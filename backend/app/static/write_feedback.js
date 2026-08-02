@@ -41,6 +41,14 @@
     if (overlay) overlay.hidden = true;
   }
 
+  function showStatus(message, state = "pending") {
+    showOverlay(message || "Выполняем…", state);
+  }
+
+  function hideStatus() {
+    hideOverlay();
+  }
+
   function relatedControls(form) {
     const controls = new Set(form.querySelectorAll("button, input[type='submit']"));
     const photoCard = form.closest && form.closest(".photo-manage-card");
@@ -155,5 +163,5 @@
   });
 
   window.addEventListener("pageshow", resetAll);
-  window.FedorinovWriteFeedback = Object.freeze({ begin, finish, resetAll });
+  window.FedorinovWriteFeedback = Object.freeze({ begin, finish, hideStatus, resetAll, showStatus });
 })();

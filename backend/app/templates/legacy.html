@@ -69,7 +69,7 @@
             <a class="tool-button legacy-action-add" href="/persons/new?return_to={{ rewards_tab_return|urlencode }}" title="Добавить">Добавить</a>
             {% if selected_person %}
               <a class="tool-button legacy-action-edit" href="/persons/{{ selected_person.id }}/edit?return_to={{ selected_person_return|urlencode }}" title="Изменить">Изменить</a>
-              <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/delete-preflight/person/{{ selected_person.id }}" data-delete-entity-type="person" data-delete-entity-id="{{ selected_person.id }}" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false">
+              <form method="post" action="/persons/{{ selected_person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/delete-preflight/person/{{ selected_person.id }}" data-delete-entity-type="person" data-delete-entity-id="{{ selected_person.id }}" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false" data-write-feedback data-write-pending-label="Удаляем…">
                 <input type="hidden" name="confirm" value="">
                 <input type="hidden" name="delete_person_confirm" value="">
                 <input type="hidden" name="delete_operation_id" value="">
@@ -182,7 +182,7 @@
                 <div class="text-block bio-text wrap-text">{{ selected_person.biography|dash }}</div>
               </details>
               <div class="person-file-actions">
-                <form method="post" action="/persons/{{ selected_person.id }}/open-folder">
+                <form method="post" action="/persons/{{ selected_person.id }}/open-folder" data-open-folder data-write-feedback data-write-pending-label="Открываем каталог…">
                   <input type="hidden" name="return_to" value="{{ selected_person_return }}">
                   <button class="button secondary-button" type="submit">Открыть каталог</button>
                 </form>
@@ -507,7 +507,7 @@
             <a class="tool-button legacy-action-add" href="/marks/new?return_to={{ marks_tab_return|urlencode }}">Добавить знак</a>
             {% if selected_mark %}
               <a class="tool-button legacy-action-edit" href="/marks/{{ selected_mark.id }}/edit?return_to={{ selected_mark_return|urlencode }}">Изменить</a>
-              <form method="post" action="/marks/{{ selected_mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-preview-url="/delete-preflight/mark/{{ selected_mark.id }}" data-delete-entity-type="mark" data-delete-entity-id="{{ selected_mark.id }}" data-confirm-title="Удаление знака" data-confirm-message="Удалить знак?" data-confirm-blocked="false">
+              <form method="post" action="/marks/{{ selected_mark.id }}/delete" data-confirm-submit="mark-delete" data-confirm-preview-url="/delete-preflight/mark/{{ selected_mark.id }}" data-delete-entity-type="mark" data-delete-entity-id="{{ selected_mark.id }}" data-confirm-title="Удаление знака" data-confirm-message="Удалить знак?" data-confirm-blocked="false" data-write-feedback data-write-pending-label="Удаляем…">
                 <input type="hidden" name="confirm" value="">
                 <input type="hidden" name="delete_operation_id" value="">
                 <input type="hidden" name="return_to" value="{{ marks_tab_return }}">
@@ -807,7 +807,7 @@
       <dl class="details">
         <dt>Название</dt>
         <dd>
-          <form class="about-title-form" method="post" action="/legacy/about/title" autocomplete="off">
+          <form class="about-title-form" method="post" action="/legacy/about/title" autocomplete="off" data-write-feedback data-write-pending-label="Сохраняем…">
             <input type="hidden" name="return_to" value="/legacy?tab=about">
             <input type="text" name="program_title" value="{{ app_display_name }}" placeholder="{{ app_name }}" maxlength="160" autocomplete="off" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>
             <button type="submit" {% if not settings.write_mode or settings.read_only %}disabled{% endif %}>Сохранить</button>

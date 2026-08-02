@@ -2,7 +2,7 @@ import logging
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 
 from ..config import get_settings
 from ..repositories.guides import list_rank_guide
@@ -392,6 +392,7 @@ async def person_open_folder(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}"
+    ajax_request = request.headers.get("x-requested-with", "") == "XMLHttpRequest"
     if get_person(settings.rewards_db_path, person_id) is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     try:
@@ -399,7 +400,14 @@ async def person_open_folder(request: Request, person_id: int):
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonFilesError:
+        if ajax_request:
+            return JSONResponse(
+                {"ok": False, "message": status_message("folder_missing")},
+                status_code=404,
+            )
         return RedirectResponse(with_status(return_to, "folder_missing"), status_code=303)
+    if ajax_request:
+        return JSONResponse({"ok": True, "message": status_message("folder_opened")})
     return RedirectResponse(with_status(return_to, "folder_opened"), status_code=303)
 
 

@@ -9,7 +9,7 @@
   <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/guides' }}">← Назад</a></p>
 </header>
 {% if error %}<section class="notice notice-error">{{ error }}</section>{% endif %}
-<form class="edit-form guide-item-form guide-form-card" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}" autocomplete="off" data-managed-validation>
+<form class="edit-form guide-item-form guide-form-card" method="post" enctype="multipart/form-data" action="{% if mode == 'create' %}/guides/levels/{{ level }}/new{% else %}/guides/levels/{{ level }}/{{ item.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-write-feedback data-write-pending-label="Сохраняем…">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <p class="guide-form-kicker">{{ level_label }}</p>
   {% if level > 0 %}
@@ -58,7 +58,7 @@
 </form>
 {% if supports_award_media and mode == "edit" and item.image_path %}
 {% set image_delete_return = '/guides/levels/' ~ level ~ '/' ~ item.id ~ '/edit' ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
-<form class="guide-image-delete-form" method="post" action="/guides/levels/{{ level }}/{{ item.id }}/image/delete" data-confirm-submit="guide-image-delete" data-confirm-message="Удалить изображение элемента справочника?">
+<form class="guide-image-delete-form" method="post" action="/guides/levels/{{ level }}/{{ item.id }}/image/delete" data-confirm-submit="guide-image-delete" data-confirm-message="Удалить изображение элемента справочника?" data-write-feedback data-write-pending-label="Удаляем…">
   <input type="hidden" name="confirm" value="">
   <input type="hidden" name="return_to" value="{{ image_delete_return }}">
   <button class="danger" type="submit">Удалить изображение</button>
