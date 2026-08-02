@@ -61,22 +61,50 @@
     }
   }
 
+  function normalizedSearchValue(value) {
+    return String(value || "").toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
+  }
+
+  function currentPersonId() {
+    try {
+      return new URL(window.location.href).searchParams.get("person_id") || "";
+    } catch (error) {
+      return "";
+    }
+  }
+
   function restoreLegacyState(root = document) {
     const state = storedLegacyState(window.location.href);
     if (!state) return false;
     const personList = root.querySelector("[data-person-list]");
     const sidebarList = root.querySelector(".legacy-sidebar .legacy-list");
     const quickSearch = root.querySelector("[data-person-quick-search]");
-    if (personList && Number.isFinite(Number(state.personListScrollTop))) {
+    const selectedPersonId = currentPersonId();
+    const storedPersonId = String(state.selectedPersonId || "");
+    const explicitSelectionPriority = /^\d+$/.test(selectedPersonId) && selectedPersonId !== storedPersonId;
+    if (personList && explicitSelectionPriority) {
+      delete personList.dataset.scrollRestored;
+      personList.dataset.selectionPriority = "true";
+    } else if (personList && Number.isFinite(Number(state.personListScrollTop))) {
       personList.scrollTop = Math.max(0, Number(state.personListScrollTop));
       personList.dataset.scrollRestored = "true";
+      delete personList.dataset.selectionPriority;
     }
-    if (sidebarList && sidebarList !== personList && Number.isFinite(Number(state.sidebarListScrollTop))) {
+    if (sidebarList && sidebarList !== personList && explicitSelectionPriority) {
+      delete sidebarList.dataset.scrollRestored;
+      sidebarList.dataset.selectionPriority = "true";
+    } else if (sidebarList && sidebarList !== personList && Number.isFinite(Number(state.sidebarListScrollTop))) {
       sidebarList.scrollTop = Math.max(0, Number(state.sidebarListScrollTop));
       sidebarList.dataset.scrollRestored = "true";
+      delete sidebarList.dataset.selectionPriority;
     }
     if (quickSearch && typeof state.quickSearch === "string") {
-      quickSearch.value = state.quickSearch;
+      const selectedRow = root.querySelector("[data-selected-person-row]");
+      const selectedName = selectedRow ? normalizedSearchValue(selectedRow.dataset.personName) : "";
+      const restoredQuery = normalizedSearchValue(state.quickSearch);
+      quickSearch.value = explicitSelectionPriority && restoredQuery && !selectedName.includes(restoredQuery)
+        ? ""
+        : state.quickSearch;
     }
     return true;
   }

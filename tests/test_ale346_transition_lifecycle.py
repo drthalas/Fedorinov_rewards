@@ -320,6 +320,209 @@ setImmediate(() => {
             ],
         )
 
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_explicit_person_selection_wins_over_stored_state_on_pageshow(self) -> None:
+        script_path = ROOT / "backend/app/static/transition_lifecycle.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const mode = process.argv[3];
+const documentListeners = {};
+const windowListeners = {};
+const currentPersonId = mode === "created" ? "42" : mode === "existing" ? "7" : "";
+const href = `http://127.0.0.1:18199/legacy?tab=rewards${currentPersonId ? `&person_id=${currentPersonId}` : ""}`;
+const storageKey = "fedorinov:legacy-list-state:/legacy?tab=rewards";
+const storage = {
+  [storageKey]: JSON.stringify({
+    personListScrollTop: 245,
+    sidebarListScrollTop: 245,
+    quickSearch: "old",
+    selectedPersonId: "7",
+  }),
+};
+
+class Element {}
+class HTMLFormElement extends Element {}
+global.Element = Element;
+global.HTMLFormElement = HTMLFormElement;
+global.FormData = class {};
+
+const personList = { scrollTop: 900, dataset: {} };
+const quickSearch = { value: "" };
+const selectedRow = currentPersonId ? { dataset: { personName: mode === "created" ? "Новый кавалер" : "Old owner" } } : null;
+
+global.window = global;
+window.location = { href, origin: "http://127.0.0.1:18199" };
+window.sessionStorage = {
+  setItem(key, value) { storage[key] = value; },
+  getItem(key) { return storage[key] || null; },
+};
+window.addEventListener = (type, callback) => {
+  if (!windowListeners[type]) windowListeners[type] = [];
+  windowListeners[type].push(callback);
+};
+global.document = {
+  documentElement: { dataset: {} },
+  querySelector(selector) {
+    if (selector === "[data-person-list]" || selector === ".legacy-sidebar .legacy-list") return personList;
+    if (selector === "[data-person-quick-search]") return quickSearch;
+    if (selector === "[data-selected-person-row]") return selectedRow;
+    return null;
+  },
+  addEventListener(type, callback) {
+    if (!documentListeners[type]) documentListeners[type] = [];
+    documentListeners[type].push(callback);
+  },
+};
+
+eval(source);
+documentListeners.DOMContentLoaded[0]();
+const afterDom = {
+  scrollTop: personList.scrollTop,
+  quickSearch: quickSearch.value,
+  scrollRestored: personList.dataset.scrollRestored || "",
+  selectionPriority: personList.dataset.selectionPriority || "",
+};
+if (mode === "created") personList.scrollTop = 777;
+windowListeners.pageshow[0]({ persisted: true });
+const afterPageShow = {
+  scrollTop: personList.scrollTop,
+  quickSearch: quickSearch.value,
+  scrollRestored: personList.dataset.scrollRestored || "",
+  selectionPriority: personList.dataset.selectionPriority || "",
+};
+process.stdout.write(JSON.stringify({ afterDom, afterPageShow }));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale346_selection_priority_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            results = {}
+            for mode in ("created", "existing", "deleted"):
+                completed = subprocess.run(
+                    ["node", str(runner_path), str(script_path), mode],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                results[mode] = json.loads(completed.stdout)
+
+        self.assertEqual(
+            results["created"],
+            {
+                "afterDom": {
+                    "scrollTop": 900,
+                    "quickSearch": "",
+                    "scrollRestored": "",
+                    "selectionPriority": "true",
+                },
+                "afterPageShow": {
+                    "scrollTop": 777,
+                    "quickSearch": "",
+                    "scrollRestored": "",
+                    "selectionPriority": "true",
+                },
+            },
+        )
+        for mode in ("existing", "deleted"):
+            self.assertEqual(results[mode]["afterDom"]["scrollTop"], 245)
+            self.assertEqual(results[mode]["afterDom"]["quickSearch"], "old")
+            self.assertEqual(results[mode]["afterDom"]["scrollRestored"], "true")
+            self.assertEqual(results[mode]["afterDom"]["selectionPriority"], "")
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_selected_person_scrolls_only_after_render_and_commits_new_state(self) -> None:
+        script_path = ROOT / "backend/app/static/legacy_rewards.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const documentListeners = {};
+const windowListeners = {};
+const frames = [];
+let savedStates = 0;
+
+const row = {
+  hidden: false,
+  isConnected: true,
+  dataset: {
+    personName: "Новый кавалер",
+    selectUrl: "/legacy?tab=rewards&person_id=42",
+    deselectUrl: "/legacy?tab=rewards",
+    detailUrl: "/persons/42",
+  },
+  classList: { toggle() {}, contains() { return true; } },
+  attrs: { "aria-selected": "true" },
+  addEventListener() {},
+  getAttribute(name) { return this.attrs[name] || ""; },
+  setAttribute(name, value) { this.attrs[name] = value; },
+  getBoundingClientRect() { return { top: 900, bottom: 930 }; },
+};
+const personList = {
+  scrollTop: 0,
+  dataset: { selectionPriority: "true" },
+  clientHeight: 400,
+  addEventListener() {},
+  focus() {},
+  getBoundingClientRect() { return { top: 100, bottom: 500 }; },
+};
+
+global.HTMLElement = class {};
+global.CustomEvent = class { constructor(type, options) { this.type = type; this.detail = options && options.detail; } };
+global.window = global;
+window.location = { href: "http://127.0.0.1:18199/legacy?tab=rewards&person_id=42", origin: "http://127.0.0.1:18199", pathname: "/legacy", search: "?tab=rewards&person_id=42" };
+window.requestAnimationFrame = (callback) => { frames.push(callback); };
+window.addEventListener = (type, callback) => { windowListeners[type] = callback; };
+window.FedorinovTransitionLifecycle = { saveLegacyState() { savedStates += 1; } };
+global.document = {
+  querySelector(selector) {
+    if (selector === "[data-person-list]") return personList;
+    if (selector === "[data-selected-person-row]") return row;
+    if (selector === ".legacy-list-row.selected-row") return row;
+    return null;
+  },
+  querySelectorAll(selector) { return selector === "[data-person-name]" ? [row] : []; },
+  addEventListener(type, callback) { documentListeners[type] = callback; },
+  dispatchEvent() {},
+};
+
+eval(source);
+documentListeners.DOMContentLoaded();
+const beforeFrame = {
+  scrollTop: personList.scrollTop,
+  selectionPriority: personList.dataset.selectionPriority,
+  savedStates,
+};
+frames.shift()();
+const afterFrame = {
+  scrollTop: personList.scrollTop,
+  selectionPriority: personList.dataset.selectionPriority || "",
+  scrollRestored: personList.dataset.scrollRestored || "",
+  savedStates,
+};
+process.stdout.write(JSON.stringify({ beforeFrame, afterFrame }));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale346_post_render_scroll_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(runner_path), str(script_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {
+                "beforeFrame": {"scrollTop": 0, "selectionPriority": "true", "savedStates": 0},
+                "afterFrame": {
+                    "scrollTop": 438,
+                    "selectionPriority": "",
+                    "scrollRestored": "",
+                    "savedStates": 1,
+                },
+            },
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

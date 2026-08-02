@@ -17,6 +17,7 @@ class Ale317FormCorrectiveTests(unittest.TestCase):
         target = persons_router._person_created_edit_url(
             42,
             "/legacy?tab=rewards&rank_id=7&person_id=3",
+            person_rank_id=7,
         )
         query = parse_qs(urlsplit(target).query)
         self.assertEqual(query["created"], ["1"])
@@ -29,6 +30,28 @@ class Ale317FormCorrectiveTests(unittest.TestCase):
         self.assertEqual(parse_qs(urlsplit(standalone).query)["return_to"], ["/persons?page=2"])
         unsafe = persons_router._person_created_edit_url(42, "https://example.test/legacy?tab=rewards")
         self.assertNotIn("return_to", parse_qs(urlsplit(unsafe).query))
+
+    def test_created_person_return_removes_only_filters_that_hide_the_new_row(self) -> None:
+        reward_filtered = persons_router._person_created_edit_url(
+            42,
+            "/legacy?tab=rewards&rank_id=7&country_id=3&category_id=9&person_id=3",
+            person_rank_id=7,
+        )
+        reward_return = parse_qs(urlsplit(reward_filtered).query)["return_to"][0]
+        reward_query = parse_qs(urlsplit(reward_return).query)
+        self.assertEqual(reward_query["person_id"], ["42"])
+        self.assertEqual(reward_query["rank_id"], ["7"])
+        self.assertNotIn("country_id", reward_query)
+        self.assertNotIn("category_id", reward_query)
+
+        rank_filtered = persons_router._person_created_edit_url(
+            42,
+            "/legacy?tab=rewards&rank_id=8",
+            person_rank_id=7,
+        )
+        rank_return = parse_qs(urlsplit(rank_filtered).query)["return_to"][0]
+        rank_query = parse_qs(urlsplit(rank_return).query)
+        self.assertEqual(rank_query, {"tab": ["rewards"], "person_id": ["42"]})
 
     def test_birth_year_contract_is_exactly_1800_through_1999(self) -> None:
         template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")

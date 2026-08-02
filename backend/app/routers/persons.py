@@ -65,13 +65,29 @@ def _with_message(url: str, message: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
-def _person_created_edit_url(person_id: int, return_to: str = "") -> str:
+def _person_created_edit_url(
+    person_id: int,
+    return_to: str = "",
+    *,
+    person_rank_id: int | None = None,
+) -> str:
     safe_back = safe_return_to(return_to)
     if safe_back:
         parts = urlsplit(safe_back)
         query_values = parse_qs(parts.query, keep_blank_values=True)
         if parts.path.rstrip("/") == "/legacy" and query_values.get("tab", [""])[-1] == "rewards":
             safe_back = with_query_value(safe_back, "person_id", str(person_id))
+            parts = urlsplit(safe_back)
+            query = parse_qsl(parts.query, keep_blank_values=True)
+            reward_filter_keys = {"country_id", "category_id", "subcategory_id", "name_id"}
+            has_reward_filter = any(key in reward_filter_keys and value for key, value in query)
+            rank_filter = next((value for key, value in reversed(query) if key == "rank_id" and value), "")
+            hidden_filter_keys = reward_filter_keys if has_reward_filter else set()
+            if person_rank_id is not None and rank_filter != str(person_rank_id):
+                hidden_filter_keys = {*hidden_filter_keys, "rank_id"}
+            if hidden_filter_keys:
+                query = [(key, value) for key, value in query if key not in hidden_filter_keys]
+                safe_back = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
     query = [("created", "1")]
     if safe_back:
         query.append(("return_to", safe_back))
@@ -171,7 +187,7 @@ async def person_create(request: Request):
             },
             status_code=400,
         )
-    target = _person_created_edit_url(person_id, return_to)
+    target = _person_created_edit_url(person_id, return_to, person_rank_id=data.id_rank)
     return RedirectResponse(target, status_code=303)
 
 

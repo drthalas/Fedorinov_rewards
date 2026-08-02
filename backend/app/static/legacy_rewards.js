@@ -398,14 +398,16 @@
         return;
       }
 
-      if (personList.dataset.scrollRestored === "true") {
-        delete personList.dataset.scrollRestored;
-        ensureRowVisible(selectedPersonRow);
-        return;
-      }
-
       window.requestAnimationFrame(() => {
+        if (selectedPersonRow.isConnected === false || selectedPersonRow.hidden) {
+          return;
+        }
+        delete personList.dataset.scrollRestored;
+        delete personList.dataset.selectionPriority;
         ensureRowVisible(selectedPersonRow);
+        if (window.FedorinovTransitionLifecycle) {
+          window.FedorinovTransitionLifecycle.saveLegacyState();
+        }
       });
     };
 
