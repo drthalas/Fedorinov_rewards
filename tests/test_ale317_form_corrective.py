@@ -53,6 +53,23 @@ class Ale317FormCorrectiveTests(unittest.TestCase):
         rank_query = parse_qs(urlsplit(rank_return).query)
         self.assertEqual(rank_query, {"tab": ["rewards"], "person_id": ["42"]})
 
+    def test_created_person_return_preserves_active_rewards_sort(self) -> None:
+        target = persons_router._person_created_edit_url(
+            42,
+            "/legacy?tab=rewards&sort=rewards_count&dir=desc&person_id=3",
+            person_rank_id=7,
+        )
+        return_to = parse_qs(urlsplit(target).query)["return_to"][0]
+        self.assertEqual(
+            parse_qs(urlsplit(return_to).query),
+            {
+                "tab": ["rewards"],
+                "sort": ["rewards_count"],
+                "dir": ["desc"],
+                "person_id": ["42"],
+            },
+        )
+
     def test_birth_year_contract_is_exactly_1800_through_1999(self) -> None:
         template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")
         validation = (ROOT / "backend/app/static/person_form_validation.js").read_text(encoding="utf-8")

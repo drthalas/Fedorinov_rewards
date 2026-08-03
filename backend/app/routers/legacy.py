@@ -15,6 +15,7 @@ from ..repositories.legacy_rewards import (
     legacy_rewards_totals,
     list_legacy_reward_persons,
     normalized_legacy_rewards_filters,
+    normalized_legacy_rewards_sort,
 )
 from ..repositories.marks import count_marks, get_mark, list_marks, mark_photo_items
 from ..repositories.persons import get_person, list_person_rewards, person_photo_items
@@ -232,7 +233,13 @@ def _write_csv_to_chosen_path(default_filename: str, title: str, content: str) -
     return target_path
 
 
-def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, object]:
+def _rewards_query_params(
+    filters,
+    person_id: int | None = None,
+    sort_by: str = "fio",
+    sort_dir: str = "asc",
+) -> dict[str, object]:
+    sorting = normalized_legacy_rewards_sort(sort_by, sort_dir)
     params: dict[str, object] = {"tab": "rewards"}
     if person_id is not None:
         params["person_id"] = person_id
@@ -246,11 +253,24 @@ def _rewards_query_params(filters, person_id: int | None = None) -> dict[str, ob
         params["subcategory_id"] = filters.subcategory_id
     if filters.name_id is not None:
         params["name_id"] = filters.name_id
+    if sorting.field != "fio":
+        params["sort"] = sorting.field
+    if sorting.direction != "asc":
+        params["dir"] = sorting.direction
     return params
 
 
-def _legacy_rewards_url(filters, person_id: int | None = None) -> str:
-    return str(URL(path="/legacy").include_query_params(**_rewards_query_params(filters, person_id)))
+def _legacy_rewards_url(
+    filters,
+    person_id: int | None = None,
+    sort_by: str = "fio",
+    sort_dir: str = "asc",
+) -> str:
+    return str(
+        URL(path="/legacy").include_query_params(
+            **_rewards_query_params(filters, person_id, sort_by, sort_dir)
+        )
+    )
 
 
 def _clean_photo_mode(photo_mode: str = "") -> str:
@@ -397,12 +417,18 @@ def _populate_selected_person_context(
     settings,
     rewards_filters,
     person_id: int,
+    rewards_sort,
 ) -> None:
     selected_person = get_person(settings.rewards_db_path, person_id)
     if selected_person is None:
         return
     selected_person_rewards = list_person_rewards(settings.rewards_db_path, person_id)
-    selected_return = _legacy_rewards_url(rewards_filters, person_id)
+    selected_return = _legacy_rewards_url(
+        rewards_filters,
+        person_id,
+        rewards_sort.field,
+        rewards_sort.direction,
+    )
     selected_person["detail_url"] = str(
         URL(path=f"/persons/{person_id}").include_query_params(return_to=selected_return)
     )
@@ -482,6 +508,7 @@ def legacy_index(
         subcategory_id=subcategory_id,
         name_id=name_id,
     )
+    rewards_sort = normalized_legacy_rewards_sort(sort, dir)
     context: dict[str, object] = {
         "settings": settings,
         "tab": active_tab,
@@ -518,8 +545,22 @@ def legacy_index(
                 rewards_filters.name_id,
             )
         ),
-        "rewards_tab_return": _legacy_rewards_url(rewards_filters),
-        "selected_person_return": _legacy_rewards_url(rewards_filters, person_id) if person_id is not None else _legacy_rewards_url(rewards_filters),
+        "rewards_sort": rewards_sort,
+        "rewards_tab_return": _legacy_rewards_url(
+            rewards_filters,
+            sort_by=rewards_sort.field,
+            sort_dir=rewards_sort.direction,
+        ),
+        "selected_person_return": _legacy_rewards_url(
+            rewards_filters,
+            person_id,
+            rewards_sort.field,
+            rewards_sort.direction,
+        ) if person_id is not None else _legacy_rewards_url(
+            rewards_filters,
+            sort_by=rewards_sort.field,
+            sort_dir=rewards_sort.direction,
+        ),
         "rewards_totals": {
             "persons_total": 0,
             "rewards_total": 0,
@@ -586,15 +627,26 @@ def legacy_index(
     )
     if partial_rewards_request:
         if person_id is not None:
-            _populate_selected_person_context(context, settings, rewards_filters, person_id)
+            _populate_selected_person_context(
+                context,
+                settings,
+                rewards_filters,
+                person_id,
+                rewards_sort,
+            )
         return templates.TemplateResponse(request, "legacy.html", context)
 
     context["rewards_filter_options"] = legacy_rewards_filter_options(settings.rewards_db_path, rewards_filters)
     context["rewards_filter_cascade"] = legacy_rewards_filter_cascade(settings.rewards_db_path)
-    persons = list_legacy_reward_persons(settings.rewards_db_path, rewards_filters)
+    persons = list_legacy_reward_persons(settings.rewards_db_path, rewards_filters, rewards_sort)
     for person in persons:
         row_id = int(person["id"])
-        person["legacy_url"] = _legacy_rewards_url(rewards_filters, row_id)
+        person["legacy_url"] = _legacy_rewards_url(
+            rewards_filters,
+            row_id,
+            rewards_sort.field,
+            rewards_sort.direction,
+        )
         person["detail_url"] = str(URL(path=f"/persons/{row_id}").include_query_params(return_to=person["legacy_url"]))
     context["persons"] = persons
     context["persons_total"] = len(persons)
@@ -608,7 +660,13 @@ def legacy_index(
     person_ids = {int(row["id"]) for row in persons}
     selected_person_id = person_id if person_id in person_ids else None
     if selected_person_id is not None:
-        _populate_selected_person_context(context, settings, rewards_filters, selected_person_id)
+        _populate_selected_person_context(
+            context,
+            settings,
+            rewards_filters,
+            selected_person_id,
+            rewards_sort,
+        )
 
     selected_mark_id = (mark_id or (int(marks[0]["id"]) if marks else None)) if active_tab == "marks" else None
     if selected_mark_id is not None:

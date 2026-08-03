@@ -8,6 +8,8 @@ from backend.app.repositories.legacy_rewards import (
     legacy_rewards_totals,
     list_legacy_reward_persons,
     normalized_legacy_rewards_filters,
+    normalized_legacy_rewards_sort,
+    person_name_sort_key,
 )
 
 
@@ -82,12 +84,74 @@ class LegacyRewardsFilterTests(unittest.TestCase):
 
     def test_empty_filters_show_all_persons(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters())
-        self.assertEqual([row["id"] for row in rows], [1, 3, 2])
-        self.assertEqual([row["fio"] for row in rows], ["Капитан Тест", "Капитан без ордена", "Майор Тест"])
+        self.assertEqual([row["id"] for row in rows], [3, 1, 2])
+        self.assertEqual([row["fio"] for row in rows], ["Капитан без ордена", "Капитан Тест", "Майор Тест"])
+
+    def test_default_person_order_uses_canonical_russian_key_not_creation_order(self) -> None:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            rows = [
+                (20, "яков Тест", "1901", 1, "", ""),
+                (21, "алексей Тест", "1901", 1, "", ""),
+                (22, "Москва Тест", "1901", 1, "", ""),
+                (23, "Ёлкин Тест", "1901", 1, "", ""),
+                (24, "Елкин Тест", "1901", 1, "", ""),
+                (25, "Анна-Мария Тест", "1901", 1, "", ""),
+                (26, "Анна Мария Тест", "1901", 1, "", ""),
+                (27, "ЕЛКИН ТЕСТ", "1901", 1, "", ""),
+            ]
+            connection.executemany("insert into person values (?, ?, ?, ?, ?, ?)", rows)
+            connection.commit()
+        finally:
+            connection.close()
+
+        result = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters())
+        qa_rows = [row for row in result if int(row["id"]) >= 20]
+
+        self.assertEqual(
+            [int(row["id"]) for row in qa_rows],
+            [21, 26, 25, 23, 24, 27, 22, 20],
+        )
+        self.assertEqual(person_name_sort_key("  ЁЛКИН Тест  "), "елкин тест")
+        self.assertLess(person_name_sort_key("Анна Мария"), person_name_sort_key("Анна-Мария"))
+
+    def test_non_default_sort_keeps_alphabetical_ties_and_existing_edit_repositions_only_target(self) -> None:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute("insert into person values (30, 'Я новый', '1901', 1, '', '')")
+            connection.execute("insert into person values (31, 'А новый', '1902', 1, '', '')")
+            connection.execute("insert into rewards values (30, 30, 1, 1, 1, 1, 'true', '', 0, 0)")
+            connection.execute("insert into rewards values (31, 30, 1, 1, 1, 1, 'true', '', 0, 0)")
+            connection.execute("insert into rewards values (32, 30, 1, 1, 1, 1, 'true', '', 0, 0)")
+            connection.commit()
+        finally:
+            connection.close()
+
+        filters = normalized_legacy_rewards_filters()
+        by_rewards = list_legacy_reward_persons(
+            self.db_path,
+            filters,
+            normalized_legacy_rewards_sort("rewards_count", "desc"),
+        )
+        self.assertEqual(int(by_rewards[0]["id"]), 30)
+        zero_reward_names = [row["fio"] for row in by_rewards if int(row["rewards_count"]) == 0]
+        self.assertEqual(zero_reward_names, sorted(zero_reward_names, key=person_name_sort_key))
+
+        before = [int(row["id"]) for row in list_legacy_reward_persons(self.db_path, filters)]
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute("update person set fio = 'АА изменённый' where id = 30")
+            connection.commit()
+        finally:
+            connection.close()
+        after = [int(row["id"]) for row in list_legacy_reward_persons(self.db_path, filters)]
+
+        self.assertNotEqual(before.index(30), after.index(30))
+        self.assertEqual([person_id for person_id in before if person_id != 30], [person_id for person_id in after if person_id != 30])
 
     def test_rank_filter(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters(rank_id="1"))
-        self.assertEqual([row["id"] for row in rows], [1, 3])
+        self.assertEqual([row["id"] for row in rows], [3, 1])
 
     def test_reward_tree_filter(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters(name_id="1"))

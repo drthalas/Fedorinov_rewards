@@ -8,9 +8,12 @@ import subprocess
 import unittest
 from types import SimpleNamespace
 from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import patch
 
 from backend.app.routers.persons import person_open_folder
+from backend.app.routers import legacy as legacy_router
+from backend.app.repositories.legacy_rewards import normalized_legacy_rewards_filters
 from backend.app.services.person_files import PersonFilesError
 
 
@@ -27,6 +30,24 @@ class FakeRequest:
 
 
 class Ale346TransitionLifecycleTests(unittest.TestCase):
+    def test_rewards_urls_preserve_one_canonical_active_sort(self) -> None:
+        url = legacy_router._legacy_rewards_url(
+            normalized_legacy_rewards_filters(rank_id="7"),
+            42,
+            "rewards_count",
+            "desc",
+        )
+        self.assertEqual(
+            parse_qs(urlsplit(url).query),
+            {
+                "tab": ["rewards"],
+                "person_id": ["42"],
+                "rank_id": ["7"],
+                "sort": ["rewards_count"],
+                "dir": ["desc"],
+            },
+        )
+
     def test_all_crud_forms_use_shared_feedback_or_specialized_non_navigation_flow(self) -> None:
         templates = ROOT / "backend/app/templates"
         exceptions = ("data-save-as-form", "data-update-form")

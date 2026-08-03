@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+import unicodedata
 
 from .common import fetch_all, fetch_one
 from .guides import guide_cascade_data, guide_cascade_options, list_rank_guide
@@ -13,6 +14,51 @@ class LegacyRewardsFilters:
     category_id: int | None = None
     subcategory_id: int | None = None
     name_id: int | None = None
+
+
+@dataclass(frozen=True)
+class LegacyRewardsSort:
+    field: str = "fio"
+    direction: str = "asc"
+
+
+LEGACY_REWARDS_SORT_FIELDS = {"fio", "birthday", "rank_name", "rewards_count"}
+
+
+def normalized_legacy_rewards_sort(
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+) -> LegacyRewardsSort:
+    field = str(sort_by or "fio").strip()
+    if field not in LEGACY_REWARDS_SORT_FIELDS:
+        field = "fio"
+    direction = "desc" if str(sort_dir or "").strip().lower() == "desc" else "asc"
+    return LegacyRewardsSort(field=field, direction=direction)
+
+
+def person_name_sort_key(value: object) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    return normalized.replace("ё", "е")
+
+
+def _sort_legacy_reward_persons(
+    rows: list[dict[str, object]],
+    sorting: LegacyRewardsSort,
+) -> list[dict[str, object]]:
+    alphabetical = sorted(
+        rows,
+        key=lambda row: (person_name_sort_key(row.get("fio")), int(row.get("id") or 0)),
+    )
+    if sorting.field == "fio":
+        return list(reversed(alphabetical)) if sorting.direction == "desc" else alphabetical
+
+    if sorting.field == "rewards_count":
+        value_key = lambda row: int(row.get("rewards_count") or 0)
+    elif sorting.field == "birthday":
+        value_key = lambda row: str(row.get("birthday") or "").strip()
+    else:
+        value_key = lambda row: person_name_sort_key(row.get("rank_name"))
+    return sorted(alphabetical, key=value_key, reverse=sorting.direction == "desc")
 
 
 def normalized_legacy_rewards_filters(
@@ -95,9 +141,13 @@ def _where_sql(clauses: list[str]) -> str:
     return " where " + " and ".join(clauses) if clauses else ""
 
 
-def list_legacy_reward_persons(db_path: Path, filters: LegacyRewardsFilters) -> list[dict[str, object]]:
+def list_legacy_reward_persons(
+    db_path: Path,
+    filters: LegacyRewardsFilters,
+    sorting: LegacyRewardsSort | None = None,
+) -> list[dict[str, object]]:
     clauses, params = _person_where(filters)
-    return fetch_all(
+    rows = fetch_all(
         db_path,
         f"""
         select
@@ -114,10 +164,10 @@ def list_legacy_reward_persons(db_path: Path, filters: LegacyRewardsFilters) -> 
         left join rewards r on r.person_id = p.id
         {_where_sql(clauses)}
         group by p.id
-        order by lower(coalesce(p.fio, '')), p.id
         """,
         params,
     )
+    return _sort_legacy_reward_persons(rows, sorting or LegacyRewardsSort())
 
 
 def legacy_rewards_totals(db_path: Path, filters: LegacyRewardsFilters) -> dict[str, object]:
