@@ -73,6 +73,17 @@
     }
   }
 
+  function restoreListScroll(list, savedScrollTop) {
+    if (!list) return false;
+    const scrollTop = Number(savedScrollTop);
+    if (!Number.isFinite(scrollTop)) return false;
+    const normalizedScrollTop = Math.max(0, scrollTop);
+    if (normalizedScrollTop > 0) list.scrollTop = normalizedScrollTop;
+    list.dataset.scrollRestored = "true";
+    delete list.dataset.selectionPriority;
+    return true;
+  }
+
   function restoreLegacyState(root = document) {
     const state = storedLegacyState(window.location.href);
     if (!state) return false;
@@ -85,26 +96,24 @@
     if (personList && explicitSelectionPriority) {
       delete personList.dataset.scrollRestored;
       personList.dataset.selectionPriority = "true";
-    } else if (personList && Number.isFinite(Number(state.personListScrollTop))) {
-      personList.scrollTop = Math.max(0, Number(state.personListScrollTop));
-      personList.dataset.scrollRestored = "true";
-      delete personList.dataset.selectionPriority;
+    } else if (personList) {
+      restoreListScroll(personList, state.personListScrollTop);
     }
     if (sidebarList && sidebarList !== personList && explicitSelectionPriority) {
       delete sidebarList.dataset.scrollRestored;
       sidebarList.dataset.selectionPriority = "true";
-    } else if (sidebarList && sidebarList !== personList && Number.isFinite(Number(state.sidebarListScrollTop))) {
-      sidebarList.scrollTop = Math.max(0, Number(state.sidebarListScrollTop));
-      sidebarList.dataset.scrollRestored = "true";
-      delete sidebarList.dataset.selectionPriority;
+    } else if (sidebarList && sidebarList !== personList) {
+      restoreListScroll(sidebarList, state.sidebarListScrollTop);
     }
     if (quickSearch && typeof state.quickSearch === "string") {
-      const selectedRow = root.querySelector("[data-selected-person-row]");
-      const selectedName = selectedRow ? normalizedSearchValue(selectedRow.dataset.personName) : "";
       const restoredQuery = normalizedSearchValue(state.quickSearch);
-      quickSearch.value = explicitSelectionPriority && restoredQuery && !selectedName.includes(restoredQuery)
-        ? ""
-        : state.quickSearch;
+      if (explicitSelectionPriority && restoredQuery) {
+        const selectedRow = root.querySelector("[data-selected-person-row]");
+        const selectedName = selectedRow ? normalizedSearchValue(selectedRow.dataset.personName) : "";
+        quickSearch.value = selectedName.includes(restoredQuery) ? state.quickSearch : "";
+      } else {
+        quickSearch.value = state.quickSearch;
+      }
     }
     return true;
   }

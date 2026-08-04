@@ -80,7 +80,6 @@ class Ale346TransitionLifecycleTests(unittest.TestCase):
         self.assertIn("document_transition.js", legacy_base)
         self.assertIn("data-document-transition-curtain", curtain)
         self.assertIn("DOMContentLoaded", document_transition)
-        self.assertIn("requestAnimationFrame", document_transition)
         self.assertNotIn("setTimeout", document_transition)
         self.assertIn("html:not(.document-loading) .document-transition-curtain", styles)
         self.assertIn("cavaliers-empty-state-awards-optimized.jpg", styles)
@@ -94,14 +93,13 @@ class Ale346TransitionLifecycleTests(unittest.TestCase):
         self.assertIn('window.addEventListener("pageshow", resetDeleteSubmissions)', (ROOT / "backend/app/static/confirm_submit.js").read_text(encoding="utf-8"))
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
-    def test_document_curtain_remains_until_dom_ready_and_next_frame(self) -> None:
+    def test_document_curtain_remains_until_dom_ready_without_waiting_for_heavy_frame(self) -> None:
         script_path = ROOT / "backend/app/static/document_transition.js"
         runner = r'''
 const fs = require("fs");
 const source = fs.readFileSync(process.argv[2], "utf8");
 const documentListeners = {};
 const windowListeners = {};
-const frames = [];
 const events = [];
 
 const root = {
@@ -122,19 +120,15 @@ global.document = {
 };
 global.window = global;
 window.addEventListener = (type, callback) => { windowListeners[type] = callback; };
-window.requestAnimationFrame = (callback) => { frames.push(callback); };
 
 eval(source);
 const beforeReady = root.classList.contains("document-loading");
 documentListeners.DOMContentLoaded();
 const afterDomReady = root.classList.contains("document-loading");
-frames.shift()();
-const afterFrame = root.classList.contains("document-loading");
 
 process.stdout.write(JSON.stringify({
   beforeReady,
   afterDomReady,
-  afterFrame,
   ready: root.dataset.documentReady,
   events,
 }));
@@ -153,8 +147,7 @@ process.stdout.write(JSON.stringify({
             json.loads(completed.stdout),
             {
                 "beforeReady": True,
-                "afterDomReady": True,
-                "afterFrame": False,
+                "afterDomReady": False,
                 "ready": "true",
                 "events": ["document-transition:ready"],
             },
@@ -449,6 +442,89 @@ process.stdout.write(JSON.stringify({ afterDom, afterPageShow }));
             self.assertEqual(results[mode]["afterDom"]["quickSearch"], "old")
             self.assertEqual(results[mode]["afterDom"]["scrollRestored"], "true")
             self.assertEqual(results[mode]["afterDom"]["selectionPriority"], "")
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_zero_saved_scroll_does_not_force_large_list_layout(self) -> None:
+        script_path = ROOT / "backend/app/static/transition_lifecycle.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const savedScrollTop = Number(process.argv[3]);
+const documentListeners = {};
+const storageKey = "fedorinov:legacy-list-state:/legacy?tab=rewards";
+const storage = {
+  [storageKey]: JSON.stringify({
+    personListScrollTop: savedScrollTop,
+    sidebarListScrollTop: savedScrollTop,
+    quickSearch: "",
+    selectedPersonId: "",
+  }),
+};
+let scrollWrites = 0;
+let currentScrollTop = 0;
+
+class Element {}
+class HTMLFormElement extends Element {}
+global.Element = Element;
+global.HTMLFormElement = HTMLFormElement;
+global.FormData = class {};
+
+const personList = {
+  dataset: {},
+  get scrollTop() { return currentScrollTop; },
+  set scrollTop(value) { scrollWrites += 1; currentScrollTop = value; },
+};
+const quickSearch = { value: "" };
+
+global.window = global;
+window.location = {
+  href: "http://127.0.0.1:18199/legacy?tab=rewards",
+  origin: "http://127.0.0.1:18199",
+};
+window.sessionStorage = {
+  setItem(key, value) { storage[key] = value; },
+  getItem(key) { return storage[key] || null; },
+};
+window.addEventListener = () => {};
+global.document = {
+  documentElement: { dataset: {} },
+  querySelector(selector) {
+    if (selector === "[data-person-list]" || selector === ".legacy-sidebar .legacy-list") return personList;
+    if (selector === "[data-person-quick-search]") return quickSearch;
+    return null;
+  },
+  addEventListener(type, callback) { documentListeners[type] = callback; },
+};
+
+eval(source);
+window.FedorinovTransitionLifecycle.restoreLegacyState(document);
+process.stdout.write(JSON.stringify({
+  scrollTop: personList.scrollTop,
+  scrollWrites,
+  scrollRestored: personList.dataset.scrollRestored || "",
+}));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale350_zero_scroll_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            results = {}
+            for saved_scroll_top in (0, 245):
+                completed = subprocess.run(
+                    ["node", str(runner_path), str(script_path), str(saved_scroll_top)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                results[saved_scroll_top] = json.loads(completed.stdout)
+
+        self.assertEqual(
+            results[0],
+            {"scrollTop": 0, "scrollWrites": 0, "scrollRestored": "true"},
+        )
+        self.assertEqual(
+            results[245],
+            {"scrollTop": 245, "scrollWrites": 1, "scrollRestored": "true"},
+        )
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_selected_person_scrolls_only_after_render_and_commits_new_state(self) -> None:

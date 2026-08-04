@@ -2,16 +2,14 @@
   "use strict";
 
   const root = document.documentElement;
-  let revealScheduled = false;
+  let revealed = false;
 
   function revealReadyDocument() {
-    if (revealScheduled) return;
-    revealScheduled = true;
-    window.requestAnimationFrame(() => {
-      root.classList.remove("document-loading");
-      root.dataset.documentReady = "true";
-      document.dispatchEvent(new CustomEvent("document-transition:ready"));
-    });
+    if (revealed) return;
+    revealed = true;
+    root.classList.remove("document-loading");
+    root.dataset.documentReady = "true";
+    document.dispatchEvent(new CustomEvent("document-transition:ready"));
   }
 
   if (document.readyState === "loading") {
