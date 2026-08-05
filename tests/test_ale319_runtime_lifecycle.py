@@ -562,17 +562,22 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
             encoding="utf-8",
         )
 
-    def _package(self, version: str) -> tuple[Path, str]:
+    def _package(self, version: str, *, include_candidate_only: bool = False) -> tuple[Path, str]:
         path = self.root / f"update-{version}.zip"
         with ZipFile(path, "w") as archive:
             archive.writestr(
                 "FedorinovRewards_WebPreview/backend/app/version.py",
                 f'APP_NAME = "Test"\nAPP_VERSION = "{version}"\nAPP_VERSION_DATE = "2026-07-21"\n',
             )
+            if include_candidate_only:
+                archive.writestr(
+                    "FedorinovRewards_WebPreview/backend/app/candidate_only.py",
+                    "CANDIDATE_ONLY = True\n",
+                )
         return path, hashlib.sha256(path.read_bytes()).hexdigest()
 
-    def _plan_and_downloader(self, version: str):
-        package, checksum = self._package(version)
+    def _plan_and_downloader(self, version: str, *, include_candidate_only: bool = False):
+        package, checksum = self._package(version, include_candidate_only=include_candidate_only)
 
         def plan_builder(_settings: Settings, current: str) -> UpdatePlan:
             return UpdatePlan(current, version, True, "https://example.test/update.zip", checksum, ["test"])
@@ -878,7 +883,8 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
 
     def test_failed_new_start_rolls_back_to_one_old_backend(self) -> None:
         old = self._start_old()
-        plan_builder, downloader = self._plan_and_downloader("9.0.1")
+        candidate_only = self.install_root / "backend" / "app" / "candidate_only.py"
+        plan_builder, downloader = self._plan_and_downloader("9.0.1", include_candidate_only=True)
         real = self.supervisor
 
         class FailNewOnce:
@@ -918,6 +924,7 @@ class SupervisedUpdateIntegrationTests(unittest.TestCase):
         status = read_update_status(self.settings)
         self.assertEqual(status["status"], "error")
         self.assertIn("Предыдущая версия восстановлена", status["message"])
+        self.assertFalse(candidate_only.exists())
 
 
 if __name__ == "__main__":

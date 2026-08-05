@@ -249,6 +249,48 @@ def copy_package_files(package_root: Path, install_dir: Path) -> int:
     return copied
 
 
+def package_files_missing_from_install(package_root: Path, install_dir: Path) -> tuple[Path, ...]:
+    missing: list[Path] = []
+    for source in sorted(package_root.rglob("*")):
+        if not source.is_file():
+            continue
+        relative = source.relative_to(package_root)
+        reason = _is_forbidden_relative(relative)
+        if reason:
+            raise UpdateError(f"Небезопасный файл обновления: {relative} ({reason}).")
+        if not (install_dir / relative).exists():
+            missing.append(relative)
+    return tuple(missing)
+
+
+def remove_new_package_files(install_dir: Path, relative_paths: tuple[Path, ...]) -> int:
+    install_root = install_dir.resolve(strict=False)
+    removed = 0
+    parents: set[Path] = set()
+    for relative in relative_paths:
+        if relative.is_absolute() or ".." in relative.parts or _is_forbidden_relative(relative):
+            raise UpdateError(f"Rollback отклонил небезопасный путь: {relative}.")
+        destination = install_dir / relative
+        resolved = destination.resolve(strict=False)
+        if not resolved.is_relative_to(install_root):
+            raise UpdateError(f"Rollback отклонил путь вне папки приложения: {relative}.")
+        if destination.is_symlink() or destination.is_file():
+            destination.unlink()
+            removed += 1
+        parents.update(destination.parents)
+
+    for directory in sorted(
+        (path for path in parents if path != install_dir and path.resolve(strict=False).is_relative_to(install_root)),
+        key=lambda path: len(path.parts),
+        reverse=True,
+    ):
+        try:
+            directory.rmdir()
+        except (FileNotFoundError, OSError):
+            pass
+    return removed
+
+
 def restore_backup(backup_path: Path, install_dir: Path) -> None:
     with ZipFile(backup_path) as archive:
         for member in archive.infolist():
@@ -335,12 +377,14 @@ def apply_update(
         write_update_status(settings, "running", "backing_up")
         backup_path = create_app_backup(settings)
 
+        introduced_files = package_files_missing_from_install(package_root, settings.app_install_dir)
         try:
             write_update_status(settings, "running", "installing")
             copied = copy_package_files(package_root, settings.app_install_dir)
         except Exception as exc:
             try:
                 restore_backup(backup_path, settings.app_install_dir)
+                remove_new_package_files(settings.app_install_dir, introduced_files)
             except Exception as rollback_exc:
                 raise UpdateError(f"Обновление не удалось, rollback тоже не завершился: {rollback_exc}") from exc
             raise UpdateError(f"Обновление не удалось, текущая версия восстановлена из backup: {exc}") from exc

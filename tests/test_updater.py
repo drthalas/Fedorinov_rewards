@@ -234,6 +234,27 @@ class UpdaterTests(unittest.TestCase):
             self.assertEqual(status["step"], "error")
             self.assertIn("download failed", str(status["error"]))
 
+    def test_rollback_removes_only_candidate_files_missing_before_install(self) -> None:
+        with TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            install_dir = root / "app"
+            package_root = root / "package"
+            (install_dir / "backend").mkdir(parents=True)
+            (install_dir / "backend" / "existing.py").write_text("old", encoding="utf-8")
+            (install_dir / "local-note.txt").write_text("keep", encoding="utf-8")
+            (package_root / "backend" / "new_module.py").parent.mkdir(parents=True)
+            (package_root / "backend" / "new_module.py").write_text("new", encoding="utf-8")
+            (package_root / "backend" / "existing.py").write_text("new", encoding="utf-8")
+
+            introduced = updater.package_files_missing_from_install(package_root, install_dir)
+            updater.copy_package_files(package_root, install_dir)
+            removed = updater.remove_new_package_files(install_dir, introduced)
+
+            self.assertEqual(removed, 1)
+            self.assertFalse((install_dir / "backend" / "new_module.py").exists())
+            self.assertTrue((install_dir / "backend" / "existing.py").exists())
+            self.assertEqual((install_dir / "local-note.txt").read_text(encoding="utf-8"), "keep")
+
     def test_updates_apply_route_requires_post(self) -> None:
         routes = [route for route in app.routes if getattr(route, "path", None) == "/updates/apply"]
         methods = set().union(*(getattr(route, "methods", set()) for route in routes))

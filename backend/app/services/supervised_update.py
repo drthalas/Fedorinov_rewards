@@ -21,6 +21,8 @@ from .updater import (
     create_app_backup,
     download_file,
     extract_update_zip,
+    package_files_missing_from_install,
+    remove_new_package_files,
     restore_backup,
     sha256_file,
     update_is_running,
@@ -174,6 +176,7 @@ def run_supervised_update(
 
     old_version = requester.record.version
     stopped = []
+    introduced_files: tuple[Path, ...] = ()
     install_started = time.monotonic()
     dependency_seconds = 0.0
     new_start = None
@@ -184,6 +187,7 @@ def run_supervised_update(
             raise UpdateError("Подтверждённый текущий backend не был завершён; установка остановлена.")
 
         write_update_status(settings, "running", "installing")
+        introduced_files = package_files_missing_from_install(prepared.package_root, settings.app_install_dir)
         copied = copy_package_files(prepared.package_root, settings.app_install_dir)
         installed_version = read_installed_version(settings.app_install_dir)
         if installed_version != prepared.plan.latest_version:
@@ -241,6 +245,7 @@ def run_supervised_update(
         try:
             supervisor.stop_all_confirmed()
             restore_backup(prepared.backup_path, settings.app_install_dir)
+            remove_new_package_files(settings.app_install_dir, introduced_files)
             restored_version = read_installed_version(settings.app_install_dir)
             if restored_version != old_version:
                 raise UpdateError(
