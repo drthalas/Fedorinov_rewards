@@ -50,6 +50,12 @@ EXCLUDED_PATTERNS = [
 ]
 EMBEDDED_UI_ASSETS = {Path(*parts) for parts in SYSTEM_UI_ASSET_PATHS}
 MAX_EMBEDDED_ASSET_TOKEN_CHARS = 1_500_000
+TRANSITION_ASSET_PATHS = (
+    Path("backend/app/static/document_transition.js"),
+    Path("backend/app/static/transition_lifecycle.js"),
+    Path("backend/app/static/write_feedback.js"),
+    Path("backend/app/templates/_document_transition_curtain.html"),
+)
 
 DIRECTORIES_TO_COPY = [
     "backend",
@@ -152,6 +158,57 @@ def _embed_ui_assets() -> None:
     styles_path.write_text(":root {\n" + "\n".join(declarations) + "\n}\n" + styles, encoding="utf-8")
 
 
+def _bundle_legacy_updater_compatible_transition_assets() -> None:
+    static_root = PACKAGE_ROOT / "backend/app/static"
+    templates_root = PACKAGE_ROOT / "backend/app/templates"
+    document_transition = (static_root / "document_transition.js").read_text(encoding="utf-8").strip()
+    transition_lifecycle = (static_root / "transition_lifecycle.js").read_text(encoding="utf-8").strip()
+    write_feedback = (static_root / "write_feedback.js").read_text(encoding="utf-8").strip()
+    curtain = (templates_root / "_document_transition_curtain.html").read_text(encoding="utf-8").strip()
+
+    escape_back_path = static_root / "escape_back.js"
+    escape_back = escape_back_path.read_text(encoding="utf-8").strip()
+    escape_back_path.write_text(
+        "\n\n".join((write_feedback, transition_lifecycle, escape_back)) + "\n",
+        encoding="utf-8",
+    )
+
+    head_reference = '    <script src="{{ static_url(\'document_transition.js\') }}" defer></script>'
+    inline_head = "    <script>\n" + "\n".join(f"      {line}" for line in document_transition.splitlines()) + "\n    </script>"
+    curtain_reference = '    {% include "_document_transition_curtain.html" %}'
+    inline_curtain = "\n".join(f"    {line}" for line in curtain.splitlines())
+    transition_reference = '    <script src="{{ static_url(\'transition_lifecycle.js\') }}" defer></script>\n'
+    feedback_reference = '    <script src="{{ static_url(\'write_feedback.js\') }}" defer></script>\n'
+    for name in ("base.html", "legacy_base.html"):
+        path = templates_root / name
+        source = path.read_text(encoding="utf-8")
+        if head_reference not in source or curtain_reference not in source:
+            raise RuntimeError(f"transition bundling markers are missing from {name}")
+        source = source.replace(head_reference, inline_head, 1)
+        source = source.replace(curtain_reference, inline_curtain, 1)
+        source = source.replace(transition_reference, "", 1)
+        source = source.replace(feedback_reference, "", 1)
+        path.write_text(source, encoding="utf-8")
+
+    booklet_path = templates_root / "person_booklet.html"
+    booklet = booklet_path.read_text(encoding="utf-8")
+    booklet_bundle = (
+        '  <script src="{{ static_url(\'transition_lifecycle.js\') }}" defer></script>\n'
+        '  <script src="{{ static_url(\'write_feedback.js\') }}" defer></script>'
+    )
+    if booklet_bundle not in booklet:
+        raise RuntimeError("transition bundling markers are missing from person_booklet.html")
+    booklet = booklet.replace(
+        booklet_bundle,
+        '  <script src="{{ static_url(\'escape_back.js\') }}" defer></script>',
+        1,
+    )
+    booklet_path.write_text(booklet, encoding="utf-8")
+
+    for relative in TRANSITION_ASSET_PATHS:
+        (PACKAGE_ROOT / relative).unlink()
+
+
 def _make_zip() -> int:
     file_count = 0
     if ZIP_PATH.exists():
@@ -171,6 +228,7 @@ def main() -> int:
 
     _copy_required_files()
     _embed_ui_assets()
+    _bundle_legacy_updater_compatible_transition_assets()
     file_count = _make_zip()
     size = ZIP_PATH.stat().st_size
 

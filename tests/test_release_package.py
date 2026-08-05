@@ -22,6 +22,30 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleasePackageTests(unittest.TestCase):
+    def test_transition_assets_use_only_paths_present_in_public_v207_package(self) -> None:
+        with TemporaryDirectory() as tmp:
+            package_root = Path(tmp) / "package"
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                build_windows_preview_package._copy_required_files()
+                build_windows_preview_package._bundle_legacy_updater_compatible_transition_assets()
+
+            for relative in build_windows_preview_package.TRANSITION_ASSET_PATHS:
+                self.assertFalse((package_root / relative).exists(), relative)
+            bundled = (package_root / "backend/app/static/escape_back.js").read_text(encoding="utf-8")
+            self.assertIn("window.FedorinovWriteFeedback", bundled)
+            self.assertIn("window.FedorinovTransitionLifecycle", bundled)
+            for name in ("base.html", "legacy_base.html"):
+                template = (package_root / "backend/app/templates" / name).read_text(encoding="utf-8")
+                self.assertIn("data-document-transition-curtain", template)
+                self.assertIn("document-transition:ready", template)
+                self.assertNotIn("document_transition.js", template)
+                self.assertNotIn("transition_lifecycle.js", template)
+                self.assertNotIn("write_feedback.js", template)
+            booklet = (package_root / "backend/app/templates/person_booklet.html").read_text(encoding="utf-8")
+            self.assertIn("escape_back.js", booklet)
+            self.assertNotIn("transition_lifecycle.js", booklet)
+            self.assertNotIn("write_feedback.js", booklet)
+
     def test_visual_assets_are_embedded_for_legacy_updater_compatibility(self) -> None:
         for parts in SYSTEM_UI_ASSET_PATHS:
             relative = Path(*parts)
