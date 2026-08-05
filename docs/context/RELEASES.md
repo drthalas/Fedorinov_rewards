@@ -68,11 +68,11 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
-## v2.0.8
+## v2.0.9
 
 Статус: release candidate, не опубликован.
 
-Дата подготовки: 2026-08-03.
+Дата подготовки: 2026-08-04.
 
 Тип: performance and transition patch.
 
@@ -83,11 +83,12 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 - Непрерывный render lifecycle без пустого или чёрного промежуточного экрана.
 - Автоматический выбор и прокрутка нового кавалера после сортировки списка.
 - Стабильные выделение, прокрутка, фильтры и сортировка при переходах.
+- Быстрая готовность вкладки «Кавалеры» на full dataset без лишнего синхронного layout при нулевой позиции списка.
 
 Release gate:
 
 - Candidate package и manifest изолируются от production update channel.
-- Обязательны три независимых updater cycle с exact public `v2.0.7` на Windows VM.
+- Обязательны три независимых updater cycle с exact post-recovery public `v2.0.7` на Windows VM и постоянном mutable Sergey fixture без per-cycle DB/media copy/reset.
 - Production publication, `latest.json` и Telegram разрешены только после отдельного physical Owner PASS.
 
 ## v2.0.7
