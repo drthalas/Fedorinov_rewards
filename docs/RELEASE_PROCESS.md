@@ -89,7 +89,7 @@ dist/latest.json
 
 and uploads both files as workflow artifacts without creating a GitHub Release.
 
-After checking the artifacts, run the workflow again with:
+After checking the artifacts, do not publish yet. Complete the Tier 4 Windows VM gate and the manual physical Windows Owner gate described below. Only after Owner PASS and separate publication authorization, run the workflow again with:
 
 ```text
 publish=true
@@ -114,7 +114,16 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The separate bootstrap downloads and verifies the ZIP, creates an application backup, stops only identity-confirmed application backends, preserves `.env`, replaces application files, and starts exactly one verified backend from the updated install root.
 
-Before publishing a release that contains runtime-lifecycle changes, run the packaged test on native Windows. The gate must prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend.
+## Windows updater gates
+
+Every Tier 4 updater/recovery release uses two different Windows gates:
+
+1. **Windows VM automated gate.** Codex runs the complete exact-user updater/recovery flow on the existing mutable Sergey fixture. It must verify package/SHA, BAT parsing, startup/reboot, backup, data preservation, strict runtime identity, single backend, repeated launch, unrelated-port protection, forced failure and rollback. The exact cycle count and any clean-baseline restore are defined by the release issue.
+2. **Physical Windows manual Owner gate.** Owner starts the current standard BAT, sees the exact candidate, clicks `Обновить`, and follows the same visible flow available to Sergey. Codex prepares the isolated candidate channel and collects evidence after Owner action, but does not prelaunch the candidate, replace files manually, or duplicate the complete automated updater flow on physical Windows.
+
+Do not copy or reset the full Sergey dataset for routine release preparation. The permanent VM fixture remains mutable; restore it only when it is broken, a clean baseline is explicitly required, or the exact updater/recovery scenario requires restore evidence.
+
+Do not publish GitHub Release, production `latest.json`, or Telegram before the physical Owner gate passes and a separate release command authorizes publication. If physical Windows is unavailable, report the unexecuted gate and residual risk; do not silently replace it with another automated run.
 
 ## Telegram release notification
 
@@ -159,7 +168,7 @@ Dry-run prints the tag, title, notes path, and assets without creating a GitHub 
 
 ## Local publish release
 
-Manual local publication is still available, but GitHub Actions is preferred. Local publication uses local GitHub CLI authentication on the developer machine:
+Manual local publication is still available after the Tier 4 VM gate, physical Owner PASS, and separate publication authorization, but GitHub Actions is preferred. Local publication uses local GitHub CLI authentication on the developer machine:
 
 ```sh
 python3 scripts/publish_github_release.py

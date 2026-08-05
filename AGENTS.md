@@ -4,7 +4,7 @@
 
 1. Прочитать этот файл, `docs/context/CODEX_START_HERE.md` и актуальный Linear Description.
 2. Проверить branch, `git status --short` и последние commits.
-3. Читать остальные context-файлы только по релевантности задачи; подробная матрица находится в `docs/context/LINEAR_PROCESS.md`.
+3. Читать остальные context-файлы только по релевантности задачи; подробная матрица Tier 1–4 находится в `docs/context/LINEAR_PROCESS.md`.
 
 ## Scope и приоритет
 
@@ -26,7 +26,9 @@
 ## Проверки и отчёт
 
 - Соблюдать test tier, time budget и stop condition. Codex не меняет Owner-selected model/reasoning effort в UI.
+- Не повышать назначенный Tier из осторожности. Повышение допускается только с причиной в актуальном Linear Description.
 - Для локального web UI browser/Playwright click-flow обязателен по tier; unit tests, mocks и прямые JS-вызовы не заменяют browser acceptance. Computer Use — только optional diagnostic fallback.
+- Постоянный mutable Sergey fixture на Windows VM использовать только по назначенному Tier; не копировать и не восстанавливать full dataset для каждой задачи. Physical Windows — ручной Owner gate, а не второй автоматический стенд Codex.
 - Runtime identity и `OWNER QA URL` обязательны только для локально запускаемой web UI feature-задачи. Для native/packaged/embedded flow честно указать `not applicable` или `not tested` и дать точную Owner retest instruction.
-- Safety hashes включать в отчёт только при T4, migrations, destructive/write flow, риске real data/media или явном требовании Description.
+- Safety hashes включать в отчёт только для затронутой области Tier 3, полного Tier 4 gate, риска real data/media или явного требования Description.
 - Подробные роли, test tiers, runtime handoff, статусы и timing telemetry определены в `docs/context/LINEAR_PROCESS.md`.

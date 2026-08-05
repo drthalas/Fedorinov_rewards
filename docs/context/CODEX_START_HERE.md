@@ -6,7 +6,7 @@
 2. Проверить branch, `git status --short` и последние commits.
 3. Сверить branch/base SHA, active scope, `Accepted` / `Frozen`, Out of Scope, test tier, time budget и stop condition.
 
-Не перечитывать всю историю проекта для T0/T1 без необходимости. Остальные context-файлы читать по релевантности:
+Не перечитывать всю историю проекта для Tier 1 без необходимости. Остальные context-файлы читать по релевантности:
 
 - product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
 - release: `RELEASES.md`, `CHANGELOG.md`;
@@ -23,11 +23,14 @@
 ## Краткий workflow
 
 - Owner выбирает model/reasoning в UI; ChatGPT даёт Owner human-facing рекомендацию до запуска; Codex модель сам не переключает.
+- Актуальный Linear Description назначает Tier 1–4. Codex не повышает Tier без зафиксированной там причины.
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
+- Постоянный Sergey dataset на Windows VM — mutable расходный fixture для назначенных Tier 3–4. Не создавать full DB/media-копию и не выполнять reset после каждой задачи.
+- Physical Windows использовать только как ручной Owner gate. Полный exact-updater/recovery gate выполняет Codex на Windows VM.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
 
-Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
+Полные правила ролей, Tier 1–4, fixture policy, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 
 ## Шаблон запуска
 

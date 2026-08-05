@@ -53,36 +53,31 @@ Linear project:
 - release: `RELEASES.md`, `CHANGELOG.md`;
 - process/docs/merge/diagnostic: соответствующие process/release-файлы.
 
-Для T0/T1 не перечитывать всю историю проекта без необходимости. Перед изменениями проверить branch, clean working tree, base/head и ограничения задачи.
+Для Tier 1 не перечитывать всю историю проекта без необходимости. Перед изменениями проверить branch, clean working tree, base/head и ограничения задачи.
 
 ## Test tiers
 
-### T0 Diagnostic
+Актуальный Linear Description назначает ровно один Tier 1–4 и объясняет любое повышение. Codex не повышает Tier самостоятельно из осторожности. Если в ходе работы доказан новый риск, остановиться и предложить изменение Description, а не молча расширять проверки.
 
-Только необходимые команды и один smoke. Без product code changes, full suite, compileall, Goal Loop и повторного safety audit. Бюджет: 3–10 минут.
+| Tier | Когда применять | Обязательно | По умолчанию не выполнять |
+| --- | --- | --- | --- |
+| **Tier 1 — малый риск** | Docs/process, merge, локальное UI/CSS/asset или другое узкое изменение без data/runtime риска | Focused или docs checks; применимые syntax/compile; один browser smoke для UI; full suite один раз перед сдачей product code | Sergey-full VM, physical Windows, broad DB/media fingerprints, updater/recovery, full dataset copy/reset |
+| **Tier 2 — обычная продуктовая логика** | Обычный backend/frontend flow без migration, platform lifecycle или scale-specific риска | Focused и связанные regressions; full suite один раз; headed browser на synthetic-small или уже существующем fixture | Обязательный Sergey-full VM, автоматический physical gate, broad fingerprints, full dataset copy/reset |
+| **Tier 3 — высокий продуктовый риск** | Media lifecycle, scale/performance, Windows-specific behavior, migrations, rollback | Focused/regression tests; full suite один раз; Windows VM с постоянным Sergey fixture; integrity/fingerprint только затронутой области | Physical Windows без доказанной Windows-specific причины или явного Owner gate; глобальные fingerprints; per-task full copy/reset |
+| **Tier 4 — release/updater/recovery** | Exact release candidate, updater, recovery, launcher/runtime lifecycle | Полный exact-user updater/recovery gate на Windows VM; package/SHA/BAT/startup/reboot/data-preservation checks; ручной Owner updater gate на physical Windows | Автоматический полный updater flow Codex на physical; публикация до Owner PASS; изменение immutable backup/master fixture |
 
-### T1 Merge/docs
+Для docs-only и merge-only Tier 1 product full suite, compile и browser отмечать `n/a`, если они не затронуты. Для product code full suite запускается один раз после стабилизации, а не после каждой iteration. Во время разработки использовать только быстрые focused checks.
 
-Ancestry, local/remote parity, clean tree, `git diff --check` и разрешённый список файлов. Product tests не повторять, Goal Loop не использовать. Бюджет: 3–20 минут.
+## Постоянный Sergey fixture на Windows VM
 
-### T2 Narrow fix
-
-Focused tests и один узкий reproduction, зависящий от поверхности:
-
-- UI/browser: browser click-flow;
-- backend-only: focused integration tests.
-
-Full suite — один раз после стабилизации, если он требуется scope/tier. Goal Loop максимум 2 итерации. Бюджет: 20–45 минут.
-
-### T3 Cross-flow UI
-
-Focused tests, browser E2E всех затронутых UI flows, full suite один раз перед final commit, runtime identity и Owner QA handoff для локально запускаемого web UI. Goal Loop максимум 3 итерации. Бюджет: 45–90 минут.
-
-### T4 Data/media
-
-Добавляет data/media safety к релевантному T2 или T3: temp DB/media, destructive/shared-reference tests, failure safety и реальные DB/media hashes при реальном риске или явном требовании. Не требует browser/runtime для чисто non-UI data task. Goal Loop максимум 3 итерации. Бюджет: 60–120+ минут.
-
-Не запускать full suite после каждой Goal Loop iteration: во время разработки использовать focused checks, а full suite запускать один раз после финальной стабилизации, если его требует scope/tier.
+- Существующий Sergey dataset на Windows VM — постоянный mutable расходный fixture, а не актуальная production-копия.
+- На fixture разрешены create/edit/delete, media mutations и необратимые тестовые действия в рамках назначенного Tier.
+- Не создавать отдельную full DB/media-копию для каждой задачи и не выполнять reset/restore после каждой задачи.
+- Backup/restore разрешён только если fixture повреждён, нужна доказуемо чистая baseline-проверка или выполняется exact updater/recovery test.
+- Не плодить full-size transport, run или safety-копии. Использовать существующий fixture root; локальные пути и приватную структуру данных не коммитить и не публиковать.
+- Для быстрых Tier 1–2 проверок использовать synthetic-small или уже существующий лёгкий fixture. Sergey-full подключать только когда это требует Tier/Description.
+- Integrity и fingerprints считать только по затронутой области, если Description не требует полный release/data gate.
+- Physical Windows не является второй автоматической копией VM workflow. Это production-like ручной Owner gate по правилам Tier 4 или отдельному явному Description.
 
 ## Browser-first UI QA
 
@@ -125,7 +120,9 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
-После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
+Для Tier 4 Codex сначала выполняет полный exact-user updater/recovery gate на Windows VM. Затем Owner вручную проверяет exact candidate на physical Windows теми же действиями, что доступны пользователю: запускает текущий штатный BAT, видит candidate и нажимает «Обновить». Codex не запускает candidate заранее, не подменяет вручную файлы и не выполняет скрытые действия, отсутствующие у пользователя.
+
+Production GitHub Release, `latest.json`, Telegram и доступность обновления разрешены только после ручного Owner PASS и отдельной команды. Пока updater не доказал стабильность на нескольких релизах, полный VM gate обязателен.
 
 ## Timing telemetry
 
