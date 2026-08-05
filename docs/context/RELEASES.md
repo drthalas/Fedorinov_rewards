@@ -54,6 +54,13 @@ gh release upload vX.Y.Z \
 
 ## Telegram notification
 
+Каноническая пользовательская инструкция генерируется
+`scripts/generate_release_telegram_message.py`. После обновления основной
+сценарий — автоматический перезапуск приложения. Ручной запуск
+`start_windows.bat` допустим только как fallback, если приложение не открылось
+самостоятельно. Не добавлять обязательный повторный запуск BAT в release notes,
+dry-run или финальное сообщение.
+
 Сначала dry-run:
 
 ```sh

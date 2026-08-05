@@ -19,6 +19,7 @@
 - При конфликте остановиться и сообщить о нём, не угадывать.
 - Не трогать реальные DB/media и не коммитить secrets, `.env`, `.venv`, DB/media, backups, logs, screenshots или generated artifacts без явного разрешения.
 - Merge, release, version/tag, `latest.json`, package publication, Telegram и real updater apply разрешены только отдельным актуальным Description.
+- В release/Telegram-инструкциях штатный post-update сценарий — автоматический перезапуск; `start_windows.bat` указывать только как fallback, если приложение не открылось самостоятельно.
 
 ## Краткий workflow
 

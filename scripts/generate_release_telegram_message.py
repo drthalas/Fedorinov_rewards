@@ -11,6 +11,19 @@ import sys
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_TITLE = "Награды и награждённые"
 FORBIDDEN_TERMS = ["GitHub Release", "ZIP", "endpoint", "router", "repository", "commit", "hash"]
+UPDATE_INSTRUCTIONS = [
+    "Как обновиться:",
+    "",
+    "1. Откройте программу.",
+    "2. Перейдите в раздел «О программе».",
+    "3. Нажмите «Проверить обновления».",
+    "4. Нажмите «Обновить».",
+    "5. Дождитесь завершения установки.",
+    "6. Если включён автоматический перезапуск, программа откроется самостоятельно.",
+    "7. Если программа не запустилась автоматически, откройте её вручную через start_windows.bat.",
+    "",
+    "Данные и фотографии при обновлении сохраняются.",
+]
 
 
 def _normalize_argv() -> list[str]:
@@ -90,21 +103,7 @@ def build_message(
             "",
         ]
     lines.extend(f"{index}. {note}." for index, note in enumerate(notes, start=1))
-    lines.extend(
-        [
-            "",
-            "Как обновиться:",
-            "",
-            "1. Откройте программу.",
-            "2. Перейдите в “О программе”.",
-            "3. Нажмите “Проверить обновления”.",
-            "4. Нажмите “Обновить”.",
-            "5. Дождитесь сообщения об успешной установке.",
-            "6. Закройте окно запуска и запустите start_windows.bat снова.",
-            "",
-            "Данные и фотографии не трогаются.",
-        ]
-    )
+    lines.extend(["", *UPDATE_INSTRUCTIONS])
     message = "\n".join(lines)
     for term in FORBIDDEN_TERMS:
         if re.search(re.escape(term), message, re.IGNORECASE):
