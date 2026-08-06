@@ -11,6 +11,7 @@
 - product/code: `PROJECT_CONTEXT.md`, `ARCHITECTURE.md`, `DECISIONS.md`, `QA_NOTES.md`;
 - release: `RELEASES.md`, `CHANGELOG.md`;
 - process/docs/merge/diagnostic: только нужные process/release-файлы, прежде всего `LINEAR_PROCESS.md`.
+- physical Windows infrastructure: `../testing/WINDOWS_PHYSICAL_GATE.md`; подключаться только через канонический SSH alias из этого runbook, а не по сохранённому DHCP-адресу.
 
 ## Приоритет и безопасность
 
@@ -25,6 +26,7 @@
 - Owner выбирает model/reasoning в UI; ChatGPT даёт Owner human-facing рекомендацию до запуска; Codex модель сам не переключает.
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
+- Для physical Windows gate использовать `ssh fedorinov-win-gate`. Текущий IP не переносить в prompts, scripts или docs как постоянную точку подключения.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
