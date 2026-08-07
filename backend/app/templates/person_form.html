@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
+{% block extra_head %}
+{% if mode == "create" %}<script src="{{ static_url('person_create_rewards.js') }}" defer></script>{% endif %}
+{% endblock %}
 {% block content %}
+{% from "_pending_reward_form.html" import pending_reward with context %}
 <section class="cavalier-standalone-page cavalier-form-page cavalier-person-form-page">
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}</h1>
 <p class="local-back-nav compact-actions">
@@ -70,6 +74,21 @@
       </label>
     </div>
   </fieldset>
+
+  {% if mode == "create" %}
+  <fieldset class="form-section pending-rewards-section" data-pending-rewards>
+    <legend>Награды</legend>
+    <div data-pending-reward-list>
+      {% for reward in pending_rewards %}
+        {{ pending_reward(loop.index0, reward, pending_reward_guides[loop.index0], reward_default_date) }}
+      {% endfor %}
+    </div>
+    <button class="secondary-button" type="button" data-add-pending-reward>Добавить награду</button>
+    <template data-pending-reward-template>
+      {{ pending_reward('__INDEX__', {}, {}, reward_default_date) }}
+    </template>
+  </fieldset>
+  {% endif %}
 
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>

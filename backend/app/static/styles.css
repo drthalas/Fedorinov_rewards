@@ -1592,6 +1592,34 @@ th {
   align-items: start;
 }
 
+.pending-rewards-section [data-pending-reward-list]:empty {
+  display: none;
+}
+
+.pending-reward {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #bd9a55;
+  background: rgba(21, 17, 12, 0.32);
+}
+
+.pending-reward-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.pending-reward-heading h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.pending-reward-remove {
+  flex: 0 0 auto;
+}
+
 .person-edit-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
