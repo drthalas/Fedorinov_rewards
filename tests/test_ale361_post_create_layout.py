@@ -14,6 +14,8 @@ class Ale361PostCreateLayoutTests(unittest.TestCase):
         main_section = template.split("<legend>Основные данные</legend>", 1)[1].split("</fieldset>", 1)[0]
         self.assertIn('class="form-grid two-columns person-links-grid"', links_section)
         self.assertNotIn("person-links-grid", main_section)
+        self.assertIn(".form-grid.two-columns.person-links-grid {", styles)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", styles)
         self.assertIn(".person-links-grid > label {", styles)
         self.assertIn("flex-direction: column;", styles)
         self.assertIn(".person-links-grid > label > input {", styles)
