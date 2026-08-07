@@ -5,12 +5,14 @@
   const TYPEAHEAD_NAVIGATION_DELAY_MS = 2600;
   const CLICK_NAVIGATION_DELAY_MS = 160;
   const KEYBOARD_NAVIGATION_DELAY_MS = 320;
+  const SEARCH_DEBOUNCE_MS = 180;
   const REQUEST_TIMEOUT_MS = 15000;
   const LOADING_TEXT = "Загрузка карточки кавалера…";
   const ERROR_TEXT = "Не удалось загрузить карточку кавалера. Попробуйте выбрать кавалера ещё раз.";
   const TIMEOUT_TEXT = "Карточка загружается слишком долго. Повторите попытку.";
 
   let activeFetchController = null;
+  let activeSearchTimer = null;
 
   const normalize = (value) => (value || "").toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
 
@@ -53,7 +55,7 @@
     });
   };
 
-  const replaceRewardsLayout = (html, focusList, listScrollTop) => {
+  const replaceRewardsLayout = (html, focusList, listScrollTop, replaceList) => {
     const parser = new DOMParser();
     const nextDocument = parser.parseFromString(html, "text/html");
     const nextLayout = nextDocument.querySelector("[data-legacy-rewards-layout]");
@@ -69,6 +71,17 @@
     const currentMain = currentLayout.querySelector(".legacy-main");
     if (!nextWorkspace || !currentWorkspace || !nextToolbar || !currentToolbar || !nextMain || !currentMain) {
       throw new Error("Rewards card fragment was not found in response.");
+    }
+    if (replaceList) {
+      const nextList = nextLayout.querySelector("[data-person-list]");
+      const currentList = currentLayout.querySelector("[data-person-list]");
+      const nextListTitle = nextLayout.querySelector(".legacy-person-list-title");
+      const currentListTitle = currentLayout.querySelector(".legacy-person-list-title");
+      if (!nextList || !currentList || !nextListTitle || !currentListTitle) {
+        throw new Error("Rewards list fragment was not found in response.");
+      }
+      currentList.replaceWith(nextList);
+      currentListTitle.replaceWith(nextListTitle);
     }
     currentWorkspace.replaceWith(nextWorkspace);
     currentToolbar.replaceWith(nextToolbar);
@@ -113,8 +126,12 @@
     }, REQUEST_TIMEOUT_MS);
 
     try {
+      const headers = { "X-Requested-With": "XMLHttpRequest" };
+      if (settings.replaceList) {
+        headers["X-Legacy-Rewards-List"] = "1";
+      }
       const response = await window.fetch(url, {
-        headers: { "X-Requested-With": "XMLHttpRequest" },
+        headers,
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -124,14 +141,22 @@
       if (activeFetchController !== controller) {
         return;
       }
-      replaceRewardsLayout(html, Boolean(settings.focusList), listScrollTop);
+      replaceRewardsLayout(html, Boolean(settings.focusList), listScrollTop, Boolean(settings.replaceList));
       if (settings.updateHistory !== false) {
-        window.history.pushState({ legacyRewardsUrl: url }, "", url);
+        const historyMethod = settings.historyMode === "replace" ? "replaceState" : "pushState";
+        window.history[historyMethod]({ legacyRewardsUrl: url }, "", url);
+      }
+      if (typeof settings.searchValue === "string") {
+        const quickSearch = document.querySelector("[data-person-quick-search]");
+        if (quickSearch) {
+          quickSearch.value = settings.searchValue;
+        }
       }
       restoreSelectionFromLocation();
       if (window.FedorinovTransitionLifecycle) {
         window.FedorinovTransitionLifecycle.saveLegacyState();
       }
+      return true;
     } catch (error) {
       if (error && error.name === "AbortError" && !timedOut) {
         return;
@@ -140,6 +165,7 @@
         restoreSelectionFromLocation();
         showErrorState(timedOut ? TIMEOUT_TEXT : ERROR_TEXT);
       }
+      return false;
     } finally {
       window.clearTimeout(timeoutId);
       if (activeFetchController === controller) {
@@ -153,18 +179,72 @@
     }
   };
 
+  const personSearchUrl = (query) => {
+    const url = new URL(window.location.href);
+    const personList = document.querySelector("[data-person-list]");
+    const activeLetter = personList ? personList.dataset.activeLetter : "";
+    url.searchParams.set("tab", "rewards");
+    url.searchParams.delete("person_id");
+    if (activeLetter) {
+      url.searchParams.set("letter", activeLetter);
+    }
+    const cleanQuery = String(query || "").trim();
+    if (cleanQuery) {
+      url.searchParams.set("person_q", cleanQuery);
+    } else {
+      url.searchParams.delete("person_q");
+    }
+    return `${url.pathname}${url.search}`;
+  };
+
+  const loadPersonSearch = async (query, selectFirst) => {
+    const cleanQuery = String(query || "").trim();
+    const loaded = await navigateToUrl(personSearchUrl(cleanQuery), {
+      replaceList: true,
+      listScrollTop: 0,
+      historyMode: "replace",
+      searchValue: cleanQuery,
+    });
+    if (!loaded || !selectFirst) {
+      return loaded;
+    }
+    const firstMatch = document.querySelector("[data-person-name]");
+    if (firstMatch && firstMatch.dataset.selectUrl) {
+      firstMatch.click();
+    }
+    return loaded;
+  };
+
+  const syncCanonicalRewardsUrl = (personList) => {
+    if (!personList || !personList.dataset.canonicalUrl || !window.history) {
+      return;
+    }
+    const canonical = new URL(personList.dataset.canonicalUrl, window.location.origin);
+    const current = new URL(window.location.href);
+    if (canonical.origin !== current.origin || canonical.pathname !== current.pathname) {
+      return;
+    }
+    const canonicalPath = `${canonical.pathname}${canonical.search}${canonical.hash}`;
+    const currentPath = `${current.pathname}${current.search}${current.hash}`;
+    if (canonicalPath !== currentPath) {
+      window.history.replaceState({ legacyRewardsUrl: canonicalPath }, "", canonicalPath);
+    }
+  };
+
   function initLegacyRewards(root) {
     const scope = root || document;
     const personList = scope.querySelector("[data-person-list]");
     const quickSearch = scope.querySelector("[data-person-quick-search]");
     const personRows = Array.from(scope.querySelectorAll("[data-person-name]"));
-    const emptySearch = scope.querySelector("[data-person-empty]");
     const selectedPersonRow = scope.querySelector("[data-selected-person-row]");
+    const alphabetLetters = Array.from(scope.querySelectorAll("[data-letter-url]"));
     let clickTimer = null;
     let typeaheadBuffer = "";
     let typeaheadTimer = null;
     let typeaheadNavigateTimer = null;
     let keyboardNavigateTimer = null;
+
+    syncCanonicalRewardsUrl(personList);
 
     const visiblePersonRows = () => personRows.filter((row) => !row.hidden);
 
@@ -184,32 +264,6 @@
       } else if (rowRect.bottom > visibleBottom) {
         personList.scrollTop += rowRect.bottom - visibleBottom;
       }
-    };
-
-    const applyPersonSearch = () => {
-      const query = normalize(quickSearch ? quickSearch.value : "");
-      let visibleCount = 0;
-      let firstMatch = null;
-      personRows.forEach((row) => {
-        const name = normalize(row.dataset.personName);
-        const visible = !query || name.includes(query);
-        row.hidden = !visible;
-        row.classList.remove("quick-search-match-row");
-        if (visible) {
-          visibleCount += 1;
-          if (!firstMatch) {
-            firstMatch = row;
-          }
-        }
-      });
-      if (emptySearch) {
-        emptySearch.hidden = visibleCount !== 0;
-      }
-      if (query && firstMatch) {
-        firstMatch.classList.add("quick-search-match-row");
-        ensureRowVisible(firstMatch);
-      }
-      return firstMatch;
     };
 
     const currentPersonRow = () => scope.querySelector(".legacy-list-row.selected-row") || selectedPersonRow;
@@ -411,26 +465,58 @@
       });
     };
 
-    if (quickSearch && quickSearch.value) {
-      applyPersonSearch();
-    }
-
     if (quickSearch && quickSearch.dataset.legacyRewardsBound !== "true") {
       quickSearch.dataset.legacyRewardsBound = "true";
-      quickSearch.addEventListener("input", applyPersonSearch);
+      quickSearch.addEventListener("input", () => {
+        if (activeSearchTimer) {
+          window.clearTimeout(activeSearchTimer);
+        }
+        activeSearchTimer = window.setTimeout(() => {
+          activeSearchTimer = null;
+          loadPersonSearch(quickSearch.value, false);
+        }, SEARCH_DEBOUNCE_MS);
+      });
       quickSearch.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
-          const firstMatch = applyPersonSearch();
-          if (firstMatch && firstMatch.dataset.selectUrl) {
-            event.preventDefault();
-            navigateToPersonRow(firstMatch);
+          event.preventDefault();
+          if (activeSearchTimer) {
+            window.clearTimeout(activeSearchTimer);
+            activeSearchTimer = null;
           }
+          loadPersonSearch(quickSearch.value, true);
         } else if (event.key === "Escape") {
+          event.preventDefault();
+          if (activeSearchTimer) {
+            window.clearTimeout(activeSearchTimer);
+            activeSearchTimer = null;
+          }
           quickSearch.value = "";
-          applyPersonSearch();
+          loadPersonSearch("", false);
         }
       });
     }
+
+    alphabetLetters.forEach((button) => {
+      if (button.dataset.legacyRewardsBound === "true" || button.disabled) {
+        return;
+      }
+      button.dataset.legacyRewardsBound = "true";
+      button.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (activeSearchTimer) {
+          window.clearTimeout(activeSearchTimer);
+          activeSearchTimer = null;
+        }
+        if (quickSearch) {
+          quickSearch.value = "";
+        }
+        navigateToUrl(button.dataset.letterUrl, {
+          replaceList: true,
+          listScrollTop: 0,
+          searchValue: "",
+        });
+      });
+    });
 
     personRows.forEach((row) => {
       if (row.dataset.legacyRewardsBound === "true") {
@@ -492,7 +578,11 @@
   document.addEventListener("DOMContentLoaded", () => initLegacyRewards(document));
   window.addEventListener("popstate", () => {
     if (window.location.pathname === "/legacy" && window.location.search.includes("tab=rewards")) {
-      navigateToUrl(window.location.pathname + window.location.search, { focusList: false, updateHistory: false });
+      navigateToUrl(window.location.pathname + window.location.search, {
+        focusList: false,
+        replaceList: true,
+        updateHistory: false,
+      });
     }
   });
 })();

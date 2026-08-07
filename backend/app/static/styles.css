@@ -4900,12 +4900,71 @@ body.legacy-rewards-theme::after {
   outline-offset: -1px;
 }
 
+.legacy-rewards-theme .legacy-alphabet-index {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  float: left;
+  display: grid;
+  grid-template-rows: repeat(32, minmax(0, 1fr));
+  width: 22px;
+  height: 100%;
+  min-height: 100%;
+  margin-right: -22px;
+  border-right: 1px solid #332d22;
+  background: #11120f;
+  box-shadow: 2px 0 7px rgb(0 0 0 / 24%);
+  user-select: none;
+}
+
+.legacy-rewards-theme .legacy-alphabet-letter {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 22px;
+  min-width: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: #8e877b;
+  background: transparent;
+  box-shadow: none;
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  cursor: pointer;
+  transition: color 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.legacy-rewards-theme .legacy-alphabet-letter:not(:disabled):hover,
+.legacy-rewards-theme .legacy-alphabet-letter:not(:disabled):focus-visible {
+  color: #f0d69a;
+  background: #2b251a;
+  box-shadow: inset 2px 0 #a98445;
+  outline: none;
+}
+
+.legacy-rewards-theme .legacy-alphabet-letter.active {
+  color: #f2dca5;
+  background: #332918;
+  box-shadow: inset 2px 0 #c8a15a;
+}
+
+.legacy-rewards-theme .legacy-alphabet-letter:disabled {
+  color: #4e4b45;
+  cursor: default;
+}
+
 .legacy-rewards-theme .legacy-list-row {
   box-sizing: border-box;
   height: 30px;
   min-height: 30px;
   align-items: center;
-  padding: 6px 11px;
+  padding: 6px 11px 6px 33px;
   color: #c7c0b4;
   border-bottom: 1px solid #302f2a;
   background: #181917;

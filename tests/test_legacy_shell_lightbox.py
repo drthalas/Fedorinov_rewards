@@ -145,7 +145,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         lightbox = (ROOT / "backend" / "app" / "templates" / "_lightbox.html").read_text()
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260804-ale350-cavaliers-tab-performance-2"', templates_py)
+        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale354-alphabet-navigation"', templates_py)
         self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
@@ -248,11 +248,12 @@ class LegacyShellLightboxTests(unittest.TestCase):
         self.assertIn("data-legacy-rewards-layout", legacy_template)
         self.assertIn("data-legacy-person-workspace", legacy_template)
         self.assertIn("toLocaleLowerCase(\"ru-RU\")", script)
-        self.assertIn("name.includes(query)", script)
+        self.assertIn('url.searchParams.set("person_q", cleanQuery)', script)
+        self.assertIn('headers["X-Legacy-Rewards-List"] = "1"', script)
+        self.assertIn("loadPersonSearch", script)
         self.assertIn("quickSearch.addEventListener(\"keydown\"", script)
         self.assertIn('event.key === "Enter"', script)
-        self.assertIn("navigateToPersonRow(firstMatch)", script)
-        self.assertIn("quick-search-match-row", script)
+        self.assertIn("firstMatch.click()", script)
 
     def test_legacy_rewards_loading_state_and_ajax_navigation(self) -> None:
         legacy_template = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text()

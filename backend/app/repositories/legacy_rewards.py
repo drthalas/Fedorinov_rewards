@@ -1,7 +1,9 @@
 from dataclasses import dataclass
+from contextlib import closing
 from pathlib import Path
 import unicodedata
 
+from ..db import open_readonly_connection, row_to_dict
 from .common import fetch_all, fetch_one
 from .guides import guide_cascade_data, guide_cascade_options, list_rank_guide
 from .summary import parse_optional_int
@@ -23,6 +25,7 @@ class LegacyRewardsSort:
 
 
 LEGACY_REWARDS_SORT_FIELDS = {"fio", "birthday", "rank_name", "rewards_count"}
+LEGACY_PERSON_ALPHABET = tuple("АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
 
 
 def normalized_legacy_rewards_sort(
@@ -39,6 +42,18 @@ def normalized_legacy_rewards_sort(
 def person_name_sort_key(value: object) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
     return normalized.replace("ё", "е")
+
+
+def person_name_initial(value: object) -> str:
+    key = person_name_sort_key(value)
+    if not key:
+        return ""
+    initial = key[0].upper()
+    return initial if initial in LEGACY_PERSON_ALPHABET else ""
+
+
+def normalized_legacy_rewards_letter(value: object) -> str:
+    return person_name_initial(value)
 
 
 def _sort_legacy_reward_persons(
@@ -168,6 +183,83 @@ def list_legacy_reward_persons(
         params,
     )
     return _sort_legacy_reward_persons(rows, sorting or LegacyRewardsSort())
+
+
+def _register_person_name_functions(connection) -> None:
+    connection.create_function("person_name_key", 1, person_name_sort_key, deterministic=True)
+    connection.create_function("person_name_initial", 1, person_name_initial, deterministic=True)
+
+
+def list_legacy_reward_person_group(
+    db_path: Path,
+    filters: LegacyRewardsFilters,
+    sorting: LegacyRewardsSort | None = None,
+    *,
+    letter: object = "",
+    query: object = "",
+) -> list[dict[str, object]]:
+    clauses, params = _person_where(filters)
+    normalized_query = person_name_sort_key(query)
+    normalized_letter = normalized_legacy_rewards_letter(letter)
+    if normalized_query:
+        clauses.append("instr(person_name_key(p.fio), ?) > 0")
+        params.append(normalized_query)
+    elif normalized_letter:
+        clauses.append("person_name_initial(p.fio) = ?")
+        params.append(normalized_letter)
+    else:
+        return []
+
+    with closing(open_readonly_connection(db_path)) as connection:
+        _register_person_name_functions(connection)
+        rows = connection.execute(
+            f"""
+            select
+                p.id,
+                p.fio,
+                p.birthday,
+                g.name as rank_name,
+                p.main_foto,
+                p.person_foto,
+                coalesce(p.main_foto, p.person_foto, '') as thumbnail_path,
+                count(r.id) as rewards_count
+            from person p
+            left join guide g on g.id = p.id_rank
+            left join rewards r on r.person_id = p.id
+            {_where_sql(clauses)}
+            group by p.id
+            """,
+            tuple(params),
+        ).fetchall()
+    return _sort_legacy_reward_persons(
+        [row_to_dict(row) for row in rows if row is not None],
+        sorting or LegacyRewardsSort(),
+    )
+
+
+def legacy_rewards_alphabet_counts(
+    db_path: Path,
+    filters: LegacyRewardsFilters,
+) -> dict[str, int]:
+    clauses, params = _person_where(filters)
+    clauses.append("person_name_initial(p.fio) <> ''")
+    with closing(open_readonly_connection(db_path)) as connection:
+        _register_person_name_functions(connection)
+        rows = connection.execute(
+            f"""
+            select person_name_initial(p.fio) as letter, count(*) as person_count
+            from person p
+            {_where_sql(clauses)}
+            group by person_name_initial(p.fio)
+            """,
+            tuple(params),
+        ).fetchall()
+    counts = {letter: 0 for letter in LEGACY_PERSON_ALPHABET}
+    for row in rows:
+        letter = str(row["letter"] or "")
+        if letter in counts:
+            counts[letter] = int(row["person_count"] or 0)
+    return counts
 
 
 def legacy_rewards_totals(db_path: Path, filters: LegacyRewardsFilters) -> dict[str, object]:
