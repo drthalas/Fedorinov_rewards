@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
@@ -215,6 +216,8 @@ class SearchRepositoryTests(unittest.TestCase):
     def test_reward_results_include_photo_document_flags_and_internal_paths_for_preview(self) -> None:
         result = search_all(self.db_path, "Орден", scope="rewards")
         reward = result["rewards"][0]
+        self.assertEqual(reward["person_foto_flag"], 1)
+        self.assertEqual(reward["person_foto"], "Source/1/person.jpg")
         self.assertEqual(reward["person_book1_foto_flag"], 1)
         self.assertEqual(reward["person_book2_foto_flag"], 0)
         self.assertEqual(reward["person_card1_foto_flag"], 0)
@@ -227,8 +230,29 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertEqual(reward["front_foto"], "Source/1/10/front.jpg")
         self.assertEqual(reward["reward_book1_foto"], "Source/1/10/book1.jpg")
 
+    def test_reward_results_include_person_photo_for_every_reward_scope(self) -> None:
+        cases = (
+            ("rewards", "Орден"),
+            ("rewards", ""),
+            ("reward_numbers", "777"),
+            ("all", "Орден"),
+        )
+        for scope, query in cases:
+            with self.subTest(scope=scope, query=query):
+                reward = search_all(self.db_path, query, scope=scope)["rewards"][0]
+                self.assertEqual(reward["person_foto_flag"], 1)
+                self.assertEqual(reward["person_foto"], "Source/1/person.jpg")
+
+    def test_reward_person_photo_uses_neutral_empty_flag(self) -> None:
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            connection.execute("update person set person_foto = '' where id = 1")
+            connection.commit()
+        reward = search_all(self.db_path, "Орден", scope="rewards")["rewards"][0]
+        self.assertEqual(reward["person_foto_flag"], 0)
+        self.assertEqual(reward["person_foto"], "")
+
     def test_search_sorting_by_columns(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             connection.execute("insert into person (id, fio, birthday, id_rank) values (2, 'Белов Борис', '1910-01-01', 1)")
             connection.execute(
                 """
@@ -239,13 +263,14 @@ class SearchRepositoryTests(unittest.TestCase):
                 values (11, 2, 1, 1, 1, 1, 111, 1, '2026-05-01', 1000, 1200)
                 """
             )
+            connection.commit()
         by_number = search_all(self.db_path, "", scope="rewards", sort_by="number", sort_dir="asc")
         self.assertEqual([row["number"] for row in by_number["rewards"]], [111, 777])
         by_birth = search_all(self.db_path, "", scope="rewards", sort_by="birthday", sort_dir="desc")
         self.assertEqual(by_birth["rewards"][0]["fio"], "Андросов Леонид Тест")
 
     def test_search_results_are_paginated_with_range_metadata(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             for idx in range(2, 63):
                 connection.execute(
                     """
@@ -256,6 +281,7 @@ class SearchRepositoryTests(unittest.TestCase):
                     """,
                     (idx + 100, idx),
                 )
+            connection.commit()
 
         first_page = search_all(self.db_path, "", scope="rewards", limit=50, page=1, sort_by="number", sort_dir="asc")
         second_page = search_all(self.db_path, "", scope="rewards", limit=50, page=2, sort_by="number", sort_dir="asc")
@@ -362,6 +388,7 @@ class SearchRepositoryTests(unittest.TestCase):
             "fio": "/search?q=Орден&scope=rewards&mode=contains&sort=fio&dir=asc",
             "rank_name": "#",
             "birthday": "#",
+            "person_foto_flag": "#",
             "person_book1_foto_flag": "#",
             "person_book2_foto_flag": "#",
             "person_card1_foto_flag": "#",
@@ -393,6 +420,7 @@ class SearchRepositoryTests(unittest.TestCase):
             search_sort={"sort": "number", "dir": "asc", "urls": sort_urls},
         )
         self.assertIn("Фото учётной карточки, страница 1", rendered)
+        self.assertLess(rendered.index("Фото кавалера"), rendered.index("Фото наградной книжки, сторона 1"))
         self.assertIn("Фото книжки награды, сторона 1", rendered)
         self.assertIn("Фото книжки награды, сторона 2", rendered)
         self.assertIn("Фото награды: аверс", rendered)
@@ -402,6 +430,12 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("sort%3Dnumber", rendered)
         self.assertIn("search-photo-flag\">1</span>", rendered)
         self.assertNotIn("Source/1/10/front.jpg", rendered)
+
+        legacy_template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        reward_header = '{{ search_sort_th("person_foto_flag", "Фото кавалера") }}'
+        reward_cell = '{{ search_photo_cell(reward, "person_foto_flag", "person_foto", "Фото кавалера") }}'
+        self.assertIn(reward_header, legacy_template)
+        self.assertIn(reward_cell, legacy_template)
 
     def test_search_photo_mode_renders_preview_links_with_existing_lightbox(self) -> None:
         results = search_all(self.db_path, "Орден", scope="rewards")
@@ -503,6 +537,7 @@ class SearchRepositoryTests(unittest.TestCase):
         text = _search_csv_text("Орден", "rewards", "contains", "number", "asc", db_path=self.db_path)
         self.assertTrue(text.startswith("\ufeff"))
         self.assertIn("Фото наградной книжки, сторона 1", text)
+        self.assertIn("Фото кавалера", text)
         self.assertIn("Фото учётной карточки, страница 1", text)
         self.assertIn("Фото книжки награды, сторона 1", text)
         self.assertIn("Фото книжки награды, сторона 2", text)
@@ -517,7 +552,7 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertNotIn("SourceMark", text)
 
     def test_search_csv_exports_more_than_current_page(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             for idx in range(2, 63):
                 connection.execute(
                     """
@@ -528,6 +563,7 @@ class SearchRepositoryTests(unittest.TestCase):
                     """,
                     (idx + 100, idx),
                 )
+            connection.commit()
 
         text = _search_csv_text("", "rewards", "contains", "number", "asc", db_path=self.db_path)
         self.assertGreaterEqual(len(text.splitlines()), 63)
