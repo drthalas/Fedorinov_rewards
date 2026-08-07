@@ -5430,6 +5430,17 @@ body.legacy-rewards-theme::after {
   overflow: auto;
 }
 
+.legacy-marks-tab .legacy-marks-placeholder {
+  color: #bdb4a6;
+  border-color: #514737;
+  background: linear-gradient(180deg, #191a17, #151613);
+  box-shadow: inset 3px 0 0 #8d6a3e;
+}
+
+.legacy-marks-tab .legacy-marks-empty {
+  color: #a79d8d;
+}
+
 .legacy-marks-tab .legacy-bottom-grid {
   gap: 10px;
 }
