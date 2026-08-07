@@ -41,6 +41,11 @@ class Ale361PostCreateLayoutTests(unittest.TestCase):
         self.assertIn("{% for reward in post_create_rewards %}", template)
         self.assertIn("/persons/{{ person.id }}/rewards/new?return_to={{ post_create_url|urlencode }}", template)
 
+    def test_updated_css_uses_a_fresh_static_cache_key(self) -> None:
+        templates = (ROOT / "backend" / "app" / "routers" / "templates.py").read_text(encoding="utf-8")
+
+        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale361-post-create-layout-1"', templates)
+
 
 if __name__ == "__main__":
     unittest.main()
