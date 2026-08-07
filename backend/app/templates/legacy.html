@@ -527,7 +527,7 @@
               {% if mark.number %}<small>№ {{ mark.number }}</small>{% endif %}
             </a>
           {% else %}
-            <div class="legacy-empty">Нет знаков.</div>
+            <div class="legacy-empty legacy-marks-empty">Нет знаков.</div>
           {% endfor %}
         </div>
       </aside>
@@ -576,7 +576,7 @@
             </section>
           </div>
         {% else %}
-          <div class="notice">Выберите знак.</div>
+          <div class="notice legacy-marks-placeholder">Выберите знак.</div>
         {% endif %}
       </section>
     </div>
