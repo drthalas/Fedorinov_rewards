@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
-{% block extra_head %}
-{% if mode == "create" %}<script src="{{ static_url('person_create_rewards.js') }}" defer></script>{% endif %}
-{% endblock %}
 {% block content %}
-{% from "_pending_reward_form.html" import pending_reward with context %}
 <section class="cavalier-standalone-page cavalier-form-page cavalier-person-form-page">
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}</h1>
 <p class="local-back-nav compact-actions">
@@ -23,6 +19,7 @@
 
 <form class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form data-write-feedback data-write-pending-label="Сохраняем…">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
+  {% if post_create %}<input type="hidden" name="post_create" value="1">{% endif %}
   <fieldset class="form-section">
     <legend>Основные данные</legend>
     <div class="form-grid two-columns">
@@ -75,21 +72,6 @@
     </div>
   </fieldset>
 
-  {% if mode == "create" %}
-  <fieldset class="form-section pending-rewards-section" data-pending-rewards>
-    <legend>Награды</legend>
-    <div data-pending-reward-list>
-      {% for reward in pending_rewards %}
-        {{ pending_reward(loop.index0, reward, pending_reward_guides[loop.index0], reward_default_date) }}
-      {% endfor %}
-    </div>
-    <button class="secondary-button" type="button" data-add-pending-reward>Добавить награду</button>
-    <template data-pending-reward-template>
-      {{ pending_reward('__INDEX__', {}, {}, reward_default_date) }}
-    </template>
-  </fieldset>
-  {% endif %}
-
   <div class="actions">
     <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
     <a data-escape-back href="{{ return_to or ('/persons' if mode == 'create' else '/persons/' ~ person.id) }}">Отмена</a>
@@ -101,14 +83,46 @@
   <div class="person-edit-photos">
 {% endif %}
 
-{% set photo_manage_compact = true %}
-{% with photo_entity_type="person", photo_entity_id=person.id %}
-  {% include "photo_management.html" %}
-{% endwith %}
+{% if mode == "edit" and settings.write_mode %}
+  {% set photo_manage_compact = true %}
+  {% with photo_entity_type="person", photo_entity_id=person.id %}
+    {% include "photo_management.html" %}
+  {% endwith %}
+{% endif %}
 
 {% if mode == "edit" and settings.write_mode %}
   </div>
 </div>
+{% endif %}
+
+{% if post_create and settings.write_mode %}
+<section class="form-section person-post-create-rewards" data-post-create-rewards>
+  <div class="person-post-create-rewards-head">
+    <div>
+      <h2>Награды</h2>
+      <p class="secondary">Добавьте нужные награды по одной. После каждой награды эта кнопка останется доступной.</p>
+    </div>
+    <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ post_create_url|urlencode }}">Добавить награду</a>
+  </div>
+  {% if post_create_rewards %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Наименование</th><th>Номер</th><th>Наличие</th></tr></thead>
+      <tbody>
+      {% for reward in post_create_rewards %}
+        <tr>
+          <td>{{ reward.name|dash }}</td>
+          <td>{{ reward.number|dash }}</td>
+          <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="secondary" data-post-create-rewards-empty>Награды ещё не добавлены.</p>
+  {% endif %}
+</section>
 {% endif %}
 </section>
 {% endblock %}

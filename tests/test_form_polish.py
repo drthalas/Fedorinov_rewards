@@ -202,7 +202,13 @@ class FormPolishTests(unittest.TestCase):
         with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
             edit_response = persons_router.person_edit(object(), 2, return_to=selected_return, created="1")
         context = edit_response["context"]
-        self.assertEqual(context["created_message"], "Кавалер создан. Теперь можно добавить фотографии и документы.")
+        self.assertEqual(
+            context["created_message"],
+            "Кавалер создан. Добавьте фотографии и награды, затем нажмите «Сохранить».",
+        )
+        self.assertTrue(context["post_create"])
+        self.assertEqual(context["post_create_rewards"], [])
+        self.assertIn("created=1", context["post_create_url"])
         self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=2")
 
         update_request = FakeRequest(
@@ -238,8 +244,9 @@ class FormPolishTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         self.assertNotIn("Следующие действия", template)
         self.assertNotIn("Добавить фото и документы", template)
-        self.assertIn("data-add-pending-reward", template)
-        self.assertIn('{% if mode == "create" %}', template)
+        self.assertNotIn("data-pending-rewards", template)
+        self.assertIn("data-post-create-rewards", template)
+        self.assertIn("Добавить награду", template)
         self.assertIn("Год рождения", template)
         self.assertIn("format_birth_year_input", template)
         self.assertIn('placeholder="ГГГГ"', template)

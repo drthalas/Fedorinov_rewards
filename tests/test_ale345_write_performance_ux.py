@@ -31,7 +31,7 @@ class Ale345WritePerformanceUxTests(unittest.TestCase):
 
     def test_static_cache_key_covers_new_write_feedback_assets(self) -> None:
         templates = (ROOT / "backend/app/routers/templates.py").read_text(encoding="utf-8")
-        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale359-integrated-owner-qa-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale359-integrated-owner-qa-2"', templates)
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_write_feedback_is_immediate_blocks_duplicates_and_recovers_after_error(self) -> None:

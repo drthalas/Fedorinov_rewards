@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from contextlib import closing
 from typing import Callable
+import unicodedata
 from uuid import uuid4
 
 from ..config import Settings
@@ -31,11 +32,11 @@ from ..services.deletion_confirmation import (
     media_delete_preview,
 )
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
-from .rewards_write import REWARD_FIELDS, RewardWriteData, insert_reward
 
 
 PERSON_BASE_FIELDS = ("fio", "birthday", "id_rank", "link1", "link2", "comment")
 PERSON_OPTIONAL_FIELDS = ("biography",)
+DUPLICATE_PERSON_MESSAGE = "Кавалер с такими ФИО, годом рождения и званием уже существует."
 
 
 class PersonValidationError(ValueError):
@@ -196,6 +197,31 @@ def _as_params(data: PersonWriteData, fields: tuple[str, ...]) -> tuple[object, 
     )
 
 
+def _person_identity_name(value: object) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or ""))
+    return " ".join(normalized.split()).casefold()
+
+
+def _find_person_duplicate(connection, data: PersonWriteData) -> int | None:
+    expected_name = _person_identity_name(data.fio)
+    expected_year = format_birth_year_input(data.birthday)
+    rows = connection.execute(
+        "select id, fio, birthday from person where id_rank = ? order by id",
+        (data.id_rank,),
+    ).fetchall()
+    for row in rows:
+        if _person_identity_name(row["fio"]) != expected_name:
+            continue
+        if format_birth_year_input(row["birthday"]) == expected_year:
+            return int(row["id"])
+    return None
+
+
+def _validate_person_duplicate(connection, data: PersonWriteData) -> None:
+    if _find_person_duplicate(connection, data) is not None:
+        raise PersonValidationError(DUPLICATE_PERSON_MESSAGE)
+
+
 def _validate_person_data(data: PersonWriteData, *, existing_birthday: object = None) -> None:
     if not data.fio.strip():
         raise PersonValidationError("Заполните ФИО.")
@@ -224,7 +250,9 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
     _validate_person_data(data)
     created_folder = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        connection.execute("begin immediate")
         _ensure_biography_column(connection)
+        _validate_person_duplicate(connection, data)
         fields = _active_fields(connection)
         columns = ", ".join(fields)
         placeholders = ", ".join("?" for _ in fields)
@@ -250,48 +278,6 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
             raise
     log_action("create", "person", person_id, {"fields": list(fields)})
     return person_id
-
-
-def create_person_with_rewards(
-    settings: Settings,
-    data: PersonWriteData,
-    rewards: list[RewardWriteData],
-) -> tuple[int, tuple[int, ...]]:
-    ensure_write_allowed(settings)
-    _validate_person_data(data)
-    created_folder = None
-    reward_ids: list[int] = []
-    with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        _ensure_biography_column(connection)
-        fields = _active_fields(connection)
-        columns = ", ".join(fields)
-        placeholders = ", ".join("?" for _ in fields)
-        cursor = connection.execute(
-            f"insert into person ({columns}) values ({placeholders})",
-            _as_params(data, fields),
-        )
-        person_id = int(cursor.lastrowid)
-        folder = safe_person_folder(settings, person_id)
-        folder_existed = folder.exists()
-        try:
-            ensure_person_folder(settings, person_id)
-            if not folder_existed:
-                created_folder = folder
-            for reward in rewards:
-                reward_ids.append(insert_reward(connection, person_id, reward))
-            connection.commit()
-        except Exception:
-            connection.rollback()
-            if created_folder is not None:
-                try:
-                    created_folder.rmdir()
-                except OSError:
-                    pass
-            raise
-    log_action("create", "person", person_id, {"fields": list(fields), "reward_count": len(reward_ids)})
-    for reward_id in reward_ids:
-        log_action("create", "reward", reward_id, {"person_id": person_id, "fields": list(REWARD_FIELDS)})
-    return person_id, tuple(reward_ids)
 
 
 def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:

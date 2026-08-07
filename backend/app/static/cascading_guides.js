@@ -84,9 +84,6 @@
 
   function initAll(root) {
     const scope = root || document;
-    if (scope.matches && scope.matches(".guide-cascade")) {
-      initCascade(scope);
-    }
     scope.querySelectorAll(".guide-cascade").forEach(initCascade);
   }
 

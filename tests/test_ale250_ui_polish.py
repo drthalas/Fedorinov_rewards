@@ -76,8 +76,9 @@ class Ale250UiPolishTests(unittest.TestCase):
 
         self.assertNotIn("Следующие действия", form)
         self.assertNotIn("Добавить фото и документы", form)
-        self.assertIn('{% if mode == "create" %}', form)
-        self.assertIn("data-add-pending-reward", form)
+        self.assertNotIn("data-pending-rewards", form)
+        self.assertIn("data-post-create-rewards", form)
+        self.assertIn("Добавить награду", form)
         self.assertIn('id="{{ photo_entity_type }}-photo-management"', photo_management)
         self.assertIn('action="/photos/upload"', photo_management)
         self.assertIn("data-mark-photo-trigger", photo_management)

@@ -1,23 +1,20 @@
 import logging
-import re
-from datetime import date
 from urllib.parse import parse_qs, parse_qsl, quote, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 
 from ..config import get_settings
-from ..repositories.guides import guide_cascade_data, guide_cascade_options, list_rank_guide
+from ..repositories.guides import list_rank_guide
 from ..repositories.persons import count_persons, get_person, list_person_rewards, list_persons, person_photo_items
 from ..repositories.persons_write import (
     PersonDeleteBlockedError,
     PersonValidationError,
-    create_person_with_rewards,
+    create_person,
     delete_person_with_result,
     person_data_from_mapping,
     update_person,
 )
-from ..repositories.rewards_write import RewardValidationError, reward_data_from_mapping
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.dates import BIRTH_YEAR_MAXIMUM, BIRTH_YEAR_MINIMUM
 from ..services.display import pagination
@@ -40,7 +37,7 @@ from .templates import templates
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-PENDING_REWARD_FIELD = re.compile(r"^reward_(\d+)_(\w+)$")
+POST_CREATE_MESSAGE = "Кавалер создан. Добавьте фотографии и награды, затем нажмите «Сохранить»."
 
 
 async def _read_form(request: Request) -> dict[str, object]:
@@ -49,38 +46,7 @@ async def _read_form(request: Request) -> dict[str, object]:
     return {key: values[-1] if values else "" for key, values in parsed.items()}
 
 
-def _pending_reward_rows(values: dict[str, object]) -> list[dict[str, object]]:
-    rows: dict[int, dict[str, object]] = {}
-    for key, value in values.items():
-        match = PENDING_REWARD_FIELD.fullmatch(key)
-        if match:
-            rows.setdefault(int(match.group(1)), {})[match.group(2)] = value
-    return [rows[index] for index in sorted(rows)]
-
-
-def _pending_reward_guides(settings, rows: list[dict[str, object]]) -> list[dict[str, list[dict[str, object]]]]:
-    if not settings.db_exists:
-        return [{} for _ in rows]
-    result = []
-    for row in rows:
-        def selected(key: str) -> int | None:
-            try:
-                return int(row.get(key) or 0) or None
-            except (TypeError, ValueError):
-                return None
-        result.append(
-            guide_cascade_options(
-                settings.rewards_db_path,
-                country_id=selected("id_gos"),
-                category_id=selected("id_catigory"),
-                subcategory_id=selected("id_sub_catigory"),
-            )
-        )
-    return result
-
-
-def _person_create_context(settings, *, person, return_to: str, error: str | None, field_errors=None, pending_rewards=None):
-    rewards = pending_rewards or []
+def _person_create_context(settings, *, person, return_to: str, error: str | None, field_errors=None):
     return {
         "settings": settings,
         "mode": "create",
@@ -93,10 +59,6 @@ def _person_create_context(settings, *, person, return_to: str, error: str | Non
         "birth_year_min": BIRTH_YEAR_MINIMUM,
         "birth_year_max": BIRTH_YEAR_MAXIMUM,
         "field_errors": field_errors or {},
-        "pending_rewards": rewards,
-        "pending_reward_guides": _pending_reward_guides(settings, rewards),
-        "guide_cascade": guide_cascade_data(settings.rewards_db_path) if settings.db_exists else {},
-        "reward_default_date": date.today().isoformat(),
     }
 
 
@@ -147,6 +109,35 @@ def _person_created_edit_url(
     if safe_back:
         query.append(("return_to", safe_back))
     return f"/persons/{person_id}/edit?{urlencode(query)}"
+
+
+def _person_edit_context(
+    settings,
+    *,
+    person: dict[str, object],
+    return_to: str,
+    error: str | None,
+    post_create: bool,
+    field_errors=None,
+) -> dict[str, object]:
+    safe_back = safe_return_to(return_to)
+    person_id = int(person["id"])
+    return {
+        "settings": settings,
+        "mode": "edit",
+        "person": person,
+        "ranks": list_rank_guide(settings.rewards_db_path) if settings.db_exists else [],
+        "photo_controls": photo_items("person", person),
+        "return_to": safe_back,
+        "error": error,
+        "created_message": POST_CREATE_MESSAGE if post_create else "",
+        "birth_year_min": BIRTH_YEAR_MINIMUM,
+        "birth_year_max": BIRTH_YEAR_MAXIMUM,
+        "field_errors": field_errors or {},
+        "post_create": post_create,
+        "post_create_rewards": list_person_rewards(settings.rewards_db_path, person_id) if post_create else [],
+        "post_create_url": _person_created_edit_url(person_id, safe_back) if post_create else "",
+    }
 
 
 def _person_detail_return_to(person_id: int, return_to: str = "") -> str:
@@ -204,17 +195,12 @@ async def person_create(request: Request):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
-    pending_rewards = _pending_reward_rows(form_values)
     try:
         data = person_data_from_mapping(form_values)
-        rewards = [reward_data_from_mapping(row) for row in pending_rewards]
-        person_id, _reward_ids = create_person_with_rewards(settings, data, rewards)
+        person_id = create_person(settings, data)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except (PersonValidationError, RewardValidationError) as exc:
-        message = str(exc)
-        if isinstance(exc, RewardValidationError):
-            message = f"Проверьте добавляемые награды: {message}"
+    except PersonValidationError as exc:
         return templates.TemplateResponse(
             request,
             "person_form.html",
@@ -222,9 +208,8 @@ async def person_create(request: Request):
                 settings,
                 person=form_values,
                 return_to=return_to,
-                error=message,
-                field_errors={exc.field: str(exc)} if isinstance(exc, PersonValidationError) and exc.field else {},
-                pending_rewards=pending_rewards,
+                error=str(exc),
+                field_errors={exc.field: str(exc)} if exc.field else {},
             ),
             status_code=400,
         )
@@ -346,23 +331,16 @@ def person_edit(request: Request, person_id: int, return_to: str = "", created: 
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
-    ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
     return templates.TemplateResponse(
         request,
         "person_form.html",
-        {
-            "settings": settings,
-            "mode": "edit",
-            "person": person,
-            "ranks": ranks,
-            "photo_controls": photo_items("person", person),
-            "return_to": safe_return_to(return_to),
-            "error": None,
-            "created_message": "Кавалер создан. Теперь можно добавить фотографии и документы." if created == "1" else "",
-            "birth_year_min": BIRTH_YEAR_MINIMUM,
-            "birth_year_max": BIRTH_YEAR_MAXIMUM,
-            "field_errors": {},
-        },
+        _person_edit_context(
+            settings,
+            person=person,
+            return_to=return_to,
+            error=None,
+            post_create=created == "1",
+        ),
     )
 
 
@@ -371,6 +349,7 @@ async def person_update(request: Request, person_id: int):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    post_create = str(form_values.get("post_create") or "") == "1"
     try:
         existing_person = get_person(settings.rewards_db_path, person_id)
         if existing_person is None:
@@ -380,24 +359,18 @@ async def person_update(request: Request, person_id: int):
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except PersonValidationError as exc:
-        ranks = list_rank_guide(settings.rewards_db_path) if settings.db_exists else []
         person = {"id": person_id, **form_values}
         return templates.TemplateResponse(
             request,
             "person_form.html",
-            {
-                "settings": settings,
-                "mode": "edit",
-                "person": person,
-                "ranks": ranks,
-                "photo_controls": photo_items("person", person),
-                "return_to": return_to,
-                "error": str(exc),
-                "created_message": "",
-                "birth_year_min": BIRTH_YEAR_MINIMUM,
-                "birth_year_max": BIRTH_YEAR_MAXIMUM,
-                "field_errors": {exc.field: str(exc)} if exc.field else {},
-            },
+            _person_edit_context(
+                settings,
+                person=person,
+                return_to=return_to,
+                error=str(exc),
+                post_create=post_create,
+                field_errors={exc.field: str(exc)} if exc.field else {},
+            ),
             status_code=400,
         )
     target = with_status(return_to, "person_updated") if return_to else f"/persons/{person_id}?status=person_updated"
