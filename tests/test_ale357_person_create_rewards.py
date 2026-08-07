@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import closing
 import os
 from pathlib import Path
 import sqlite3
@@ -48,7 +49,7 @@ class Ale357PersonCreateRewardsTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _create_db(self) -> None:
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             connection.executescript(
                 """
                 create table guide (id integer primary key, name text, image_path text);
@@ -73,12 +74,13 @@ class Ale357PersonCreateRewardsTests(unittest.TestCase):
                     f"create table guide_lev_{level} (id integer primary key, idl integer, name text, rating_rank integer, image_path text)"
                 )
                 connection.execute(f"insert into guide_lev_{level} values (?, ?, ?, null, null)", values)
+            connection.commit()
 
     def _person(self, fio: str) -> PersonWriteData:
         return PersonWriteData(fio=fio, birthday="1910", id_rank=1)
 
     def _counts(self) -> tuple[int, int]:
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             return (
                 connection.execute("select count(*) from person").fetchone()[0],
                 connection.execute("select count(*) from rewards").fetchone()[0],
@@ -100,7 +102,7 @@ class Ale357PersonCreateRewardsTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(reward_ids), 2)
-        with sqlite3.connect(self.db_path) as connection:
+        with closing(sqlite3.connect(self.db_path)) as connection:
             owners = connection.execute("select distinct person_id from rewards order by person_id").fetchall()
         self.assertEqual(owners, [(person_id,)])
         self.assertEqual(self._counts(), (1, 2))
