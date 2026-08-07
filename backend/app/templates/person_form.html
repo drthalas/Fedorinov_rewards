@@ -85,6 +85,7 @@
 
 {% if mode == "edit" and settings.write_mode %}
   {% set photo_manage_compact = true %}
+  {% set photo_manage_return_url = post_create_url if post_create else "" %}
   {% with photo_entity_type="person", photo_entity_id=person.id %}
     {% include "photo_management.html" %}
   {% endwith %}
