@@ -43,7 +43,7 @@ class Ale317OwnerQaPackageTests(unittest.TestCase):
                 patch.object(legacy_router, "list_person_rewards", return_value=[]),
                 patch.object(legacy_router, "person_folder_image_items", return_value=[]),
                 patch.object(legacy_router.templates, "TemplateResponse", side_effect=template_response),
-                patch.object(legacy_router, "list_legacy_reward_persons") as full_list,
+                patch.object(legacy_router, "list_legacy_reward_person_group") as full_list,
                 patch.object(legacy_router, "legacy_rewards_filter_options") as filter_options,
                 patch.object(legacy_router, "legacy_rewards_filter_cascade") as filter_cascade,
                 patch.object(legacy_router, "legacy_rewards_totals") as totals,
@@ -177,7 +177,7 @@ eval(source);
 
         self.assertIn("person_form_validation.js", base)
         self.assertIn("form_behavior.js", base)
-        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale354-alphabet-navigation"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260807-ale354-alphabet-lifecycle-corrective-2"', templates)
 
 
 if __name__ == "__main__":

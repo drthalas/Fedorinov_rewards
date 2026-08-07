@@ -1,6 +1,9 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import json
+import shutil
 import sqlite3
+import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -104,6 +107,9 @@ class Ale354AlphabetUiContractTests(unittest.TestCase):
         self.assertIn('class="legacy-alphabet-index"', template)
         self.assertLess(template.index('class="legacy-alphabet-index"'), template.index("{% for person in persons %}"))
         self.assertIn("width: 22px", styles)
+        self.assertIn("grid-template-rows: repeat(32, minmax(11px, 1fr))", styles)
+        self.assertIn("min-height: 11px", styles)
+        self.assertIn("overflow-y: auto", styles)
         self.assertIn(".legacy-alphabet-letter:not(:disabled):hover", styles)
         self.assertIn(".legacy-alphabet-letter.active", styles)
         self.assertIn(".legacy-alphabet-letter:disabled", styles)
@@ -115,6 +121,213 @@ class Ale354AlphabetUiContractTests(unittest.TestCase):
         self.assertIn('url.searchParams.delete("person_q")', script)
         self.assertIn("replaceList: true", script)
         self.assertNotIn("name.includes(query)", script)
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_fragment_updates_rebind_every_new_alphabet_group_and_person_row(self) -> None:
+        script_path = ROOT / "backend/app/static/legacy_rewards.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const documentListeners = {};
+let generation = 0;
+
+const quickSearch = {
+  value: "",
+  dataset: {},
+  listeners: {},
+  addEventListener(type, callback) { this.listeners[type] = callback; },
+};
+const makeGeneration = () => {
+  const letter = {
+    disabled: false,
+    dataset: { letterUrl: `/legacy?tab=rewards&letter=${generation}` },
+    listeners: {},
+    addEventListener(type, callback) { this.listeners[type] = callback; },
+  };
+  const row = {
+    hidden: false,
+    dataset: {
+      personName: `Кавалер ${generation}`,
+      selectUrl: `/legacy?tab=rewards&person_id=${generation}`,
+      deselectUrl: "/legacy?tab=rewards",
+      detailUrl: `/persons/${generation}`,
+    },
+    listeners: {},
+    attrs: { "aria-selected": "false" },
+    classList: { toggle() {} },
+    addEventListener(type, callback) { this.listeners[type] = callback; },
+    getAttribute(name) { return this.attrs[name] || ""; },
+    setAttribute(name, value) { this.attrs[name] = value; },
+    getBoundingClientRect() { return { top: 100, bottom: 120, height: 20 }; },
+  };
+  const list = {
+    scrollTop: 0,
+    clientHeight: 400,
+    dataset: {},
+    listeners: {},
+    addEventListener(type, callback) { this.listeners[type] = callback; },
+    focus() {},
+    getBoundingClientRect() { return { top: 80, bottom: 480 }; },
+  };
+  return {
+    letter,
+    row,
+    list,
+    querySelector(selector) {
+      if (selector === "[data-person-list]") return list;
+      if (selector === "[data-person-quick-search]") return quickSearch;
+      return null;
+    },
+    querySelectorAll(selector) {
+      if (selector === "[data-person-name]") return [row];
+      if (selector === "[data-letter-url]") return [letter];
+      return [];
+    },
+  };
+};
+
+let current = makeGeneration();
+global.HTMLElement = class {};
+global.window = global;
+window.location = {
+  href: "http://127.0.0.1/legacy?tab=rewards",
+  origin: "http://127.0.0.1",
+  pathname: "/legacy",
+  search: "?tab=rewards",
+};
+window.history = { replaceState() {}, pushState() {} };
+window.addEventListener = () => {};
+global.document = {
+  addEventListener(type, callback) { documentListeners[type] = callback; },
+  querySelector(selector) { return current.querySelector(selector); },
+  querySelectorAll(selector) { return current.querySelectorAll(selector); },
+};
+
+eval(source);
+documentListeners.DOMContentLoaded();
+const bound = [];
+for (let index = 0; index < 12; index += 1) {
+  bound.push(Boolean(
+    current.letter.listeners.click &&
+    current.row.listeners.click &&
+    current.row.listeners.dblclick &&
+    current.list.listeners.keydown
+  ));
+  generation += 1;
+  current = makeGeneration();
+  documentListeners["legacy:content-updated"]({ detail: { root: current } });
+}
+bound.push(Boolean(current.letter.listeners.click && current.row.listeners.click));
+process.stdout.write(JSON.stringify({ bound, quickSearchListeners: Object.keys(quickSearch.listeners).sort() }));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale354_rebind_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(runner_path), str(script_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["bound"], [True] * 13)
+        self.assertEqual(result["quickSearchListeners"], ["input", "keydown"])
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_stale_search_response_cannot_overwrite_newer_typed_value(self) -> None:
+        script_path = ROOT / "backend/app/static/legacy_rewards.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const documentListeners = {};
+const searchTimers = [];
+const fetchResolvers = [];
+let parserCalls = 0;
+let workspaceState = null;
+
+const workspace = {
+  attrs: {},
+  setAttribute(name, value) { this.attrs[name] = value; },
+  querySelector() { return workspaceState; },
+  append(state) { workspaceState = state; },
+};
+const quickSearch = {
+  value: "",
+  dataset: {},
+  listeners: {},
+  addEventListener(type, callback) { this.listeners[type] = callback; },
+};
+const personList = {
+  scrollTop: 0,
+  dataset: { activeLetter: "А" },
+  addEventListener() {},
+  focus() {},
+};
+
+global.HTMLElement = class {};
+global.window = global;
+window.location = {
+  href: "http://127.0.0.1/legacy?tab=rewards&letter=А",
+  origin: "http://127.0.0.1",
+  pathname: "/legacy",
+  search: "?tab=rewards&letter=А",
+};
+window.history = { replaceState() {}, pushState() {} };
+window.addEventListener = () => {};
+window.setTimeout = (callback, delay) => {
+  if (delay === 180) searchTimers.push(callback);
+  return searchTimers.length;
+};
+window.clearTimeout = () => {};
+window.fetch = () => new Promise((resolve) => fetchResolvers.push(resolve));
+global.DOMParser = class { constructor() { parserCalls += 1; } };
+global.document = {
+  addEventListener(type, callback) { documentListeners[type] = callback; },
+  querySelector(selector) {
+    if (selector === "[data-legacy-person-workspace]") return workspace;
+    if (selector === "[data-person-list]") return personList;
+    if (selector === "[data-person-quick-search]") return quickSearch;
+    return null;
+  },
+  querySelectorAll() { return []; },
+  createElement() {
+    return {
+      dataset: {},
+      setAttribute() {},
+      remove() { workspaceState = null; },
+    };
+  },
+};
+
+eval(source);
+documentListeners.DOMContentLoaded();
+
+(async () => {
+  quickSearch.value = "А";
+  quickSearch.listeners.input();
+  searchTimers.shift()();
+  quickSearch.value = "Алекс";
+  quickSearch.listeners.input();
+  fetchResolvers.shift()({ ok: true, text: async () => "<html></html>" });
+  await new Promise((resolve) => setImmediate(resolve));
+  process.stdout.write(JSON.stringify({ value: quickSearch.value, parserCalls, busy: workspace.attrs["aria-busy"] }));
+})().catch((error) => { console.error(error); process.exit(1); });
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "ale354_stale_search_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(runner_path), str(script_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {"value": "Алекс", "parserCalls": 0, "busy": "false"},
+        )
 
 
 class _Request:

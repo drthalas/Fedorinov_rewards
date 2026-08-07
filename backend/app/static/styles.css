@@ -4907,7 +4907,7 @@ body.legacy-rewards-theme::after {
   z-index: 4;
   float: left;
   display: grid;
-  grid-template-rows: repeat(32, minmax(0, 1fr));
+  grid-template-rows: repeat(32, minmax(11px, 1fr));
   width: 22px;
   height: 100%;
   min-height: 100%;
@@ -4915,7 +4915,15 @@ body.legacy-rewards-theme::after {
   border-right: 1px solid #332d22;
   background: #11120f;
   box-shadow: 2px 0 7px rgb(0 0 0 / 24%);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
   user-select: none;
+}
+
+.legacy-rewards-theme .legacy-alphabet-index::-webkit-scrollbar {
+  display: none;
 }
 
 .legacy-rewards-theme .legacy-alphabet-letter {
@@ -4924,7 +4932,7 @@ body.legacy-rewards-theme::after {
   box-sizing: border-box;
   width: 22px;
   min-width: 22px;
-  min-height: 0;
+  min-height: 11px;
   padding: 0;
   border: 0;
   border-radius: 0;

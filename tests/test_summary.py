@@ -368,7 +368,6 @@ class SummaryTests(unittest.TestCase):
             patch("backend.app.routers.legacy.summary_rows") as rows_mock,
             patch("backend.app.routers.legacy.summary_matrix") as matrix_mock,
             patch("backend.app.routers.legacy._legacy_summary") as summary_mock,
-            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
             patch("backend.app.routers.legacy.count_marks", return_value=0),
             patch("backend.app.routers.legacy.list_marks", return_value=[]),
             patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
@@ -386,7 +385,6 @@ class SummaryTests(unittest.TestCase):
 
     def test_legacy_summary_tab_builds_after_show(self) -> None:
         with (
-            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
             patch("backend.app.routers.legacy.count_marks", return_value=0),
             patch("backend.app.routers.legacy.list_marks", return_value=[]),
             patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
@@ -403,7 +401,6 @@ class SummaryTests(unittest.TestCase):
 
     def test_legacy_summary_reset_returns_to_unapplied_state(self) -> None:
         with (
-            patch("backend.app.routers.legacy.list_legacy_reward_persons", return_value=[]),
             patch("backend.app.routers.legacy.count_marks", return_value=0),
             patch("backend.app.routers.legacy.list_marks", return_value=[]),
             patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),

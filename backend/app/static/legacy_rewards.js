@@ -13,6 +13,7 @@
 
   let activeFetchController = null;
   let activeSearchTimer = null;
+  let activeSearchRevision = 0;
 
   const normalize = (value) => (value || "").toLocaleLowerCase("ru-RU").replace(/ё/g, "е").trim();
 
@@ -44,6 +45,18 @@
 
   const showLoadingState = () => showWorkspaceState("legacy-loading-state", LOADING_TEXT, "status");
   const showErrorState = (text) => showWorkspaceState("legacy-error-state", text || ERROR_TEXT, "alert");
+
+  const clearWorkspaceState = () => {
+    const target = workspace();
+    if (!target) {
+      return;
+    }
+    target.setAttribute("aria-busy", "false");
+    const state = target.querySelector(":scope > [data-legacy-workspace-state]");
+    if (state) {
+      state.remove();
+    }
+  };
 
   const restoreSelectionFromLocation = () => {
     const currentPersonId = new URL(window.location.href).searchParams.get("person_id");
@@ -103,6 +116,9 @@
       return;
     }
     const settings = options || {};
+    if (typeof settings.shouldApply === "function" && !settings.shouldApply()) {
+      return false;
+    }
     if (!window.fetch || !window.DOMParser || !window.history || !window.AbortController) {
       window.location.href = url;
       return;
@@ -140,6 +156,11 @@
       const html = await response.text();
       if (activeFetchController !== controller) {
         return;
+      }
+      if (typeof settings.shouldApply === "function" && !settings.shouldApply()) {
+        activeFetchController = null;
+        clearWorkspaceState();
+        return false;
       }
       replaceRewardsLayout(html, Boolean(settings.focusList), listScrollTop, Boolean(settings.replaceList));
       if (settings.updateHistory !== false) {
@@ -197,13 +218,14 @@
     return `${url.pathname}${url.search}`;
   };
 
-  const loadPersonSearch = async (query, selectFirst) => {
+  const loadPersonSearch = async (query, selectFirst, searchRevision) => {
     const cleanQuery = String(query || "").trim();
     const loaded = await navigateToUrl(personSearchUrl(cleanQuery), {
       replaceList: true,
       listScrollTop: 0,
       historyMode: "replace",
       searchValue: cleanQuery,
+      shouldApply: () => searchRevision === activeSearchRevision,
     });
     if (!loaded || !selectFirst) {
       return loaded;
@@ -231,8 +253,9 @@
     }
   };
 
-  function initLegacyRewards(root) {
+  function initLegacyRewards(root, options) {
     const scope = root || document;
+    const settings = options || {};
     const personList = scope.querySelector("[data-person-list]");
     const quickSearch = scope.querySelector("[data-person-quick-search]");
     const personRows = Array.from(scope.querySelectorAll("[data-person-name]"));
@@ -244,7 +267,9 @@
     let typeaheadNavigateTimer = null;
     let keyboardNavigateTimer = null;
 
-    syncCanonicalRewardsUrl(personList);
+    if (settings.syncCanonicalUrl !== false) {
+      syncCanonicalRewardsUrl(personList);
+    }
 
     const visiblePersonRows = () => personRows.filter((row) => !row.hidden);
 
@@ -468,30 +493,36 @@
     if (quickSearch && quickSearch.dataset.legacyRewardsBound !== "true") {
       quickSearch.dataset.legacyRewardsBound = "true";
       quickSearch.addEventListener("input", () => {
+        activeSearchRevision += 1;
+        const searchRevision = activeSearchRevision;
         if (activeSearchTimer) {
           window.clearTimeout(activeSearchTimer);
         }
         activeSearchTimer = window.setTimeout(() => {
           activeSearchTimer = null;
-          loadPersonSearch(quickSearch.value, false);
+          loadPersonSearch(quickSearch.value, false, searchRevision);
         }, SEARCH_DEBOUNCE_MS);
       });
       quickSearch.addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
+          activeSearchRevision += 1;
+          const searchRevision = activeSearchRevision;
           if (activeSearchTimer) {
             window.clearTimeout(activeSearchTimer);
             activeSearchTimer = null;
           }
-          loadPersonSearch(quickSearch.value, true);
+          loadPersonSearch(quickSearch.value, true, searchRevision);
         } else if (event.key === "Escape") {
           event.preventDefault();
+          activeSearchRevision += 1;
+          const searchRevision = activeSearchRevision;
           if (activeSearchTimer) {
             window.clearTimeout(activeSearchTimer);
             activeSearchTimer = null;
           }
           quickSearch.value = "";
-          loadPersonSearch("", false);
+          loadPersonSearch("", false, searchRevision);
         }
       });
     }
@@ -503,6 +534,7 @@
       button.dataset.legacyRewardsBound = "true";
       button.addEventListener("click", (event) => {
         event.preventDefault();
+        activeSearchRevision += 1;
         if (activeSearchTimer) {
           window.clearTimeout(activeSearchTimer);
           activeSearchTimer = null;
@@ -576,6 +608,11 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => initLegacyRewards(document));
+  document.addEventListener("legacy:content-updated", (event) => {
+    initLegacyRewards(event && event.detail && event.detail.root ? event.detail.root : document, {
+      syncCanonicalUrl: false,
+    });
+  });
   window.addEventListener("popstate", () => {
     if (window.location.pathname === "/legacy" && window.location.search.includes("tab=rewards")) {
       navigateToUrl(window.location.pathname + window.location.search, {
