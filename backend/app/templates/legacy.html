@@ -424,6 +424,7 @@
                     {{ search_sort_th("fio", "ФИО") }}
                     {{ search_sort_th("rank_name", "Звание / специальность") }}
                     {{ search_sort_th("birthday", "Год рождения") }}
+                    {{ search_sort_th("person_foto_flag", "Фото кавалера") }}
                     {{ search_sort_th("person_book1_foto_flag", "Фото наградной книжки, сторона 1") }}
                     {{ search_sort_th("person_book2_foto_flag", "Фото наградной книжки, сторона 2") }}
                     {{ search_sort_th("person_card1_foto_flag", "Фото учётной карточки, страница 1") }}
@@ -446,6 +447,7 @@
                     <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
                     <td>{{ reward.rank_name|dash }}</td>
                     <td>{{ reward.birthday|format_birth_year }}</td>
+                    {{ search_photo_cell(reward, "person_foto_flag", "person_foto", "Фото кавалера") }}
                     {{ search_photo_cell(reward, "person_book1_foto_flag", "person_book1_foto", "Фото наградной книжки кавалера, сторона 1") }}
                     {{ search_photo_cell(reward, "person_book2_foto_flag", "person_book2_foto", "Фото наградной книжки кавалера, сторона 2") }}
                     {{ search_photo_cell(reward, "person_card1_foto_flag", "person_card1_foto", "Фото учётной карточки, страница 1") }}
@@ -462,7 +464,7 @@
                     {{ search_photo_cell(reward, "reward_list_flag", "reward_list", "Наградной лист") }}
                   </tr>
                   {% else %}
-                  <tr><td colspan="17">Не найдено.</td></tr>
+                  <tr><td colspan="18">Не найдено.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>

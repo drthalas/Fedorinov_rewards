@@ -67,6 +67,7 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
         "ФИО",
         "Звание / специальность",
         "Дата рождения",
+        "Фото кавалера",
         "Наименование",
         "Номер",
         "Дата покупки",
@@ -91,6 +92,7 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 person.get("fio"),
                 person.get("rank_name"),
                 person.get("birthday"),
+                _csv_bool(person.get("person_foto_flag")),
                 "",
                 "",
                 "",
@@ -114,6 +116,7 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 reward.get("fio"),
                 reward.get("rank_name"),
                 reward.get("birthday"),
+                _csv_bool(reward.get("person_foto_flag")),
                 reward.get("name"),
                 reward.get("number"),
                 reward.get("date_purchase"),
@@ -131,7 +134,7 @@ def _search_csv_text(q: str, scope: str, mode: str, sort: str = "", direction: s
                 _csv_bool(reward.get("reward_list_flag")),
             ])
         for mark in results["marks"]:
-            writer.writerow(["Знаки", mark.get("id"), "", "", "", mark.get("name"), mark.get("number"), "", "", "", _csv_bool(mark.get("instock")), "", "", "", "", "", "", "", "", ""])
+            writer.writerow(["Знаки", mark.get("id"), "", "", "", "", mark.get("name"), mark.get("number"), "", "", "", _csv_bool(mark.get("instock")), "", "", "", "", "", "", "", "", ""])
     return output.getvalue()
 
 
