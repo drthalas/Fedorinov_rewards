@@ -156,7 +156,6 @@ class Ale359IntegratedCreateFlowTests(unittest.TestCase):
 
         template = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")
         self.assertIn("/rewards/new?return_to={{ post_create_url|urlencode }}", template)
-        self.assertIn("После каждой награды эта кнопка останется доступной", template)
         self.assertIn('photo_manage_return_url = post_create_url if post_create else ""', template)
         photo_template = (ROOT / "backend" / "app" / "templates" / "photo_management.html").read_text(
             encoding="utf-8"

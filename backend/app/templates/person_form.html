@@ -46,7 +46,7 @@
 
   <fieldset class="form-section">
     <legend>Ссылки</legend>
-    <div class="form-grid two-columns">
+    <div class="form-grid two-columns person-links-grid">
       <label>
         <span>Ссылка на сайт “Память народа”</span>
         <input name="link1" value="{{ person.link1 or '' }}" autocomplete="off">
@@ -99,10 +99,7 @@
 {% if post_create and settings.write_mode %}
 <section class="form-section person-post-create-rewards" data-post-create-rewards>
   <div class="person-post-create-rewards-head">
-    <div>
-      <h2>Награды</h2>
-      <p class="secondary">Добавьте нужные награды по одной. После каждой награды эта кнопка останется доступной.</p>
-    </div>
+    <h2>Награды</h2>
     <a class="button" href="/persons/{{ person.id }}/rewards/new?return_to={{ post_create_url|urlencode }}">Добавить награду</a>
   </div>
   {% if post_create_rewards %}
@@ -120,8 +117,6 @@
       </tbody>
     </table>
   </div>
-  {% else %}
-  <p class="secondary" data-post-create-rewards-empty>Награды ещё не добавлены.</p>
   {% endif %}
 </section>
 {% endif %}

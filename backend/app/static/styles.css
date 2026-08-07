@@ -1592,21 +1592,33 @@ th {
   align-items: start;
 }
 
+.person-links-grid > label {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}
+
+.person-links-grid > label > input {
+  margin-top: auto;
+}
+
 .person-post-create-rewards-head {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 10px;
   margin-bottom: 8px;
 }
 
-.person-post-create-rewards-head h2,
-.person-post-create-rewards-head p {
+.person-post-create-rewards-head h2 {
   margin: 0;
+  color: #cda262;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
 }
 
 .person-post-create-rewards-head .button {
-  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .person-edit-workspace {
