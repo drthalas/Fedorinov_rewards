@@ -49,6 +49,14 @@ http://127.0.0.1:8080
 
 Скрипт сам создаст `.venv`, установит зависимости и запустит локальный сервер на `127.0.0.1`. Повторный запуск не создаёт второй сервер: уже работающий подтверждённый экземпляр будет переиспользован.
 
+## Codex test contours
+
+Windows VM используется для технических branch-level, headed и updater/recovery checks. Его PASS означает готовность candidate к review, но не заменяет Owner acceptance. Для product UI/UX, performance/scale и release user-flow Codex готовит один exact candidate на physical Windows и передаёт Owner SHA, PID, port и local URL.
+
+После каждого VM или physical test stage Codex останавливает task-owned runtimes, listeners, browser sessions и temporary Scheduled Tasks, которые больше не нужны. Перед Owner handoff допускается ровно один явно идентифицированный candidate runtime; постоянный mutable Sergey-full DB/media fixture не сбрасывается и не удаляется этим cleanup.
+
+Подробные роли, Tier mapping, accepted integration base и cleanup contract определены в `docs/context/LINEAR_PROCESS.md`.
+
 ## Остановка
 
 В окне сервера нажмите `Ctrl+C`, подтвердите остановку при запросе и закройте окно.

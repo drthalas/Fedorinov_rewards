@@ -55,6 +55,19 @@ Linear project:
 
 Для T0/T1 не перечитывать всю историю проекта без необходимости. Перед изменениями проверить branch, clean working tree, base/head и ограничения задачи.
 
+## Accepted integration base для product-веток
+
+Перед началом product или integration-задачи Codex обязан определить `accepted integration HEAD`: branch и полный SHA, содержащие все Owner-accepted изменения, которые должны войти в следующий candidate. `main` не является автоматическим источником истины, пока этот state не был в него controlled-merged.
+
+До создания ветки:
+
+1. Составить список обязательных accepted commits из Description и актуальных Owner decisions.
+2. Проверить каждый commit через `git merge-base --is-ancestor <commit> <base>` или эквивалент.
+3. Зафиксировать в стартовом evidence base branch, base SHA, список commits и `ACCEPTED BASE VERIFIED: YES/NO`.
+4. При любом отсутствующем предке остановиться: сначала собрать controlled integration base после проверки Git graph, ancestry и conflicts. Blind cherry-pick запрещён.
+
+Перед VM gate повторить ancestry verification и добавить короткий smoke соседних принятых critical flows. Потеря accepted UI/UX считается VM gate FAIL, даже если focused и full tests зелёные.
+
 ## Test tiers
 
 ### T0 Diagnostic
@@ -84,6 +97,21 @@ Focused tests, browser E2E всех затронутых UI flows, full suite о
 
 Не запускать full suite после каждой Goal Loop iteration: во время разработки использовать focused checks, а full suite запускать один раз после финальной стабилизации, если его требует scope/tier.
 
+## Windows gates и Owner acceptance
+
+Windows VM — технический контур Codex: automated, focused, full и headed checks по назначенному Tier, включая updater/recovery loops. VM PASS подтверждает техническую готовность к Owner review, но не заменяет ручную product acceptance.
+
+Physical Windows — стандартный контур ручной Owner acceptance, максимально близкий к среде Сергея. Codex не выполняет эту acceptance за Owner: после VM PASS он передаёт один exact candidate с SHA, PID, port, local URL и краткими шагами.
+
+| Scope | VM technical gate | Physical Owner acceptance |
+| --- | --- | --- |
+| Tier 1 docs/process | Требуемые docs checks | Не требуется |
+| Tier 1–2 product | По scope | Нужна для visual/UX либо когда Linear требует Owner acceptance |
+| Tier 3 product/performance/scale | Обязательна | Обязательна по умолчанию после VM PASS |
+| Tier 4 release/updater | Полный technical/updater gate | Отдельный ручной user-flow gate exact candidate до publication |
+
+До явного Owner PASS нельзя закрывать задачу, если Description требует Owner acceptance. Owner не направляется на VM preview как на финальную UI/UX приёмку.
+
 ## Browser-first UI QA
 
 Для локального web UI основной путь — built-in browser / Playwright headed E2E. UI PASS требует реальный click-flow, фактический результат после reload, console/network/application HTTP checks и screenshots, когда они нужны для visual evidence.
@@ -104,11 +132,22 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 4. Подтвердить identity через startup log, cache key, HTML marker или другой воспроизводимый механизм без UI clutter.
 5. Выполнить browser smoke с того же URL, который передаётся Owner.
 6. Не смешивать write QA real-data и temp runtime без явного разделения процессов, портов и safety baseline.
-7. Оставить проверенный QA runtime запущенным для Owner.
+7. Перед handoff выполнить Test Environment Cleanup и оставить только один проверенный exact candidate runtime для Owner.
 
 Финальный отчёт и Linear comment должны содержать `OWNER QA URL`: один clickable URL, port, PID, start time, branch, полный SHA, TEMP/REAL DB/media, старые URL/порты, которые нельзя использовать, 3–7 коротких шагов и подтверждение, что runtime оставлен запущенным.
 
 Для native, packaged или embedded flow, когда branch runtime нельзя запустить локально, указать `not applicable` или `not tested`, дать точную Owner retest instruction и не заявлять косвенный PASS. Не требовать невозможный localhost URL только для перехода в `Needs Test`.
+
+## Test Environment Cleanup
+
+После каждого VM или physical test stage Codex обязан выполнить Test Environment Cleanup:
+
+1. Остановить task-owned runtime/web-server processes, localhost listeners, headed browser/test sessions, Scheduled Tasks, launcher/supervisor и другие operational artifacts, которые не нужны следующему этапу.
+2. Удалить только task-owned temporary files, logs и cache, если они больше не нужны как evidence; не затрагивать постоянный mutable Sergey-full fixture, его working DB/media и не делать per-task reset без отдельной причины.
+3. Проверить, что не осталось stale task-owned processes, ports или listeners.
+4. Зафиксировать в evidence, что остановлено и что намеренно оставлено.
+
+Исключение только для ближайшего ручного Owner handoff: можно оставить ровно один exact candidate runtime с явными SHA, PID, port и URL. Все старые preview/runtime/ports должны быть остановлены. После Owner PASS/FAIL или завершения необходимости этот runtime удаляется следующим cleanup.
 
 ## Git, статусы и Owner QA
 

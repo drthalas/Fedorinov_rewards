@@ -5,6 +5,7 @@
 1. Прочитать `AGENTS.md`, этот файл и актуальный Linear Description.
 2. Проверить branch, `git status --short` и последние commits.
 3. Сверить branch/base SHA, active scope, `Accepted` / `Frozen`, Out of Scope, test tier, time budget и stop condition.
+4. Для product/integration-задачи до создания ветки определить `accepted integration HEAD` и проверить ancestry обязательных Owner-accepted commits. Не начинать работу от `main` по умолчанию, если accepted state ещё не вошёл в него.
 
 Не перечитывать всю историю проекта для T0/T1 без необходимости. Остальные context-файлы читать по релевантности:
 
@@ -28,7 +29,7 @@
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
 
-Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
+Полные правила accepted integration base, ролей, VM technical gate, physical Owner acceptance, Test Environment Cleanup, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 
 ## Шаблон запуска
 

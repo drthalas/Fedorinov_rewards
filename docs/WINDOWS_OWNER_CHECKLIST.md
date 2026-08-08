@@ -1,5 +1,9 @@
 # Windows Owner Preview Checklist
 
+## Роль physical Windows
+
+Этот чек-лист предназначен для ручной Owner acceptance на physical Windows. Windows VM — технический контур Codex и не заменяет эту приёмку для product UI/UX, performance/scale и release user-flow задач. Перед handoff Codex передаёт один exact candidate: SHA, PID, port и local URL; Owner не должен искать preview по старым портам или запускать несколько runtime.
+
 ## Компьютер
 
 - [ ] Windows version: ______________________________
@@ -39,3 +43,8 @@
 - [ ] Фотографии отображаются или показывается понятный placeholder.
 - [ ] После обновления приложение перезапускается само и показывает новую версию.
 - [ ] Перед release проверены PID, install root и версия через локальный runtime identity.
+
+## После проверки
+
+- [ ] Owner сообщил явный PASS или FAIL для переданного candidate.
+- [ ] Codex остановил candidate при следующем Test Environment Cleanup, если он больше не нужен.
