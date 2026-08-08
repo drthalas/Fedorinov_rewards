@@ -122,6 +122,12 @@ After a successful publication, prepare the Telegram release notification on the
 
 Before sending, review `release_notes/X.Y.Z.md` and make sure it covers all user-visible release changes, not only the last technical task. The notification should mention the real owner-facing improvements in plain language.
 
+The canonical update instructions come from
+`scripts/generate_release_telegram_message.py`. The normal post-update path is
+automatic restart. Mention `start_windows.bat` only as a fallback when the
+application does not reopen automatically; never require a manual BAT restart
+after every successful update.
+
 First preview the message:
 
 ```sh

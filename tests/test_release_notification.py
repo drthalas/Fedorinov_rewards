@@ -64,8 +64,12 @@ class ReleaseNotificationTests(unittest.TestCase):
         self.assertIn("Награды и награждённые", message)
         self.assertIn("v0.1.1", message)
         self.assertIn("Откройте программу", message)
-        self.assertIn("Нажмите “Обновить”", message)
-        self.assertIn("Данные и фотографии не трогаются", message)
+        self.assertIn("Нажмите «Обновить»", message)
+        self.assertIn("Если включён автоматический перезапуск, программа откроется самостоятельно", message)
+        self.assertIn("Если программа не запустилась автоматически, откройте её вручную через start_windows.bat", message)
+        self.assertIn("Данные и фотографии при обновлении сохраняются", message)
+        self.assertNotIn("Закройте окно запуска", message)
+        self.assertNotIn("запустите start_windows.bat снова", message)
         for term in ["endpoint", "router", "repository", "commit", "hash", "GitHub Release", "ZIP"]:
             self.assertNotIn(term, message)
 
@@ -91,7 +95,7 @@ class ReleaseNotificationTests(unittest.TestCase):
         for expected in ["фильтры", "итоги", "поиск", "Пустой запрос", "справочники", "возврат", "статус процесса обновления"]:
             self.assertIn(expected, message)
         self.assertIn("Откройте программу", message)
-        self.assertIn("Данные и фотографии не трогаются", message)
+        self.assertIn("Данные и фотографии при обновлении сохраняются", message)
         for term in ["endpoint", "router", "repository", "commit", "hash", "GitHub Release", "ZIP"]:
             self.assertNotIn(term, message)
 
@@ -110,8 +114,8 @@ class ReleaseNotificationTests(unittest.TestCase):
         for expected in ["шахмат", "CSV", "Открыть каталог", "Архивировать", "фотограф", "PDF-буклет", "рабочий режим"]:
             self.assertIn(expected, message)
         self.assertIn("Откройте программу", message)
-        self.assertIn("Нажмите “Обновить”", message)
-        self.assertIn("Данные и фотографии не трогаются", message)
+        self.assertIn("Нажмите «Обновить»", message)
+        self.assertIn("Данные и фотографии при обновлении сохраняются", message)
         for term in ["endpoint", "router", "repository", "commit", "hash", "GitHub Release", "ZIP"]:
             self.assertNotIn(term, message)
 
