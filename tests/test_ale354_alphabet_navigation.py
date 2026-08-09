@@ -10,7 +10,10 @@ from unittest.mock import patch
 from backend.app.config import Settings
 from backend.app.repositories.legacy_rewards import (
     LEGACY_PERSON_ALPHABET,
+    LEGACY_PERSON_DIGITS,
+    LEGACY_PERSON_GROUPS,
     legacy_rewards_alphabet_counts,
+    legacy_rewards_group_counts,
     list_legacy_reward_person_group,
     normalized_legacy_rewards_filters,
     normalized_legacy_rewards_sort,
@@ -45,6 +48,9 @@ class Ale354AlphabetRepositoryTests(unittest.TestCase):
                     (4, "елена Тест"),
                     (5, "Яков Тест"),
                     (6, "Latin Test"),
+                    (7, "  1 Первый"),
+                    (8, "9 Девятый"),
+                    (9, "0 Нулевой"),
                 ],
             )
             connection.executemany(
@@ -63,6 +69,10 @@ class Ale354AlphabetRepositoryTests(unittest.TestCase):
         self.assertNotIn("Ё", LEGACY_PERSON_ALPHABET)
         self.assertEqual(person_name_initial("  ЁЛКИН"), "Е")
         self.assertEqual(person_name_initial("елена"), "Е")
+        self.assertEqual(LEGACY_PERSON_DIGITS, tuple("123456789"))
+        self.assertNotIn("0", LEGACY_PERSON_GROUPS)
+        self.assertEqual(person_name_initial("  1 Первый"), "1")
+        self.assertEqual(person_name_initial("0 Нулевой"), "")
 
     def test_group_query_returns_only_requested_letter_in_canonical_order(self) -> None:
         rows = list_legacy_reward_person_group(
@@ -98,6 +108,18 @@ class Ale354AlphabetRepositoryTests(unittest.TestCase):
         self.assertEqual(counts["Я"], 1)
         self.assertEqual(sum(counts.values()), 5)
 
+    def test_digit_group_query_and_counts_use_the_same_canonical_normalization(self) -> None:
+        rows = list_legacy_reward_person_group(
+            self.db_path,
+            normalized_legacy_rewards_filters(),
+            letter=" 1 ",
+        )
+        self.assertEqual([int(row["id"]) for row in rows], [7])
+        counts = legacy_rewards_group_counts(self.db_path, normalized_legacy_rewards_filters())
+        self.assertEqual(counts["1"], 1)
+        self.assertEqual(counts["9"], 1)
+        self.assertNotIn("0", counts)
+
 
 class Ale354AlphabetUiContractTests(unittest.TestCase):
     def test_variant_a_is_inside_existing_list_and_has_hover_active_disabled_states(self) -> None:
@@ -105,6 +127,9 @@ class Ale354AlphabetUiContractTests(unittest.TestCase):
         styles = (ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8")
         self.assertIn('data-person-list data-active-letter=', template)
         self.assertIn('class="legacy-alphabet-index"', template)
+        self.assertIn('class="legacy-digit-index"', template)
+        self.assertIn("{% for item in rewards_digits %}", template)
+        self.assertIn('data-person-digit="{{ item.digit }}"', template)
         self.assertLess(template.index('class="legacy-alphabet-index"'), template.index("{% for person in persons %}"))
         self.assertIn("width: 22px", styles)
         self.assertIn("grid-template-rows: repeat(32, minmax(11px, 1fr))", styles)
@@ -362,7 +387,7 @@ class Ale354AlphabetRouteTests(unittest.TestCase):
                 patch.object(legacy_router, "get_settings", return_value=settings),
                 patch.object(legacy_router, "legacy_rewards_filter_options", return_value={"ranks": [], "countries": [], "categories": [], "subcategories": [], "names": []}),
                 patch.object(legacy_router, "legacy_rewards_filter_cascade", return_value={}),
-                patch.object(legacy_router, "legacy_rewards_alphabet_counts", return_value=counts),
+                patch.object(legacy_router, "legacy_rewards_group_counts", return_value=counts),
                 patch.object(legacy_router, "list_legacy_reward_person_group", return_value=rows) as group_list,
                 patch.object(legacy_router, "list_legacy_reward_persons", create=True) as full_list,
                 patch.object(legacy_router, "legacy_rewards_totals", return_value={"persons_total": 1}),
@@ -396,7 +421,7 @@ class Ale354AlphabetRouteTests(unittest.TestCase):
                 patch.object(legacy_router, "get_person", return_value=selected),
                 patch.object(legacy_router, "legacy_rewards_filter_options", return_value={"ranks": [], "countries": [], "categories": [], "subcategories": [], "names": []}),
                 patch.object(legacy_router, "legacy_rewards_filter_cascade", return_value={}),
-                patch.object(legacy_router, "legacy_rewards_alphabet_counts", return_value=counts),
+                patch.object(legacy_router, "legacy_rewards_group_counts", return_value=counts),
                 patch.object(legacy_router, "list_legacy_reward_person_group", return_value=[selected]) as group_list,
                 patch.object(legacy_router, "legacy_rewards_totals", return_value={"persons_total": 1}),
                 patch.object(legacy_router, "count_marks", return_value=0),

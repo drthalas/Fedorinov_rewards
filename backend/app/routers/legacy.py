@@ -11,7 +11,9 @@ from ..config import PROJECT_ROOT, get_settings
 from ..repositories.common import fetch_one, table_counts
 from ..repositories.legacy_rewards import (
     LEGACY_PERSON_ALPHABET,
-    legacy_rewards_alphabet_counts,
+    LEGACY_PERSON_DIGITS,
+    LEGACY_PERSON_GROUPS,
+    legacy_rewards_group_counts,
     legacy_rewards_filter_cascade,
     legacy_rewards_filter_options,
     legacy_rewards_totals,
@@ -556,6 +558,7 @@ def legacy_index(
         "person_rewards": [],
         "persons_total": 0,
         "rewards_alphabet": [],
+        "rewards_digits": [],
         "rewards_active_letter": active_letter,
         "person_query": active_person_query,
         "rewards_filters": rewards_filters,
@@ -687,9 +690,9 @@ def legacy_index(
         if selected_letter:
             active_letter = selected_letter
 
-    alphabet_counts = legacy_rewards_alphabet_counts(settings.rewards_db_path, rewards_filters)
-    if not active_letter or (not active_person_query and alphabet_counts.get(active_letter, 0) == 0):
-        active_letter = next((item for item in LEGACY_PERSON_ALPHABET if alphabet_counts.get(item, 0)), "")
+    group_counts = legacy_rewards_group_counts(settings.rewards_db_path, rewards_filters)
+    if not active_letter or (not active_person_query and group_counts.get(active_letter, 0) == 0):
+        active_letter = next((item for item in LEGACY_PERSON_GROUPS if group_counts.get(item, 0)), "")
 
     persons = list_legacy_reward_person_group(
         settings.rewards_db_path,
@@ -732,9 +735,9 @@ def legacy_index(
     context["rewards_alphabet"] = [
         {
             "letter": item,
-            "count": alphabet_counts.get(item, 0),
+            "count": group_counts.get(item, 0),
             "active": item == active_letter,
-            "disabled": alphabet_counts.get(item, 0) == 0,
+            "disabled": group_counts.get(item, 0) == 0,
             "url": _legacy_rewards_url(
                 rewards_filters,
                 sort_by=rewards_sort.field,
@@ -743,6 +746,21 @@ def legacy_index(
             ),
         }
         for item in LEGACY_PERSON_ALPHABET
+    ]
+    context["rewards_digits"] = [
+        {
+            "digit": item,
+            "count": group_counts.get(item, 0),
+            "active": item == active_letter,
+            "disabled": group_counts.get(item, 0) == 0,
+            "url": _legacy_rewards_url(
+                rewards_filters,
+                sort_by=rewards_sort.field,
+                sort_dir=rewards_sort.direction,
+                letter=item,
+            ),
+        }
+        for item in LEGACY_PERSON_DIGITS
     ]
 
     if list_fragment_request:

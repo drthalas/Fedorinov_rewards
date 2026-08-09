@@ -26,6 +26,8 @@ class LegacyRewardsSort:
 
 LEGACY_REWARDS_SORT_FIELDS = {"fio", "birthday", "rank_name", "rewards_count"}
 LEGACY_PERSON_ALPHABET = tuple("АБВГДЕЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
+LEGACY_PERSON_DIGITS = tuple("123456789")
+LEGACY_PERSON_GROUPS = LEGACY_PERSON_ALPHABET + LEGACY_PERSON_DIGITS
 
 
 def normalized_legacy_rewards_sort(
@@ -49,7 +51,7 @@ def person_name_initial(value: object) -> str:
     if not key:
         return ""
     initial = key[0].upper()
-    return initial if initial in LEGACY_PERSON_ALPHABET else ""
+    return initial if initial in LEGACY_PERSON_GROUPS else ""
 
 
 def normalized_legacy_rewards_letter(value: object) -> str:
@@ -237,7 +239,7 @@ def list_legacy_reward_person_group(
     )
 
 
-def legacy_rewards_alphabet_counts(
+def legacy_rewards_group_counts(
     db_path: Path,
     filters: LegacyRewardsFilters,
 ) -> dict[str, int]:
@@ -254,12 +256,20 @@ def legacy_rewards_alphabet_counts(
             """,
             tuple(params),
         ).fetchall()
-    counts = {letter: 0 for letter in LEGACY_PERSON_ALPHABET}
+    counts = {group: 0 for group in LEGACY_PERSON_GROUPS}
     for row in rows:
         letter = str(row["letter"] or "")
         if letter in counts:
             counts[letter] = int(row["person_count"] or 0)
     return counts
+
+
+def legacy_rewards_alphabet_counts(
+    db_path: Path,
+    filters: LegacyRewardsFilters,
+) -> dict[str, int]:
+    counts = legacy_rewards_group_counts(db_path, filters)
+    return {letter: counts[letter] for letter in LEGACY_PERSON_ALPHABET}
 
 
 def legacy_rewards_totals(db_path: Path, filters: LegacyRewardsFilters) -> dict[str, object]:

@@ -101,8 +101,8 @@ class BrowserSaveAsTests(unittest.TestCase):
 
     def test_archive_button_uses_browser_save_as_zip_route(self) -> None:
         legacy = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
-        self.assertIn('action="/persons/{{ selected_person.id }}/archive-folder.zip" data-save-as-form', legacy)
-        self.assertIn('data-save-as-filename="{{ selected_person_archive_filename }}"', legacy)
+        self.assertIn('action="/persons/{{ person.id }}/archive-folder.zip" data-save-as-form', legacy)
+        self.assertIn('data-save-as-filename="{{ archive_filename }}"', legacy)
         self.assertIn('data-save-as-mime="application/zip"', legacy)
         self.assertIn("Архивировать", legacy)
 

@@ -4836,7 +4836,10 @@ body.legacy-rewards-theme::after {
 
 .legacy-rewards-theme .legacy-action-add::before,
 .legacy-rewards-theme .legacy-action-edit::before,
-.legacy-rewards-theme .legacy-action-delete::before {
+.legacy-rewards-theme .legacy-action-delete::before,
+.legacy-rewards-theme .legacy-action-open-folder::before,
+.legacy-rewards-theme .legacy-action-archive::before,
+.legacy-rewards-theme .legacy-action-booklet::before {
   content: "";
   width: 15px;
   height: 15px;
@@ -4850,10 +4853,13 @@ body.legacy-rewards-theme::after {
 .legacy-rewards-theme .legacy-action-add::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M12 5v14M5 12h14'/%3E%3C/svg%3E"); }
 .legacy-rewards-theme .legacy-action-edit::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m14 5 5 5M4 20l3.5-.8L19 7.7 16.3 5 4.8 16.5z'/%3E%3C/svg%3E"); }
 .legacy-rewards-theme .legacy-action-delete::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5'/%3E%3C/svg%3E"); }
+.legacy-rewards-theme .legacy-action-open-folder::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M3 6h7l2 2h9v11H3z'/%3E%3C/svg%3E"); }
+.legacy-rewards-theme .legacy-action-archive::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='4' y='7' width='16' height='13' rx='1' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M8 7V4h8v3m-7 5h6'/%3E%3C/svg%3E"); }
+.legacy-rewards-theme .legacy-action-booklet::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M4 4h7a3 3 0 0 1 3 3v13H7a3 3 0 0 0-3 3zm16 0h-3a3 3 0 0 0-3 3v13h3a3 3 0 0 1 3 3z'/%3E%3C/svg%3E"); }
 
 .legacy-rewards-theme .legacy-toolbar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   padding: 8px 10px;
   border-bottom: 1px solid #3d382f;
@@ -4933,21 +4939,32 @@ body.legacy-rewards-theme::after {
   outline-offset: -1px;
 }
 
-.legacy-rewards-theme .legacy-alphabet-index {
+.legacy-rewards-theme .legacy-person-indexes {
   position: sticky;
   top: 0;
   left: 0;
   z-index: 4;
   float: left;
   display: grid;
-  grid-template-rows: repeat(32, minmax(11px, 1fr));
+  grid-template-columns: repeat(2, 22px);
+  width: 44px;
+  height: 100%;
+  min-height: 100%;
+  margin-right: -44px;
+  background: #11120f;
+  box-shadow: 2px 0 7px rgb(0 0 0 / 24%);
+  overflow: hidden;
+  user-select: none;
+}
+
+.legacy-rewards-theme .legacy-alphabet-index,
+.legacy-rewards-theme .legacy-digit-index {
+  display: grid;
   width: 22px;
   height: 100%;
   min-height: 100%;
-  margin-right: -22px;
   border-right: 1px solid #332d22;
   background: #11120f;
-  box-shadow: 2px 0 7px rgb(0 0 0 / 24%);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4955,7 +4972,16 @@ body.legacy-rewards-theme::after {
   user-select: none;
 }
 
-.legacy-rewards-theme .legacy-alphabet-index::-webkit-scrollbar {
+.legacy-rewards-theme .legacy-alphabet-index {
+  grid-template-rows: repeat(32, minmax(11px, 1fr));
+}
+
+.legacy-rewards-theme .legacy-digit-index {
+  grid-template-rows: repeat(9, minmax(11px, 1fr));
+}
+
+.legacy-rewards-theme .legacy-alphabet-index::-webkit-scrollbar,
+.legacy-rewards-theme .legacy-digit-index::-webkit-scrollbar {
   display: none;
 }
 
@@ -5005,7 +5031,7 @@ body.legacy-rewards-theme::after {
   height: 30px;
   min-height: 30px;
   align-items: center;
-  padding: 6px 11px 6px 33px;
+  padding: 6px 11px 6px 55px;
   color: #c7c0b4;
   border-bottom: 1px solid #302f2a;
   background: #181917;
