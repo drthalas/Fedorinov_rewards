@@ -223,10 +223,11 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_archive_cancel_status_is_transient_and_outside_layout(self) -> None:
         template = self.read("backend/app/templates/legacy.html")
+        actions = self.read("backend/app/templates/_person_file_actions.html")
         script = self.read("backend/app/static/save_as.js")
         styles = self.read("backend/app/static/styles.css")
-        self.assertIn('data-save-as-cancel-timeout="4000"', template)
-        self.assertIn('data-save-as-success-message="Архив сохранён."', template)
+        self.assertIn('data-save-as-cancel-timeout="4000"', actions)
+        self.assertIn('data-save-as-success-message="Архив сохранён."', actions)
         self.assertIn('id="person-archive-status"', template)
         self.assertNotIn("Откроется предпросмотр буклета", template)
         self.assertIn('setMessage(form, "Сохранение отменено.", "cancel")', script)
@@ -267,7 +268,7 @@ class Ale256UiContractTests(unittest.TestCase):
 
     def test_corrective_runtime_javascript_uses_a_new_static_cache_key(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260809-ale364-actions-digits-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260809-ale364-owner-corrective-1"', templates)
         self.assertNotIn('STATIC_ASSET_VERSION = "20260712-cavaliers-design-4"', templates)
 
 

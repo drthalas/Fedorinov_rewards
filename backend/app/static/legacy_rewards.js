@@ -133,7 +133,9 @@
     const listScrollTop = Number.isFinite(settings.listScrollTop)
       ? settings.listScrollTop
       : currentList ? currentList.scrollTop : 0;
-    showLoadingState();
+    if (settings.showLoading !== false) {
+      showLoadingState();
+    }
 
     let timedOut = false;
     const timeoutId = window.setTimeout(() => {
@@ -546,6 +548,7 @@
           replaceList: true,
           listScrollTop: 0,
           searchValue: "",
+          showLoading: false,
         });
       });
     });

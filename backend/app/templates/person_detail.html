@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_person_file_actions.html" import open_person_catalog, archive_person_catalog, person_booklet_action %}
 {% block title %}{{ person.fio }}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-person-theme{% endblock %}
 {% block content %}
@@ -23,7 +24,7 @@
   <a class="button secondary-button person-history-back" data-escape-back href="{{ person_back_url }}">← Назад</a>
 </p>
 {% if settings.write_mode %}
-<div class="actions">
+<div class="actions person-detail-actions">
   <a class="button" href="/persons/{{ person.id }}/edit{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Изменить</a>
   <form method="post" action="/persons/{{ person.id }}/delete" data-confirm-submit="person-delete" data-confirm-preview-url="/delete-preflight/person/{{ person.id }}" data-delete-entity-type="person" data-delete-entity-id="{{ person.id }}" data-confirm-title="Удаление кавалера" data-confirm-message="Удалить кавалера?" data-confirm-blocked="false" data-write-feedback data-write-pending-label="Удаляем…">
     <input type="hidden" name="confirm" value="">
@@ -32,7 +33,11 @@
     {% if return_to %}<input type="hidden" name="return_to" value="{{ return_to }}">{% endif %}
     <button class="button-danger" type="submit">Удалить</button>
   </form>
+  {{ open_person_catalog(person, person_card_return, "button secondary-button") }}
+  {{ archive_person_catalog(person, person_archive_filename, "button secondary-button") }}
+  {{ person_booklet_action(person, person_card_return, "button") }}
 </div>
+<div id="person-archive-status" class="save-as-status archive-save-status" role="status" aria-live="polite" hidden></div>
 {% endif %}
 
 <section class="grid person-detail-grid compact-person-detail-grid cavalier-profile-grid">

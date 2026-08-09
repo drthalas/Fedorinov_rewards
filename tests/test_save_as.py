@@ -46,9 +46,9 @@ class BrowserSaveAsTests(unittest.TestCase):
 
     def test_save_as_success_is_compact_and_does_not_offer_a_second_download(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
-        legacy = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
+        actions = (ROOT / "backend" / "app" / "templates" / "_person_file_actions.html").read_text(encoding="utf-8")
         self.assertIn("function showSavedMessage(form, blob, filename, mode)", source)
-        self.assertIn('data-save-as-success-message="Архив сохранён."', legacy)
+        self.assertIn('data-save-as-success-message="Архив сохранён."', actions)
         custom_branch = source.split('const customMessage = form.getAttribute("data-save-as-success-message")', 1)[1]
         custom_branch = custom_branch.split('if (mode === "fallback")', 1)[0]
         self.assertIn('setMessage(form, customMessage, "success")', custom_branch)
@@ -100,11 +100,11 @@ class BrowserSaveAsTests(unittest.TestCase):
         self.assertIn("save_as.js", booklet)
 
     def test_archive_button_uses_browser_save_as_zip_route(self) -> None:
-        legacy = (ROOT / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
-        self.assertIn('action="/persons/{{ person.id }}/archive-folder.zip" data-save-as-form', legacy)
-        self.assertIn('data-save-as-filename="{{ archive_filename }}"', legacy)
-        self.assertIn('data-save-as-mime="application/zip"', legacy)
-        self.assertIn("Архивировать", legacy)
+        actions = (ROOT / "backend" / "app" / "templates" / "_person_file_actions.html").read_text(encoding="utf-8")
+        self.assertIn('action="/persons/{{ person.id }}/archive-folder.zip" data-save-as-form', actions)
+        self.assertIn('data-save-as-filename="{{ archive_filename }}"', actions)
+        self.assertIn('data-save-as-mime="application/zip"', actions)
+        self.assertIn("Архивировать", actions)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,16 @@
+{% macro open_person_catalog(person, return_url, button_class) -%}
+  <form method="post" action="/persons/{{ person.id }}/open-folder" data-open-folder data-write-pending-label="Открываем каталог…">
+    <input type="hidden" name="return_to" value="{{ return_url }}">
+    <button class="{{ button_class }}" type="submit">Открыть каталог</button>
+  </form>
+{%- endmacro %}
+
+{% macro archive_person_catalog(person, archive_filename, button_class) -%}
+  <form method="post" action="/persons/{{ person.id }}/archive-folder.zip" data-save-as-form data-save-as-filename="{{ archive_filename }}" data-save-as-mime="application/zip" data-save-as-status="#person-archive-status" data-save-as-success-message="Архив сохранён." data-save-as-cancel-timeout="4000" data-save-as-message-timeout="8000">
+    <button class="{{ button_class }}" type="submit">Архивировать</button>
+  </form>
+{%- endmacro %}
+
+{% macro person_booklet_action(person, return_url, button_class) -%}
+  <a class="{{ button_class }}" href="/persons/{{ person.id }}/booklet?return_to={{ return_url|urlencode }}">Сформировать буклет</a>
+{%- endmacro %}

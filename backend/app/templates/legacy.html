@@ -1,18 +1,5 @@
 {% extends "legacy_base.html" %}
-{% macro open_person_catalog(person, return_url, button_class) -%}
-  <form method="post" action="/persons/{{ person.id }}/open-folder" data-open-folder data-write-pending-label="Открываем каталог…">
-    <input type="hidden" name="return_to" value="{{ return_url }}">
-    <button class="{{ button_class }} legacy-action-open-folder" type="submit">Открыть каталог</button>
-  </form>
-{%- endmacro %}
-{% macro archive_person_catalog(person, archive_filename, button_class) -%}
-  <form method="post" action="/persons/{{ person.id }}/archive-folder.zip" data-save-as-form data-save-as-filename="{{ archive_filename }}" data-save-as-mime="application/zip" data-save-as-status="#person-archive-status" data-save-as-success-message="Архив сохранён." data-save-as-cancel-timeout="4000" data-save-as-message-timeout="8000">
-    <button class="{{ button_class }} legacy-action-archive" type="submit">Архивировать</button>
-  </form>
-{%- endmacro %}
-{% macro person_booklet_action(person, return_url, button_class) -%}
-  <a class="{{ button_class }} legacy-action-booklet" href="/persons/{{ person.id }}/booklet?return_to={{ return_url|urlencode }}">Сформировать буклет</a>
-{%- endmacro %}
+{% from "_person_file_actions.html" import open_person_catalog, archive_person_catalog, person_booklet_action %}
 {% block title %}Legacy UI · Fedorinov Rewards{% endblock %}
 {% block content %}
   {% if message == "pdf_not_implemented" %}
@@ -102,15 +89,6 @@
             <span class="tool-button disabled legacy-action-edit">Изменить</span>
             <span class="tool-button disabled legacy-action-delete">Удалить</span>
           {% endif %}
-          {% if selected_person %}
-            {{ open_person_catalog(selected_person, selected_person_return, "tool-button") }}
-            {{ archive_person_catalog(selected_person, selected_person_archive_filename, "tool-button") }}
-            {{ person_booklet_action(selected_person, selected_person_return, "tool-button") }}
-          {% else %}
-            <span class="tool-button disabled legacy-action-open-folder">Открыть каталог</span>
-            <span class="tool-button disabled legacy-action-archive">Архивировать</span>
-            <span class="tool-button disabled legacy-action-booklet">Сформировать буклет</span>
-          {% endif %}
         </div>
         <div class="legacy-person-search">
           <label for="legacy-person-search-input">Быстрый поиск по ФИО</label>
@@ -120,14 +98,14 @@
         <div class="legacy-person-list-title"><strong>Список кавалеров</strong><span>{{ persons_total or persons|length }} записей</span></div>
         <div class="legacy-list" tabindex="0" role="listbox" aria-label="Список кавалеров" data-person-list data-active-letter="{{ rewards_active_letter }}" data-person-query="{{ person_query }}" data-canonical-url="{{ selected_person_return if selected_person else rewards_tab_return }}">
           <div class="legacy-person-indexes">
-            <nav class="legacy-alphabet-index" aria-label="Алфавитная навигация по кавалерам" data-person-alphabet>
-              {% for item in rewards_alphabet %}
-                <button class="legacy-alphabet-letter{% if item.active %} active{% endif %}" type="button" data-person-letter="{{ item.letter }}" data-letter-url="{{ item.url }}" title="{{ item.letter }}{% if item.count %}: {{ item.count }}{% endif %}"{% if item.active %} aria-current="true"{% endif %}{% if item.disabled %} disabled aria-disabled="true"{% endif %}>{{ item.letter }}</button>
-              {% endfor %}
-            </nav>
             <nav class="legacy-digit-index" aria-label="Цифровая навигация по кавалерам" data-person-digits>
               {% for item in rewards_digits %}
                 <button class="legacy-alphabet-letter legacy-digit-group{% if item.active %} active{% endif %}" type="button" data-person-digit="{{ item.digit }}" data-letter-url="{{ item.url }}" title="{{ item.digit }}{% if item.count %}: {{ item.count }}{% endif %}"{% if item.active %} aria-current="true"{% endif %}{% if item.disabled %} disabled aria-disabled="true"{% endif %}>{{ item.digit }}</button>
+              {% endfor %}
+            </nav>
+            <nav class="legacy-alphabet-index" aria-label="Алфавитная навигация по кавалерам" data-person-alphabet>
+              {% for item in rewards_alphabet %}
+                <button class="legacy-alphabet-letter{% if item.active %} active{% endif %}" type="button" data-person-letter="{{ item.letter }}" data-letter-url="{{ item.url }}" title="{{ item.letter }}{% if item.count %}: {{ item.count }}{% endif %}"{% if item.active %} aria-current="true"{% endif %}{% if item.disabled %} disabled aria-disabled="true"{% endif %}>{{ item.letter }}</button>
               {% endfor %}
             </nav>
           </div>

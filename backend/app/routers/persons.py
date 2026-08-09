@@ -241,6 +241,7 @@ def person_detail(request: Request, person_id: int, status: str = "", return_to:
             "return_to": safe_back,
             "person_folder_exists": person_folder_exists,
             "person_folder_name": person_folder.name,
+            "person_archive_filename": person_archive_filename(str(person.get("fio") or "person"), person_id),
         },
     )
 
