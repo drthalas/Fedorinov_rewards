@@ -26,6 +26,7 @@
 - Owner выбирает model/reasoning в UI; ChatGPT даёт Owner human-facing рекомендацию до запуска; Codex модель сам не переключает.
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
+- Перед выводом, что physical Windows host недоступен, обязательно пройти [canonical discovery](../WINDOWS_PREVIEW_RUNBOOK.md#canonical-discovery-physical-windows-test-host): SSH alias `fedorinov-win-gate`, fallback discovery helper с проверкой актуального resolved address, повторный SSH только через alias и предусмотренную network reachability проверку. Один failed ping/IP/SSH probe не доказывает offline; при неполной или противоречивой диагностике статус только `connectivity unresolved`. WOL автоматически не использовать.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.

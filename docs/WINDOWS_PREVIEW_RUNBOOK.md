@@ -111,3 +111,68 @@ WRITE_MODE=false
 - Не запускать старые `.exe` из legacy-приложения.
 - Не редактировать единственную рабочую базу без backup.
 - Не удалять `database`, `Source`, `SourceMark` или `default` из папки Rewards.
+
+## Canonical discovery physical Windows test host
+
+Этот раздел применяется только к выделенному physical Windows release gate. Он не заменяет обычный локальный запуск preview и не требует публиковать адрес, MAC, ключи или credentials.
+
+### Обязательная цепочка
+
+Перед любым выводом `physical Windows offline/unavailable` выполнить шаги по порядку:
+
+1. Проверить канонический SSH alias/hostname:
+
+```bash
+ssh -o ConnectTimeout=15 fedorinov-win-gate "cmd.exe /c echo READY"
+```
+
+2. Если alias не подключился, запустить существующий fallback discovery helper. Helper проверяет найденный host по закреплённому SSH host key и обновляет machine-local cache актуального адреса:
+
+```bash
+resolved_host="$($HOME/.local/bin/fedorinov-win-gate-proxy --discover 22)"
+```
+
+3. Не использовать старый hardcoded IP или значение из cache как доказательство. После discovery повторить подключение только через alias:
+
+```bash
+ssh -o ConnectTimeout=15 fedorinov-win-gate "cmd.exe /c echo READY"
+```
+
+4. Если SSH всё ещё не отвечает, отдельно зафиксировать network reachability актуального найденного адреса, не изменяя конфигурацию host или сети:
+
+```bash
+nc -G 3 -z "$resolved_host" 22
+```
+
+Проверка актуального адреса допустима только в текущей диагностической сессии. Адрес не коммитить, не помещать в Linear и не превращать в новый hardcoded endpoint.
+
+### Decision tree
+
+| Результат | Вывод | Действие |
+| --- | --- | --- |
+| Alias подключился | `reachable` | Продолжить gate через `fedorinov-win-gate`. |
+| Первый alias probe упал, helper нашёл pinned host, повторный alias подключился | `reachable` | Первый probe считать ложным/устаревшим сигналом. |
+| Helper нашёл pinned host и TCP/22 доступен, но SSH session не установилась | `connectivity unresolved` | Зафиксировать конкретный SSH/auth/banner этап; не объявлять host offline. |
+| Helper не завершился, resolved address отсутствует или сигналы расходятся | `connectivity unresolved` | Вернуть выполненные шаги и недостающую проверку; не угадывать состояние host. |
+| Полная canonical chain завершена и pinned host не найден/не отвечает предусмотренными способами | `probably unavailable` | Сообщить evidence и запросить следующий разрешённый инфраструктурный шаг. Не писать категоричное `offline`, если sleep/power state не доказан отдельно. |
+
+Один failed ping, старый IP, stale ARP/cache, один SSH timeout или неудачный LAN scan не доказывают offline state.
+
+### WOL и изменения сети
+
+- WOL не запускать автоматически после failed probe.
+- WOL допустим только когда недоступность или sleep доказаны полной canonical chain, действие предусмотрено текущим runbook и явно разрешено для этого gate.
+- Для диагностики не менять power plan, NIC, firewall, router, DHCP, SSH/RDP или другие network/security settings без отдельного scope и разрешения.
+
+### Evidence
+
+В отчёте указывать:
+
+- выполнен ли SSH alias probe;
+- запускался ли fallback helper и подтвердил ли pinned host;
+- повторялось ли подключение через alias после discovery;
+- какая network reachability проверка выполнена;
+- итоговый статус: `reachable`, `connectivity unresolved` или `probably unavailable`;
+- какие шаги не выполнены и почему.
+
+Не включать в отчёт актуальный IP, MAC, host key, credentials или содержимое machine-local discovery config.

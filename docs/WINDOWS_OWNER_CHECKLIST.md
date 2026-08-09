@@ -39,3 +39,16 @@
 - [ ] Фотографии отображаются или показывается понятный placeholder.
 - [ ] После обновления приложение перезапускается само и показывает новую версию.
 - [ ] Перед release проверены PID, install root и версия через локальный runtime identity.
+
+## Physical Owner gate: доступность перед handoff
+
+Полная команда и decision tree находятся в [Windows Portable Preview Runbook](WINDOWS_PREVIEW_RUNBOOK.md#canonical-discovery-physical-windows-test-host).
+
+- [ ] Codex проверил SSH alias `fedorinov-win-gate`.
+- [ ] При первом failed probe Codex запустил canonical fallback discovery helper.
+- [ ] После discovery Codex повторил SSH через alias, не через старый hardcoded IP.
+- [ ] При продолжающемся SSH failure отдельно проверена network reachability актуального resolved address.
+- [ ] Один failed ping/IP/SSH probe не использован как доказательство offline state.
+- [ ] При неполной или противоречивой диагностике указан статус `connectivity unresolved`.
+- [ ] WOL не запускался автоматически.
+- [ ] В evidence отсутствуют IP, MAC, host keys, passwords и другие credentials.
