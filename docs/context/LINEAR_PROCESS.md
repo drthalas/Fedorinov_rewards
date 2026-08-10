@@ -137,6 +137,8 @@ Merge и release — отдельные issue и выполняются толь
 
 VM gates feature-веток и test tiers остаются без изменений. Pre-merge physical Owner acceptance подтверждает product behavior, но не заменяет post-merge проверку exact release artifact.
 
+На physical Windows папка `Fedorinov Rewards - Public Current` является permanent baseline только для последней опубликованной production-версии. Candidate всегда использует отдельный task-owned path; baseline обновляется exact public artifact только после publication и сохраняет внешние Sergey-full data pointers без копирования media.
+
 После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
 ## Timing telemetry

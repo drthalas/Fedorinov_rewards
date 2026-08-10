@@ -49,3 +49,11 @@
 - [ ] Повторный `start_windows.bat` не создаёт второй backend.
 - [ ] Forced-failure/rollback проверены, если менялись updater/recovery или этого потребовал Owner.
 - [ ] Production publication не началась до PASS physical exact-candidate gate.
+
+## Physical public baseline
+
+- [ ] На Desktop есть `Fedorinov Rewards - Public Current`.
+- [ ] `PUBLIC_BASELINE.txt` совпадает с текущими public version/tag/package SHA.
+- [ ] Обычный `start_windows.bat` запускает эту Desktop-папку, HTTP и `О программе` показывают public version.
+- [ ] `.env` ссылается на внешний Sergey-full data root/state DB; DB/media не скопированы в папку приложения.
+- [ ] Candidate использует отдельный run path и не перезаписывает public baseline до publication.

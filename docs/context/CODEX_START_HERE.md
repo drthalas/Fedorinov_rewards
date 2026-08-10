@@ -30,6 +30,7 @@
 - Windows VM остаётся development/test-контуром feature-задач по их tier. Если product change уже прошёл требуемый VM gate и Owner acceptance на physical Windows, release stage не повторяет полный VM updater gate по умолчанию.
 - После controlled merge exact release package из merged `main` до publication проверяется один раз на physical Windows по пути current public -> candidate. Pre-merge Owner acceptance не заменяет этот exact-artifact gate.
 - Rollback/forced-failure на release stage обязателен только для изменений updater/recovery либо по явному требованию Owner.
+- На physical Windows постоянная Desktop-папка `Fedorinov Rewards - Public Current` содержит только текущую опубликованную production-версию. Candidate разворачивать отдельно и никогда не заменять эту baseline-папку до publication.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 

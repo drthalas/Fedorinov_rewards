@@ -91,6 +91,15 @@ Pre-merge physical product acceptance does not replace this post-merge package
 gate. The physical gate may be performed by the Owner or by Codex with explicit
 authorization for that release.
 
+The physical host keeps `Fedorinov Rewards - Public Current` on the Owner's
+Desktop as the canonical installation of the latest published production
+version. A candidate always uses a separate task-owned run directory and must
+not overwrite this folder before publication. After public ZIP and manifest
+parity are verified, refresh the Desktop baseline from that exact public
+artifact, update its version/SHA marker, preserve its external data pointers,
+and verify the ordinary `start_windows.bat` again. Do not copy Sergey-full media
+into the application folder.
+
 ## Dry-run publication
 
 ### GitHub Actions

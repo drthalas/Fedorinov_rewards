@@ -73,6 +73,37 @@ install, restart, version/runtime identity, сохранность DB/media, о�
 повторный BAT launch. Forced-failure/rollback требуется, когда release меняет
 updater/recovery или Owner явно включил эту проверку в scope.
 
+## Постоянная public baseline на physical Windows
+
+На рабочем столе physical Windows хранится одна постоянная папка:
+
+```text
+Fedorinov Rewards - Public Current
+```
+
+Она содержит только exact artifact последней опубликованной production-версии,
+обычный `start_windows.bat` и `PUBLIC_BASELINE.txt` с version, tag, release commit
+и package SHA256. Перед использованием сверить public `latest.json`, GitHub
+Release и package SHA, а не полагаться на имя локальной папки.
+
+`.env` подключает существующий внешний Sergey-full data root и отдельную рабочую
+state DB. Media и DB не копируются в application folder. `APP_INSTALL_DIR`
+оставляется пустым, чтобы штатный launcher определял текущую Desktop-папку, а не
+старый task-owned run path.
+
+Правила lifecycle:
+
+1. Candidate всегда разворачивается в отдельной task-owned директории и не
+   изменяет public baseline.
+2. Папка обновляется только после публикации и проверки exact public artifact.
+3. При обновлении нельзя смешивать program files разных версий; сначала
+   проверяются version/SHA, затем сохраняются внешние data pointers и обновляется
+   marker.
+4. После обновления проверить HTTP, `О программе`, runtime identity, один backend
+   и повторный `start_windows.bat`.
+5. Cleanup удаляет завершённые candidate/runtime paths, но не эту permanent
+   папку и не подключённый Sergey-full dataset.
+
 ## Если порт 8080 занят
 
 1. Откройте `.env`.
@@ -123,3 +154,4 @@ WRITE_MODE=false
 - Не запускать старые `.exe` из legacy-приложения.
 - Не редактировать единственную рабочую базу без backup.
 - Не удалять `database`, `Source`, `SourceMark` или `default` из папки Rewards.
+- Не использовать `Fedorinov Rewards - Public Current` для feature/candidate QA.
