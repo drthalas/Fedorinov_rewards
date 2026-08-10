@@ -8,6 +8,12 @@
 
 База, фотографии и локальные файлы владельца остаются на компьютере владельца и не входят в архив. Приложение работает локально и не загружает базу или фотографии в облако.
 
+Windows VM используется для development/test gate feature-веток по назначенному
+tier. После принятого VM gate и physical Owner product PASS полный VM updater
+цикл на release stage по умолчанию не повторяется. Exact package, собранный после
+merge из `main`, проверяется перед publication на physical Windows по штатному
+пути current public -> candidate.
+
 ## Что нужно заранее
 
 - Windows 10 или Windows 11.
@@ -60,6 +66,12 @@ http://127.0.0.1:8080
 При включённом автоматическом перезапуске программа после обновления откроется самостоятельно. Запускайте `start_windows.bat` вручную только как резервный вариант, если приложение не открылось автоматически.
 
 Если порт занят посторонней программой, Fedorinov Rewards покажет ошибку и не будет завершать этот процесс.
+
+Для release gate physical Windows должен начинать с текущей public production
+версии и обычного `start_windows.bat`. Проверяются exact artifact SHA, backup,
+install, restart, version/runtime identity, сохранность DB/media, один backend и
+повторный BAT launch. Forced-failure/rollback требуется, когда release меняет
+updater/recovery или Owner явно включил эту проверку в scope.
 
 ## Если порт 8080 занят
 

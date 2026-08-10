@@ -64,6 +64,33 @@ The ZIP must not contain:
 - EXE/DLL files
 - nested ZIP files
 
+## Exact release candidate gate
+
+Development Windows VM gates are defined by the task tier and remain part of the
+feature workflow. Once the change has passed its required VM checks and physical
+Owner product acceptance, do not repeat the full VM updater gate by default at
+the release stage.
+
+After the accepted integration is merged:
+
+1. Record the accepted integration HEAD and verify its ancestry in `main`.
+2. Build one exact versioned candidate from merged `main`.
+3. Run the required automated release suite, manifest/SHA checks, package safety,
+   and repository parity checks.
+4. Prepare physical Windows from the current public production version and its
+   ordinary `start_windows.bat`.
+5. Use the UI updater to install the exact merged candidate and verify its SHA,
+   backup, install, restart, version/runtime identity, DB/media preservation, one
+   app-owned backend, and repeated BAT launch.
+6. Run forced-failure and rollback at this stage only when updater/recovery code
+   changed or the Owner explicitly requires that gate.
+7. Publish only after the physical exact-candidate gate passes and publication is
+   authorized.
+
+Pre-merge physical product acceptance does not replace this post-merge package
+gate. The physical gate may be performed by the Owner or by Codex with explicit
+authorization for that release.
+
 ## Dry-run publication
 
 ### GitHub Actions
@@ -114,7 +141,7 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The separate bootstrap downloads and verifies the ZIP, creates an application backup, stops only identity-confirmed application backends, preserves `.env`, replaces application files, and starts exactly one verified backend from the updated install root.
 
-Before publishing a release that contains runtime-lifecycle changes, run the packaged test on native Windows. The gate must prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend.
+Before publishing a release that contains runtime-lifecycle changes, extend the physical packaged gate to prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend.
 
 ## Telegram release notification
 

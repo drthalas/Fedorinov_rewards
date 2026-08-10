@@ -27,6 +27,9 @@
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
+- Windows VM остаётся development/test-контуром feature-задач по их tier. Если product change уже прошёл требуемый VM gate и Owner acceptance на physical Windows, release stage не повторяет полный VM updater gate по умолчанию.
+- После controlled merge exact release package из merged `main` до publication проверяется один раз на physical Windows по пути current public -> candidate. Pre-merge Owner acceptance не заменяет этот exact-artifact gate.
+- Rollback/forced-failure на release stage обязателен только для изменений updater/recovery либо по явному требованию Owner.
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 

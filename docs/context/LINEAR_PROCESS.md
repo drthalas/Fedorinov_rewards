@@ -125,6 +125,18 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
+После Owner product PASS и controlled merge release flow разделяется так:
+
+1. Зафиксировать accepted integration HEAD и доказать ancestry при merge в `main`.
+2. Собрать exact versioned package из merged `main` и выполнить automated release suite, package safety, manifest/SHA и clean-tree/parity checks.
+3. Не повторять полный Windows VM updater gate только ради release stage, если затронутое product behavior уже прошло требуемый development VM gate и physical Owner acceptance.
+4. Проверить exact merged package на physical Windows по штатному UI updater path от текущей public production версии, соответствующей установке Сергея.
+5. Доказать download/SHA, backup, install, restart, новую version/runtime identity, сохранность DB/media, один app-owned backend и повторный обычный BAT launch.
+6. Forced-failure/rollback повторять на release stage только при изменениях updater/recovery либо по явному требованию Owner.
+7. Physical release gate выполняет Owner или Codex только с явным разрешением Owner для конкретного релиза. Publication разрешена только после PASS этого gate.
+
+VM gates feature-веток и test tiers остаются без изменений. Pre-merge physical Owner acceptance подтверждает product behavior, но не заменяет post-merge проверку exact release artifact.
+
 После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
 ## Timing telemetry

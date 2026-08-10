@@ -39,3 +39,13 @@
 - [ ] Фотографии отображаются или показывается понятный placeholder.
 - [ ] После обновления приложение перезапускается само и показывает новую версию.
 - [ ] Перед release проверены PID, install root и версия через локальный runtime identity.
+
+## Exact release candidate
+
+- [ ] Feature прошла требуемый Windows VM gate до merge; этот development gate не повторяется на release stage без отдельной причины.
+- [ ] Physical Windows запущена с текущей public production версии обычным `start_windows.bat`.
+- [ ] Через UI updater установлен exact package, собранный из merged `main`.
+- [ ] SHA, backup, новая версия, runtime identity, DB/media и один backend подтверждены.
+- [ ] Повторный `start_windows.bat` не создаёт второй backend.
+- [ ] Forced-failure/rollback проверены, если менялись updater/recovery или этого потребовал Owner.
+- [ ] Production publication не началась до PASS physical exact-candidate gate.
