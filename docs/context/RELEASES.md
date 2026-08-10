@@ -75,11 +75,33 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
-## v2.0.10
+## v2.0.11
 
 Статус: release candidate, не опубликован.
 
-Дата подготовки: 2026-08-07.
+Дата подготовки: 2026-08-09.
+
+Тип: navigation and Windows action patch.
+
+Состав:
+
+- Цифровая навигация `1–9` слева от алфавита с общей групповой загрузкой и сохранением глобального поиска и выбора.
+- Действия открытия каталога, архивирования и формирования буклета доступны в отдельной карточке кавалера рядом с изменением и удалением.
+- Открытие каталога корректно завершает loading-state и показывает папку в видимой Windows-сессии.
+- Главный экран остаётся эквивалентным предыдущему релизу за исключением цифрового индекса.
+
+Release gate:
+
+- Exact candidate package и manifest изолируются от production update channel.
+- Обязателен полный Tier 4 updater gate с exact public `v2.0.10` на Windows VM и постоянном mutable Sergey fixture.
+- Physical Windows остаётся в pre-update `v2.0.10`; Owner самостоятельно выполняет штатное UI-обновление.
+- GitHub Release и production `latest.json` разрешены только после Owner updater PASS. Telegram не отправляется.
+
+## v2.0.10
+
+Статус: выпущено.
+
+Дата релиза: 2026-08-07.
 
 Тип: integrated UI and workflow patch.
 
