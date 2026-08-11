@@ -10,6 +10,8 @@ class RewardReferenceContractTests(unittest.TestCase):
         template = (ROOT / "backend/app/templates/reward_form.html").read_text(encoding="utf-8")
 
         self.assertIn('select name="id_name"', template)
+        self.assertIn('value="{{ item.id_name }}"', template)
+        self.assertIn("item.id_name|string == reward.id_name|string", template)
         self.assertEqual(template.count("data-reward-reference-field="), 4)
         for field in ("id_gos", "id_catigory", "id_sub_catigory", "id_link"):
             self.assertNotIn(f'name="{field}"', template)
