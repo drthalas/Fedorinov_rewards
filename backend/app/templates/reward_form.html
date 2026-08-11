@@ -18,8 +18,8 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
-<form class="edit-form legacy-edit-form guide-cascade cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}" data-write-feedback data-write-pending-label="Сохраняем…">
-  <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
+<form class="edit-form legacy-edit-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-reward-reference-derived data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}" data-write-feedback data-write-pending-label="Сохраняем…">
+  <script type="application/json" data-reward-reference-options>{{ reward_references|tojson }}</script>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
     <legend>Справочник награды</legend>
@@ -27,36 +27,21 @@
     <div class="form-grid two-columns">
       <label>
         <span>Государство</span>
-        <select name="id_gos" data-guide-role="country" data-styled-select>
-          <option value="">—</option>
-          {% for item in guides.gos %}
-          <option value="{{ item.id }}" {% if item.id|string == reward.id_gos|string %}selected{% endif %}>{{ item.name }}</option>
-          {% endfor %}
-        </select>
+        <input value="{{ reward_reference.gos or '' }}" data-reward-reference-field="gos" readonly aria-readonly="true">
       </label>
       <label>
         <span>Категория</span>
-        <select name="id_catigory" data-guide-role="category" data-styled-select>
-          <option value="">—</option>
-          {% for item in guides.categories %}
-          <option value="{{ item.id }}" {% if item.id|string == reward.id_catigory|string %}selected{% endif %}>{{ item.name }}</option>
-          {% endfor %}
-        </select>
+        <input value="{{ reward_reference.category or '' }}" data-reward-reference-field="category" readonly aria-readonly="true">
       </label>
       <label>
         <span>Подкатегория</span>
-        <select name="id_sub_catigory" data-guide-role="subcategory" data-styled-select>
-          <option value="">—</option>
-          {% for item in guides.subcategories %}
-          <option value="{{ item.id }}" {% if item.id|string == reward.id_sub_catigory|string %}selected{% endif %}>{{ item.name }}</option>
-          {% endfor %}
-        </select>
+        <input value="{{ reward_reference.subcategory or '' }}" data-reward-reference-field="subcategory" readonly aria-readonly="true">
       </label>
       <label>
         <span>Наименование <span class="required-marker" aria-hidden="true">*</span></span>
         <select name="id_name" data-guide-role="name" data-styled-select required>
           <option value="">—</option>
-          {% for item in guides.names %}
+          {% for item in reward_references %}
           <option value="{{ item.id }}" {% if item.id|string == reward.id_name|string %}selected{% endif %}>{{ item.name }}</option>
           {% endfor %}
         </select>
@@ -64,7 +49,7 @@
     </div>
     <label>
       <span>Ссылка на Монетный двор / справочник</span>
-      <input name="id_link" value="{{ reward.id_link or '' }}" autocomplete="off">
+      <input value="{{ reward_reference.id_link or '' }}" data-reward-reference-field="id_link" readonly aria-readonly="true">
     </label>
   </fieldset>
 

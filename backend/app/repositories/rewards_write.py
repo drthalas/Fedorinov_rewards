@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from contextlib import closing
 from typing import Callable
 from uuid import uuid4
@@ -20,6 +20,7 @@ from ..services.deletion_lifecycle import (
 from ..services.dates import normalize_date_input
 from ..services.deletion_confirmation import MediaDeletePreview, confirmation_message, media_delete_preview
 from ..services.write_guard import ensure_dangerous_action_allowed, ensure_write_allowed
+from .reward_reference import reward_reference_from_connection
 
 
 REWARD_FIELDS = (
@@ -56,9 +57,6 @@ DUPLICATE_REWARD_MESSAGE = (
 
 
 NUMERIC_FIELD_ERRORS = {
-    "id_gos": "Выберите корректное государство.",
-    "id_catigory": "Выберите корректную категорию.",
-    "id_sub_catigory": "Выберите корректную подкатегорию.",
     "id_name": "Выберите корректное наименование награды.",
     "number": "Укажите корректный номер награды.",
     "price_purchase": "Укажите корректную цену покупки.",
@@ -130,11 +128,7 @@ def reward_data_from_mapping(values: dict[str, object]) -> RewardWriteData:
     except ValueError as exc:
         raise RewardValidationError(str(exc)) from exc
     return RewardWriteData(
-        id_gos=_optional_int(values, "id_gos"),
-        id_catigory=_optional_int(values, "id_catigory"),
-        id_sub_catigory=_optional_int(values, "id_sub_catigory"),
         id_name=_optional_int(values, "id_name"),
-        id_link=_empty_to_none(values.get("id_link")),
         number=_optional_int(values, "number"),
         instock=_checkbox(values.get("instock")),
         date_purchase=date_purchase,
@@ -162,12 +156,25 @@ def _validate_required_name(data: RewardWriteData) -> None:
             raise RewardValidationError(str(exc)) from exc
 
 
-def _preserve_existing_guide_ids(data: RewardWriteData, existing_row) -> RewardWriteData:
-    values = {field: getattr(data, field) for field in REWARD_FIELDS}
-    for field in ("id_gos", "id_catigory", "id_sub_catigory", "id_name"):
-        if values[field] is None and existing_row[field] is not None:
-            values[field] = existing_row[field]
-    return RewardWriteData(**values)
+def _preserve_existing_name(data: RewardWriteData, existing_row) -> RewardWriteData:
+    if data.id_name is not None or existing_row["id_name"] is None:
+        return data
+    return replace(data, id_name=int(existing_row["id_name"]))
+
+
+def _with_reference_fields(connection, data: RewardWriteData) -> RewardWriteData:
+    if data.id_name is None:
+        raise RewardValidationError("Выберите наименование награды.")
+    reference = reward_reference_from_connection(connection, data.id_name)
+    if reference is None:
+        raise RewardValidationError("Выбранное наименование отсутствует в справочнике наград.")
+    return replace(
+        data,
+        id_gos=int(reference["id_gos"]),
+        id_catigory=int(reference["id_catigory"]),
+        id_sub_catigory=int(reference["id_sub_catigory"]),
+        id_link=str(reference["id_link"]) if reference.get("id_link") not in {None, ""} else None,
+    )
 
 
 def _person_exists(connection, person_id: int) -> bool:
@@ -244,6 +251,7 @@ def create_reward(settings: Settings, person_id: int, data: RewardWriteData) -> 
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         if not _person_exists(connection, person_id):
             raise RewardValidationError("Награжденный не найден.")
+        data = _with_reference_fields(connection, data)
         _validate_unique_reward_number(connection, data)
         cursor = connection.execute(
             """
@@ -266,14 +274,15 @@ def update_reward(settings: Settings, reward_id: int, data: RewardWriteData) -> 
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         row = connection.execute(
-            "select person_id, id_gos, id_catigory, id_sub_catigory, id_name from rewards where id = ?",
+            "select person_id, id_name from rewards where id = ?",
             (reward_id,),
         ).fetchone()
         if row is None:
             raise RewardValidationError("Награда не найдена.")
         person_id = int(row["person_id"])
-        data = _preserve_existing_guide_ids(data, row)
+        data = _preserve_existing_name(data, row)
         _validate_required_name(data)
+        data = _with_reference_fields(connection, data)
         _validate_unique_reward_number(connection, data, reward_id)
         cursor = connection.execute(
             """

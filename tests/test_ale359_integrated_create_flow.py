@@ -77,6 +77,7 @@ class Ale359IntegratedCreateFlowTests(unittest.TestCase):
                 create table guide_lev_1 (id integer primary key, idl integer, name text);
                 create table guide_lev_2 (id integer primary key, idl integer, name text);
                 create table guide_lev_3 (id integer primary key, idl integer, name text);
+                create table guide_lev_4 (id integer primary key, idl integer, name text);
                 insert into guide_lev_0 values (1, -1, 'Страна');
                 insert into guide_lev_1 values (2, 1, 'Категория');
                 insert into guide_lev_2 values (3, 2, 'Подкатегория');

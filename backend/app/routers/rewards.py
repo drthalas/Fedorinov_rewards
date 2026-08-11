@@ -4,8 +4,8 @@ from fastapi.responses import RedirectResponse
 from urllib.parse import parse_qs, urlencode
 
 from ..config import get_settings
-from ..repositories.guides import guide_cascade_data, guide_cascade_options
 from ..repositories.persons import get_person
+from ..repositories.reward_reference import get_reward_reference, list_reward_references
 from ..repositories.rewards import get_reward, reward_photo_items
 from ..repositories.rewards_write import (
     RewardValidationError,
@@ -46,24 +46,15 @@ def _safe_int(value: object) -> int | None:
         return None
 
 
-def _selected_guides(row: dict[str, object] | None) -> dict[str, int | None]:
-    if not row:
-        return {"country_id": None, "category_id": None, "subcategory_id": None}
-    return {
-        "country_id": _safe_int(row.get("id_gos")),
-        "category_id": _safe_int(row.get("id_catigory")),
-        "subcategory_id": _safe_int(row.get("id_sub_catigory")),
-    }
+def _reward_references(settings) -> list[dict[str, object]]:
+    return list_reward_references(settings.rewards_db_path) if settings.db_exists else []
 
 
-def _guide_options(settings, selected: dict[str, object] | None = None):
-    if not settings.db_exists:
-        return {"gos": [], "categories": [], "subcategories": [], "names": []}
-    return guide_cascade_options(settings.rewards_db_path, **_selected_guides(selected))
-
-
-def _guide_cascade(settings) -> dict[str, list[dict[str, object]]]:
-    return guide_cascade_data(settings.rewards_db_path) if settings.db_exists else {}
+def _selected_reward_reference(settings, row: dict[str, object] | None) -> dict[str, object]:
+    name_id = _safe_int(row.get("id_name")) if row else None
+    if not settings.db_exists or name_id is None:
+        return {}
+    return get_reward_reference(settings.rewards_db_path, name_id) or {}
 
 
 def _reward_created_edit_url(reward_id: int, return_to: str = "") -> str:
@@ -122,6 +113,7 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
     if person is None:
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     reward = {"person_id": person_id, "instock": False, "date_purchase": date.today().isoformat()}
+    reward_references = _reward_references(settings)
     return templates.TemplateResponse(
         request,
         "reward_form.html",
@@ -130,8 +122,8 @@ def reward_new(request: Request, person_id: int, return_to: str = ""):
             "mode": "create",
             "person": person,
             "reward": reward,
-            "guides": _guide_options(settings),
-            "guide_cascade": _guide_cascade(settings),
+            "reward_references": reward_references,
+            "reward_reference": {},
             "photo_controls": [],
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -152,6 +144,7 @@ async def reward_create(request: Request, person_id: int):
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
         person = get_person(settings.rewards_db_path, person_id)
+        reward = {"person_id": person_id, **form_values}
         return templates.TemplateResponse(
             request,
             "reward_form.html",
@@ -159,9 +152,9 @@ async def reward_create(request: Request, person_id: int):
                 "settings": settings,
                 "mode": "create",
                 "person": person,
-                "reward": {"person_id": person_id, **form_values},
-                "guides": _guide_options(settings, form_values),
-                "guide_cascade": _guide_cascade(settings),
+                "reward": reward,
+                "reward_references": _reward_references(settings),
+                "reward_reference": _selected_reward_reference(settings, reward),
                 "photo_controls": [],
                 "return_to": return_to,
                 "error": str(exc),
@@ -213,8 +206,8 @@ def reward_edit(request: Request, reward_id: int, return_to: str = "", created: 
             "mode": "edit",
             "person": person,
             "reward": reward,
-            "guides": _guide_options(settings, reward),
-            "guide_cascade": _guide_cascade(settings),
+            "reward_references": _reward_references(settings),
+            "reward_reference": _selected_reward_reference(settings, reward),
             "photo_controls": photo_items("reward", reward),
             "return_to": safe_return_to(return_to),
             "error": None,
@@ -234,9 +227,10 @@ async def reward_update(request: Request, reward_id: int):
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
     except RewardValidationError as exc:
-        reward = get_reward(settings.rewards_db_path, reward_id) or {"id": reward_id}
-        person_id = int(reward.get("person_id") or 0)
+        stored_reward = get_reward(settings.rewards_db_path, reward_id) or {"id": reward_id}
+        person_id = int(stored_reward.get("person_id") or 0)
         person = get_person(settings.rewards_db_path, person_id) if person_id else None
+        reward = {**stored_reward, **form_values}
         return templates.TemplateResponse(
             request,
             "reward_form.html",
@@ -244,10 +238,10 @@ async def reward_update(request: Request, reward_id: int):
                 "settings": settings,
                 "mode": "edit",
                 "person": person,
-                "reward": {**reward, **form_values},
-                "guides": _guide_options(settings, {**reward, **form_values}),
-                "guide_cascade": _guide_cascade(settings),
-                "photo_controls": photo_items("reward", reward),
+                "reward": reward,
+                "reward_references": _reward_references(settings),
+                "reward_reference": _selected_reward_reference(settings, reward),
+                "photo_controls": photo_items("reward", stored_reward),
                 "return_to": return_to,
                 "error": str(exc),
                 "created_message": "",

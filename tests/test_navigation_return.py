@@ -73,6 +73,12 @@ class ReturnNavigationTests(unittest.TestCase):
         try:
             connection.execute("create table guide (id integer primary key, name text)")
             connection.execute("insert into guide (id, name) values (1, 'Test Rank')")
+            for level in range(5):
+                connection.execute(f"create table guide_lev_{level} (id integer primary key, idl integer, name text)")
+            connection.execute("insert into guide_lev_0 values (1, -1, 'Country')")
+            connection.execute("insert into guide_lev_1 values (1, 1, 'Category')")
+            connection.execute("insert into guide_lev_2 values (1, 1, 'Subcategory')")
+            connection.execute("insert into guide_lev_3 values (2, 1, 'Reward')")
             connection.execute(
                 """
                 create table person (

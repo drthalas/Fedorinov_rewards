@@ -38,13 +38,15 @@ class RewardWriteTests(unittest.TestCase):
         )
 
     def reward_data(self, **overrides) -> RewardWriteData:
-        values = {"id_gos": 1, "id_catigory": 2, "id_sub_catigory": 3, "id_name": 4}
+        values = {"id_name": 4}
         values.update(overrides)
         return RewardWriteData(**values)
 
     def _create_db(self) -> None:
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("create table person (id integer primary key autoincrement, fio varchar)")
+            for level in range(5):
+                connection.execute(f"create table guide_lev_{level} (id integer primary key, idl integer, name text)")
             connection.execute(
                 """
                 create table rewards (
@@ -70,6 +72,16 @@ class RewardWriteTests(unittest.TestCase):
             )
             connection.execute("insert into person (id, fio) values (1, 'Person')")
             connection.execute("insert into person (id, fio) values (2, 'Other Person')")
+            connection.execute("insert into guide_lev_0 values (1, -1, 'СССР')")
+            connection.execute("insert into guide_lev_1 values (2, 1, 'Ордена')")
+            connection.execute("insert into guide_lev_2 values (3, 2, 'Боевые')")
+            connection.execute("insert into guide_lev_3 values (4, 3, 'Орден Красной Звезды')")
+            connection.execute("insert into guide_lev_4 values (40, 4, 'https://first.example')")
+            connection.execute("insert into guide_lev_4 values (41, 4, 'каталог')")
+            connection.execute("insert into guide_lev_0 values (10, -1, 'Россия')")
+            connection.execute("insert into guide_lev_1 values (20, 10, 'Медали')")
+            connection.execute("insert into guide_lev_2 values (30, 20, 'Юбилейные')")
+            connection.execute("insert into guide_lev_3 values (5, 30, 'Медаль')")
 
     def fetch_reward(self, reward_id: int) -> sqlite3.Row | None:
         with sqlite3.connect(self.db_path) as connection:
@@ -97,6 +109,10 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["person_id"], 1)
         self.assertEqual(row["number"], 77)
         self.assertEqual(row["instock"], 1)
+        self.assertEqual(row["id_gos"], 1)
+        self.assertEqual(row["id_catigory"], 2)
+        self.assertEqual(row["id_sub_catigory"], 3)
+        self.assertEqual(row["id_link"], "https://first.example каталог")
 
     def test_create_reward_with_empty_number_skips_duplicate_validation(self) -> None:
         first_id = create_reward(self.settings(), 1, self.reward_data(number=None))
@@ -184,8 +200,45 @@ class RewardWriteTests(unittest.TestCase):
         text = "Link 'single' and \"double\""
         reward_id = create_reward(self.settings(), 1, self.reward_data(id_link=text, reward_list="Source/quoted path.jpg"))
         row = self.fetch_reward(reward_id)
-        self.assertEqual(row["id_link"], text)
+        self.assertEqual(row["id_link"], "https://first.example каталог")
         self.assertEqual(row["reward_list"], "Source/quoted path.jpg")
+
+    def test_create_ignores_tampered_reference_fields(self) -> None:
+        reward_id = create_reward(
+            self.settings(),
+            1,
+            RewardWriteData(
+                id_gos=999,
+                id_catigory=998,
+                id_sub_catigory=997,
+                id_name=5,
+                id_link="tampered",
+                number=321,
+            ),
+        )
+
+        row = self.fetch_reward(reward_id)
+        self.assertEqual((row["id_gos"], row["id_catigory"], row["id_sub_catigory"]), (10, 20, 30))
+        self.assertIsNone(row["id_link"])
+
+    def test_changing_name_refreshes_reference_fields_and_keeps_instance_fields(self) -> None:
+        reward_id = create_reward(self.settings(), 1, self.reward_data(number=7, price_now=100, instock=True))
+
+        update_reward(
+            self.settings(),
+            reward_id,
+            RewardWriteData(id_name=5, number=8, price_now=900, instock=True, id_link="tampered"),
+        )
+
+        row = self.fetch_reward(reward_id)
+        self.assertEqual((row["id_gos"], row["id_catigory"], row["id_sub_catigory"], row["id_name"]), (10, 20, 30, 5))
+        self.assertIsNone(row["id_link"])
+        self.assertEqual((row["number"], row["price_now"], row["instock"]), (8, 900, 1))
+
+    def test_invalid_reference_name_is_rejected(self) -> None:
+        with self.assertRaises(RewardValidationError) as invalid:
+            create_reward(self.settings(), 1, self.reward_data(id_name=999, number=5))
+        self.assertEqual(str(invalid.exception), "Выбранное наименование отсутствует в справочнике наград.")
 
     def test_create_reward_fails_for_nonexistent_person(self) -> None:
         with self.assertRaises(RewardValidationError):
@@ -200,8 +253,11 @@ class RewardWriteTests(unittest.TestCase):
         data = reward_data_from_mapping({"id_name": "4", "date_purchase": "05.06.2026"})
         self.assertEqual(data.date_purchase, "2026-06-05")
 
-    def test_update_reward_preserves_existing_guide_ids_when_form_omits_them(self) -> None:
+    def test_update_reward_preserves_existing_name_and_refreshes_derived_fields(self) -> None:
         reward_id = create_reward(self.settings(), 1, self.reward_data(number=77))
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("update guide_lev_0 set name = 'СССР обновлён' where id = 1")
+            connection.execute("update guide_lev_4 set name = 'обновлённая ссылка' where id = 40")
         update_reward(self.settings(), reward_id, RewardWriteData(number=88, price_now=700))
         row = self.fetch_reward(reward_id)
         self.assertEqual(row["number"], 88)
@@ -209,6 +265,7 @@ class RewardWriteTests(unittest.TestCase):
         self.assertEqual(row["id_catigory"], 2)
         self.assertEqual(row["id_sub_catigory"], 3)
         self.assertEqual(row["id_name"], 4)
+        self.assertEqual(row["id_link"], "обновлённая ссылка каталог")
 
 
 if __name__ == "__main__":

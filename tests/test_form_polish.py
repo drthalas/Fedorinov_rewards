@@ -286,7 +286,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertNotIn("/guides/ranks/new", template)
         self.assertIn('select name="id_rank" data-styled-select required', template)
 
-    def test_reward_form_preserves_cascading_guides_after_validation_error(self) -> None:
+    def test_reward_form_preserves_instance_values_and_derives_reference_after_validation_error(self) -> None:
         request = FakeRequest(
             {
                 "id_gos": "1",
@@ -306,9 +306,31 @@ class FormPolishTests(unittest.TestCase):
         self.assertEqual(context["reward"]["number"], "12345")
         self.assertEqual(context["reward"]["price_now"], "700")
         self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
-        self.assertEqual([item["id"] for item in context["guides"]["categories"]], [2])
-        self.assertEqual([item["id"] for item in context["guides"]["subcategories"]], [3])
-        self.assertEqual([item["id"] for item in context["guides"]["names"]], [4])
+        self.assertEqual([item["id_name"] for item in context["reward_references"]], [4])
+        self.assertEqual(context["reward_reference"], {})
+
+    def test_reward_form_rebuilds_readonly_reference_from_selected_name_after_error(self) -> None:
+        request = FakeRequest(
+            {
+                "id_gos": "999",
+                "id_catigory": "998",
+                "id_sub_catigory": "997",
+                "id_name": "4",
+                "id_link": "tampered",
+                "number": "not-a-number",
+                "return_to": "/legacy?tab=rewards&person_id=1",
+            }
+        )
+
+        with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):
+            response = asyncio.run(rewards_router.reward_create(request, 1))
+
+        context = response["context"]
+        self.assertEqual(response["status_code"], 400)
+        self.assertEqual(context["reward_reference"]["id_gos"], 1)
+        self.assertEqual(context["reward_reference"]["id_catigory"], 2)
+        self.assertEqual(context["reward_reference"]["id_sub_catigory"], 3)
+        self.assertEqual(context["reward_reference"]["name"], "Орден Красной Звезды")
 
     def test_new_reward_page_shows_person_context(self) -> None:
         with patch.object(rewards_router.templates, "TemplateResponse", side_effect=_template_result):

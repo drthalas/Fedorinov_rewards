@@ -163,17 +163,19 @@ class CavalierRelatedVisualTests(unittest.TestCase):
         self.assertIn('data-confirm-submit="reward-delete"', templates["reward_detail.html"])
         self.assertIn("cavalier-photos-page", templates["person_photos.html"])
 
-    def test_reward_forms_reuse_custom_select_without_weakening_cascade(self) -> None:
+    def test_reward_form_only_exposes_name_as_editable_reference_field(self) -> None:
         reward_form = self.read("backend/app/templates/reward_form.html")
-        cascade = self.read("backend/app/static/cascading_guides.js")
+        reference_fields = self.read("backend/app/static/reward_reference_fields.js")
 
-        self.assertEqual(reward_form.count("data-styled-select"), 4)
-        self.assertIn('data-guide-role="country"', reward_form)
-        self.assertIn('data-guide-role="category"', reward_form)
-        self.assertIn('data-guide-role="subcategory"', reward_form)
+        self.assertEqual(reward_form.count("data-styled-select"), 1)
+        self.assertNotIn('name="id_gos"', reward_form)
+        self.assertNotIn('name="id_catigory"', reward_form)
+        self.assertNotIn('name="id_sub_catigory"', reward_form)
+        self.assertNotIn('name="id_link"', reward_form)
         self.assertIn('data-guide-role="name"', reward_form)
+        self.assertEqual(reward_form.count('readonly aria-readonly="true"'), 4)
         self.assertIn('select.dispatchEvent(new Event("change"', self.read("backend/app/static/custom_select.js"))
-        self.assertIn('country.addEventListener("change"', cascade)
+        self.assertIn('nameSelect.addEventListener("change", updateDerivedFields)', reference_fields)
 
 
 if __name__ == "__main__":
