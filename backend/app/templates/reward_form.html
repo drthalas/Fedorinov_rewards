@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block title %}{% if mode == "create" %}Добавить награду{% else %}{% set reward_edit_name = reward.name|default('', true)|trim %}{% if reward_edit_name %}Изменить награду: {{ reward_edit_name }}{% else %}Изменить награду{% endif %}{% endif %}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
