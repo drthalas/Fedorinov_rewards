@@ -284,7 +284,10 @@ class FormPolishTests(unittest.TestCase):
         )
         self.assertNotIn("/guides?section=ranks", template)
         self.assertNotIn("/guides/ranks/new", template)
-        self.assertIn('select name="id_rank" data-styled-select required', template)
+        self.assertIn(
+            'select name="id_rank" data-styled-select data-styled-select-typeahead="prefix" required',
+            template,
+        )
 
     def test_reward_form_preserves_instance_values_and_derives_reference_after_validation_error(self) -> None:
         request = FakeRequest(

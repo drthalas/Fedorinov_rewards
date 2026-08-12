@@ -62,7 +62,10 @@
       if (typeaheadTimer) {
         window.clearTimeout(typeaheadTimer);
       }
-      typeaheadTimer = window.setTimeout(resetTypeahead, 800);
+      typeaheadTimer = window.setTimeout(() => {
+        typeaheadBuffer = "";
+        typeaheadTimer = null;
+      }, 800);
     }
 
     function prefixMatches(query) {
@@ -233,7 +236,7 @@
         }
       } else if (event.key === "Tab") {
         close();
-      } else if (typeaheadEnabled() && event.key === "Backspace" && typeaheadBuffer) {
+      } else if (typeaheadEnabled() && event.key === "Backspace") {
         event.preventDefault();
         typeaheadBuffer = typeaheadBuffer.slice(0, -1);
         scheduleTypeaheadReset();

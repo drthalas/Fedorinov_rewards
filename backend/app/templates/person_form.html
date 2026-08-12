@@ -35,7 +35,7 @@
     </div>
     <label>
       <span>Звание / специальность <span class="required-marker" aria-hidden="true">*</span></span>
-      <select name="id_rank" data-styled-select required>
+      <select name="id_rank" data-styled-select data-styled-select-typeahead="prefix" required>
         <option value="">—</option>
         {% for rank in ranks %}
         <option value="{{ rank.id }}" {% if rank.id|string == person.id_rank|string %}selected{% endif %}>{{ rank.name }}</option>

@@ -56,7 +56,10 @@ class Ale250UiPolishTests(unittest.TestCase):
         self.assertNotIn("Открыть справочник", template)
         self.assertNotIn("Добавить звание", template)
         self.assertNotIn("Текущее значение:", template)
-        self.assertIn('select name="id_rank" data-styled-select required', template)
+        self.assertIn(
+            'select name="id_rank" data-styled-select data-styled-select-typeahead="prefix" required',
+            template,
+        )
         self.assertIn('value="{{ person.birthday|format_birth_year_input }}"', template)
 
     def test_current_specialty_value_uses_light_form_color(self) -> None:
