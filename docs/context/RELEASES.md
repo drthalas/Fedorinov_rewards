@@ -75,11 +75,33 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
-## v2.0.11
+## v2.0.12
 
 Статус: release candidate, не опубликован.
 
-Дата подготовки: 2026-08-09.
+Дата подготовки: 2026-08-12.
+
+Тип: reward and rank reference patch.
+
+Состав:
+
+- Алфавитная сортировка и prefix-typeahead для наименования награды.
+- Prefix-typeahead для звания или специальности без отображения нерелевантных вариантов.
+- Автоматическое заполнение и read-only режим производных справочных сведений награды.
+- Сохранённое редактирование даты, номера, наличия, фотографий и документов конкретной награды.
+
+Release gate:
+
+- Accepted product HEAD интегрируется в `main` после exact ancestry/parity verification.
+- По разовому Owner-разрешению повторный полный Windows VM Tier 4 gate не выполняется.
+- Exact merged package проверяется штатным UI updater из public `v2.0.11` на physical Windows.
+- GitHub Release, tag, production `latest.json` и Telegram заблокированы до отдельного Owner-разрешения.
+
+## v2.0.11
+
+Статус: выпущено.
+
+Дата релиза: 2026-08-09.
 
 Тип: navigation and Windows action patch.
 
@@ -90,12 +112,12 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 - Открытие каталога корректно завершает loading-state и показывает папку в видимой Windows-сессии.
 - Главный экран остаётся эквивалентным предыдущему релизу за исключением цифрового индекса.
 
-Release gate:
+Проверки релиза:
 
 - Exact candidate package и manifest изолируются от production update channel.
 - Обязателен полный Tier 4 updater gate с exact public `v2.0.10` на Windows VM и постоянном mutable Sergey fixture.
 - Physical Windows остаётся в pre-update `v2.0.10`; Owner самостоятельно выполняет штатное UI-обновление.
-- GitHub Release и production `latest.json` разрешены только после Owner updater PASS. Telegram не отправляется.
+- Physical Windows updater gate и проверка exact candidate выполнены до публикации; production artifacts опубликованы без изменения принятого ZIP.
 
 ## v2.0.10
 
