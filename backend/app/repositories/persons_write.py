@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from contextlib import closing
+from pathlib import Path
 from typing import Callable
 import unicodedata
 from uuid import uuid4
