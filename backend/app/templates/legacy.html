@@ -151,6 +151,7 @@
                 <thead>
                   <tr>
                     <th>Наименование</th>
+                    <th class="reward-reference-photo-heading">Фото</th>
                     <th>Номер</th>
                     <th>Наличие</th>
                     <th>Дата покупки</th>
@@ -162,6 +163,11 @@
                   {% for reward in person_rewards %}
                     <tr>
                       <td><a href="/rewards/{{ reward.id }}?return_to={{ selected_person_return|urlencode }}">{{ reward.name|dash }}</a></td>
+                      <td class="reward-reference-photo-cell">
+                        {% if reward.reward_image_path and media_exists(reward.reward_image_path) %}
+                          <img class="reward-reference-thumbnail" src="{{ media_url(reward.reward_image_path) }}" alt="Фото награды {{ reward.name|dash }}">
+                        {% endif %}
+                      </td>
                       <td>{{ reward.number|dash }}</td>
                       <td><span class="badge badge-{{ reward.instock|bool_class }}">{{ reward.instock|format_bool }}</span></td>
                       <td>{{ reward.date_purchase|format_date }}</td>
@@ -169,7 +175,7 @@
                       <td>{{ reward.price_now|format_money }}</td>
                     </tr>
                   {% else %}
-                    <tr><td colspan="6">Награды не найдены.</td></tr>
+                    <tr><td colspan="7">Награды не найдены.</td></tr>
                   {% endfor %}
                 </tbody>
               </table>

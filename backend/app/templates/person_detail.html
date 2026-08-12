@@ -84,12 +84,17 @@
 <div class="table-wrap person-detail-rewards-wrap">
   <table>
     <thead>
-      <tr><th>Государство</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
+      <tr><th>Государство</th><th class="reward-reference-photo-heading">Фото</th><th>Категория</th><th>Подкатегория</th><th>Наименование</th><th>Номер</th><th>Наличие</th><th>Дата покупки</th><th>Цена покупки</th><th>Текущая цена</th><th></th></tr>
     </thead>
     <tbody>
       {% for reward in rewards %}
       <tr>
         <td>{{ reward.gos|dash }}</td>
+        <td class="reward-reference-photo-cell">
+          {% if reward.reward_image_path and media_exists(reward.reward_image_path) %}
+          <img class="reward-reference-thumbnail" src="{{ media_url(reward.reward_image_path) }}" alt="Фото награды {{ reward.name|dash }}">
+          {% endif %}
+        </td>
         <td>{{ reward.category|dash }}</td>
         <td>{{ reward.subcategory|dash }}</td>
         <td>{{ reward.name|dash }}</td>

@@ -18,6 +18,12 @@ def rank_guide_has_image(db_path: Path) -> bool:
     return "image_path" in columns
 
 
+def reward_guide_has_image(db_path: Path) -> bool:
+    with closing(open_readonly_connection(db_path)) as connection:
+        columns = {row["name"] for row in connection.execute("pragma table_info(guide_lev_3)").fetchall()}
+    return "image_path" in columns
+
+
 def count_persons(db_path: Path) -> int:
     row = fetch_one(db_path, "select count(*) as count from person")
     return int(row["count"]) if row else 0
@@ -80,9 +86,10 @@ def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
 
 
 def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]]:
+    reward_image_expr = "g3.image_path" if reward_guide_has_image(db_path) else "null"
     return fetch_all(
         db_path,
-        """
+        f"""
         select
             r.id,
             r.person_id,
@@ -90,6 +97,7 @@ def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]
             g1.name as category,
             g2.name as subcategory,
             g3.name as name,
+            {reward_image_expr} as reward_image_path,
             r.number,
             r.instock,
             r.date_purchase,

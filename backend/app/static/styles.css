@@ -405,6 +405,21 @@ a.link-wrap {
   scrollbar-gutter: stable;
 }
 
+.reward-reference-photo-heading,
+.reward-reference-photo-cell {
+  width: 58px;
+  min-width: 58px;
+  text-align: center;
+}
+
+.reward-reference-thumbnail {
+  display: block;
+  width: 46px;
+  height: 46px;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
 .person-bio-panel,
 .person-links-panel,
 .person-main-photo-panel {
