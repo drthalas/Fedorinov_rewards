@@ -20,6 +20,8 @@
 - Не трогать реальные DB/media и не коммитить secrets, `.env`, `.venv`, DB/media, backups, logs, screenshots или generated artifacts без явного разрешения.
 - Merge, release, version/tag, `latest.json`, package publication, Telegram и real updater apply разрешены только отдельным актуальным Description.
 - В release/Telegram-инструкциях штатный post-update сценарий — автоматический перезапуск; `start_windows.bat` указывать только как fallback, если приложение не открылось самостоятельно.
+- Release всегда разделён на две стадии. В release-candidate gate выполняются product/updater/VM/physical проверки и фиксируется exact `SHA + version + artifact SHA256`. После PASS exact candidate и Owner authorization publication stage только публикует эти bytes, проверяет public parity, отправляет Telegram и сохраняет evidence.
+- В publication stage по умолчанию запрещено повторять full suite, Windows VM, physical updater, UI/regression acceptance или второй updater cycle ради `Public Current`. Дополнительная проверка допустима только при конкретном evidence-based mismatch. Обслуживание `Public Current` не блокирует публикацию и оформляется отдельной infrastructure-задачей.
 
 ## Краткий workflow
 

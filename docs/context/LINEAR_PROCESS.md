@@ -121,11 +121,28 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 После commit/push добавить Linear comment: что сделано, commit hash, проверки, ограничения и Owner QA steps. Для UI включить browser evidence и runtime handoff, если они применимы.
 
-## Релизы и Owner проверка
+## Release-candidate gate и publication stage
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
-После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
+Release обязательно разделён на две независимые стадии:
+
+1. **Release-candidate gate** владеет сборкой exact candidate, package safety, требуемыми product tests, updater cycle, Windows VM и physical Windows acceptance. После PASS фиксируются `main SHA`, version, имя/размер/SHA256 artifact, результаты gate и Owner authorization.
+2. **Publication stage** использует только уже принятый exact candidate. Она проверяет локальную parity зафиксированного `SHA + version + artifact SHA256`, создаёт production tag/GitHub Release, публикует `latest.json`, проверяет public bytes/SHA/metadata, отправляет разрешённое Telegram-сообщение и сохраняет evidence/statuses.
+
+После принятого updater/physical gate в publication stage по умолчанию запрещено повторно запускать:
+
+- full suite;
+- Windows VM gate;
+- physical updater gate;
+- UI/regression acceptance;
+- второй updater cycle только ради обновления `Public Current`.
+
+Повторная проверка допустима только при конкретном evidence-based mismatch или blocker: например, расходятся commit SHA, version, artifact bytes/SHA256 или metadata `latest.json`. В этом случае остановиться, зафиксировать точное расхождение и проверить только затронутую поверхность; нельзя молча пересобирать или заменять принятый artifact.
+
+`Public Current` — вспомогательный physical baseline, а не release gate. Его минимально синхронизируют после публикации, если это безопасно и предусмотрено задачей. Отдельная неисправность baseline, ACL, launcher или окружения оформляется infrastructure-задачей и не блокирует уже авторизованную публикацию exact candidate.
+
+Owner product acceptance выполняется в release-candidate gate до публикации. После publication создаётся только post-release feedback/rollout tracking, если это требуется; уже пройденные updater/product/physical проверки не повторяются без нового evidence.
 
 ## Timing telemetry
 

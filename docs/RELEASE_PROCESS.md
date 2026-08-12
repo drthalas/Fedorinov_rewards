@@ -15,6 +15,46 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 Owner-side update checks do not require a GitHub token.
 
+## Two-stage release workflow
+
+Release work has two distinct stages.
+
+### 1. Release-candidate gate
+
+This stage owns all validation work: version metadata, package build and safety,
+required product tests, updater checks, Windows VM checks, and physical Windows
+acceptance. When it passes, record and freeze:
+
+- the exact `main` commit SHA;
+- the exact application version;
+- the artifact filename and size;
+- the artifact SHA256;
+- the completed gate evidence and Owner authorization.
+
+The accepted candidate must not be rebuilt or substituted during publication.
+
+### 2. Publication stage
+
+After the exact candidate passes and the Owner authorizes publication, perform
+only this short sequence:
+
+1. Confirm exact commit, version, artifact bytes, and SHA256 parity.
+2. Create the production tag and GitHub Release for that commit.
+3. Upload the accepted ZIP and its `latest.json`.
+4. Verify public artifact bytes, SHA256, URL, and manifest metadata.
+5. Send the authorized Telegram notification.
+6. Record release evidence and final statuses.
+
+Do not repeat the full suite, Windows VM gate, physical updater, UI/regression
+acceptance, or a second updater cycle only to refresh `Public Current`. Run an
+additional check only when concrete evidence shows a mismatch, such as a commit,
+version, artifact SHA256, or manifest difference. Stop on the mismatch and check
+only the affected surface; do not silently rebuild the accepted candidate.
+
+`Public Current` is a convenience baseline, not a publication gate. A separate
+problem with its ACL, launcher, runtime, or synchronization belongs in an
+infrastructure issue and must not stretch or block an otherwise safe publication.
+
 ## Prepare a version
 
 1. Update the version in `backend/app/version.py`.
@@ -64,11 +104,11 @@ The ZIP must not contain:
 - EXE/DLL files
 - nested ZIP files
 
-## Dry-run publication
+## Candidate build and dry-run
 
 ### GitHub Actions
 
-Recommended release path:
+The manual workflow may build candidate artifacts before acceptance:
 
 1. Push the committed version to `main`.
 2. Open GitHub -> Actions -> Manual Release.
@@ -88,21 +128,14 @@ dist/latest.json
 ```
 
 and uploads both files as workflow artifacts without creating a GitHub Release.
+Do not run `publish=true` before candidate acceptance.
 
-After checking the artifacts, run the workflow again with:
-
-```text
-publish=true
-```
-
-The workflow creates:
-
-```text
-tag: vX.Y.Z
-title: Награды и награждённые vX.Y.Z
-```
-
-and uploads the ZIP plus `latest.json` as release assets. The workflow refuses to overwrite an existing release.
+After candidate acceptance, do not use a publication path that rebuilds the ZIP.
+Publish the already accepted artifact through the existing local publication
+command. Another project-supported path is allowed only when it consumes that
+same artifact and proves byte-for-byte identity with the recorded SHA256. The
+publisher creates the `vX.Y.Z` tag and `Награды и награждённые vX.Y.Z` release
+and must refuse to overwrite an existing release.
 
 The workflow uses the standard GitHub Actions `GITHUB_TOKEN` only inside GitHub Actions. The owner's computer does not need a GitHub token.
 
@@ -114,7 +147,7 @@ https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.js
 
 After the owner opens `О программе` and clicks `Проверить обновления`, the app can show the new version. If the new version is newer than the installed version, the owner can click `Обновить`. The separate bootstrap downloads and verifies the ZIP, creates an application backup, stops only identity-confirmed application backends, preserves `.env`, replaces application files, and starts exactly one verified backend from the updated install root.
 
-Before publishing a release that contains runtime-lifecycle changes, run the packaged test on native Windows. The gate must prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend.
+For a release candidate that contains runtime-lifecycle changes, run the packaged test on native Windows during the release-candidate gate. The gate must prove that old PIDs are dead, one backend remains, `/runtime/identity` matches the release version and install root, a repeated launcher does not create a duplicate, an unrelated port owner is untouched, and rollback restores one valid old backend. Do not repeat this acceptance during publication after the exact candidate is frozen.
 
 ## Telegram release notification
 

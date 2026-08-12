@@ -2,39 +2,54 @@
 
 ## Общий процесс
 
-1. Убедиться, что Hermes QA PASS.
-2. Поднять `APP_VERSION` в `backend/app/version.py`.
-3. Создать или обновить `release_notes/X.Y.Z.md`.
-4. Обновить docs/context при необходимости.
-5. Запустить локальные проверки.
-6. Собрать release package:
+Релиз состоит из двух стадий. Их нельзя смешивать.
+
+### Release-candidate gate
+
+1. Подтвердить принятый integration HEAD и release authorization.
+2. Поднять `APP_VERSION`, подготовить release notes и нужные context docs.
+3. Выполнить требуемые product/package/updater/Windows проверки.
+4. Собрать release package:
 
 ```sh
 python3 scripts/build_release_package.py
 ```
 
-7. Проверить safety:
+5. Проверить safety:
 
 ```sh
 python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_vX.Y.Z.zip
 ```
 
-8. Выполнить publish dry-run:
+6. Выполнить publish dry-run:
 
 ```sh
 python3 scripts/publish_github_release.py --dry-run
 ```
 
-9. Опубликовать через Manual Release workflow или обновить существующие assets, если это явно разрешено.
-10. Проверить public `latest.json`:
+7. После VM/physical/Owner PASS зафиксировать exact `main SHA`, version, имя/размер/SHA256 ZIP и запретить его пересборку или подмену.
+
+### Publication stage
+
+После отдельного Owner authorization:
+
+1. Проверить exact parity зафиксированных SHA/version/artifact bytes.
+2. Создать tag/GitHub Release и загрузить exact принятые ZIP и `latest.json`.
+3. Проверить public `latest.json`:
 
 ```sh
 curl -fsS -L https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
-11. Только после успешного public `latest.json` отправить Telegram notification.
-12. Обновить Linear release issue.
-13. Перевести owner testing issue в проверку владельцем.
+4. Проверить public ZIP byte/SHA/metadata parity.
+5. Только после успешной public-проверки отправить Telegram notification.
+6. Обновить Linear evidence/statuses.
+
+На publication stage не повторять full suite, Windows VM, physical updater,
+UI/regression acceptance или второй updater cycle ради `Public Current`.
+Дополнительные проверки разрешены только при конкретном расхождении SHA,
+version, bytes или manifest metadata. Проблемы `Public Current` не блокируют
+publication и оформляются отдельной infrastructure-задачей.
 
 ## Если release уже существует
 
