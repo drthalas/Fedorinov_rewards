@@ -6,6 +6,8 @@
 
 Это не production installer. Архив содержит только код приложения, стартовые скрипты и документацию.
 
+Для physical Windows release gate, RDP/interactive session и visible Edge evidence использовать отдельный `docs/WINDOWS_PHYSICAL_GUI_RUNBOOK.md`. Этот preview runbook не определяет удалённый GUI lifecycle.
+
 База, фотографии и локальные файлы владельца остаются на компьютере владельца и не входят в архив. Приложение работает локально и не загружает базу или фотографии в облако.
 
 ## Что нужно заранее

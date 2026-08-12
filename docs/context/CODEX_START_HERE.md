@@ -25,6 +25,7 @@
 
 - Owner выбирает model/reasoning в UI; ChatGPT даёт Owner human-facing рекомендацию до запуска; Codex модель сам не переключает.
 - Для local web UI использовать browser/Playwright first; Computer Use — optional fallback. Native/packaged/embedded flow без доступного branch runtime отмечать `not applicable` / `not tested` с точной Owner retest instruction.
+- Перед physical Windows GUI/updater gate выполнить canonical discovery и interactive preflight из `docs/WINDOWS_PHYSICAL_GUI_RUNBOOK.md`; SSH reachability сама по себе не доказывает наличие оконного desktop.
 - Runtime identity и `OWNER QA URL` требуются только для локально запускаемых web UI feature-задач.
 - Соблюдать назначенный tier и budget; full suite запускать только когда он требуется scope/tier, а не после каждой iteration.
 

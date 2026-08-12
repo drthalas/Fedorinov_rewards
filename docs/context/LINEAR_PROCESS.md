@@ -92,6 +92,8 @@ File upload/source selection проверять реальными `filechooser`
 
 Computer Use — только optional diagnostic fallback: best effort, non-blocking, не обязательный QA/release gate и не единственное evidence PASS. Human-required native шаги нельзя называть автономным PASS.
 
+Для physical Windows gate сначала выполнить `scripts/physical_windows_gui_preflight.sh` и следовать `docs/WINDOWS_PHYSICAL_GUI_RUNBOOK.md`. Connectivity, RDP transport и interactive GUI — разные слои: SSH PASS без вошедшей session/Explorer/DWM не является GUI readiness. Headless/S4U не заменяет visible Edge evidence. Session ID после reboot/reconnect нельзя фиксировать константой; нужно доказать совпадение Edge, Explorer и DWM в текущей положительной session ID.
+
 ## Runtime identity и Owner QA handoff
 
 Runtime identity и блок `OWNER QA URL` обязательны только для feature-задачи с локально запускаемым web UI runtime.
