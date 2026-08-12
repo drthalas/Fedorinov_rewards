@@ -3,6 +3,7 @@
 
   const STORAGE_KEY = "fedorinov:summary-session-url";
   const DEFAULT_URL = "/legacy?tab=summary";
+  let resetNavigation = false;
 
   function summaryUrl(value) {
     try {
@@ -33,6 +34,7 @@
   }
 
   function saveCurrentUrl() {
+    if (resetNavigation) return false;
     const url = summaryUrl(window.location.href);
     if (!url || url.searchParams.get("summary_applied") !== "1") return false;
     try {
@@ -45,6 +47,7 @@
   }
 
   function clear() {
+    resetNavigation = true;
     try {
       window.sessionStorage.removeItem(STORAGE_KEY);
     } catch (error) {
@@ -54,6 +57,7 @@
   }
 
   function initialize() {
+    resetNavigation = false;
     saveCurrentUrl();
     updateNavigation();
     document.querySelectorAll("[data-summary-reset]").forEach((link) => {

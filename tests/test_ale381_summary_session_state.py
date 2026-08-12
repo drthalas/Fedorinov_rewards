@@ -70,6 +70,7 @@ window.location.href = "http://127.0.0.1:18080/legacy?tab=rewards";
 windowListeners.pageshow();
 const repeatedHref = firstNav.href;
 reset.listeners.click();
+windowListeners.pagehide();
 process.stdout.write(JSON.stringify({ saved, restoredHref, repeatedHref, resetHref: firstNav.href, storage }));
 '''
         with TemporaryDirectory() as temp_dir:
