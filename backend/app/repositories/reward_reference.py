@@ -42,4 +42,11 @@ def get_reward_reference(db_path: Path, name_id: int) -> dict[str, object] | Non
 
 def list_reward_references(db_path: Path) -> list[dict[str, object]]:
     with closing(open_readonly_connection(db_path)) as connection:
-        return [dict(row) for row in connection.execute(_REFERENCE_SELECT + " order by g3.id").fetchall()]
+        rows = [dict(row) for row in connection.execute(_REFERENCE_SELECT).fetchall()]
+    return sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("name") or "").casefold().replace("ё", "е"),
+            int(row.get("id_name") or 0),
+        ),
+    )

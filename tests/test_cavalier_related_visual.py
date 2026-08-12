@@ -167,7 +167,8 @@ class CavalierRelatedVisualTests(unittest.TestCase):
         reward_form = self.read("backend/app/templates/reward_form.html")
         reference_fields = self.read("backend/app/static/reward_reference_fields.js")
 
-        self.assertEqual(reward_form.count("data-styled-select"), 1)
+        self.assertEqual(reward_form.count('select name="id_name"'), 1)
+        self.assertIn('data-styled-select data-styled-select-typeahead="prefix"', reward_form)
         self.assertNotIn('name="id_gos"', reward_form)
         self.assertNotIn('name="id_catigory"', reward_form)
         self.assertNotIn('name="id_sub_catigory"', reward_form)

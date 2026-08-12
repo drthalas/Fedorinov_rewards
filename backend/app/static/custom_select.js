@@ -38,9 +38,69 @@
     select.insertAdjacentElement("afterend", wrapper);
 
     let activeIndex = -1;
+    let typeaheadBuffer = "";
+    let typeaheadTimer = null;
 
     const optionButtons = () => Array.from(listbox.querySelectorAll("[role='option']"));
+    const visibleOptionButtons = () => optionButtons().filter((option) => !option.hidden);
     const selectedIndex = () => Math.max(0, select.selectedIndex);
+    const typeaheadEnabled = () => select.dataset.styledSelectTypeahead === "prefix";
+    const normalize = (text) => String(text || "").trim().toLocaleLowerCase("ru-RU").replaceAll("ё", "е");
+
+    function resetTypeahead() {
+      typeaheadBuffer = "";
+      if (typeaheadTimer) {
+        window.clearTimeout(typeaheadTimer);
+        typeaheadTimer = null;
+      }
+      optionButtons().forEach((option) => {
+        option.hidden = false;
+      });
+    }
+
+    function scheduleTypeaheadReset() {
+      if (typeaheadTimer) {
+        window.clearTimeout(typeaheadTimer);
+      }
+      typeaheadTimer = window.setTimeout(resetTypeahead, 800);
+    }
+
+    function prefixMatches(query) {
+      const normalizedQuery = normalize(query);
+      if (!normalizedQuery) {
+        return [];
+      }
+      return Array.from(select.options)
+        .map((option, index) => ({ option, index }))
+        .filter(({ option }) =>
+          !option.disabled && option.value && normalize(option.textContent).startsWith(normalizedQuery)
+        )
+        .map(({ index }) => index);
+    }
+
+    function applyTypeahead() {
+      if (!wrapper.classList.contains("is-open")) {
+        open();
+      }
+      if (!typeaheadBuffer) {
+        optionButtons().forEach((option) => {
+          option.hidden = false;
+        });
+        setActive(selectedIndex(), true);
+        return;
+      }
+      const matches = new Set(prefixMatches(typeaheadBuffer));
+      optionButtons().forEach((option, index) => {
+        option.hidden = !matches.has(index);
+      });
+      const firstMatch = visibleOptionButtons()[0];
+      if (firstMatch) {
+        setActive(Number(firstMatch.dataset.optionIndex), true);
+      } else {
+        activeIndex = -1;
+        button.removeAttribute("aria-activedescendant");
+      }
+    }
 
     function close(options) {
       const settings = options || {};
@@ -48,6 +108,7 @@
       listbox.hidden = true;
       button.setAttribute("aria-expanded", "false");
       button.removeAttribute("aria-activedescendant");
+      resetTypeahead();
       if (settings.focusButton) {
         button.focus({ preventScroll: true });
       }
@@ -134,14 +195,30 @@
         if (!wrapper.classList.contains("is-open")) {
           open();
         } else {
-          setActive(activeIndex + (event.key === "ArrowDown" ? 1 : -1), true);
+          const visible = visibleOptionButtons();
+          const activeVisibleIndex = visible.findIndex(
+            (option) => Number(option.dataset.optionIndex) === activeIndex
+          );
+          const nextVisibleIndex = Math.max(
+            0,
+            Math.min(
+              activeVisibleIndex + (event.key === "ArrowDown" ? 1 : -1),
+              visible.length - 1
+            )
+          );
+          if (visible[nextVisibleIndex]) {
+            setActive(Number(visible[nextVisibleIndex].dataset.optionIndex), true);
+          }
         }
       } else if (event.key === "Home" || event.key === "End") {
         if (!wrapper.classList.contains("is-open")) {
           return;
         }
         event.preventDefault();
-        setActive(event.key === "Home" ? 0 : optionButtons().length - 1, true);
+        const visible = visibleOptionButtons();
+        if (visible.length) {
+          setActive(Number((event.key === "Home" ? visible[0] : visible[visible.length - 1]).dataset.optionIndex), true);
+        }
       } else if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         if (!wrapper.classList.contains("is-open")) {
@@ -156,6 +233,16 @@
         }
       } else if (event.key === "Tab") {
         close();
+      } else if (typeaheadEnabled() && event.key === "Backspace" && typeaheadBuffer) {
+        event.preventDefault();
+        typeaheadBuffer = typeaheadBuffer.slice(0, -1);
+        scheduleTypeaheadReset();
+        applyTypeahead();
+      } else if (typeaheadEnabled() && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        typeaheadBuffer += event.key;
+        scheduleTypeaheadReset();
+        applyTypeahead();
       }
     });
 

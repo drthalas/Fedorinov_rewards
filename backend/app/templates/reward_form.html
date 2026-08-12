@@ -39,7 +39,7 @@
       </label>
       <label>
         <span>Наименование <span class="required-marker" aria-hidden="true">*</span></span>
-        <select name="id_name" data-guide-role="name" data-styled-select required>
+        <select name="id_name" data-guide-role="name" data-styled-select data-styled-select-typeahead="prefix" required>
           <option value="">—</option>
           {% for item in reward_references %}
           <option value="{{ item.id_name }}" {% if item.id_name|string == reward.id_name|string %}selected{% endif %}>{{ item.name }}</option>
