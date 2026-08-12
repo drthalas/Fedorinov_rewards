@@ -603,7 +603,7 @@
     <section class="legacy-tab-panel legacy-archive-tab legacy-summary-tab">
       <h1>Сводная таблица</h1>
       {% if summary %}
-        <form class="summary-filter-form guide-cascade" method="get" action="/legacy" autocomplete="off">
+        <form class="summary-filter-form guide-cascade" method="get" action="/legacy" autocomplete="off" data-summary-filter-form>
           <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="summary">
           <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
@@ -665,7 +665,7 @@
           </label>
           <div class="summary-filter-actions">
             <button class="summary-primary-action" type="submit">Показать</button>
-            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}">Сброс</a>
+            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}" data-summary-reset>Сброс</a>
             {% if summary_has_result %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
             <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">CSV свод</button>
