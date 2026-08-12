@@ -96,12 +96,11 @@ class Ale359IntegratedCreateFlowTests(unittest.TestCase):
                 connection.execute("select count(*) from rewards").fetchone()[0],
             )
 
-    def test_primary_create_has_no_rewards_and_redirects_to_post_create(self) -> None:
+    def test_primary_create_is_now_final_and_redirects_to_selected_person(self) -> None:
         template = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")
-        self.assertNotIn("data-pending-rewards", template)
-        self.assertNotIn("person_create_rewards.js", template)
-        self.assertIn("data-post-create-rewards", template)
-        self.assertIn("{% if post_create and settings.write_mode %}", template)
+        self.assertIn("data-person-draft", template)
+        self.assertIn("data-draft-reward-open", template)
+        self.assertIn("data-draft-photo-trigger", template)
 
         request = FakeRequest(
             {
@@ -115,8 +114,7 @@ class Ale359IntegratedCreateFlowTests(unittest.TestCase):
             response = asyncio.run(persons_router.person_create(request))
         location = response.headers["location"]
         self.assertEqual(response.status_code, 303)
-        self.assertIn("created=1", location)
-        self.assertIn("/persons/1/edit", location)
+        self.assertEqual(location, "/legacy?tab=rewards&person_id=1&status=person_created")
         self.assertEqual(self._counts(), (1, 0))
 
     def test_post_create_keeps_photo_controls_and_add_reward_after_each_reward(self) -> None:

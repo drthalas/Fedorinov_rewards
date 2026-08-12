@@ -1658,6 +1658,25 @@ th {
   margin-top: 0;
 }
 
+.person-create-draft-rewards {
+  margin-top: 10px;
+}
+
+.person-create-draft-rewards .draft-reward-form {
+  margin: 8px 0;
+  padding: 10px;
+  border: 1px solid #746753;
+  background: rgb(20 21 18 / 72%);
+}
+
+.person-create-draft-rewards .draft-reward-form[hidden] {
+  display: none;
+}
+
+.person-create-cancel {
+  margin-top: 8px;
+}
+
 .person-edit-photos .photo-manage-section .muted {
   margin: 0 0 8px;
   font-size: 12px;

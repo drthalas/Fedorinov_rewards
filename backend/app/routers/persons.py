@@ -15,6 +15,8 @@ from ..repositories.persons_write import (
     person_data_from_mapping,
     update_person,
 )
+from ..repositories.reward_reference import list_reward_references
+from ..repositories.rewards_write import RewardValidationError
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
 from ..services.dates import BIRTH_YEAR_MAXIMUM, BIRTH_YEAR_MINIMUM
 from ..services.display import pagination
@@ -29,7 +31,19 @@ from ..services.person_files import (
     person_folder_status,
 )
 from ..services.person_archive import PersonArchiveError, build_person_archive, save_person_archive
-from ..services.photos import photo_items
+from ..services.photos import PhotoValidationError, photo_items
+from ..services.person_create_drafts import (
+    add_reward as add_draft_reward,
+    cleanup_expired_drafts,
+    clear_staged_photo,
+    commit_draft,
+    discard_draft,
+    load_draft,
+    new_draft_token,
+    remove_reward as remove_draft_reward,
+    staged_photo_path,
+    stage_photo,
+)
 from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -46,19 +60,39 @@ async def _read_form(request: Request) -> dict[str, object]:
     return {key: values[-1] if values else "" for key, values in parsed.items()}
 
 
-def _person_create_context(settings, *, person, return_to: str, error: str | None, field_errors=None):
+def _person_create_context(
+    settings,
+    *,
+    person,
+    return_to: str,
+    error: str | None,
+    field_errors=None,
+    draft_token: str = "",
+    draft=None,
+):
+    reward_references = list_reward_references(settings.rewards_db_path) if settings.db_exists else []
+    reference_names = {int(item["id_name"]): item["name"] for item in reward_references}
+    draft = draft or {"rewards": [], "photos": {}}
+    draft_rewards = [
+        {**item, "name": reference_names.get(int(item.get("id_name") or 0), "—"), "index": index}
+        for index, item in enumerate(draft.get("rewards", []))
+    ]
     return {
         "settings": settings,
         "mode": "create",
         "person": person,
         "ranks": list_rank_guide(settings.rewards_db_path) if settings.db_exists else [],
-        "photo_controls": [],
+        "photo_controls": photo_items("person", {}),
         "return_to": return_to,
         "error": error,
         "created_message": "",
         "birth_year_min": BIRTH_YEAR_MINIMUM,
         "birth_year_max": BIRTH_YEAR_MAXIMUM,
         "field_errors": field_errors or {},
+        "draft_token": draft_token,
+        "draft_rewards": draft_rewards,
+        "draft_photos": draft.get("photos", {}),
+        "reward_references": reward_references,
     }
 
 
@@ -183,10 +217,19 @@ def person_new(request: Request, return_to: str = ""):
     settings = get_settings()
     if not settings.write_mode:
         raise HTTPException(status_code=403, detail="Редактирование выключено.")
+    cleanup_expired_drafts(settings)
+    draft_token = new_draft_token()
     return templates.TemplateResponse(
         request,
         "person_form.html",
-        _person_create_context(settings, person={}, return_to=safe_return_to(return_to), error=None),
+        _person_create_context(
+            settings,
+            person={},
+            return_to=safe_return_to(return_to),
+            error=None,
+            draft_token=draft_token,
+            draft=load_draft(settings, draft_token),
+        ),
     )
 
 
@@ -195,12 +238,14 @@ async def person_create(request: Request):
     settings = get_settings()
     form_values = await _read_form(request)
     return_to = safe_return_to(form_values.get("return_to"))
+    draft_token = str(form_values.get("draft_token") or "") or new_draft_token()
     try:
         data = person_data_from_mapping(form_values)
-        person_id = create_person(settings, data)
+        person_id = commit_draft(settings, draft_token, data)
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except PersonValidationError as exc:
+    except (PersonValidationError, RewardValidationError, PhotoValidationError, ValueError, OSError) as exc:
+        field = exc.field if isinstance(exc, PersonValidationError) else None
         return templates.TemplateResponse(
             request,
             "person_form.html",
@@ -209,12 +254,86 @@ async def person_create(request: Request):
                 person=form_values,
                 return_to=return_to,
                 error=str(exc),
-                field_errors={exc.field: str(exc)} if exc.field else {},
+                field_errors={field: str(exc)} if field else {},
+                draft_token=draft_token,
+                draft=load_draft(settings, draft_token),
             ),
             status_code=400,
         )
-    target = _person_created_edit_url(person_id, return_to, person_rank_id=data.id_rank)
+    target = with_status(with_query_value(return_to or "/legacy?tab=rewards", "person_id", str(person_id)), "person_created")
     return RedirectResponse(target, status_code=303)
+
+
+@router.post("/persons/new/draft/{draft_token}/rewards")
+async def person_draft_reward_add(request: Request, draft_token: str):
+    settings = get_settings()
+    form = await request.form()
+    try:
+        draft = add_draft_reward(settings, draft_token, dict(form))
+    except (ValueError, RewardValidationError) as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    reference_names = {
+        int(item["id_name"]): item["name"] for item in list_reward_references(settings.rewards_db_path)
+    }
+    item = draft["rewards"][-1]
+    return JSONResponse({
+        "ok": True,
+        "index": len(draft["rewards"]) - 1,
+        "name": reference_names.get(int(item.get("id_name") or 0), "—"),
+        "number": item.get("number"),
+    })
+
+
+@router.post("/persons/new/draft/{draft_token}/rewards/{index}/remove")
+def person_draft_reward_remove(draft_token: str, index: int):
+    settings = get_settings()
+    try:
+        remove_draft_reward(settings, draft_token, index)
+    except ValueError as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=404)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/persons/new/draft/{draft_token}/photos")
+async def person_draft_photo_upload(request: Request, draft_token: str):
+    settings = get_settings()
+    form = await request.form()
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        return JSONResponse({"ok": False, "message": "Выберите файл изображения."}, status_code=400)
+    content = await upload.read(25 * 1024 * 1024 + 1)
+    try:
+        stage_photo(settings, draft_token, str(form.get("photo_field") or ""), upload.filename or "", content)
+    except (ValueError, PhotoValidationError) as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    finally:
+        await upload.close()
+    field = str(form.get("photo_field") or "")
+    return JSONResponse({"ok": True, "url": f"/persons/new/draft/{draft_token}/photos/{field}"})
+
+
+@router.get("/persons/new/draft/{draft_token}/photos/{photo_field}")
+def person_draft_photo_view(draft_token: str, photo_field: str):
+    path = staged_photo_path(get_settings(), draft_token, photo_field)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Фото черновика не найдено.")
+    return FileResponse(path)
+
+
+@router.post("/persons/new/draft/{draft_token}/photos/{photo_field}/clear")
+def person_draft_photo_clear(draft_token: str, photo_field: str):
+    try:
+        clear_staged_photo(get_settings(), draft_token, photo_field)
+    except (ValueError, PhotoValidationError) as exc:
+        return JSONResponse({"ok": False, "message": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@router.post("/persons/new/draft/{draft_token}/cancel")
+async def person_draft_cancel(request: Request, draft_token: str):
+    form_values = await _read_form(request)
+    discard_draft(get_settings(), draft_token)
+    return RedirectResponse(safe_return_to(form_values.get("return_to")) or "/legacy?tab=rewards", status_code=303)
 
 
 @router.get("/persons/{person_id}")

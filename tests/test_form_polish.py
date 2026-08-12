@@ -183,7 +183,7 @@ class FormPolishTests(unittest.TestCase):
         self.assertEqual(context["person"]["biography"], "Биография")
         self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=1")
 
-    def test_successful_person_create_redirects_to_edit_with_created_message(self) -> None:
+    def test_successful_person_create_redirects_to_selected_legacy_person(self) -> None:
         request = FakeRequest(
             {
                 "fio": "Петров Пётр Петрович",
@@ -194,29 +194,14 @@ class FormPolishTests(unittest.TestCase):
         )
         response = asyncio.run(persons_router.person_create(request))
         location = response.headers["location"]
-        self.assertTrue(location.startswith("/persons/2/edit?"))
-        self.assertIn("created=1", location)
-        selected_return = parse_qs(urlsplit(location).query)["return_to"][0]
-        self.assertEqual(selected_return, "/legacy?tab=rewards&person_id=2")
-
-        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
-            edit_response = persons_router.person_edit(object(), 2, return_to=selected_return, created="1")
-        context = edit_response["context"]
-        self.assertEqual(
-            context["created_message"],
-            "Кавалер создан. Добавьте фотографии и награды, затем нажмите «Сохранить».",
-        )
-        self.assertTrue(context["post_create"])
-        self.assertEqual(context["post_create_rewards"], [])
-        self.assertIn("created=1", context["post_create_url"])
-        self.assertEqual(context["return_to"], "/legacy?tab=rewards&person_id=2")
+        self.assertEqual(location, "/legacy?tab=rewards&person_id=2&status=person_created")
 
         update_request = FakeRequest(
             {
                 "fio": "Петров Пётр Петрович",
                 "birthday": "1914",
                 "id_rank": "1",
-                "return_to": selected_return,
+                "return_to": "/legacy?tab=rewards&person_id=2",
             }
         )
         update_response = asyncio.run(persons_router.person_update(update_request, 2))

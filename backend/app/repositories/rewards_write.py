@@ -245,26 +245,30 @@ def _validate_unique_reward_number(connection, data: RewardWriteData, current_re
         raise RewardValidationError(reward_duplicate_message(duplicate))
 
 
+def create_reward_in_connection(connection, person_id: int, data: RewardWriteData) -> int:
+    _validate_required_name(data)
+    if not _person_exists(connection, person_id):
+        raise RewardValidationError("Награжденный не найден.")
+    data = _with_reference_fields(connection, data)
+    _validate_unique_reward_number(connection, data)
+    cursor = connection.execute(
+        """
+        insert into rewards (
+            person_id, id_gos, id_catigory, id_sub_catigory, id_name, id_link,
+            number, instock, date_purchase, price_purchase, price_now,
+            front_foto, back_foto, book1_foto, book2_foto, reward_list
+        )
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (person_id, *_as_params(data)),
+    )
+    return int(cursor.lastrowid)
+
+
 def create_reward(settings: Settings, person_id: int, data: RewardWriteData) -> int:
     ensure_write_allowed(settings)
-    _validate_required_name(data)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
-        if not _person_exists(connection, person_id):
-            raise RewardValidationError("Награжденный не найден.")
-        data = _with_reference_fields(connection, data)
-        _validate_unique_reward_number(connection, data)
-        cursor = connection.execute(
-            """
-            insert into rewards (
-                person_id, id_gos, id_catigory, id_sub_catigory, id_name, id_link,
-                number, instock, date_purchase, price_purchase, price_now,
-                front_foto, back_foto, book1_foto, book2_foto, reward_list
-            )
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (person_id, *_as_params(data)),
-        )
-        reward_id = int(cursor.lastrowid)
+        reward_id = create_reward_in_connection(connection, person_id, data)
         connection.commit()
     log_action("create", "reward", reward_id, {"person_id": person_id, "fields": list(REWARD_FIELDS)})
     return reward_id

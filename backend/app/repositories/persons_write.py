@@ -245,28 +245,31 @@ def _validate_person_data(data: PersonWriteData, *, existing_birthday: object = 
         raise PersonValidationError("Выберите звание / специальность.")
 
 
+def create_person_in_connection(connection, settings: Settings, data: PersonWriteData) -> tuple[int, Path | None, tuple[str, ...]]:
+    _validate_person_data(data)
+    _ensure_biography_column(connection)
+    _validate_person_duplicate(connection, data)
+    fields = _active_fields(connection)
+    columns = ", ".join(fields)
+    placeholders = ", ".join("?" for _ in fields)
+    cursor = connection.execute(
+        f"insert into person ({columns}) values ({placeholders})",
+        _as_params(data, fields),
+    )
+    person_id = int(cursor.lastrowid)
+    folder = safe_person_folder(settings, person_id)
+    folder_existed = folder.exists()
+    ensure_person_folder(settings, person_id)
+    return person_id, None if folder_existed else folder, fields
+
+
 def create_person(settings: Settings, data: PersonWriteData) -> int:
     ensure_write_allowed(settings)
-    _validate_person_data(data)
     created_folder = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         connection.execute("begin immediate")
-        _ensure_biography_column(connection)
-        _validate_person_duplicate(connection, data)
-        fields = _active_fields(connection)
-        columns = ", ".join(fields)
-        placeholders = ", ".join("?" for _ in fields)
-        cursor = connection.execute(
-            f"insert into person ({columns}) values ({placeholders})",
-            _as_params(data, fields),
-        )
-        person_id = int(cursor.lastrowid)
-        folder = safe_person_folder(settings, person_id)
-        folder_existed = folder.exists()
         try:
-            ensure_person_folder(settings, person_id)
-            if not folder_existed:
-                created_folder = folder
+            person_id, created_folder, fields = create_person_in_connection(connection, settings, data)
             connection.commit()
         except Exception:
             connection.rollback()
