@@ -5724,6 +5724,10 @@ body.legacy-rewards-theme::after {
   text-align: left;
 }
 
+.styled-select-option[hidden] {
+  display: none;
+}
+
 .styled-select-option:last-child {
   border-bottom: 0;
 }

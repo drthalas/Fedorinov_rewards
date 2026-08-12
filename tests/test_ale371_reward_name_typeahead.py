@@ -58,6 +58,14 @@ class RewardNameTypeaheadContractTests(unittest.TestCase):
         self.assertIn("visibleOptionButtons()[0]", script)
         self.assertIn('event.key === "Backspace"', script)
 
+    def test_hidden_typeahead_options_override_the_base_display_rule(self) -> None:
+        styles = (ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8")
+
+        base_rule = styles.index(".styled-select-option {")
+        hidden_rule = styles.index(".styled-select-option[hidden] {")
+        self.assertGreater(hidden_rule, base_rule)
+        self.assertIn("display: none;", styles[hidden_rule : hidden_rule + 80])
+
 
 if __name__ == "__main__":
     unittest.main()
