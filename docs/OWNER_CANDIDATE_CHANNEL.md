@@ -5,9 +5,9 @@
 Physical Windows использует два независимых update channel:
 
 - **Production channel** — public GitHub `latest.json`. Его используют Сергей и обычные production installations. Он меняется только в отдельно авторизованной publication stage.
-- **Owner candidate channel** — private loopback channel только на physical test host. Он содержит exact непубликованный ZIP, уже прошедший Windows VM updater gate.
+- **Owner candidate channel** — private loopback channel только на physical test host. Он содержит exact непубликованный ZIP, собранный из accepted merged HEAD и прошедший минимальные release/package parity checks.
 
-Candidate channel не является заменой VM gate. Это обязательный последний шаг release-candidate stage перед ручным Owner update.
+Product feature проходит свой tier и physical Owner acceptance до release stage. После этого release stage по умолчанию не повторяет VM updater, full suite или product regression. Candidate channel и physical visibility — обязательный последний шаг перед ручным Owner update, который является реальным pre-publication updater gate.
 
 ## Постоянные пути
 
@@ -19,9 +19,9 @@ Candidate channel не является заменой VM gate. Это обяз�
 
 Сервер слушает только loopback. Candidate не публикуется в LAN, GitHub или production updater channel. Passwords/keys не хранятся в repo, command arguments, manifests или logs.
 
-## Deploy после VM PASS
+## Deploy после Owner feature PASS и release package checks
 
-Использовать exact artifact, который прошёл VM gate. Не пересобирать его:
+Использовать exact artifact из accepted merged HEAD. Не пересобирать его после handoff без доказанного mismatch:
 
 ```sh
 python3 scripts/prepare_owner_candidate_channel.py deploy \
@@ -69,7 +69,7 @@ DB/media paths, data fixture, launcher и product files не меняются. `
 Только затем допустим статус:
 
 ```text
-READY FOR OWNER MANUAL PHYSICAL UPDATE: YES
+READY FOR OWNER MANUAL UPDATE: YES
 ```
 
 Owner подходит к ноутбуку и сам нажимает `Обновить`. Codex не запускает update без отдельного разрешения.
@@ -102,7 +102,7 @@ python3 scripts/prepare_owner_candidate_channel.py restore
 
 ### Owner FAIL
 
-Production channel не менять. После corrective merge/build/VM PASS повторный `deploy` заменяет только candidate channel и сохраняет permanent `Public Current`. Затем повторяется physical visibility gate нового exact candidate.
+Production channel не менять. После corrective product validation, Owner acceptance, merge/build и минимальных package checks повторный `deploy` заменяет только candidate channel и сохраняет permanent `Public Current`. Затем повторяется physical visibility gate нового exact candidate.
 
 ## Failure handling и rollback
 

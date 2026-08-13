@@ -43,7 +43,7 @@
 ## Ручное обновление release candidate
 
 - [ ] Используется существующая Desktop-папка `Fedorinov Rewards - Public Current`, а не новая копия.
-- [ ] Codex подтвердил `READY FOR OWNER MANUAL PHYSICAL UPDATE` только после physical visibility gate.
+- [ ] Codex подтвердил `READY FOR OWNER MANUAL UPDATE` только после physical visibility gate.
 - [ ] Запустить обычный `start_windows.bat`.
 - [ ] Открыть `О программе` и нажать `Проверить обновления`.
 - [ ] Проверить показанные current/candidate version; затем Owner самостоятельно решает, нажимать ли `Обновить`.

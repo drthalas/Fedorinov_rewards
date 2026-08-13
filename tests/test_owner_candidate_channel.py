@@ -170,6 +170,20 @@ class OwnerCandidateChannelTests(unittest.TestCase):
         self.assertIn("update_not_applied", handoff)
         self.assertNotIn("/updates/apply", handoff)
 
+    def test_release_docs_do_not_require_duplicate_vm_gate_after_owner_pass(self) -> None:
+        release_process = (
+            prepare_owner_candidate_channel.PROJECT_ROOT / "docs" / "RELEASE_PROCESS.md"
+        ).read_text(encoding="utf-8")
+        channel_runbook = (
+            prepare_owner_candidate_channel.PROJECT_ROOT
+            / "docs"
+            / "OWNER_CANDIDATE_CHANNEL.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("Do not repeat the full suite, Windows VM updater gate", release_process)
+        self.assertIn("manual Owner update", release_process)
+        self.assertIn("не повторяет VM updater", channel_runbook)
+        self.assertIn("pre-publication updater gate", channel_runbook)
+
 
 if __name__ == "__main__":
     unittest.main()

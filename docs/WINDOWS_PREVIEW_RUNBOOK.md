@@ -65,7 +65,7 @@ http://127.0.0.1:8080
 
 Постоянная Desktop-папка `Fedorinov Rewards - Public Current` не пересоздаётся для каждого release candidate. До Owner PASS в ней остаётся текущая public production версия и прежние DB/media paths.
 
-После Windows VM gate Codex штатным tool `scripts/prepare_owner_candidate_channel.py`:
+После Owner feature PASS, controlled merge/build и минимальных package/parity checks Codex штатным tool `scripts/prepare_owner_candidate_channel.py`:
 
 - размещает exact проверенный ZIP и отдельный `latest.json` в `C:\FedorinovGate\OwnerCandidateChannel`;
 - запускает loopback-only channel на `127.0.0.1:18387`;
@@ -74,6 +74,8 @@ http://127.0.0.1:8080
 - проверяет в видимом Edge, что `О программе → Проверить обновления` показывает candidate, но не запускает установку.
 
 Production GitHub `latest.json` от этого не меняется, поэтому Сергей candidate не видит. Команды, lifecycle и rollback: `docs/OWNER_CANDIDATE_CHANNEL.md`.
+
+Release stage не повторяет Windows VM updater gate, full suite или product regression без конкретного mismatch либо изменения updater/recovery/packaging/bootstrap/migration. Реальный pre-publication updater gate выполняет Owner из постоянного `Public Current`.
 
 ## Если порт 8080 занят
 

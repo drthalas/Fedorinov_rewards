@@ -44,19 +44,28 @@ dist/latest.json
 
 ## Release-candidate stage
 
-After controlled integration and the required Windows VM updater gate, prepare the
-physical Owner handoff before reporting the candidate as ready:
+After the feature candidate has passed its assigned test tier and the Owner has
+accepted it on physical Windows, the release stage is deliberately short:
 
-1. Keep the production GitHub `latest.json` on the current public version.
-2. Deploy the already tested ZIP to the isolated Owner candidate channel with
+1. Record the exact accepted product HEAD and verify ancestry during controlled integration.
+2. Select the next patch version and build the exact release artifact.
+3. Run only version, manifest, SHA, package-safety/parity, clean-tree, and release-tooling static checks.
+4. Do not repeat the full suite, Windows VM updater gate, headed product regression, or branch preview by default.
+5. Keep the production GitHub `latest.json` on the current public version.
+6. Deploy the exact ZIP to the isolated Owner candidate channel with
    `scripts/prepare_owner_candidate_channel.py`.
-3. Do not rebuild or recreate the permanent physical `Public Current` install.
-4. Start that existing install with its ordinary `start_windows.bat`.
-5. In headed Edge, open `О программе`, click `Проверить обновления`, and prove
+7. Do not rebuild or recreate the permanent physical `Public Current` install.
+8. Start that existing install with its ordinary `start_windows.bat`.
+9. In headed Edge, open `О программе`, click `Проверить обновления`, and prove
    that the exact candidate version and SHA are visible.
-6. Do not click `Обновить` for the Owner without separate authorization.
+10. Do not click `Обновить` for the Owner without separate authorization.
 
-Example after the VM gate:
+Additional VM/release gates are justified only by a concrete mismatch or when
+the release changes updater, recovery, packaging, bootstrap, or migrations. The
+manual Owner update from the permanent physical `Public Current` is the real
+pre-publication updater gate.
+
+Example after merge/build and minimal package checks:
 
 ```sh
 python3 scripts/prepare_owner_candidate_channel.py deploy \
@@ -73,7 +82,7 @@ the exact candidate code archive and a private loopback manifest, and points the
 existing physical `Public Current` to that local Owner channel. It does not alter
 the production manifest or copy the data/media fixture.
 
-`READY FOR OWNER MANUAL PHYSICAL UPDATE` is valid only after the headed physical
+`READY FOR OWNER MANUAL UPDATE` is valid only after the headed physical
 visibility check passes. See `docs/OWNER_CANDIDATE_CHANNEL.md` for deploy,
 status, restore, and failure handling.
 
