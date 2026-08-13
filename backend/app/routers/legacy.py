@@ -54,6 +54,7 @@ logger = logging.getLogger(__name__)
 
 VALID_TABS = {"rewards", "search", "marks", "summary", "about"}
 SEARCH_PAGE_SIZE = 50
+SUMMARY_PAGE_SIZE = 50
 LEGACY_DOCUMENT_PHOTO_SLOTS = (
     ("card1_foto", "FotoCard1", "Учётная карточка, сторона 1"),
     ("card2_foto", "FotoCard2", "Учётная карточка, сторона 2"),
@@ -140,12 +141,64 @@ def _truthy_query_flag(value: object) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _summary_url(filters, summary_mode: str, summary_applied: bool = False) -> str:
+def _summary_url(
+    filters,
+    summary_mode: str,
+    summary_applied: bool = False,
+    *,
+    summary_page: int = 1,
+    matrix_sort: str = "fio",
+    matrix_dir: str = "asc",
+) -> str:
     params = {"tab": "summary", "summary_mode": summary_mode}
     params.update(_summary_query_params(filters))
     if summary_applied:
         params["summary_applied"] = "1"
+    if summary_mode == "matrix" and matrix_sort != "fio":
+        params["matrix_sort"] = matrix_sort
+    if summary_mode == "matrix" and matrix_dir == "desc":
+        params["matrix_dir"] = "desc"
+    if summary_page > 1:
+        params["summary_page"] = summary_page
     return str(URL(path="/legacy").include_query_params(**params))
+
+
+def _summary_pagination_context(
+    filters,
+    summary_mode: str,
+    total: int,
+    requested_page: int,
+    *,
+    matrix_sort: str = "fio",
+    matrix_dir: str = "asc",
+) -> tuple[slice, dict[str, object]]:
+    pages = max(1, (max(0, total) + SUMMARY_PAGE_SIZE - 1) // SUMMARY_PAGE_SIZE)
+    page = min(max(1, int(requested_page or 1)), pages)
+    start = (page - 1) * SUMMARY_PAGE_SIZE
+    end = min(start + SUMMARY_PAGE_SIZE, total)
+
+    def url_for(page_number: int) -> str:
+        return _summary_url(
+            filters,
+            summary_mode,
+            True,
+            summary_page=page_number,
+            matrix_sort=matrix_sort,
+            matrix_dir=matrix_dir,
+        )
+
+    return slice(start, end), {
+        "page": page,
+        "pages": pages,
+        "page_size": SUMMARY_PAGE_SIZE,
+        "total": total,
+        "range_start": start + 1 if total else 0,
+        "range_end": end,
+        "prev_url": url_for(page - 1) if page > 1 else "",
+        "next_url": url_for(page + 1) if page < pages else "",
+        "first_url": url_for(1),
+        "last_url": url_for(pages),
+    }
 
 
 def _normalized_matrix_sort(sort_by: str = "", sort_dir: str = "") -> tuple[str, str]:
@@ -516,6 +569,7 @@ def legacy_index(
     summary_applied: str = "",
     matrix_sort: str = "fio",
     matrix_dir: str = "asc",
+    summary_page: int = 1,
     check_updates: str | None = None,
 ):
     settings = get_settings()
@@ -640,6 +694,7 @@ def legacy_index(
         "summary_matrix_sort": {"sort": active_matrix_sort, "dir": active_matrix_dir, "urls": {}, "photo_urls": {}, "reward_urls": {}},
         "summary_csv_url": "/summary.csv",
         "summary_matrix": None,
+        "summary_pagination": None,
         "summary_matrix_csv_url": "/summary_matrix.csv",
         "summary_matrix_mode_url": "/legacy?tab=summary&summary_mode=matrix",
         "summary_aggregate_mode_url": "/legacy?tab=summary&summary_mode=aggregate",
@@ -654,6 +709,134 @@ def legacy_index(
     }
 
     if not settings.db_exists:
+        return templates.TemplateResponse(request, "legacy.html", context)
+
+    if active_tab == "search":
+        if q.strip() or scope != "all":
+            search_results = search_all(
+                settings.rewards_db_path,
+                q,
+                limit=SEARCH_PAGE_SIZE,
+                page=page,
+                scope=scope,
+                mode=mode,
+                sort_by=sort,
+                sort_dir=dir,
+            )
+            context["search_results"] = search_results
+            context["scope"] = search_results["scope"]
+            context["mode"] = search_results["mode"]
+            context["sort"] = search_results["sort_by"]
+            context["dir"] = search_results["sort_dir"]
+            context["search_return_to"] = _legacy_search_url(
+                q,
+                search_results["scope"],
+                search_results["mode"],
+                search_results["sort_by"],
+                search_results["sort_dir"],
+                active_photo_mode,
+                int(search_results["page"]),
+            )
+            context["search_sort"] = _search_sort_context(
+                "/legacy",
+                q,
+                search_results["scope"],
+                search_results["mode"],
+                search_results["sort_by"],
+                search_results["sort_dir"],
+                active_photo_mode,
+            )
+            context["search_pagination"] = _legacy_search_pagination_context(
+                q,
+                search_results["scope"],
+                search_results["mode"],
+                search_results["sort_by"],
+                search_results["sort_dir"],
+                active_photo_mode,
+                search_results,
+            )
+        context["search_suggestions"] = search_suggestions(settings.rewards_db_path)
+        return templates.TemplateResponse(request, "legacy.html", context)
+
+    if active_tab == "summary":
+        context["summary"] = {"counts": {"person": 0, "rewards": 0, "mark": 0}}
+        context["summary_options"] = summary_filter_options(settings.rewards_db_path, context["summary_filters"])
+        context["summary_filter_cascade"] = summary_filter_cascade(settings.rewards_db_path)
+        context["summary_matrix_mode_url"] = _summary_url(
+            context["summary_filters"], "matrix", active_summary_applied
+        )
+        context["summary_aggregate_mode_url"] = _summary_url(
+            context["summary_filters"], "aggregate", active_summary_applied
+        )
+        context["summary_reset_url"] = _summary_url(
+            normalized_summary_filters(), active_summary_mode, False
+        )
+        if not active_summary_applied:
+            return templates.TemplateResponse(request, "legacy.html", context)
+
+        context["summary"] = _legacy_summary(settings.rewards_db_path)
+        context["summary_has_result"] = True
+        context["summary_csv_url"] = str(
+            URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"]))
+        )
+        context["summary_matrix_csv_url"] = str(
+            URL(path="/summary_matrix.csv").include_query_params(
+                **_summary_query_params(context["summary_filters"])
+            )
+        )
+
+        if active_summary_mode == "matrix":
+            matrix = summary_matrix(
+                settings.rewards_db_path,
+                context["summary_filters"],
+                active_matrix_sort,
+                active_matrix_dir,
+            )
+            row_slice, pagination = _summary_pagination_context(
+                context["summary_filters"],
+                "matrix",
+                len(matrix["rows"]),
+                summary_page,
+                matrix_sort=active_matrix_sort,
+                matrix_dir=active_matrix_dir,
+            )
+            current_url = _summary_url(
+                context["summary_filters"],
+                "matrix",
+                True,
+                summary_page=pagination["page"],
+                matrix_sort=active_matrix_sort,
+                matrix_dir=active_matrix_dir,
+            )
+            visible_rows = []
+            for row in matrix["rows"][row_slice]:
+                visible = dict(row)
+                visible["detail_url"] = str(
+                    URL(path=f"/persons/{visible['id']}").include_query_params(return_to=current_url)
+                )
+                visible_rows.append(visible)
+            context["summary_matrix"] = {**matrix, "rows": visible_rows}
+            context["summary_pagination"] = pagination
+            context["summary_matrix_sort"] = _matrix_sort_context(
+                matrix,
+                context["summary_filters"],
+                active_matrix_sort,
+                active_matrix_dir,
+                True,
+            )
+        else:
+            rows = summary_rows(settings.rewards_db_path, context["summary_filters"])
+            row_slice, pagination = _summary_pagination_context(
+                context["summary_filters"], "aggregate", len(rows), summary_page
+            )
+            context["summary_rows"] = rows[row_slice]
+            context["summary_totals"] = summary_totals(rows)
+            context["summary_pagination"] = pagination
+
+        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix", True)
+        context["summary_aggregate_mode_url"] = _summary_url(
+            context["summary_filters"], "aggregate", True
+        )
         return templates.TemplateResponse(request, "legacy.html", context)
 
     partial_rewards_request = (
@@ -800,73 +983,6 @@ def legacy_index(
         selected_mark = get_mark(settings.rewards_db_path, selected_mark_id)
         context["selected_mark"] = selected_mark
         context["selected_mark_photos"] = mark_photo_items(selected_mark) if selected_mark else []
-
-    if active_tab == "search" and (q.strip() or scope != "all"):
-        search_results = search_all(settings.rewards_db_path, q, limit=SEARCH_PAGE_SIZE, page=page, scope=scope, mode=mode, sort_by=sort, sort_dir=dir)
-        context["search_results"] = search_results
-        context["scope"] = search_results["scope"]
-        context["mode"] = search_results["mode"]
-        context["sort"] = search_results["sort_by"]
-        context["dir"] = search_results["sort_dir"]
-        context["search_return_to"] = _legacy_search_url(
-            q,
-            search_results["scope"],
-            search_results["mode"],
-            search_results["sort_by"],
-            search_results["sort_dir"],
-            active_photo_mode,
-            int(search_results["page"]),
-        )
-        context["search_sort"] = _search_sort_context(
-            "/legacy",
-            q,
-            search_results["scope"],
-            search_results["mode"],
-            search_results["sort_by"],
-            search_results["sort_dir"],
-            active_photo_mode,
-        )
-        context["search_pagination"] = _legacy_search_pagination_context(
-            q,
-            search_results["scope"],
-            search_results["mode"],
-            search_results["sort_by"],
-            search_results["sort_dir"],
-            active_photo_mode,
-            search_results,
-        )
-    if active_tab == "search":
-        context["search_suggestions"] = search_suggestions(settings.rewards_db_path)
-
-    if active_tab == "summary":
-        context["summary"] = {"counts": {"person": 0, "rewards": 0, "mark": 0}}
-        context["summary_options"] = summary_filter_options(settings.rewards_db_path, context["summary_filters"])
-        context["summary_filter_cascade"] = summary_filter_cascade(settings.rewards_db_path)
-        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix", active_summary_applied)
-        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate", active_summary_applied)
-        context["summary_reset_url"] = _summary_url(normalized_summary_filters(), active_summary_mode, False)
-        if not active_summary_applied:
-            return templates.TemplateResponse(request, "legacy.html", context)
-
-        context["summary"] = _legacy_summary(settings.rewards_db_path)
-        context["summary_has_result"] = True
-        rows = summary_rows(settings.rewards_db_path, context["summary_filters"])
-        context["summary_rows"] = rows
-        context["summary_totals"] = summary_totals(rows)
-        context["summary_csv_url"] = str(URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"])))
-        context["summary_matrix"] = summary_matrix(settings.rewards_db_path, context["summary_filters"], active_matrix_sort, active_matrix_dir)
-        context["summary_matrix_csv_url"] = str(
-            URL(path="/summary_matrix.csv").include_query_params(**_summary_query_params(context["summary_filters"]))
-        )
-        context["summary_matrix_sort"] = _matrix_sort_context(
-            context["summary_matrix"],
-            context["summary_filters"],
-            active_matrix_sort,
-            active_matrix_dir,
-            True,
-        )
-        context["summary_matrix_mode_url"] = _summary_url(context["summary_filters"], "matrix", True)
-        context["summary_aggregate_mode_url"] = _summary_url(context["summary_filters"], "aggregate", True)
 
     if active_tab == "about" and context["check_updates"]:
         context["update_check"] = check_for_updates(settings)

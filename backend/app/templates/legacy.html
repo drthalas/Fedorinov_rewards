@@ -366,7 +366,7 @@
           <label><input type="radio" name="photo_mode" value="photos" {% if photo_mode == "photos" %}checked{% endif %}> мини-фото</label>
         </fieldset>
         <button type="submit">Искать</button>
-        <a class="button secondary-button" href="/legacy?tab=search">Сброс</a>
+        <a class="button secondary-button" href="/legacy?tab=search" data-search-reset>Сброс</a>
       </form>
       {% if not q.strip() and scope == "all" %}
         <div class="notice">Введите строку поиска или выберите конкретную категорию. Если оставить поле пустым и выбрать категорию, будут показаны все записи выбранной категории.</div>
@@ -602,8 +602,30 @@
   {% elif tab == "summary" %}
     <section class="legacy-tab-panel legacy-archive-tab legacy-summary-tab">
       <h1>Сводная таблица</h1>
+      {% macro summary_pagination_controls(pagination) -%}
+      {% if pagination and pagination.total > pagination.page_size %}
+      <nav class="search-pagination" aria-label="Страницы сводной таблицы">
+        <span class="search-pagination-range">Показаны {{ pagination.range_start }}–{{ pagination.range_end }} из {{ pagination.total }}</span>
+        {% if pagination.page > 1 %}
+        <a class="button secondary-button search-page-button" href="{{ pagination.first_url }}">Первая</a>
+        <a class="button secondary-button search-page-button" href="{{ pagination.prev_url }}">Предыдущая</a>
+        {% else %}
+        <span class="button secondary-button search-page-button disabled" aria-disabled="true">Первая</span>
+        <span class="button secondary-button search-page-button disabled" aria-disabled="true">Предыдущая</span>
+        {% endif %}
+        <span class="search-page-current">Страница {{ pagination.page }} из {{ pagination.pages }}</span>
+        {% if pagination.page < pagination.pages %}
+        <a class="button secondary-button search-page-button" href="{{ pagination.next_url }}">Следующая</a>
+        <a class="button secondary-button search-page-button" href="{{ pagination.last_url }}">Последняя</a>
+        {% else %}
+        <span class="button secondary-button search-page-button disabled" aria-disabled="true">Следующая</span>
+        <span class="button secondary-button search-page-button disabled" aria-disabled="true">Последняя</span>
+        {% endif %}
+      </nav>
+      {% endif %}
+      {%- endmacro %}
       {% if summary %}
-        <form class="summary-filter-form guide-cascade" method="get" action="/legacy" autocomplete="off" data-summary-filter-form>
+        <form class="summary-filter-form guide-cascade" method="get" action="/legacy" autocomplete="off">
           <script type="application/json" data-guide-cascade-options>{{ summary_filter_cascade|tojson }}</script>
           <input type="hidden" name="tab" value="summary">
           <input type="hidden" name="summary_mode" value="{{ summary_mode }}">
@@ -665,7 +687,7 @@
           </label>
           <div class="summary-filter-actions">
             <button class="summary-primary-action" type="submit">Показать</button>
-            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}" data-summary-reset>Сброс</a>
+            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}">Сброс</a>
             {% if summary_has_result %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
             <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">CSV свод</button>
@@ -736,7 +758,7 @@
             <tbody>
               {% for row in summary_matrix.rows %}
               <tr>
-                <td><a href="/persons/{{ row.id }}?return_to=/legacy%3Ftab%3Dsummary%26summary_mode%3Dmatrix">{{ row.fio|dash }}</a></td>
+                <td><a href="{{ row.detail_url }}">{{ row.fio|dash }}</a></td>
                 <td>{{ row.rank_name|dash }}</td>
                 <td>{{ row.birthday|format_birth_year }}</td>
                 {% for column in summary_matrix.photo_columns %}
@@ -768,6 +790,7 @@
             </tbody>
           </table>
         </div>
+        {{ summary_pagination_controls(summary_pagination) }}
         <p class="secondary">В ячейках показано количество наград выбранного наименования у кавалера: 0, 1 или больше.</p>
         {% else %}
         <div class="legacy-table-wrap summary-matrix-wrap">
@@ -815,6 +838,7 @@
             </tbody>
           </table>
         </div>
+        {{ summary_pagination_controls(summary_pagination) }}
         <p class="secondary">По умолчанию таблица показывает награды. Чтобы включить знаки, отметьте “Знаки” и нажмите “Показать”.</p>
         {% endif %}
         {% endif %}

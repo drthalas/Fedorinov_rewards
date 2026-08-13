@@ -315,7 +315,7 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
         person_params: list[object] = []
         if active_filters:
             exists_where, exists_params = _where_clause("rx", filters, extra_name)
-            person_where = f"where exists (select 1 from rewards rx {exists_where} and rx.person_id = p.id)"
+            person_where = f"where p.id in (select distinct rx.person_id from rewards rx {exists_where})"
             person_params.extend(exists_params)
 
         person_rows_sql = connection.execute(

@@ -1,45 +1,49 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "fedorinov:summary-session-url";
-  const DEFAULT_URL = "/legacy?tab=summary";
+  const STORAGE_KEY = "fedorinov:search-session-url";
+  const DEFAULT_URL = "/legacy?tab=search";
   let resetNavigation = false;
 
-  function summaryUrl(value) {
+  function searchUrl(value) {
     try {
       const url = new URL(value, window.location.origin);
       if (url.origin !== window.location.origin || url.pathname !== "/legacy") return null;
-      if (url.searchParams.get("tab") !== "summary") return null;
+      if (url.searchParams.get("tab") !== "search") return null;
       return url;
     } catch (error) {
       return null;
     }
   }
 
+  function hasResultsState(url) {
+    return Boolean((url.searchParams.get("q") || "").trim()) ||
+      (url.searchParams.get("scope") || "all") !== "all";
+  }
+
   function storedUrl() {
     try {
-      const url = summaryUrl(window.sessionStorage.getItem(STORAGE_KEY) || "");
-      return url && url.searchParams.get("summary_applied") === "1"
-        ? `${url.pathname}${url.search}${url.hash}`
-        : "";
+      const url = searchUrl(window.sessionStorage.getItem(STORAGE_KEY) || "");
+      return url && hasResultsState(url) ? `${url.pathname}${url.search}${url.hash}` : "";
     } catch (error) {
       return "";
     }
   }
 
   function updateNavigation(url = storedUrl()) {
-    document.querySelectorAll("[data-summary-nav]").forEach((link) => {
+    document.querySelectorAll("[data-search-nav]").forEach((link) => {
       link.href = url || DEFAULT_URL;
     });
   }
 
   function saveCurrentUrl() {
     if (resetNavigation) return false;
-    const url = summaryUrl(window.location.href);
-    if (!url || url.searchParams.get("summary_applied") !== "1") return false;
+    const url = searchUrl(window.location.href);
+    if (!url || !hasResultsState(url)) return false;
+    const value = `${url.pathname}${url.search}${url.hash}`;
     try {
-      window.sessionStorage.setItem(STORAGE_KEY, `${url.pathname}${url.search}${url.hash}`);
-      updateNavigation(`${url.pathname}${url.search}${url.hash}`);
+      window.sessionStorage.setItem(STORAGE_KEY, value);
+      updateNavigation(value);
       return true;
     } catch (error) {
       return false;
@@ -60,9 +64,9 @@
     resetNavigation = false;
     saveCurrentUrl();
     updateNavigation();
-    document.querySelectorAll("[data-summary-reset]").forEach((link) => {
-      if (link.dataset.summaryResetBound === "true") return;
-      link.dataset.summaryResetBound = "true";
+    document.querySelectorAll("[data-search-reset]").forEach((link) => {
+      if (link.dataset.searchResetBound === "true") return;
+      link.dataset.searchResetBound = "true";
       link.addEventListener("click", clear);
     });
   }
@@ -71,7 +75,7 @@
   window.addEventListener("pageshow", initialize);
   window.addEventListener("pagehide", saveCurrentUrl);
 
-  window.FedorinovSummarySessionState = {
+  window.FedorinovSearchSessionState = {
     clear,
     saveCurrentUrl,
     storedUrl,

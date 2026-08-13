@@ -385,28 +385,34 @@ class SummaryTests(unittest.TestCase):
 
     def test_legacy_summary_tab_builds_after_show(self) -> None:
         with (
+            patch("backend.app.routers.legacy.summary_rows") as rows_mock,
             patch("backend.app.routers.legacy.count_marks", return_value=0),
             patch("backend.app.routers.legacy.list_marks", return_value=[]),
             patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
         ):
             context = legacy_index(FakeTemplateRequest(), tab="summary", summary_applied="1", name_id="1")
 
+        rows_mock.assert_not_called()
         self.assertTrue(context["summary_has_result"])
         self.assertTrue(context["summary_applied"])
         self.assertIsNotNone(context["summary_matrix"])
-        self.assertGreaterEqual(len(context["summary_rows"]), 1)
+        self.assertGreaterEqual(len(context["summary_matrix"]["rows"]), 1)
+        self.assertEqual(context["summary_rows"], [])
+        self.assertIsNotNone(context["summary_pagination"])
         self.assertIn("summary_applied=1", context["summary_matrix_mode_url"])
         self.assertIn("summary_applied=1", context["summary_aggregate_mode_url"])
         self.assertIn("summary_applied=1", context["summary_matrix_sort"]["urls"]["fio"])
 
     def test_legacy_summary_reset_returns_to_unapplied_state(self) -> None:
         with (
+            patch("backend.app.routers.legacy.summary_matrix") as matrix_mock,
             patch("backend.app.routers.legacy.count_marks", return_value=0),
             patch("backend.app.routers.legacy.list_marks", return_value=[]),
             patch("backend.app.routers.legacy.templates.TemplateResponse", side_effect=lambda request, name, context: context),
         ):
             context = legacy_index(FakeTemplateRequest(), tab="summary", summary_mode="aggregate", summary_applied="1", name_id="1")
 
+        matrix_mock.assert_not_called()
         self.assertEqual(context["summary_reset_url"], "/legacy?tab=summary&summary_mode=aggregate")
         self.assertNotIn("summary_applied", context["summary_reset_url"])
 
