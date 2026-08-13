@@ -4,9 +4,15 @@
 {% block content %}
 <section class="cavalier-standalone-page cavalier-form-page cavalier-person-form-page">
 <h1>{% if mode == "create" %}Добавить награжденного{% else %}Изменить награжденного{% endif %}</h1>
-<p class="local-back-nav compact-actions">
+<div class="local-back-nav compact-actions">
   <a class="button secondary-button" data-escape-back {% if mode == 'create' %}data-draft-cancel-link data-draft-token="{{ draft_token }}"{% endif %} href="{{ return_to or ('/legacy?tab=rewards&person_id=' ~ person.id if mode == 'edit' else '/legacy?tab=rewards') }}">← Назад</a>
-</p>
+  {% if mode == "create" and settings.write_mode %}
+  <form class="person-create-cancel" method="post" action="/persons/new/draft/{{ draft_token }}/cancel" data-write-feedback data-write-pending-label="Отменяем…">
+    <input type="hidden" name="return_to" value="{{ return_to or '/legacy?tab=rewards' }}">
+    <button class="secondary-button" type="submit">Отмена</button>
+  </form>
+  {% endif %}
+</div>
 
 {% if error %}
 <section class="notice notice-error">{{ error }}</section>
@@ -75,6 +81,14 @@
 
   <div class="actions">
     <button type="submit">Сохранить</button>
+    {% if mode == "create" %}
+    <button
+      type="submit"
+      formaction="/persons/new/draft/{{ draft_token }}/rewards/new"
+      formmethod="post"
+      formnovalidate
+    >Добавить награду</button>
+    {% endif %}
     {% if mode == 'edit' %}<a data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">Отмена</a>{% endif %}
   </div>
 </form>
@@ -126,14 +140,6 @@
 <section class="form-section person-create-draft-rewards" data-person-draft data-draft-token="{{ draft_token }}">
   <div class="person-post-create-rewards-head">
     <h2>Награды</h2>
-    <button
-      class="button"
-      type="submit"
-      form="person-primary-form"
-      formaction="/persons/new/draft/{{ draft_token }}/rewards/new"
-      formmethod="post"
-      formnovalidate
-    >Добавить награду</button>
   </div>
   <div class="table-wrap" data-draft-reward-table {% if not draft_rewards %}hidden{% endif %}>
     <table><thead><tr><th>Наименование</th><th>Номер</th><th></th></tr></thead><tbody data-draft-reward-rows>
@@ -143,10 +149,6 @@
     </tbody></table>
   </div>
 </section>
-<form class="person-create-cancel" method="post" action="/persons/new/draft/{{ draft_token }}/cancel" data-write-feedback data-write-pending-label="Отменяем…">
-  <input type="hidden" name="return_to" value="{{ return_to or '/legacy?tab=rewards' }}">
-  <button class="secondary-button" type="submit">Отмена</button>
-</form>
 {% endif %}
 
 {% if post_create and settings.write_mode %}

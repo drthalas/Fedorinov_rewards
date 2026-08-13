@@ -231,11 +231,15 @@ class PersonCreateDraftTests(unittest.TestCase):
         self.assertIn("data-draft-photo-trigger", template)
         self.assertIn('formaction="/persons/new/draft/{{ draft_token }}/rewards/new"', template)
         self.assertIn("Добавить награду", template)
-        draft_aside = template.index("person-create-draft-photos")
-        reward_action = template.index("Добавить награду", draft_aside)
-        photo_section = template.index("photo-manage-section", draft_aside)
-        self.assertGreater(reward_action, photo_section)
+        primary_actions = template.split('<div class="actions">', 1)[1].split("</div>", 1)[0]
+        self.assertLess(primary_actions.index("Сохранить"), primary_actions.index("Добавить награду"))
+        draft_rewards = template.split('class="form-section person-create-draft-rewards"', 1)[1]
+        self.assertNotIn("Добавить награду", draft_rewards.split("</section>", 1)[0])
         self.assertIn('action="/persons/new/draft/{{ draft_token }}/cancel"', template)
+        top_nav = template.split('class="local-back-nav compact-actions"', 1)[1].split("</div>", 1)[0]
+        self.assertIn("← Назад", top_nav)
+        self.assertIn(">Отмена</button>", top_nav)
+        self.assertEqual(template.count(">Отмена</button>"), 1)
         self.assertIn('mode == "draft"', reward_template)
         self.assertIn("data-draft-photo-base", reward_template)
         self.assertIn("data-reward-reference-derived", reward_template)
