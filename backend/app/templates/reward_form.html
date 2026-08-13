@@ -10,7 +10,7 @@
 {% endif %}
 {% set reward_list_url = '/legacy?tab=rewards' ~ ('&person_id=' ~ person.id if person else '') %}
 {% if mode == "draft" %}
-<form id="draft-reward-cancel-form" method="post" action="/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/cancel">
+<form id="draft-reward-cancel-form" method="post" action="/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/cancel" data-write-feedback data-write-pending-label="Отменяем…">
   <input type="hidden" name="return_to" value="{{ return_to }}">
 </form>
 {% endif %}
