@@ -687,7 +687,7 @@
           </label>
           <div class="summary-filter-actions">
             <button class="summary-primary-action" type="submit">Показать</button>
-            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}">Сброс</a>
+            <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}" data-summary-reset>Сброс</a>
             {% if summary_has_result %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
             <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">CSV свод</button>

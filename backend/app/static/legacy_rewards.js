@@ -168,6 +168,7 @@
       if (settings.updateHistory !== false) {
         const historyMethod = settings.historyMode === "replace" ? "replaceState" : "pushState";
         window.history[historyMethod]({ legacyRewardsUrl: url }, "", url);
+        document.dispatchEvent(new CustomEvent("legacy:url-updated"));
       }
       if (typeof settings.searchValue === "string") {
         const quickSearch = document.querySelector("[data-person-quick-search]");
