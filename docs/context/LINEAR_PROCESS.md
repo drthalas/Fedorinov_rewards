@@ -125,6 +125,8 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
+Release-candidate stage завершается не только Windows VM gate. После VM PASS exact ZIP должен быть размещён в изолированном Owner candidate channel, а постоянный physical `Public Current` должен через штатное `О программе → Проверить обновления` увидеть candidate без запуска самого update. Только после этой проверки разрешён статус `READY FOR OWNER MANUAL PHYSICAL UPDATE`. Production channel остаётся на текущем public release. Каналы, deploy/restore и короткая publication stage описаны в `docs/OWNER_CANDIDATE_CHANNEL.md` и `docs/RELEASE_PROCESS.md`.
+
 После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
 ## Timing telemetry

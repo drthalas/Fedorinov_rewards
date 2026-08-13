@@ -61,6 +61,20 @@ http://127.0.0.1:8080
 
 Если порт занят посторонней программой, Fedorinov Rewards покажет ошибку и не будет завершать этот процесс.
 
+### Physical Owner candidate
+
+Постоянная Desktop-папка `Fedorinov Rewards - Public Current` не пересоздаётся для каждого release candidate. До Owner PASS в ней остаётся текущая public production версия и прежние DB/media paths.
+
+После Windows VM gate Codex штатным tool `scripts/prepare_owner_candidate_channel.py`:
+
+- размещает exact проверенный ZIP и отдельный `latest.json` в `C:\FedorinovGate\OwnerCandidateChannel`;
+- запускает loopback-only channel на `127.0.0.1:18387`;
+- изменяет только `UPDATE_MANIFEST_URL` в `.env` постоянного `Public Current`;
+- сохраняет canonical production URL для обратимого возврата;
+- проверяет в видимом Edge, что `О программе → Проверить обновления` показывает candidate, но не запускает установку.
+
+Production GitHub `latest.json` от этого не меняется, поэтому Сергей candidate не видит. Команды, lifecycle и rollback: `docs/OWNER_CANDIDATE_CHANNEL.md`.
+
 ## Если порт 8080 занят
 
 1. Откройте `.env`.

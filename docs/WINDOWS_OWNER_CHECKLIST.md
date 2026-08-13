@@ -39,3 +39,12 @@
 - [ ] Фотографии отображаются или показывается понятный placeholder.
 - [ ] После обновления приложение перезапускается само и показывает новую версию.
 - [ ] Перед release проверены PID, install root и версия через локальный runtime identity.
+
+## Ручное обновление release candidate
+
+- [ ] Используется существующая Desktop-папка `Fedorinov Rewards - Public Current`, а не новая копия.
+- [ ] Codex подтвердил `READY FOR OWNER MANUAL PHYSICAL UPDATE` только после physical visibility gate.
+- [ ] Запустить обычный `start_windows.bat`.
+- [ ] Открыть `О программе` и нажать `Проверить обновления`.
+- [ ] Проверить показанные current/candidate version; затем Owner самостоятельно решает, нажимать ли `Обновить`.
+- [ ] До Owner PASS production `latest.json` остаётся на предыдущей public версии.

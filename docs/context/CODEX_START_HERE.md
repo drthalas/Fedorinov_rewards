@@ -20,6 +20,7 @@
 - Не трогать реальные DB/media и не коммитить secrets, `.env`, `.venv`, DB/media, backups, logs, screenshots или generated artifacts без явного разрешения.
 - Merge, release, version/tag, `latest.json`, package publication, Telegram и real updater apply разрешены только отдельным актуальным Description.
 - В release/Telegram-инструкциях штатный post-update сценарий — автоматический перезапуск; `start_windows.bat` указывать только как fallback, если приложение не открылось самостоятельно.
+- После release-candidate VM PASS обязательно подготовить изолированный Owner candidate channel и доказать на существующем physical `Public Current`, что штатная проверка обновлений видит exact candidate. До этого нельзя сообщать `READY FOR OWNER MANUAL PHYSICAL UPDATE`. Production `latest.json` при этом не менять; подробности: `docs/OWNER_CANDIDATE_CHANNEL.md`.
 
 ## Краткий workflow
 

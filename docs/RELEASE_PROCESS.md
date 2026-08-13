@@ -42,6 +42,41 @@ dist/latest.json
 
 `latest.json` contains version, release date, public ZIP URL, SHA256, and notes.
 
+## Release-candidate stage
+
+After controlled integration and the required Windows VM updater gate, prepare the
+physical Owner handoff before reporting the candidate as ready:
+
+1. Keep the production GitHub `latest.json` on the current public version.
+2. Deploy the already tested ZIP to the isolated Owner candidate channel with
+   `scripts/prepare_owner_candidate_channel.py`.
+3. Do not rebuild or recreate the permanent physical `Public Current` install.
+4. Start that existing install with its ordinary `start_windows.bat`.
+5. In headed Edge, open `О программе`, click `Проверить обновления`, and prove
+   that the exact candidate version and SHA are visible.
+6. Do not click `Обновить` for the Owner without separate authorization.
+
+Example after the VM gate:
+
+```sh
+python3 scripts/prepare_owner_candidate_channel.py deploy \
+  --artifact dist/FedorinovRewards_WebPreview_vX.Y.Z.zip \
+  --manifest dist/latest.json \
+  --candidate-commit FULL_MERGED_MAIN_SHA \
+  --candidate-version X.Y.Z \
+  --candidate-sha256 EXACT_SHA256 \
+  --public-version CURRENT_PUBLIC_VERSION
+```
+
+The command verifies commit/package/manifest/public-version parity, copies only
+the exact candidate code archive and a private loopback manifest, and points the
+existing physical `Public Current` to that local Owner channel. It does not alter
+the production manifest or copy the data/media fixture.
+
+`READY FOR OWNER MANUAL PHYSICAL UPDATE` is valid only after the headed physical
+visibility check passes. See `docs/OWNER_CANDIDATE_CHANNEL.md` for deploy,
+status, restore, and failure handling.
+
 ## Safety check
 
 ```sh
@@ -65,6 +100,14 @@ The ZIP must not contain:
 - nested ZIP files
 
 ## Dry-run publication
+
+Publication is a separate short stage after the exact candidate was updated and
+accepted by the Owner. Per the ALE-379 workflow, do not repeat the full suite,
+Windows VM gate, physical updater gate, or product acceptance merely for
+publication unless concrete parity evidence has changed. Publication checks the
+accepted commit/version/artifact, creates the tag and GitHub Release, switches
+the public `latest.json`, verifies public byte/SHA parity, and sends the separately
+authorized Telegram notification.
 
 ### GitHub Actions
 
