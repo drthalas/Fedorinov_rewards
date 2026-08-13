@@ -30,6 +30,12 @@
 
 Полные правила ролей, постановки задач, test tiers, Owner QA handoff, статусов и timing telemetry: `docs/context/LINEAR_PROCESS.md`.
 
+Для physical Windows сначала использовать canonical connectivity/access preflight
+из `docs/testing/WINDOWS_PHYSICAL_GATE.md`, затем interactive GUI layer из
+`docs/WINDOWS_PHYSICAL_GUI_RUNBOOK.md`. Один failed SSH probe не доказывает
+offline: обязательна точная классификация discovery, TCP/SSH banner, host key,
+service и GUI.
+
 ## Шаблон запуска
 
 ```text
