@@ -1677,6 +1677,33 @@ th {
   margin-top: 10px;
 }
 
+.person-create-navigation,
+.person-create-actions {
+  display: flex;
+  align-items: stretch;
+}
+
+.person-create-navigation {
+  gap: 8px;
+}
+
+.person-create-navigation form {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.person-create-navigation .button,
+.person-create-navigation button,
+.person-create-actions button {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  margin: 0;
+  line-height: 1;
+}
+
 .person-edit-photos .photo-manage-section .muted {
   margin: 0 0 8px;
   font-size: 12px;

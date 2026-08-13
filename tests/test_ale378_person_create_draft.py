@@ -231,12 +231,12 @@ class PersonCreateDraftTests(unittest.TestCase):
         self.assertIn("data-draft-photo-trigger", template)
         self.assertIn('formaction="/persons/new/draft/{{ draft_token }}/rewards/new"', template)
         self.assertIn("Добавить награду", template)
-        primary_actions = template.split('<div class="actions">', 1)[1].split("</div>", 1)[0]
+        primary_actions = template.split('<div class="actions{% if mode == \'create\' %} person-create-actions{% endif %}">', 1)[1].split("</div>", 1)[0]
         self.assertLess(primary_actions.index("Сохранить"), primary_actions.index("Добавить награду"))
         draft_rewards = template.split('class="form-section person-create-draft-rewards"', 1)[1]
         self.assertNotIn("Добавить награду", draft_rewards.split("</section>", 1)[0])
         self.assertIn('action="/persons/new/draft/{{ draft_token }}/cancel"', template)
-        top_nav = template.split('class="local-back-nav compact-actions"', 1)[1].split("</div>", 1)[0]
+        top_nav = template.split('class="local-back-nav compact-actions{% if mode == \'create\' %} person-create-navigation{% endif %}"', 1)[1].split("</div>", 1)[0]
         self.assertIn("← Назад", top_nav)
         self.assertIn(">Отмена</button>", top_nav)
         self.assertEqual(template.count(">Отмена</button>"), 1)
@@ -246,6 +246,16 @@ class PersonCreateDraftTests(unittest.TestCase):
         self.assertIn("Дата покупки", reward_template)
         self.assertIn("Цена покупки", reward_template)
         self.assertIn("photoBase", script)
+
+    def test_create_action_groups_use_shared_baseline_alignment(self) -> None:
+        template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")
+        styles = (ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8")
+
+        self.assertIn("person-create-navigation", template)
+        self.assertIn("person-create-actions", template)
+        self.assertIn(".person-create-navigation,\n.person-create-actions", styles)
+        self.assertIn("align-items: stretch", styles)
+        self.assertIn("min-height: 36px", styles)
 
 
 if __name__ == "__main__":

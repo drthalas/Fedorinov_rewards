@@ -44,7 +44,7 @@ class Ale361PostCreateLayoutTests(unittest.TestCase):
     def test_updated_css_uses_a_fresh_static_cache_key(self) -> None:
         templates = (ROOT / "backend" / "app" / "routers" / "templates.py").read_text(encoding="utf-8")
 
-        self.assertIn('STATIC_ASSET_VERSION = "20260813-owner-corrections-1"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260813-ale384-385-1"', templates)
 
 
 if __name__ == "__main__":
