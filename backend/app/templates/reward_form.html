@@ -34,18 +34,24 @@
   <fieldset class="form-section">
     <legend>Справочник награды</legend>
     <p class="secondary"><a class="reward-guide-link" href="/guides?section=tree&return_to={{ form_return_path|urlencode }}#guide-tree">Открыть справочник наград</a></p>
-    <div class="form-grid two-columns">
+    <div class="form-grid two-columns" data-reward-reference-cascade>
       <label>
         <span>Государство</span>
-        <input value="{{ reward_reference.gos or '' }}" data-reward-reference-field="gos" readonly aria-readonly="true">
+        <select name="reference_country_id" data-guide-role="country" data-reward-reference-filter="country" data-initial-value="{{ reward_reference.id_gos or '' }}" data-styled-select>
+          <option value="">—</option>
+        </select>
       </label>
       <label>
         <span>Категория</span>
-        <input value="{{ reward_reference.category or '' }}" data-reward-reference-field="category" readonly aria-readonly="true">
+        <select name="reference_category_id" data-guide-role="category" data-reward-reference-filter="category" data-initial-value="{{ reward_reference.id_catigory or '' }}" data-styled-select>
+          <option value="">—</option>
+        </select>
       </label>
       <label>
         <span>Подкатегория</span>
-        <input value="{{ reward_reference.subcategory or '' }}" data-reward-reference-field="subcategory" readonly aria-readonly="true">
+        <select name="reference_subcategory_id" data-guide-role="subcategory" data-reward-reference-filter="subcategory" data-initial-value="{{ reward_reference.id_sub_catigory or '' }}" data-styled-select>
+          <option value="">—</option>
+        </select>
       </label>
       <label>
         <span>Наименование <span class="required-marker" aria-hidden="true">*</span></span>
@@ -59,7 +65,7 @@
     </div>
     <label>
       <span>Ссылка на Монетный двор / справочник</span>
-      <input value="{{ reward_reference.id_link or '' }}" data-reward-reference-field="id_link" readonly aria-readonly="true">
+      <input value="{{ reward_reference.id_link or '' }}" data-reward-reference-link data-reward-reference-field="id_link" readonly aria-readonly="true">
     </label>
   </fieldset>
 

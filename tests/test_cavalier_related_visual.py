@@ -163,18 +163,19 @@ class CavalierRelatedVisualTests(unittest.TestCase):
         self.assertIn('data-confirm-submit="reward-delete"', templates["reward_detail.html"])
         self.assertIn("cavalier-photos-page", templates["person_photos.html"])
 
-    def test_reward_form_only_exposes_name_as_editable_reference_field(self) -> None:
+    def test_reward_form_exposes_reference_cascade_but_keeps_link_derived(self) -> None:
         reward_form = self.read("backend/app/templates/reward_form.html")
         reference_fields = self.read("backend/app/static/reward_reference_fields.js")
 
         self.assertEqual(reward_form.count('select name="id_name"'), 1)
         self.assertIn('data-styled-select data-styled-select-typeahead="prefix"', reward_form)
-        self.assertNotIn('name="id_gos"', reward_form)
-        self.assertNotIn('name="id_catigory"', reward_form)
-        self.assertNotIn('name="id_sub_catigory"', reward_form)
+        self.assertIn('name="reference_country_id"', reward_form)
+        self.assertIn('name="reference_category_id"', reward_form)
+        self.assertIn('name="reference_subcategory_id"', reward_form)
         self.assertNotIn('name="id_link"', reward_form)
-        self.assertIn('data-guide-role="name"', reward_form)
-        self.assertEqual(reward_form.count('readonly aria-readonly="true"'), 4)
+        for role in ("country", "category", "subcategory", "name"):
+            self.assertIn(f'data-guide-role="{role}"', reward_form)
+        self.assertEqual(reward_form.count('readonly aria-readonly="true"'), 1)
         self.assertIn('select.dispatchEvent(new Event("change"', self.read("backend/app/static/custom_select.js"))
         self.assertIn('nameSelect.addEventListener("change", updateDerivedFields)', reference_fields)
 
