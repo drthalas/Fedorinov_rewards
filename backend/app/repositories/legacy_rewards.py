@@ -146,7 +146,7 @@ def _person_where(filters: LegacyRewardsFilters) -> tuple[list[str], list[object
     reward_clauses, reward_params = _reward_filter_clauses(filters, "rf")
     if reward_clauses:
         clauses.append(
-            "exists (select 1 from rewards rf where rf.person_id = p.id and "
+            "p.id in (select distinct rf.person_id from rewards rf where "
             + " and ".join(reward_clauses)
             + ")"
         )

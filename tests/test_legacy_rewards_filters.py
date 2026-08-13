@@ -4,8 +4,11 @@ import sqlite3
 import unittest
 
 from backend.app.repositories.legacy_rewards import (
+    _person_where,
     legacy_rewards_filter_options,
+    legacy_rewards_group_counts,
     legacy_rewards_totals,
+    list_legacy_reward_person_group,
     list_legacy_reward_persons,
     normalized_legacy_rewards_filters,
     normalized_legacy_rewards_sort,
@@ -160,6 +163,28 @@ class LegacyRewardsFilterTests(unittest.TestCase):
     def test_combined_rank_and_reward_filter(self) -> None:
         rows = list_legacy_reward_persons(self.db_path, normalized_legacy_rewards_filters(rank_id="1", name_id="1"))
         self.assertEqual([row["id"] for row in rows], [1])
+
+    def test_reward_filter_is_set_based_and_shared_by_group_navigation(self) -> None:
+        filters = normalized_legacy_rewards_filters(country_id="1", category_id="1", subcategory_id="1", name_id="1")
+        clauses, params = _person_where(filters)
+        where_sql = " where " + " and ".join(clauses)
+        connection = sqlite3.connect(self.db_path)
+        try:
+            plan = connection.execute(
+                "explain query plan select p.id from person p" + where_sql,
+                tuple(params),
+            ).fetchall()
+        finally:
+            connection.close()
+
+        plan_text = " ".join(str(row[3]) for row in plan).upper()
+        self.assertNotIn("CORRELATED", plan_text)
+        self.assertIn("LIST SUBQUERY", plan_text)
+        self.assertEqual(legacy_rewards_group_counts(self.db_path, filters)["К"], 1)
+        self.assertEqual(
+            [int(row["id"]) for row in list_legacy_reward_person_group(self.db_path, filters, letter="К")],
+            [1],
+        )
 
     def test_totals_change_with_filters(self) -> None:
         all_totals = legacy_rewards_totals(self.db_path, normalized_legacy_rewards_filters())
