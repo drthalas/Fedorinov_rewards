@@ -75,9 +75,32 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
-## v2.0.12
+## v2.0.13
 
 Статус: release candidate, не опубликован.
+
+Дата подготовки: 2026-08-13.
+
+Тип: large-data workflow and media patch.
+
+Состав:
+
+- Быстрые фильтры кавалеров с сохранением активного набора при алфавитно-цифровой навигации.
+- Единый create-flow кавалера с фотографиями и несколькими наградами до финального сохранения.
+- Session-state вкладки «Поиск» и постраничная выдача «Сводной таблицы».
+- Справочные изображения наград, clipboard-first фотографии и каскадный выбор справочника.
+- Плавные переходы без белых промежуточных кадров.
+
+Release gate:
+
+- Accepted product HEAD интегрируется в `main` только после exact ancestry/parity verification.
+- Exact merged package проверяется из public `v2.0.12` штатным UI updater на Windows VM и постоянном Sergey-full fixture.
+- Physical Windows не используется до ручного Owner update gate после технического VM PASS.
+- GitHub Release, tag, production `latest.json` и Telegram заблокированы до отдельного Owner-разрешения.
+
+## v2.0.12
+
+Статус: выпущено.
 
 Дата подготовки: 2026-08-12.
 
