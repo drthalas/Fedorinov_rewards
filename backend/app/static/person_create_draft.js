@@ -40,7 +40,9 @@
     root.querySelectorAll("[data-draft-photo-trigger]").forEach((button) => {
       const card = button.closest("[data-draft-photo-card]");
       const input = card && card.querySelector("[data-draft-photo-input]");
-      if (!input) return;
+      const photoScope = button.closest("[data-draft-photo-base]");
+      const photoBase = photoScope && photoScope.dataset.draftPhotoBase;
+      if (!input || !photoBase) return;
       button.addEventListener("click", () => input.click());
       input.addEventListener("change", async () => {
         const file = input.files && input.files[0];
@@ -52,7 +54,7 @@
         setBusy(button, true);
         if (error) error.hidden = true;
         try {
-          const payload = await jsonRequest(`/persons/new/draft/${token}/photos`, { method: "POST", body: form });
+          const payload = await jsonRequest(photoBase, { method: "POST", body: form });
           const image = card.querySelector("[data-draft-photo-image]");
           const placeholder = card.querySelector("[data-draft-photo-placeholder]");
           const clear = card.querySelector("[data-draft-photo-clear]");
@@ -73,50 +75,29 @@
     root.querySelectorAll("[data-draft-photo-clear]").forEach((button) => {
       button.addEventListener("click", async () => {
         const card = button.closest("[data-draft-photo-card]");
+        const photoScope = button.closest("[data-draft-photo-base]");
+        const photoBase = photoScope && photoScope.dataset.draftPhotoBase;
+        const error = card && card.querySelector("[data-draft-photo-error]");
+        if (!photoBase) return;
         setBusy(button, true);
+        if (error) error.hidden = true;
         try {
-          await jsonRequest(`/persons/new/draft/${token}/photos/${button.dataset.photoField}/clear`, { method: "POST" });
+          await jsonRequest(`${photoBase}/${button.dataset.photoField}/clear`, { method: "POST" });
           card.querySelector("[data-draft-photo-image]").hidden = true;
           card.querySelector("[data-draft-photo-placeholder]").hidden = false;
           card.classList.add("placeholder-card");
           button.hidden = true;
+        } catch (failure) {
+          if (error) { error.textContent = failure.message; error.hidden = false; }
         } finally {
           setBusy(button, false);
         }
       });
     });
 
-    const open = root.querySelector("[data-draft-reward-open]");
-    const form = root.querySelector("[data-draft-reward-form]");
-    const close = root.querySelector("[data-draft-reward-close]");
     const rows = root.querySelector("[data-draft-reward-rows]");
     const table = root.querySelector("[data-draft-reward-table]");
-    if (open && form && rows && table) {
-      open.addEventListener("click", () => { form.hidden = false; form.querySelector("select").focus(); });
-      close.addEventListener("click", () => { form.reset(); form.hidden = true; });
-      form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const submit = form.querySelector("button[type='submit']");
-        const error = form.querySelector("[data-draft-reward-error]");
-        setBusy(submit, true);
-        if (error) error.hidden = true;
-        try {
-          const payload = await jsonRequest(`/persons/new/draft/${token}/rewards`, { method: "POST", body: new FormData(form) });
-          const row = document.createElement("tr");
-          row.dataset.draftRewardIndex = String(payload.index);
-          row.innerHTML = `<td></td><td></td><td><button class="mini-button danger" type="button" data-draft-reward-remove>×</button></td>`;
-          row.cells[0].textContent = payload.name;
-          row.cells[1].textContent = payload.number == null ? "—" : String(payload.number);
-          rows.appendChild(row);
-          table.hidden = false;
-          form.reset();
-          form.hidden = true;
-        } catch (failure) {
-          if (error) { error.textContent = failure.message; error.hidden = false; }
-        } finally {
-          setBusy(submit, false);
-        }
-      });
+    if (rows && table) {
       rows.addEventListener("click", async (event) => {
         const button = event.target.closest("[data-draft-reward-remove]");
         const row = button && button.closest("[data-draft-reward-index]");

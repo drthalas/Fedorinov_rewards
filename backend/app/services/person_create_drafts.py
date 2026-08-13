@@ -16,7 +16,14 @@ from ..repositories.rewards_write import RewardWriteData, create_reward_in_conne
 from .audit import log_action
 from .media_filenames import write_collision_safe_media
 from .media_lifecycle import discard_uncommitted_image
-from .photos import MAX_PHOTO_BYTES, PERSON_PHOTO_FIELDS, PhotoValidationError, _extension, _matches_image_signature
+from .photos import (
+    MAX_PHOTO_BYTES,
+    PERSON_PHOTO_FIELDS,
+    REWARD_PHOTO_FIELDS,
+    PhotoValidationError,
+    _extension,
+    _matches_image_signature,
+)
 from .write_guard import ensure_write_allowed
 
 
@@ -91,21 +98,68 @@ def save_person_values(settings: Settings, token: object, values: dict[str, obje
     return draft
 
 
-def add_reward(settings: Settings, token: object, values: dict[str, object]) -> dict[str, object]:
+def start_reward(settings: Settings, token: object) -> str:
+    ensure_write_allowed(settings)
+    draft = load_draft(settings, token)
+    reward_token = uuid4().hex
+    rewards = list(draft["rewards"])
+    rewards.append({"token": reward_token, "data": {}, "photos": {}})
+    draft["rewards"] = rewards
+    _save(settings, draft)
+    return reward_token
+
+
+def _reward_entry(draft: dict[str, object], reward_token: object) -> tuple[int, dict[str, object]]:
+    clean_token = _token(reward_token)
+    for index, raw in enumerate(draft["rewards"]):
+        if isinstance(raw, dict) and raw.get("token") == clean_token:
+            return index, raw
+    raise ValueError("Награда черновика не найдена.")
+
+
+def load_reward(settings: Settings, token: object, reward_token: object) -> dict[str, object]:
+    draft = load_draft(settings, token)
+    _index, entry = _reward_entry(draft, reward_token)
+    data = entry.get("data") if isinstance(entry.get("data"), dict) else {}
+    photos = entry.get("photos") if isinstance(entry.get("photos"), dict) else {}
+    return {"token": entry["token"], "data": data, "photos": photos}
+
+
+def save_reward(
+    settings: Settings,
+    token: object,
+    reward_token: object,
+    values: dict[str, object],
+) -> dict[str, object]:
     ensure_write_allowed(settings)
     data = reward_data_from_mapping(values)
     if data.id_name is None:
         raise ValueError("Выберите наименование награды.")
     draft = load_draft(settings, token)
+    index, entry = _reward_entry(draft, reward_token)
+    for other_index, raw in enumerate(draft["rewards"]):
+        if other_index == index or not isinstance(raw, dict):
+            continue
+        raw_data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
+        if data.number is not None and (
+            int(raw_data.get("id_name") or 0) == data.id_name
+            and raw_data.get("number") == data.number
+        ):
+            raise ValueError("Такая награда с этим номером уже добавлена в черновик.")
+    updated = dict(entry)
+    updated["data"] = asdict(data)
+    updated["complete"] = True
     rewards = list(draft["rewards"])
-    if data.number is not None and any(
-        int(item.get("id_name") or 0) == data.id_name and item.get("number") == data.number for item in rewards
-    ):
-        raise ValueError("Такая награда с этим номером уже добавлена в черновик.")
-    rewards.append(asdict(data))
+    rewards[index] = updated
     draft["rewards"] = rewards
     _save(settings, draft)
-    return draft
+    return updated
+
+
+def add_reward(settings: Settings, token: object, values: dict[str, object]) -> dict[str, object]:
+    reward_token = start_reward(settings, token)
+    save_reward(settings, token, reward_token, values)
+    return load_draft(settings, token)
 
 
 def remove_reward(settings: Settings, token: object, index: int) -> dict[str, object]:
@@ -114,10 +168,21 @@ def remove_reward(settings: Settings, token: object, index: int) -> dict[str, ob
     rewards = list(draft["rewards"])
     if index < 0 or index >= len(rewards):
         raise ValueError("Награда черновика не найдена.")
-    rewards.pop(index)
+    removed = rewards.pop(index)
     draft["rewards"] = rewards
     _save(settings, draft)
+    if isinstance(removed, dict) and removed.get("token"):
+        reward_dir = _draft_dir(settings, token) / "rewards" / _token(removed["token"])
+        if reward_dir.is_dir():
+            shutil.rmtree(reward_dir)
     return draft
+
+
+def discard_reward(settings: Settings, token: object, reward_token: object) -> None:
+    ensure_write_allowed(settings)
+    draft = load_draft(settings, token)
+    index, _entry = _reward_entry(draft, reward_token)
+    remove_reward(settings, token, index)
 
 
 def stage_photo(settings: Settings, token: object, photo_field: str, filename: str, content: bytes) -> dict[str, object]:
@@ -168,6 +233,81 @@ def clear_staged_photo(settings: Settings, token: object, photo_field: str) -> N
     _save(settings, draft)
 
 
+def stage_reward_photo(
+    settings: Settings,
+    token: object,
+    reward_token: object,
+    photo_field: str,
+    filename: str,
+    content: bytes,
+) -> dict[str, object]:
+    ensure_write_allowed(settings)
+    field = next((item for item in REWARD_PHOTO_FIELDS if item.field == photo_field), None)
+    if field is None:
+        raise PhotoValidationError("Некорректное поле фото")
+    extension = _extension(filename)
+    if not content:
+        raise PhotoValidationError("Файл пустой")
+    if len(content) > MAX_PHOTO_BYTES:
+        raise PhotoValidationError("Файл больше 25 MB")
+    if not _matches_image_signature(extension, content):
+        raise PhotoValidationError("Файл не является корректным изображением выбранного типа")
+    draft = load_draft(settings, token)
+    index, entry = _reward_entry(draft, reward_token)
+    photo_dir = _draft_dir(settings, token) / "rewards" / _token(reward_token) / "photos"
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    for old in photo_dir.glob(f"{photo_field}.*"):
+        old.unlink()
+    target = photo_dir / f"{photo_field}{extension}"
+    target.write_bytes(content)
+    updated = dict(entry)
+    photos = dict(updated.get("photos") or {})
+    photos[photo_field] = {"filename": target.name, "original_name": Path(filename).name}
+    updated["photos"] = photos
+    rewards = list(draft["rewards"])
+    rewards[index] = updated
+    draft["rewards"] = rewards
+    _save(settings, draft)
+    return updated
+
+
+def staged_reward_photo_path(
+    settings: Settings,
+    token: object,
+    reward_token: object,
+    photo_field: str,
+) -> Path | None:
+    reward = load_reward(settings, token, reward_token)
+    item = reward["photos"].get(photo_field)
+    if not isinstance(item, dict):
+        return None
+    filename = Path(str(item.get("filename") or "")).name
+    path = _draft_dir(settings, token) / "rewards" / _token(reward_token) / "photos" / filename
+    return path if filename and path.is_file() else None
+
+
+def clear_staged_reward_photo(
+    settings: Settings,
+    token: object,
+    reward_token: object,
+    photo_field: str,
+) -> None:
+    ensure_write_allowed(settings)
+    draft = load_draft(settings, token)
+    index, entry = _reward_entry(draft, reward_token)
+    path = staged_reward_photo_path(settings, token, reward_token, photo_field)
+    if path is not None:
+        path.unlink()
+    updated = dict(entry)
+    photos = dict(updated.get("photos") or {})
+    photos.pop(photo_field, None)
+    updated["photos"] = photos
+    rewards = list(draft["rewards"])
+    rewards[index] = updated
+    draft["rewards"] = rewards
+    _save(settings, draft)
+
+
 def discard_draft(settings: Settings, token: object) -> None:
     directory = _draft_dir(settings, token)
     if directory.is_dir():
@@ -193,7 +333,32 @@ def commit_draft(settings: Settings, token: object, person_data: PersonWriteData
                 written_paths.append(relative)
                 connection.execute(f"update person set {field.field} = ? where id = ?", (relative, person_id))
             for raw in draft["rewards"]:
-                create_reward_in_connection(connection, person_id, RewardWriteData(**raw))
+                if not isinstance(raw, dict):
+                    continue
+                reward_data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
+                if not reward_data.get("id_name"):
+                    continue
+                reward_id = create_reward_in_connection(connection, person_id, RewardWriteData(**reward_data))
+                reward_token = raw.get("token")
+                for field in REWARD_PHOTO_FIELDS:
+                    if not reward_token:
+                        continue
+                    source = staged_reward_photo_path(settings, token, reward_token, field.field)
+                    if source is None:
+                        continue
+                    relative_dir = Path("Source") / str(person_id) / str(reward_id)
+                    target = write_collision_safe_media(
+                        settings.rewards_data_dir / relative_dir,
+                        field.stem,
+                        source.suffix.lower(),
+                        source.read_bytes(),
+                    )
+                    relative = (relative_dir / target.name).as_posix()
+                    written_paths.append(relative)
+                    connection.execute(
+                        f"update rewards set {field.field} = ? where id = ?",
+                        (relative, reward_id),
+                    )
             connection.commit()
         except Exception:
             connection.rollback()

@@ -99,32 +99,7 @@
 
 {% if mode == "create" and settings.write_mode %}
   </div>
-  <aside class="person-edit-photos person-create-draft-photos" data-person-draft data-draft-token="{{ draft_token }}">
-    <section class="form-section person-create-draft-rewards" data-person-draft data-draft-token="{{ draft_token }}">
-      <div class="person-post-create-rewards-head">
-        <h2>Награды</h2>
-        <button class="button" type="button" data-draft-reward-open>Добавить награду</button>
-      </div>
-      <form class="edit-form draft-reward-form" data-draft-reward-form hidden>
-        <div class="form-grid two-columns">
-          <label><span>Наименование</span><select name="id_name" required><option value="">—</option>{% for item in reward_references %}<option value="{{ item.id_name }}">{{ item.name }}</option>{% endfor %}</select></label>
-          <label><span>Номер</span><input name="number" inputmode="numeric"></label>
-          <label><span>Дата покупки</span><input name="date_purchase"></label>
-          <label><span>Цена покупки</span><input name="price_purchase" inputmode="numeric"></label>
-          <label><span>Текущая цена</span><input name="price_now" inputmode="numeric"></label>
-          <label class="checkbox-row"><input name="instock" type="checkbox"><span>В наличии</span></label>
-        </div>
-        <div class="actions"><button type="submit">Добавить</button><button class="secondary-button" type="button" data-draft-reward-close>Отмена</button></div>
-        <p class="notice notice-error" data-draft-reward-error hidden></p>
-      </form>
-      <div class="table-wrap" data-draft-reward-table {% if not draft_rewards %}hidden{% endif %}>
-        <table><thead><tr><th>Наименование</th><th>Номер</th><th></th></tr></thead><tbody data-draft-reward-rows>
-        {% for reward in draft_rewards %}
-          <tr data-draft-reward-index="{{ reward.index }}"><td>{{ reward.name }}</td><td>{{ reward.number|dash }}</td><td><button class="mini-button danger" type="button" data-draft-reward-remove>×</button></td></tr>
-        {% endfor %}
-        </tbody></table>
-      </div>
-    </section>
+  <aside class="person-edit-photos person-create-draft-photos" data-person-draft data-draft-token="{{ draft_token }}" data-draft-photo-base="/persons/new/draft/{{ draft_token }}/photos">
     <section class="photo-manage-section photo-manage-section-compact">
       <h2>Фотографии</h2>
       <div class="photo-manage-grid">
@@ -148,6 +123,26 @@
     </section>
   </aside>
 </div>
+<section class="form-section person-create-draft-rewards" data-person-draft data-draft-token="{{ draft_token }}">
+  <div class="person-post-create-rewards-head">
+    <h2>Награды</h2>
+    <button
+      class="button"
+      type="submit"
+      form="person-primary-form"
+      formaction="/persons/new/draft/{{ draft_token }}/rewards/new"
+      formmethod="post"
+      formnovalidate
+    >Добавить награду</button>
+  </div>
+  <div class="table-wrap" data-draft-reward-table {% if not draft_rewards %}hidden{% endif %}>
+    <table><thead><tr><th>Наименование</th><th>Номер</th><th></th></tr></thead><tbody data-draft-reward-rows>
+    {% for reward in draft_rewards %}
+      <tr data-draft-reward-index="{{ reward.index }}"><td>{{ reward.name }}</td><td>{{ reward.number|dash }}</td><td><button class="mini-button danger" type="button" data-draft-reward-remove>×</button></td></tr>
+    {% endfor %}
+    </tbody></table>
+  </div>
+</section>
 <form class="person-create-cancel" method="post" action="/persons/new/draft/{{ draft_token }}/cancel" data-write-feedback data-write-pending-label="Отменяем…">
   <input type="hidden" name="return_to" value="{{ return_to or '/legacy?tab=rewards' }}">
   <button class="secondary-button" type="submit">Отмена</button>

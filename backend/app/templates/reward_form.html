@@ -1,16 +1,25 @@
 {% extends "base.html" %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
-{% block title %}{% if mode == "create" %}Добавить награду{% else %}{% set reward_edit_name = reward.name|default('', true)|trim %}{% if reward_edit_name %}Изменить награду: {{ reward_edit_name }}{% else %}Изменить награду{% endif %}{% endif %}{% endblock %}
+{% block title %}{% if mode in ("create", "draft") %}Добавить награду{% else %}{% set reward_edit_name = reward.name|default('', true)|trim %}{% if reward_edit_name %}Изменить награду: {{ reward_edit_name }}{% else %}Изменить награду{% endif %}{% endif %}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
 <section class="cavalier-standalone-page cavalier-form-page cavalier-reward-form-page">
-<h1 class="wrap-text">{% if mode == "create" %}Добавить награду{% else %}{% set reward_edit_name = reward.name|default('', true)|trim %}{% if reward_edit_name %}Изменить награду: {{ reward_edit_name }}{% else %}Изменить награду{% endif %}{% endif %}</h1>
-{% if mode == "create" and person %}
+<h1 class="wrap-text">{% if mode in ("create", "draft") %}Добавить награду{% else %}{% set reward_edit_name = reward.name|default('', true)|trim %}{% if reward_edit_name %}Изменить награду: {{ reward_edit_name }}{% else %}Изменить награду{% endif %}{% endif %}</h1>
+{% if mode in ("create", "draft") and person %}
 <p class="secondary">Кавалер: {{ person.fio|dash }}</p>
 {% endif %}
 {% set reward_list_url = '/legacy?tab=rewards' ~ ('&person_id=' ~ person.id if person else '') %}
+{% if mode == "draft" %}
+<form id="draft-reward-cancel-form" method="post" action="/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/cancel">
+  <input type="hidden" name="return_to" value="{{ return_to }}">
+</form>
+{% endif %}
 <p class="local-back-nav compact-actions">
+  {% if mode == "draft" %}
+  <button class="button secondary-button" type="submit" form="draft-reward-cancel-form">← Назад</button>
+  {% else %}
   <a class="button secondary-button" data-escape-back href="{{ return_to or ('/persons/' ~ person.id if mode == 'create' and person else ('/rewards/' ~ reward.id if mode == 'edit' else reward_list_url)) }}">← Назад</a>
+  {% endif %}
 </p>
 
 {% if error %}
@@ -19,7 +28,7 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
-<form class="edit-form legacy-edit-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-reward-reference-derived data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}" data-write-feedback data-write-pending-label="Сохраняем…">
+<form class="edit-form legacy-edit-form cavalier-form-card" method="post" action="{% if mode == 'draft' %}/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}{% elif mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-reward-reference-derived data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}" data-write-feedback data-write-pending-label="Сохраняем…">
   <script type="application/json" data-reward-reference-options>{{ reward_references|tojson }}</script>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   <fieldset class="form-section">
@@ -86,12 +95,40 @@
   {% endfor %}
 
   <div class="actions">
-    <button type="submit">{% if mode == "create" %}Добавить{% else %}Сохранить{% endif %}</button>
+    <button type="submit">{% if mode in ("create", "draft") %}Добавить{% else %}Сохранить{% endif %}</button>
+    {% if mode == "draft" %}
+    <button class="secondary-button" type="submit" form="draft-reward-cancel-form">Отмена</button>
+    {% else %}
     <a data-escape-back href="{{ return_to or ('/persons/' ~ person.id if mode == 'create' else '/rewards/' ~ reward.id) }}">Отмена</a>
+    {% endif %}
   </div>
 </form>
+{% if mode == "draft" %}
+<section class="photo-manage-section" data-person-draft data-draft-token="{{ draft_token }}" data-draft-photo-base="/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/photos">
+  <h2>Фотографии</h2>
+  <div class="photo-manage-grid">
+  {% for photo in photo_controls %}
+    {% set draft_photo = draft_photos.get(photo.field) %}
+    <div class="photo-manage-card {{ '' if draft_photo else 'placeholder-card' }}" data-draft-photo-card="{{ photo.field }}">
+      <div class="photo-frame">
+        <img class="photo" data-draft-photo-image src="{% if draft_photo %}/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/photos/{{ photo.field }}{% endif %}" alt="{{ photo.label }}" {% if not draft_photo %}hidden{% endif %}>
+        <div class="photo photo-placeholder" data-draft-photo-placeholder {% if draft_photo %}hidden{% endif %}>Нет фото</div>
+      </div>
+      <p class="photo-manage-label">{{ photo.label }}</p>
+      <div class="photo-manage-actions">
+        <button class="mini-button photo-icon-button" type="button" data-draft-photo-trigger data-photo-field="{{ photo.field }}" aria-label="Добавить фотографию: {{ photo.label }}" title="Добавить фотографию">+</button>
+        <input class="sr-only-file" type="file" data-draft-photo-input data-photo-field="{{ photo.field }}" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
+        <button class="mini-button danger photo-icon-button" type="button" data-draft-photo-clear data-photo-field="{{ photo.field }}" aria-label="Удалить фотографию: {{ photo.label }}" title="Удалить фотографию" {% if not draft_photo %}hidden{% endif %}>×</button>
+        <p class="notice notice-error photo-source-error" data-draft-photo-error hidden></p>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+</section>
+{% else %}
 {% with photo_entity_type="reward", photo_entity_id=reward.id %}
   {% include "photo_management.html" %}
 {% endwith %}
+{% endif %}
 </section>
 {% endblock %}

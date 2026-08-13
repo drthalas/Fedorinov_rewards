@@ -12,10 +12,15 @@ from backend.app.repositories.persons_write import PersonWriteData
 from backend.app.services.person_create_drafts import (
     add_reward,
     commit_draft,
+    discard_reward,
     discard_draft,
     load_draft,
+    load_reward,
     new_draft_token,
+    save_reward,
+    stage_reward_photo,
     stage_photo,
+    start_reward,
 )
 
 
@@ -112,6 +117,80 @@ class PersonCreateDraftTests(unittest.TestCase):
         self.assertFalse((self.root / ".fedorinov-create-drafts" / token).exists())
         self.assertFalse((self.root / "Source").exists())
 
+    def test_full_reward_form_data_and_photo_remain_draft_until_final_save(self) -> None:
+        token = new_draft_token()
+        reward_token = start_reward(self.settings, token)
+        save_reward(
+            self.settings,
+            token,
+            reward_token,
+            {
+                "id_name": "4",
+                "number": "303",
+                "date_purchase": "05.06.2026",
+                "price_purchase": "1200",
+                "price_now": "1800",
+                "instock": "on",
+            },
+        )
+        stage_reward_photo(
+            self.settings,
+            token,
+            reward_token,
+            "front_foto",
+            "front.jpg",
+            JPEG_BYTES,
+        )
+
+        self.assertEqual(self._counts(), (0, 0))
+        self.assertTrue(load_reward(self.settings, token, reward_token)["photos"]["front_foto"])
+
+        person_id = commit_draft(self.settings, token, PersonWriteData("ALE378 Full Reward", "1916", 1))
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            row = connection.execute(
+                "select person_id, id_name, number, date_purchase, price_purchase, price_now, instock, front_foto "
+                "from rewards"
+            ).fetchone()
+        self.assertEqual(row[:7], (person_id, 4, 303, "2026-06-05", 1200, 1800, 1))
+        self.assertTrue((self.root / row[7]).is_file())
+
+    def test_cancel_reward_form_removes_only_that_staged_reward(self) -> None:
+        token = new_draft_token()
+        stage_photo(self.settings, token, "person_foto", "person.jpg", JPEG_BYTES)
+        reward_token = start_reward(self.settings, token)
+        stage_reward_photo(self.settings, token, reward_token, "front_foto", "front.jpg", JPEG_BYTES)
+
+        discard_reward(self.settings, token, reward_token)
+
+        draft = load_draft(self.settings, token)
+        self.assertEqual(draft["rewards"], [])
+        self.assertIn("person_foto", draft["photos"])
+        self.assertFalse((self.root / ".fedorinov-create-drafts" / token / "rewards" / reward_token).exists())
+        self.assertEqual(self._counts(), (0, 0))
+
+    def test_multiple_full_rewards_accumulate_before_final_person_save(self) -> None:
+        token = new_draft_token()
+        for number in (401, 402, 403):
+            reward_token = start_reward(self.settings, token)
+            save_reward(
+                self.settings,
+                token,
+                reward_token,
+                {"id_name": "4", "number": str(number), "date_purchase": "06.06.2026"},
+            )
+
+        self.assertEqual(self._counts(), (0, 0))
+        person_id = commit_draft(self.settings, token, PersonWriteData("ALE378 Multiple Rewards", "1917", 1))
+
+        with closing(sqlite3.connect(self.db_path)) as connection:
+            rewards = connection.execute(
+                "select person_id, id_name, number from rewards order by number"
+            ).fetchall()
+        self.assertEqual(
+            rewards,
+            [(person_id, 4, 401), (person_id, 4, 402), (person_id, 4, 403)],
+        )
+
     def test_atomic_failure_rolls_back_person_rewards_and_final_media(self) -> None:
         with closing(sqlite3.connect(self.db_path)) as connection:
             connection.execute(
@@ -145,20 +224,24 @@ class PersonCreateDraftTests(unittest.TestCase):
 
     def test_create_template_exposes_full_draft_workspace_before_save(self) -> None:
         template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")
+        reward_template = (ROOT / "backend/app/templates/reward_form.html").read_text(encoding="utf-8")
         script = (ROOT / "backend/app/static/person_create_draft.js").read_text(encoding="utf-8")
 
         self.assertIn("data-person-draft", template)
         self.assertIn("data-draft-photo-trigger", template)
-        self.assertIn("data-draft-reward-open", template)
+        self.assertIn('formaction="/persons/new/draft/{{ draft_token }}/rewards/new"', template)
         self.assertIn("Добавить награду", template)
         draft_aside = template.index("person-create-draft-photos")
-        reward_action = template.index("data-draft-reward-open", draft_aside)
+        reward_action = template.index("Добавить награду", draft_aside)
         photo_section = template.index("photo-manage-section", draft_aside)
-        self.assertLess(reward_action, photo_section)
-        self.assertEqual(template.count("data-draft-reward-open"), 1)
+        self.assertGreater(reward_action, photo_section)
         self.assertIn('action="/persons/new/draft/{{ draft_token }}/cancel"', template)
-        self.assertIn("/persons/new/draft/${token}/photos", script)
-        self.assertIn("/persons/new/draft/${token}/rewards", script)
+        self.assertIn('mode == "draft"', reward_template)
+        self.assertIn("data-draft-photo-base", reward_template)
+        self.assertIn("data-reward-reference-derived", reward_template)
+        self.assertIn("Дата покупки", reward_template)
+        self.assertIn("Цена покупки", reward_template)
+        self.assertIn("photoBase", script)
 
 
 if __name__ == "__main__":

@@ -99,7 +99,7 @@ class Ale359IntegratedCreateFlowTests(unittest.TestCase):
     def test_primary_create_is_now_final_and_redirects_to_selected_person(self) -> None:
         template = (ROOT / "backend" / "app" / "templates" / "person_form.html").read_text(encoding="utf-8")
         self.assertIn("data-person-draft", template)
-        self.assertIn("data-draft-reward-open", template)
+        self.assertIn('formaction="/persons/new/draft/{{ draft_token }}/rewards/new"', template)
         self.assertIn("data-draft-photo-trigger", template)
 
         request = FakeRequest(

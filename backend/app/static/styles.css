@@ -1674,18 +1674,7 @@ th {
 }
 
 .person-create-draft-rewards {
-  margin: 0 0 10px;
-}
-
-.person-create-draft-rewards .draft-reward-form {
-  margin: 8px 0;
-  padding: 10px;
-  border: 1px solid #746753;
-  background: rgb(20 21 18 / 72%);
-}
-
-.person-create-draft-rewards .draft-reward-form[hidden] {
-  display: none;
+  margin-top: 10px;
 }
 
 .person-create-cancel {
