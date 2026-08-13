@@ -494,6 +494,7 @@
     endFeedback: endClipboardFeedback,
     rememberPending: rememberPendingClipboardImage,
     clearPending: clearPendingClipboardImage,
+    consumePending: consumePendingClipboardImage,
     isConsumed: function (image) {
       return Boolean(image && isConsumedFingerprint(image.fingerprint));
     }

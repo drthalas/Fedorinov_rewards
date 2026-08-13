@@ -17,6 +17,42 @@
     control.setAttribute("aria-busy", busy ? "true" : "false");
   }
 
+  function draftPhotoError(card) {
+    return card && card.querySelector("[data-draft-photo-error]");
+  }
+
+  function clearDraftPhotoError(card) {
+    const error = draftPhotoError(card);
+    if (!error) return;
+    error.textContent = "";
+    error.hidden = true;
+  }
+
+  function showDraftPhotoError(card, message) {
+    const error = draftPhotoError(card);
+    if (!error) return;
+    error.textContent = message || "Не удалось сохранить фотографию.";
+    error.hidden = false;
+  }
+
+  function applyDraftPhoto(card, payload) {
+    const image = card.querySelector("[data-draft-photo-image]");
+    const placeholder = card.querySelector("[data-draft-photo-placeholder]");
+    const clear = card.querySelector("[data-draft-photo-clear]");
+    image.src = `${payload.url}?v=${Date.now()}`;
+    image.hidden = false;
+    placeholder.hidden = true;
+    clear.hidden = false;
+    card.classList.remove("placeholder-card");
+  }
+
+  async function uploadDraftPhoto(photoBase, photoField, file) {
+    const form = new FormData();
+    form.append("photo_field", photoField || "");
+    form.append("file", file, file.name || "clipboard.jpg");
+    return jsonRequest(photoBase, { method: "POST", body: form });
+  }
+
   function initDraft(root) {
     const scopes = root.querySelectorAll("[data-person-draft]");
     if (!scopes.length) return;
@@ -43,28 +79,44 @@
       const photoScope = button.closest("[data-draft-photo-base]");
       const photoBase = photoScope && photoScope.dataset.draftPhotoBase;
       if (!input || !photoBase) return;
-      button.addEventListener("click", () => input.click());
+      button.addEventListener("click", async () => {
+        const helper = window.FedorinovClipboardImages;
+        if (!helper || typeof helper.readWithTimeout !== "function") {
+          input.click();
+          return;
+        }
+        if (!helper.beginFeedback(button)) return;
+        clearDraftPhotoError(card);
+        let clipboardImage;
+        try {
+          clipboardImage = await helper.readWithTimeout(helper.attemptTimeoutMs);
+        } catch (_error) {
+          helper.endFeedback(button);
+          input.click();
+          return;
+        }
+        helper.rememberPending(clipboardImage, []);
+        try {
+          const payload = await uploadDraftPhoto(photoBase, button.dataset.photoField, clipboardImage.blob);
+          helper.consumePending(clipboardImage.fingerprint);
+          applyDraftPhoto(card, payload);
+        } catch (failure) {
+          helper.clearPending(clipboardImage.fingerprint);
+          showDraftPhotoError(card, failure.message);
+        } finally {
+          helper.endFeedback(button);
+        }
+      });
       input.addEventListener("change", async () => {
         const file = input.files && input.files[0];
         if (!file) return;
-        const error = card.querySelector("[data-draft-photo-error]");
-        const form = new FormData();
-        form.append("photo_field", input.dataset.photoField || "");
-        form.append("file", file);
         setBusy(button, true);
-        if (error) error.hidden = true;
+        clearDraftPhotoError(card);
         try {
-          const payload = await jsonRequest(photoBase, { method: "POST", body: form });
-          const image = card.querySelector("[data-draft-photo-image]");
-          const placeholder = card.querySelector("[data-draft-photo-placeholder]");
-          const clear = card.querySelector("[data-draft-photo-clear]");
-          image.src = `${payload.url}?v=${Date.now()}`;
-          image.hidden = false;
-          placeholder.hidden = true;
-          clear.hidden = false;
-          card.classList.remove("placeholder-card");
+          const payload = await uploadDraftPhoto(photoBase, input.dataset.photoField, file);
+          applyDraftPhoto(card, payload);
         } catch (failure) {
-          if (error) { error.textContent = failure.message; error.hidden = false; }
+          showDraftPhotoError(card, failure.message);
         } finally {
           input.value = "";
           setBusy(button, false);
