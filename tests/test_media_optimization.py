@@ -7,9 +7,11 @@ import tempfile
 import unittest
 from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image
 
+from backend.app.services import media_optimization
 from backend.app.services.media_optimization import (
     COMPLETE_MARKER,
     INCOMPLETE_MARKER,
@@ -149,6 +151,25 @@ class MediaOptimizationTests(unittest.TestCase):
                 self.source / "optimized",
                 ConversionPolicy(),
             )
+
+    def test_status_write_retries_transient_windows_replace_denial(self) -> None:
+        destination = self.root / "optimization-status.json"
+        real_replace = media_optimization.os.replace
+        attempts = 0
+
+        def replace_with_transient_denial(source: Path, target: Path) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                raise PermissionError(5, "Access is denied", str(target))
+            real_replace(source, target)
+
+        with patch.object(media_optimization.os, "replace", side_effect=replace_with_transient_denial):
+            media_optimization._write_json(destination, {"state": "running"})
+
+        self.assertEqual(attempts, 3)
+        self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"state": "running"})
+        self.assertEqual(list(self.root.glob("*.tmp")), [])
 
 
 if __name__ == "__main__":

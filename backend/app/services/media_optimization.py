@@ -87,9 +87,19 @@ def _safe_destination(source_root: Path, destination: Path) -> tuple[Path, Path]
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        for attempt in range(6):
+            try:
+                os.replace(temporary, path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.01 * (2**attempt))
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _status(destination: Path, state: str, **extra: object) -> None:
