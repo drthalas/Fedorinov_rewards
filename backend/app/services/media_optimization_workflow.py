@@ -323,7 +323,9 @@ def _index_summary(index_path: Path) -> dict[str, object]:
         return {"exists": False, "indexed": 0, "bytes": 0, "missing": 0}
     with closing(sqlite3.connect(index_path)) as connection:
         indexed, total_bytes, missing = connection.execute(
-            "select count(*), coalesce(sum(size), 0), sum(case when status = 'missing' then 1 else 0 end) "
+            "select count(*), "
+            "coalesce(sum(case when status != 'missing' then size else 0 end), 0), "
+            "sum(case when status = 'missing' then 1 else 0 end) "
             "from media_objects"
         ).fetchone()
         metadata = {

@@ -117,6 +117,13 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(delta["decoded"], 0)
         self.assertEqual(delta["unchanged"], len(inventory_files(self.target)))
 
+        removed = self.target / "default/nofoto.jpg"
+        removed.unlink()
+        delta = workflow.run_check(optimized_settings)
+        self.assertEqual(delta["missing"], 1)
+        current_bytes = sum(item.size for item in inventory_files(self.target))
+        self.assertEqual(workflow.workflow_snapshot(optimized_settings)["current_bytes"], current_bytes)
+
     def test_incomplete_copy_cannot_activate_and_can_restart_safely(self) -> None:
         workflow.run_check(self.settings)
         with self.assertRaises(InterruptedError):
