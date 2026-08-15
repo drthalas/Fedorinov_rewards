@@ -7,8 +7,10 @@ from ..services.display import (
     dash_if_empty,
     format_bool,
     format_birth_year,
+    format_bytes,
     format_date,
     format_money,
+    format_timestamp,
     has_media_path,
     safe_external_url,
 )
@@ -20,7 +22,7 @@ from ..services.notifications import transient_notifications
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260813-ale384-385-1"
+STATIC_ASSET_VERSION = "20260815-ale393-1"
 
 
 def static_url(path: str) -> str:
@@ -60,7 +62,9 @@ templates.env.filters["bool_class"] = bool_class
 templates.env.filters["dash"] = dash_if_empty
 templates.env.filters["format_bool"] = format_bool
 templates.env.filters["format_birth_year"] = format_birth_year
+templates.env.filters["format_bytes"] = format_bytes
 templates.env.filters["format_date"] = format_date
 templates.env.filters["format_birth_year_input"] = format_birth_year_input
 templates.env.filters["format_date_input"] = format_date_input
 templates.env.filters["format_money"] = format_money
+templates.env.filters["format_timestamp"] = format_timestamp

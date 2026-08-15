@@ -23,6 +23,8 @@
   {% set active_nav = "search" %}
 {% elif current_path.startswith("/guides") %}
   {% set active_nav = "guides" %}
+{% elif current_path.startswith("/maintenance/media-optimization") %}
+  {% set active_nav = "maintenance" %}
 {% endif %}
 {% set guides_href = "/guides" %}
 {% if current_url and active_nav != "guides" %}
@@ -44,5 +46,6 @@
     <a class="{% if active_nav == 'summary' %}active{% endif %}" href="/legacy?tab=summary" data-summary-nav>Свод.таблица</a>
     <a class="{% if active_nav == 'guides' %}active{% endif %}" href="{{ guides_href }}">Справочник</a>
     <a class="{% if active_nav == 'about' %}active{% endif %}" href="/legacy?tab=about">О программе</a>
+    <a class="{% if active_nav == 'maintenance' %}active{% endif %}" href="/maintenance/media-optimization">Обслуживание данных</a>
   </nav>
 </header>

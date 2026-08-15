@@ -50,7 +50,7 @@ class Ale346TransitionLifecycleTests(unittest.TestCase):
 
     def test_all_crud_forms_use_shared_feedback_or_specialized_non_navigation_flow(self) -> None:
         templates = ROOT / "backend/app/templates"
-        exceptions = ("data-open-folder", "data-save-as-form", "data-update-form")
+        exceptions = ("data-open-folder", "data-save-as-form", "data-update-form", "data-optimization-form")
         uncovered: list[str] = []
         for path in sorted(templates.glob("*.html")):
             source = path.read_text(encoding="utf-8")

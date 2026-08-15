@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+
+{% block title %}Оптимизация изображений — Fedorinov Rewards{% endblock %}
+{% block body_class %}legacy-rewards-theme media-optimization-theme{% endblock %}
+
+{% block extra_head %}
+  <script src="{{ static_url('media_optimization.js') }}" defer></script>
+{% endblock %}
+
+{% block content %}
+<section
+  class="media-optimization-page"
+  data-media-optimization
+  data-status-url="/maintenance/media-optimization/status"
+>
+  <header class="media-optimization-heading">
+    <div>
+      <p class="media-optimization-eyebrow">Обслуживание данных</p>
+      <h1>Оптимизация изображений</h1>
+    </div>
+    <span class="media-workspace-badge {% if snapshot.workspace_state == 'optimized' %}is-optimized{% endif %}">
+      {% if snapshot.workspace_state == "optimized" %}Оптимизированная копия активна{% else %}Исходная рабочая копия активна{% endif %}
+    </span>
+  </header>
+
+  {% if status_message %}
+    <div class="media-optimization-notice is-success" role="status">{{ status_message }}</div>
+  {% endif %}
+  {% if error_message %}
+    <div class="media-optimization-notice is-error" role="alert">{{ error_message }}</div>
+  {% endif %}
+  <div class="media-optimization-notice" data-operation-message role="status" aria-live="polite" hidden></div>
+
+  <section class="media-optimization-summary" aria-labelledby="media-summary-title">
+    <div class="media-section-heading">
+      <div>
+        <h2 id="media-summary-title">Состояние изображений</h2>
+        <p>
+          {% if snapshot.baseline_exists %}
+            Базовая проверка создана. Следующая проверка обработает только новые и изменённые файлы.
+          {% else %}
+            Базовая проверка ещё не выполнена. Первый запуск может занять продолжительное время.
+          {% endif %}
+        </p>
+      </div>
+      <span class="media-health-state {% if snapshot.health_passed %}is-healthy{% endif %}">
+        {% if snapshot.health_passed %}Проверка целостности пройдена{% elif snapshot.target_incomplete %}Копия не завершена{% elif snapshot.baseline_exists %}Базовая проверка готова{% else %}Ожидает проверки{% endif %}
+      </span>
+    </div>
+
+    <dl class="media-metrics">
+      <div>
+        <dt>Текущий размер</dt>
+        <dd data-metric="current_bytes">{{ snapshot.current_bytes|format_bytes }}</dd>
+      </div>
+      <div>
+        <dt>Файлов в индексе</dt>
+        <dd data-metric="current_index.indexed">{{ "{:,}".format(snapshot.current_index.indexed)|replace(",", " ") }}</dd>
+      </div>
+      <div>
+        <dt>Новых / изменённых</dt>
+        <dd><span data-metric="new_files">{{ snapshot.new_files }}</span> / <span data-metric="changed_files">{{ snapshot.changed_files }}</span></dd>
+      </div>
+      <div>
+        <dt>Потенциальная экономия</dt>
+        <dd data-metric="predicted_saved_bytes">{{ snapshot.predicted_saved_bytes|format_bytes }}</dd>
+      </div>
+      <div>
+        <dt>Фактическая экономия</dt>
+        <dd data-metric="actual_saved_bytes">{{ snapshot.actual_saved_bytes|format_bytes }}</dd>
+      </div>
+      <div>
+        <dt>Последняя проверка</dt>
+        <dd data-metric="last_check.completed_at">{{ (snapshot.last_check.completed_at if snapshot.last_check else None)|format_timestamp }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="media-operation-panel" data-operation-state="{{ snapshot.operation.state }}">
+    <div class="media-section-heading">
+      <div>
+        <h2>Выполнение</h2>
+        <p data-operation-label>
+          {% if snapshot.operation.state == "running" %}
+            Операция выполняется. Можно оставить этот экран открытым.
+          {% elif snapshot.operation.state in ["cancelled", "interrupted"] %}
+            Операция остановлена безопасно. Её можно продолжить.
+          {% elif snapshot.operation.state == "error" %}
+            Операция завершилась с ошибкой. Данные исходной копии не изменены.
+          {% elif snapshot.operation.state == "complete" %}
+            Последняя операция завершена.
+          {% else %}
+            Нет активной операции.
+          {% endif %}
+        </p>
+      </div>
+      <strong data-operation-percent>{{ snapshot.operation.percent|default(0) }}%</strong>
+    </div>
+    <progress class="media-operation-progress" data-operation-progress max="100" value="{{ snapshot.operation.percent|default(0) }}">
+      {{ snapshot.operation.percent|default(0) }}%
+    </progress>
+    <p class="media-operation-detail" data-operation-detail>
+      {% if snapshot.operation.processed is defined and snapshot.operation.total is defined %}
+        Обработано {{ snapshot.operation.processed }} из {{ snapshot.operation.total }}
+      {% else %}
+        Статус обновляется автоматически.
+      {% endif %}
+    </p>
+  </section>
+
+  <section class="media-optimization-actions" aria-labelledby="media-actions-title">
+    <div class="media-section-heading">
+      <div>
+        <h2 id="media-actions-title">Действия</h2>
+        <p>Проверка не меняет изображения. Оптимизация всегда создаёт отдельную копию.</p>
+      </div>
+    </div>
+    <div class="media-action-row">
+      <form method="post" action="/maintenance/media-optimization/check" data-optimization-form data-pending-label="Проверяем…">
+        <button class="button" type="submit" {% if snapshot.running %}disabled{% endif %}>Проверить</button>
+      </form>
+
+      <form method="post" action="/maintenance/media-optimization/optimize" data-optimization-form data-pending-label="Оптимизируем…">
+        {% if not snapshot.target_complete %}
+          <label class="media-copy-confirmation">
+            <input type="checkbox" name="confirm_separate_copy" value="true" required>
+            Создать отдельную optimized copy. Исходная база и изображения останутся без изменений.
+          </label>
+        {% endif %}
+        {% if snapshot.resume_available %}<input type="hidden" name="resume" value="true">{% endif %}
+        <button class="button" type="submit" {% if snapshot.running or not snapshot.baseline_exists %}disabled{% endif %}>
+          {% if snapshot.resume_available %}Продолжить безопасно{% else %}Оптимизировать{% endif %}
+        </button>
+      </form>
+
+      <form method="post" action="/maintenance/media-optimization/cancel" data-optimization-form data-pending-label="Останавливаем…" data-cancel-form {% if not snapshot.running %}hidden{% endif %}>
+        <button class="button secondary-button" type="submit">Остановить</button>
+      </form>
+    </div>
+
+    <div class="media-action-facts">
+      <p><strong>Ожидаемый размер копии:</strong> {{ snapshot.predicted_target_bytes|format_bytes }}</p>
+      <p><strong>Свободно в расположении копии:</strong> {{ snapshot.available_bytes|format_bytes }}</p>
+      {% if not snapshot.estimated_space_ok %}
+        <p class="media-space-warning">По консервативной оценке свободного места недостаточно. Оптимизация не должна запускаться до освобождения места.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if snapshot.target_status %}
+  <section class="media-optimization-report" aria-labelledby="media-report-title">
+    <div class="media-section-heading">
+      <div>
+        <h2 id="media-report-title">Результат</h2>
+        <p>Краткий отчёт последней подготовленной optimized copy.</p>
+      </div>
+      <span class="media-health-state {% if snapshot.health_passed %}is-healthy{% endif %}">
+        {% if snapshot.health_passed %}Готова к активации{% else %}Активация запрещена{% endif %}
+      </span>
+    </div>
+    <div class="media-before-after">
+      <div><span>Было</span><strong>{{ snapshot.source_bytes|format_bytes }}</strong></div>
+      <div><span>Стало</span><strong>{{ snapshot.target_bytes|format_bytes }}</strong></div>
+      <div><span>Сэкономлено</span><strong>{{ snapshot.actual_saved_bytes|format_bytes }}</strong></div>
+    </div>
+    <dl class="media-report-counts">
+      <div><dt>Конвертировано</dt><dd>{{ snapshot.converted_files }}</dd></div>
+      <div><dt>Оставлено без изменений</dt><dd>{{ snapshot.skipped_files }}</dd></div>
+      <div><dt>Ошибки</dt><dd>{{ snapshot.error_files }}</dd></div>
+      <div><dt>Целостность DB</dt><dd>{{ snapshot.health.integrity_check|default("—") if snapshot.health else "—" }}</dd></div>
+    </dl>
+    <div class="media-action-row">
+      {% if snapshot.can_activate and snapshot.workspace_state != "optimized" %}
+      <form method="post" action="/maintenance/media-optimization/activate" data-optimization-form data-reload-after data-pending-label="Активируем…">
+        <button class="button" type="submit">Активировать проверенную копию</button>
+      </form>
+      {% endif %}
+      {% if snapshot.workspace_state == "optimized" %}
+      <form method="post" action="/maintenance/media-optimization/activate-source" data-optimization-form data-reload-after data-pending-label="Переключаем…">
+        <button class="button secondary-button" type="submit">Вернуться к исходной копии</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <details class="media-workspace-details">
+    <summary>Расположение рабочих копий</summary>
+    <dl>
+      <div><dt>Исходная</dt><dd>{{ snapshot.source_workspace }}</dd></div>
+      <div><dt>Оптимизированная</dt><dd>{{ snapshot.target_workspace }}</dd></div>
+      <div><dt>Активная</dt><dd>{{ snapshot.active_workspace }}</dd></div>
+    </dl>
+  </details>
+</section>
+{% endblock %}

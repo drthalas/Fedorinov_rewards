@@ -7,6 +7,35 @@ from urllib.parse import urlsplit
 DASH = "—"
 
 
+def format_bytes(value: object) -> str:
+    try:
+        size = max(int(value), 0)
+    except (TypeError, ValueError):
+        return DASH
+    units = ("Б", "КБ", "МБ", "ГБ", "ТБ")
+    amount = float(size)
+    unit = units[0]
+    for unit in units:
+        if amount < 1000 or unit == units[-1]:
+            break
+        amount /= 1000
+    if unit == "Б":
+        return f"{size:,} Б".replace(",", " ")
+    return f"{amount:.3f} {unit}" if amount < 10 else f"{amount:.2f} {unit}"
+
+
+def format_timestamp(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return DASH
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return DASH
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone()
+    return parsed.strftime("%d.%m.%Y %H:%M")
+
+
 def dash_if_empty(value: object) -> object:
     if value is None:
         return DASH

@@ -2,7 +2,21 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .config import PROJECT_ROOT
-from .routers import dashboard, delete_preflight, guides, health, legacy, marks, media, persons, photos, rewards, search, updates
+from .routers import (
+    dashboard,
+    delete_preflight,
+    guides,
+    health,
+    legacy,
+    marks,
+    media,
+    media_optimization,
+    persons,
+    photos,
+    rewards,
+    search,
+    updates,
+)
 from .version import APP_VERSION
 
 
@@ -21,3 +35,4 @@ app.include_router(health.router)
 app.include_router(media.router)
 app.include_router(photos.router)
 app.include_router(updates.router)
+app.include_router(media_optimization.router)

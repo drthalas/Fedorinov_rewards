@@ -15,7 +15,7 @@ from typing import Callable, Iterable, Sequence
 from PIL import Image, UnidentifiedImageError
 
 from .media_image_policy import JPEG_OPTIONS, JPEG_POLICY_VERSION, JPEG_QUALITY
-from scripts.analyze_managed_media import (
+from .managed_media_analysis import (
     MANAGED_ROOTS,
     REFERENCE_COLUMNS,
     inventory_files,

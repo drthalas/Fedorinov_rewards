@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Callable, Sequence
 from uuid import uuid4
 
-from scripts.analyze_managed_media import (
+from .managed_media_analysis import (
     FileEntry,
     inspect_file,
     inventory_files,
@@ -347,6 +347,9 @@ def run_incremental_index(
         schema_version = _metadata_get(connection, "schema_version")
         if schema_version != INDEX_SCHEMA_VERSION:
             raise OptimizationIndexError("unsupported optimization index schema")
+        indexed_root = Path(str(_metadata_get(connection, "data_root") or "")).resolve()
+        if indexed_root != data_root.resolve():
+            raise OptimizationIndexError("optimization index belongs to a different data root")
         missing_ids = sorted(set(previous) - set(current))
         new_ids: list[str] = []
         changed_ids: list[str] = []
