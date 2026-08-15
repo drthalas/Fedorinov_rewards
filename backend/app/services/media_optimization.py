@@ -14,6 +14,7 @@ from typing import Callable, Iterable, Sequence
 
 from PIL import Image, UnidentifiedImageError
 
+from .media_image_policy import JPEG_OPTIONS, JPEG_POLICY_VERSION, JPEG_QUALITY
 from scripts.analyze_managed_media import (
     MANAGED_ROOTS,
     REFERENCE_COLUMNS,
@@ -34,11 +35,11 @@ INCOMPLETE_MARKER = ".optimization-incomplete"
 
 @dataclass(frozen=True)
 class ConversionPolicy:
-    version: str = "jpeg-q90-opaque-photo-v1"
-    jpeg_quality: int = 90
-    optimize: bool = False
-    progressive: bool = False
-    subsampling: int = 0
+    version: str = JPEG_POLICY_VERSION
+    jpeg_quality: int = JPEG_QUALITY
+    optimize: bool = bool(JPEG_OPTIONS["optimize"])
+    progressive: bool = bool(JPEG_OPTIONS["progressive"])
+    subsampling: int = int(JPEG_OPTIONS["subsampling"])
 
     def jpeg_options(self) -> dict[str, object]:
         return {

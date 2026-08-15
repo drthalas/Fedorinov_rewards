@@ -19,8 +19,7 @@ from backend.app.services.display import dash_if_empty, format_birth_year
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"rank-png"
-WEBP_BYTES = b"RIFF" + (9).to_bytes(4, "little") + b"WEBP" + b"rank-webp"
+from tests.image_fixtures import PNG_BYTES, WEBP_BYTES
 
 
 class FakeMultipartRequest:

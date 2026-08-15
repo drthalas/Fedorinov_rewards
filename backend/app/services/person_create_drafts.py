@@ -14,6 +14,7 @@ from ..db import open_write_connection
 from ..repositories.persons_write import PersonWriteData, create_person_in_connection
 from ..repositories.rewards_write import RewardWriteData, create_reward_in_connection, reward_data_from_mapping
 from .audit import log_action
+from .media_image_policy import ImagePolicyError, NormalizedImage, normalize_uploaded_image
 from .media_filenames import write_collision_safe_media
 from .media_lifecycle import discard_uncommitted_image
 from .photos import (
@@ -21,8 +22,6 @@ from .photos import (
     PERSON_PHOTO_FIELDS,
     REWARD_PHOTO_FIELDS,
     PhotoValidationError,
-    _extension,
-    _matches_image_signature,
 )
 from .write_guard import ensure_write_allowed
 
@@ -44,6 +43,15 @@ def _token(value: object) -> str:
 
 def _root(settings: Settings) -> Path:
     return settings.rewards_data_dir / ".fedorinov-create-drafts"
+
+
+def _normalize_draft_upload(filename: str, content: bytes) -> NormalizedImage:
+    if len(content) > MAX_PHOTO_BYTES:
+        raise PhotoValidationError("Файл больше 25 MB")
+    try:
+        return normalize_uploaded_image(filename, content)
+    except ImagePolicyError as exc:
+        raise PhotoValidationError(str(exc)) from exc
 
 
 def _draft_dir(settings: Settings, token: object) -> Path:
@@ -190,20 +198,14 @@ def stage_photo(settings: Settings, token: object, photo_field: str, filename: s
     field = next((item for item in PERSON_PHOTO_FIELDS if item.field == photo_field), None)
     if field is None:
         raise PhotoValidationError("Некорректное поле фото")
-    extension = _extension(filename)
-    if not content:
-        raise PhotoValidationError("Файл пустой")
-    if len(content) > MAX_PHOTO_BYTES:
-        raise PhotoValidationError("Файл больше 25 MB")
-    if not _matches_image_signature(extension, content):
-        raise PhotoValidationError("Файл не является корректным изображением выбранного типа")
+    normalized = _normalize_draft_upload(filename, content)
     draft = load_draft(settings, token)
     photo_dir = _draft_dir(settings, token) / "photos"
     photo_dir.mkdir(parents=True, exist_ok=True)
     for old in photo_dir.glob(f"{photo_field}.*"):
         old.unlink()
-    target = photo_dir / f"{photo_field}{extension}"
-    target.write_bytes(content)
+    target = photo_dir / f"{photo_field}{normalized.extension}"
+    target.write_bytes(normalized.content)
     photos = dict(draft["photos"])
     photos[photo_field] = {"filename": target.name, "original_name": Path(filename).name}
     draft["photos"] = photos
@@ -245,21 +247,15 @@ def stage_reward_photo(
     field = next((item for item in REWARD_PHOTO_FIELDS if item.field == photo_field), None)
     if field is None:
         raise PhotoValidationError("Некорректное поле фото")
-    extension = _extension(filename)
-    if not content:
-        raise PhotoValidationError("Файл пустой")
-    if len(content) > MAX_PHOTO_BYTES:
-        raise PhotoValidationError("Файл больше 25 MB")
-    if not _matches_image_signature(extension, content):
-        raise PhotoValidationError("Файл не является корректным изображением выбранного типа")
+    normalized = _normalize_draft_upload(filename, content)
     draft = load_draft(settings, token)
     index, entry = _reward_entry(draft, reward_token)
     photo_dir = _draft_dir(settings, token) / "rewards" / _token(reward_token) / "photos"
     photo_dir.mkdir(parents=True, exist_ok=True)
     for old in photo_dir.glob(f"{photo_field}.*"):
         old.unlink()
-    target = photo_dir / f"{photo_field}{extension}"
-    target.write_bytes(content)
+    target = photo_dir / f"{photo_field}{normalized.extension}"
+    target.write_bytes(normalized.content)
     updated = dict(entry)
     photos = dict(updated.get("photos") or {})
     photos[photo_field] = {"filename": target.name, "original_name": Path(filename).name}

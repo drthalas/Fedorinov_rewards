@@ -1,10 +1,14 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import io
 import os
+import random
 import sqlite3
 import unittest
 from unittest.mock import patch
 from zipfile import ZipFile
+
+from PIL import Image
 
 from backend.app.config import Settings
 from backend.app.services.person_files import (
@@ -17,11 +21,7 @@ from backend.app.services.person_files import (
 from backend.app.services.media_filenames import readable_media_stem, write_collision_safe_media
 from backend.app.services.photos import PhotoValidationError, clear_photo, photo_items, save_photo
 from backend.app.services.write_guard import WriteBlockedError
-
-
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"jpeg-image"
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"png-image"
-WEBP_BYTES = b"RIFF" + (10).to_bytes(4, "little") + b"WEBP" + b"webp-image"
+from tests.image_fixtures import JPEG_BYTES, PNG_BYTES, WEBP_BYTES
 
 
 class PhotoManagementTests(unittest.TestCase):
@@ -112,6 +112,32 @@ class PhotoManagementTests(unittest.TestCase):
         target = self.root / path
         self.assertTrue(target.exists())
         self.assertEqual(target.read_bytes(), JPEG_BYTES)
+
+    def test_actual_format_and_q90_policy_control_saved_extension(self) -> None:
+        mismatched = save_photo(
+            self.settings(),
+            "person",
+            1,
+            "person_foto",
+            "clipboard.jpg",
+            PNG_BYTES,
+        )
+        self.assertTrue(mismatched.endswith(".png"))
+        noise = Image.frombytes("RGB", (512, 512), random.Random(392).randbytes(512 * 512 * 3))
+        encoded = io.BytesIO()
+        noise.save(encoded, format="PNG")
+        optimized = save_photo(
+            self.settings(),
+            "person",
+            1,
+            "person_foto",
+            "photo.png",
+            encoded.getvalue(),
+        )
+        self.assertTrue(optimized.endswith(".jpg"))
+        with Image.open(self.root / optimized) as decoded:
+            self.assertEqual(decoded.format, "JPEG")
+            self.assertEqual(decoded.size, (512, 512))
 
     def test_person_fixed_slot_upload_replace_and_clear_do_not_change_neighbor(self) -> None:
         with sqlite3.connect(self.db_path) as connection:

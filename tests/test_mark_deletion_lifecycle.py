@@ -16,7 +16,7 @@ from backend.app.repositories.marks_write import (
 
 
 MEDIA_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto")
-JPEG_BYTES = b"\xff\xd8\xff\xe0mark-delete"
+from tests.image_fixtures import JPEG_BYTES
 
 
 class MarkDeletionLifecycleTests(unittest.TestCase):

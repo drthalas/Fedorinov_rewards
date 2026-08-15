@@ -17,8 +17,7 @@ from backend.app.services.media_lifecycle import (
 from backend.app.services.photos import clear_photo_with_result, save_photo_with_result
 
 
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"lifecycle-jpeg"
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"lifecycle-png"
+from tests.image_fixtures import JPEG_BYTES, PNG_BYTES
 
 
 class MediaLifecycleTests(unittest.TestCase):

@@ -25,7 +25,7 @@ from backend.app.services.deletion_lifecycle import (
 )
 
 
-JPEG_BYTES = b"\xff\xd8\xff\xe0deletion-foundation"
+from tests.image_fixtures import JPEG_BYTES
 
 
 class DeletionLifecycleTests(unittest.TestCase):

@@ -32,8 +32,7 @@ PERSON_MEDIA_FIELDS = (
 )
 REWARD_MEDIA_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")
 MARK_MEDIA_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto")
-JPEG_BYTES = b"\xff\xd8\xff\xe0ale292-integration"
-PNG_BYTES = b"\x89PNG\r\n\x1a\nale292-integration"
+from tests.image_fixtures import JPEG_BYTES, PNG_BYTES
 
 
 class FullDeletionIntegrationTests(unittest.TestCase):

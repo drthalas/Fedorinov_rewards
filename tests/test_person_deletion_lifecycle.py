@@ -26,7 +26,7 @@ PERSON_FIELDS = (
     "card2_foto",
 )
 REWARD_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")
-JPEG_BYTES = b"\xff\xd8\xff\xe0person-delete"
+from tests.image_fixtures import JPEG_BYTES
 
 
 class PersonDeletionLifecycleTests(unittest.TestCase):

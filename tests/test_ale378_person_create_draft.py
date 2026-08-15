@@ -25,7 +25,7 @@ from backend.app.services.person_create_drafts import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"draft-image"
+from tests.image_fixtures import JPEG_BYTES
 
 
 class PersonCreateDraftTests(unittest.TestCase):

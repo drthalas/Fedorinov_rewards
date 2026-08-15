@@ -26,6 +26,17 @@ from urllib.parse import quote, unquote
 
 from PIL import Image, UnidentifiedImageError
 
+from backend.app.services.media_image_policy import (
+    JPEG_CANDIDATE_MIN_BYTES,
+    JPEG_CANDIDATE_MIN_DIMENSION,
+    JPEG_MAX_DIMENSION,
+    JPEG_OPTIONS,
+    PHOTO_LIKE_MIN_COLORS,
+    alpha_state,
+    classify_png,
+    photo_like,
+)
+
 
 MANAGED_ROOTS = ("Source", "SourceMark", "default", "GuideImages")
 REFERENCE_COLUMNS = {
@@ -72,17 +83,9 @@ NON_RASTER_EXTENSIONS = {
     ".xls",
     ".xlsx",
 }
-JPEG_CANDIDATE_MIN_BYTES = 64 * 1024
-JPEG_CANDIDATE_MIN_DIMENSION = 256
-JPEG_MAX_DIMENSION = 65_500
-PHOTO_LIKE_MIN_COLORS = 1024
 DEFAULT_QUALITIES = (88, 90, 92)
 DEFAULT_ESTIMATE_SAMPLE_SIZE = 1200
-JPEG_PROFILE_SETTINGS = {
-    "optimize": False,
-    "progressive": False,
-    "subsampling": 0,
-}
+JPEG_PROFILE_SETTINGS = {key: value for key, value in JPEG_OPTIONS.items() if key != "quality"}
 
 
 @dataclass(frozen=True)
@@ -302,46 +305,6 @@ def extension_matches(actual_format: str | None, extension: str) -> bool | None:
     if expected == "JPEG" and actual_format == "MPO":
         return True
     return expected == actual_format
-
-
-def alpha_state(image: Image.Image) -> tuple[bool, bool]:
-    has_alpha_channel = "A" in image.getbands() or "transparency" in image.info
-    if not has_alpha_channel:
-        return False, False
-    try:
-        alpha = image.convert("RGBA").getchannel("A")
-        extrema = alpha.getextrema()
-        return True, bool(extrema and extrema[0] < 255)
-    except (OSError, ValueError):
-        return True, True
-
-
-def photo_like(image: Image.Image) -> bool:
-    sample = image.convert("RGB")
-    sample.thumbnail((256, 256))
-    return sample.getcolors(maxcolors=PHOTO_LIKE_MIN_COLORS) is None
-
-
-def classify_png(
-    image: Image.Image,
-    source_bytes: int,
-    has_alpha_channel: bool,
-    has_transparency: bool,
-) -> tuple[str, str]:
-    if has_transparency:
-        return "keep_lossless_alpha", "actual_transparency"
-    if image.mode not in {"RGB", "RGBA"}:
-        return "keep_lossless_other", f"non_rgb_mode:{image.mode}"
-    if source_bytes < JPEG_CANDIDATE_MIN_BYTES:
-        return "keep_lossless_other", "small_source"
-    if min(image.size) < JPEG_CANDIDATE_MIN_DIMENSION:
-        return "keep_lossless_other", "small_dimension"
-    if max(image.size) > JPEG_MAX_DIMENSION:
-        return "keep_lossless_other", "jpeg_dimension_limit"
-    if not photo_like(image):
-        return "keep_lossless_other", "limited_color_graphic_or_document"
-    reason = "opaque_photo_like_rgba_png" if has_alpha_channel else "opaque_photo_like_rgb_png"
-    return "jpeg_candidate", reason
 
 
 def inspect_file(entry: FileEntry, reference_count: int) -> dict[str, object]:

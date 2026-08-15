@@ -16,7 +16,7 @@ from backend.app.repositories.rewards_write import (
 
 
 MEDIA_FIELDS = ("front_foto", "back_foto", "book1_foto", "book2_foto", "reward_list")
-JPEG_BYTES = b"\xff\xd8\xff\xe0reward-delete"
+from tests.image_fixtures import JPEG_BYTES
 
 
 class RewardDeletionLifecycleTests(unittest.TestCase):

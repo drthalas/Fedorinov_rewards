@@ -7,13 +7,13 @@ from pathlib import Path
 from ..config import Settings
 from ..db import open_write_connection
 from .audit import log_action
+from .media_image_policy import ImagePolicyError, normalize_uploaded_image
 from .media_lifecycle import MediaCleanupResult, cleanup_unreferenced_image, discard_uncommitted_image
 from .media_filenames import write_collision_safe_media
 from .write_guard import ensure_write_allowed
 
 
 MAX_PHOTO_BYTES = 25 * 1024 * 1024
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 class PhotoValidationError(ValueError):
@@ -84,23 +84,6 @@ def _field_config(entity_type: str, photo_field: str) -> PhotoField:
     raise PhotoValidationError("Некорректное поле фото")
 
 
-def _extension(filename: str) -> str:
-    suffix = Path(filename or "").suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise PhotoValidationError("Разрешены только .jpg, .jpeg, .png, .webp")
-    return suffix
-
-
-def _matches_image_signature(extension: str, content: bytes) -> bool:
-    if extension in {".jpg", ".jpeg"}:
-        return content.startswith(b"\xff\xd8\xff")
-    if extension == ".png":
-        return content.startswith(b"\x89PNG\r\n\x1a\n")
-    if extension == ".webp":
-        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
-    return False
-
-
 def _entity_row(connection, entity_type: str, entity_id: int):
     if entity_type == "person":
         return connection.execute("select id from person where id = ?", (entity_id,)).fetchone()
@@ -160,13 +143,12 @@ def save_photo_with_result(
 ) -> PhotoMutationResult:
     ensure_write_allowed(settings)
     field = _field_config(entity_type, photo_field)
-    extension = _extension(filename)
-    if not content:
-        raise PhotoValidationError("Файл пустой")
     if len(content) > MAX_PHOTO_BYTES:
         raise PhotoValidationError("Файл больше 25 MB")
-    if not _matches_image_signature(extension, content):
-        raise PhotoValidationError("Файл не является корректным изображением выбранного типа")
+    try:
+        normalized = normalize_uploaded_image(filename, content)
+    except ImagePolicyError as exc:
+        raise PhotoValidationError(str(exc)) from exc
 
     relative_path: str | None = None
     old_path: object = None
@@ -183,7 +165,12 @@ def save_photo_with_result(
         relative_dir = _relative_dir(entity_type, entity_id, row)
         target_dir = settings.rewards_data_dir / relative_dir
         try:
-            target_path = write_collision_safe_media(target_dir, field.stem, extension, content)
+            target_path = write_collision_safe_media(
+                target_dir,
+                field.stem,
+                normalized.extension,
+                normalized.content,
+            )
             relative_path = (relative_dir / target_path.name).as_posix()
             connection.execute(f"update {table} set {field.field} = ? where id = ?", (relative_path, entity_id))
             connection.commit()

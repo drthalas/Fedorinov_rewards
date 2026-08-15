@@ -2,6 +2,7 @@ from pathlib import Path, PureWindowsPath
 from urllib.parse import unquote
 
 from ..config import Settings
+from .media_image_policy import ImagePolicyError, normalize_uploaded_image
 from .media_filenames import readable_media_stem, write_collision_safe_media
 from .write_guard import ensure_write_allowed
 
@@ -33,36 +34,23 @@ def normalize_guide_image_path(raw_path: object) -> str:
     return candidate.as_posix()
 
 
-def _validated_extension(filename: str) -> str:
-    suffix = Path(filename).suffix.lower()
-    if suffix not in ALLOWED_GUIDE_IMAGE_EXTENSIONS:
-        raise GuideImageValidationError("Разрешены только .jpg, .jpeg, .png, .webp")
-    return suffix
-
-
-def _matches_image_signature(extension: str, content: bytes) -> bool:
-    if extension in {".jpg", ".jpeg"}:
-        return content.startswith(b"\xff\xd8\xff")
-    if extension == ".png":
-        return content.startswith(b"\x89PNG\r\n\x1a\n")
-    if extension == ".webp":
-        return len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP"
-    return False
-
-
 def save_guide_image(settings: Settings, filename: str, content: bytes) -> str:
     ensure_write_allowed(settings)
-    extension = _validated_extension(filename)
-    if not content:
-        raise GuideImageValidationError("Файл изображения пустой.")
     if len(content) > MAX_GUIDE_IMAGE_BYTES:
         raise GuideImageValidationError("Файл изображения больше 5 MB.")
-    if not _matches_image_signature(extension, content):
-        raise GuideImageValidationError("Файл не является корректным изображением выбранного типа.")
+    try:
+        normalized = normalize_uploaded_image(filename, content)
+    except ImagePolicyError as exc:
+        raise GuideImageValidationError(str(exc)) from exc
 
     root = settings.guide_images_dir.resolve()
     source_stem = readable_media_stem(Path(filename).stem, fallback="изображение_справочника")
-    target = write_collision_safe_media(root, source_stem, extension, content).resolve()
+    target = write_collision_safe_media(
+        root,
+        source_stem,
+        normalized.extension,
+        normalized.content,
+    ).resolve()
     try:
         target.relative_to(root)
     except ValueError as exc:

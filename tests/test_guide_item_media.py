@@ -39,8 +39,7 @@ from backend.app.services.guide_tree_state import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"test-png"
-WEBP_BYTES = b"RIFF" + (8).to_bytes(4, "little") + b"WEBP" + b"test-webp"
+from tests.image_fixtures import PNG_BYTES, WEBP_BYTES
 
 
 class FakeMultipartRequest:
