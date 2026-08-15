@@ -75,6 +75,28 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.14
+
+Статус: release candidate, не опубликован.
+
+Дата подготовки: 2026-08-15.
+
+Тип: media optimization and maintenance patch.
+
+Состав:
+
+- Read-only анализ managed media и прогноз экономии без изменения source dataset.
+- Отдельная optimized copy с Q90/4:4:4 для безопасных JPEG-кандидатов и сохранением lossless-изображений.
+- Incremental index для быстрых повторных проверок и обработки только новых или изменённых файлов.
+- Resume/idempotency, health checks и безопасная активация optimized copy.
+- Пользовательский экран «Обслуживание данных → Оптимизация изображений» с прогрессом и итоговым отчётом.
+
+Release gate:
+
+- Exact integrated candidate проходит один полный Windows VM Sergey-full end-to-end gate.
+- Release-candidate stage публикует только изолированный Owner candidate channel и не обращается к physical Windows.
+- GitHub Release, tag, production `latest.json` и Telegram заблокированы до отдельного Owner PASS и authorization.
+
 ## v2.0.13
 
 Статус: release candidate, не опубликован.
