@@ -148,6 +148,25 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(snapshot["operation"]["state"], "interrupted")
         self.assertTrue(snapshot["resume_available"])
 
+    def test_state_write_retries_transient_windows_replace_denial(self) -> None:
+        destination = self.state / workflow.OPERATION_STATUS
+        real_replace = workflow.os.replace
+        attempts = 0
+
+        def replace_with_transient_denial(source: Path, target: Path) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                raise PermissionError(5, "Access is denied", str(target))
+            real_replace(source, target)
+
+        with patch.object(workflow.os, "replace", side_effect=replace_with_transient_denial):
+            workflow._write_json(destination, {"state": "complete"})
+
+        self.assertEqual(attempts, 3)
+        self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"state": "complete"})
+        self.assertEqual(list(self.state.glob("*.tmp")), [])
+
     def test_background_error_and_cancel_finish_the_lifecycle(self) -> None:
         with patch.object(workflow, "run_check", side_effect=RuntimeError("controlled failure")):
             workflow.start_check(self.settings)

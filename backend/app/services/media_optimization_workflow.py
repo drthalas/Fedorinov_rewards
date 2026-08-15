@@ -5,6 +5,7 @@ import os
 import shutil
 import sqlite3
 import threading
+import time
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -80,9 +81,19 @@ def _index_path(settings: Settings, data_root: Path) -> Path:
 
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(temporary, path)
+    try:
+        for attempt in range(6):
+            try:
+                os.replace(temporary, path)
+                return
+            except PermissionError:
+                if attempt == 5:
+                    raise
+                time.sleep(0.01 * (2**attempt))
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _read_json(path: Path) -> dict[str, object] | None:
