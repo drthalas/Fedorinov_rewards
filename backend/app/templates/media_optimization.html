@@ -140,6 +140,7 @@
 
     <div class="media-action-facts">
       <p><strong>Ожидаемый размер копии:</strong> {{ snapshot.predicted_target_bytes|format_bytes }}</p>
+      <p><strong>Требуется свободного места:</strong> {{ snapshot.estimated_required_bytes|format_bytes }}</p>
       <p><strong>Свободно в расположении копии:</strong> {{ snapshot.available_bytes|format_bytes }}</p>
       {% if not snapshot.estimated_space_ok %}
         <p class="media-space-warning">По консервативной оценке свободного места недостаточно. Оптимизация не должна запускаться до освобождения места.</p>

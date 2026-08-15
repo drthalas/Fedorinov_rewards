@@ -174,6 +174,36 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"state": "complete"})
         self.assertEqual(list(self.state.glob("*.tmp")), [])
 
+    def test_same_volume_space_estimate_counts_new_jpeg_bytes_not_hardlinks(self) -> None:
+        analysis = {
+            "records": {"classifications": {"jpeg_candidate": {"bytes": 1_000_000_000}}},
+            "quality_forecasts": {"90": {"predicted_saved_bytes": 800_000_000}},
+        }
+        with patch.object(workflow, "_same_filesystem", return_value=True):
+            required, strategy = workflow._estimated_required_bytes(
+                analysis,
+                self.source,
+                self.target,
+                2_000_000_000,
+            )
+        self.assertEqual(required, 200_000_000 + 128 * 1024 * 1024)
+        self.assertEqual(strategy, "same-volume-hardlinks")
+
+    def test_cross_volume_space_estimate_requires_full_logical_copy(self) -> None:
+        analysis = {
+            "records": {"classifications": {"jpeg_candidate": {"bytes": 1_000_000_000}}},
+            "quality_forecasts": {"90": {"predicted_saved_bytes": 800_000_000}},
+        }
+        with patch.object(workflow, "_same_filesystem", return_value=False):
+            required, strategy = workflow._estimated_required_bytes(
+                analysis,
+                self.source,
+                self.target,
+                2_000_000_000,
+            )
+        self.assertEqual(required, 2_000_000_000)
+        self.assertEqual(strategy, "full-copy")
+
     def test_background_error_and_cancel_finish_the_lifecycle(self) -> None:
         with patch.object(workflow, "run_check", side_effect=RuntimeError("controlled failure")):
             workflow.start_check(self.settings)

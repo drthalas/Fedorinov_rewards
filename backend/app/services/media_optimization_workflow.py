@@ -353,6 +353,51 @@ def _available_bytes(path: Path) -> int:
         return 0
 
 
+def _same_filesystem(first: Path, second: Path) -> bool:
+    first_drive = os.path.splitdrive(str(first.resolve()))[0].casefold()
+    second_drive = os.path.splitdrive(str(second.resolve()))[0].casefold()
+    if first_drive or second_drive:
+        return bool(first_drive and first_drive == second_drive)
+
+    def existing_ancestor(path: Path) -> Path:
+        candidate = path.resolve()
+        while not candidate.exists() and candidate != candidate.parent:
+            candidate = candidate.parent
+        return candidate
+
+    try:
+        return os.stat(existing_ancestor(first)).st_dev == os.stat(existing_ancestor(second)).st_dev
+    except OSError:
+        return False
+
+
+def _estimated_required_bytes(
+    analysis: dict[str, object] | None,
+    source: Path,
+    target: Path,
+    predicted_target_bytes: int,
+) -> tuple[int, str]:
+    if not analysis or not predicted_target_bytes:
+        return predicted_target_bytes, "full-copy"
+    if not _same_filesystem(source, target.parent):
+        return predicted_target_bytes, "full-copy"
+
+    records = dict(analysis.get("records") or {})
+    classifications = dict(records.get("classifications") or {})
+    candidates = dict(classifications.get("jpeg_candidate") or {})
+    candidate_source_bytes = int(candidates.get("bytes") or 0)
+    forecast = dict((analysis.get("quality_forecasts") or {}).get("90") or {})
+    predicted_saved_bytes = int(forecast.get("predicted_saved_bytes") or 0)
+    converted_bytes = max(0, candidate_source_bytes - predicted_saved_bytes)
+    if not candidate_source_bytes or not converted_bytes:
+        return predicted_target_bytes, "full-copy"
+
+    # Same-volume unchanged media use hardlinks; reserve only converted bytes
+    # plus bounded space for the copied DB, manifests, index and filesystem variance.
+    overhead = max(128 * 1024 * 1024, converted_bytes // 50)
+    return converted_bytes + overhead, "same-volume-hardlinks"
+
+
 def _file_mtime(path: Path) -> str | None:
     try:
         return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
@@ -391,6 +436,12 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     available_bytes = _available_bytes(target.parent)
     target_incomplete = bool(target_status and target_status.get("state") == "incomplete")
     target_complete = bool((target / COMPLETE_MARKER).is_file() and target_status and target_status.get("state") == "complete")
+    estimated_required_bytes, space_strategy = _estimated_required_bytes(
+        analysis,
+        source,
+        target,
+        predicted_target_bytes,
+    )
     current_bytes = (
         int(current_index.get("bytes") or 0)
         if current_index.get("exists")
@@ -413,8 +464,12 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         "current_bytes": current_bytes,
         "predicted_saved_bytes": int(forecast.get("predicted_saved_bytes") or 0),
         "predicted_target_bytes": predicted_target_bytes,
+        "estimated_required_bytes": estimated_required_bytes,
+        "space_strategy": space_strategy,
         "available_bytes": available_bytes,
-        "estimated_space_ok": bool(not predicted_target_bytes or target_complete or available_bytes >= predicted_target_bytes),
+        "estimated_space_ok": bool(
+            not estimated_required_bytes or target_complete or available_bytes >= estimated_required_bytes
+        ),
         "new_files": int(last_delta.get("new") or 0),
         "changed_files": int(last_delta.get("changed") or 0),
         "delta_files": changed_count,
