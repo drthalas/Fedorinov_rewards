@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
@@ -72,6 +73,10 @@ class BuildResult:
 
 
 class OptimizationError(RuntimeError):
+    pass
+
+
+class OptimizationTargetNotWritableError(OptimizationError):
     pass
 
 
@@ -155,6 +160,34 @@ def _copy_database(source_database: Path, destination_database: Path) -> None:
     destination_database.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_database, destination_database)
     destination_database.chmod(destination_database.stat().st_mode | stat.S_IWRITE | stat.S_IWUSR)
+
+
+def _prepare_destination(target: Path) -> None:
+    created = False
+    probe = target / f".optimization-write-probe.{os.getpid()}.tmp"
+    try:
+        if not target.exists():
+            target.mkdir(parents=True, exist_ok=False)
+            created = True
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+        with probe.open("xb") as handle:
+            handle.write(b"write-probe\n")
+            handle.flush()
+        probe.unlink()
+    except OSError as exc:
+        probe.unlink(missing_ok=True)
+        if created:
+            try:
+                target.rmdir()
+            except OSError:
+                pass
+        if isinstance(exc, PermissionError) or exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
+            raise OptimizationTargetNotWritableError(
+                "Не удалось создать optimized copy: папка назначения защищена от записи. "
+                "Проверьте права на папку или выберите доступное расположение."
+            ) from exc
+        raise
 
 
 def _hardlink_or_copy(source: Path, destination: Path) -> str:
@@ -384,8 +417,14 @@ def build_optimized_copy(
             raise OptimizationError("destination is not empty")
         shutil.rmtree(target)
 
-    target.mkdir(parents=True, exist_ok=True)
-    (target / INCOMPLETE_MARKER).write_text("incomplete\n", encoding="ascii")
+    _prepare_destination(target)
+    try:
+        (target / INCOMPLETE_MARKER).write_text("incomplete\n", encoding="ascii")
+    except PermissionError as exc:
+        raise OptimizationTargetNotWritableError(
+            "Не удалось создать optimized copy: папка назначения защищена от записи. "
+            "Проверьте права на папку или выберите доступное расположение."
+        ) from exc
     started = time.perf_counter()
     source_db_before = sha256_file(source_database)
     source_files_before = inventory_files(source)

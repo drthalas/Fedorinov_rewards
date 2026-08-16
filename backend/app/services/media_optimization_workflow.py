@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import json
 import os
 import shutil
@@ -19,7 +20,10 @@ from .media_optimization import (
     COMPLETE_MARKER,
     CONVERSION_MANIFEST,
     HEALTH_REPORT,
+    INCOMPLETE_MARKER,
     STATUS_FILE,
+    OptimizationError,
+    OptimizationTargetNotWritableError,
     build_optimized_copy,
 )
 from .media_optimization_index import build_index_from_manifest, run_incremental_index
@@ -202,10 +206,12 @@ def run_check(settings: Settings) -> dict[str, object]:
 
 def run_optimize(settings: Settings, *, restart_incomplete: bool = False) -> dict[str, object]:
     source_root = _source_root(settings)
-    source_database = source_root / "database" / "MyDatabase.sqlite"
+    source_database = settings.rewards_db_path.resolve()
     target_root = _target_root(settings)
     if not _analysis_manifest(settings).is_file():
         raise MediaOptimizationWorkflowError("Сначала выполните проверку исходных изображений")
+    if not source_database.is_file():
+        raise MediaOptimizationWorkflowError("Рабочая база данных не найдена")
     _write_operation(settings, state="running", operation="optimize", phase="copy", percent=0)
     result = build_optimized_copy(
         source_root,
@@ -230,6 +236,56 @@ def run_optimize(settings: Settings, *, restart_incomplete: bool = False) -> dic
     return payload
 
 
+def _interrupted_message(operation_name: str) -> str:
+    if operation_name == "optimize":
+        return (
+            "Оптимизация остановлена безопасно. Незавершённую копию нельзя продолжить пофайлово; "
+            "её можно удалить и создать заново."
+        )
+    return "Проверка остановлена безопасно. Запустите проверку заново."
+
+
+def _failure_details(exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, OptimizationTargetNotWritableError):
+        return (
+            "target_not_writable",
+            "Не удалось создать optimized copy: папка назначения защищена от записи. "
+            "Проверьте права на папку или выберите доступное расположение.",
+        )
+    if isinstance(exc, PermissionError):
+        return (
+            "state_not_writable",
+            "Не удалось записать служебный статус операции. Проверьте права на папку приложения.",
+        )
+    if isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.ENOSPC:
+        return "insufficient_space", "Недостаточно свободного места для создания optimized copy."
+    if isinstance(exc, OptimizationError) and "analysis manifest does not match" in str(exc):
+        return (
+            "source_changed_after_check",
+            "Состав исходных изображений изменился после проверки. Выполните «Проверить» ещё раз.",
+        )
+    message = str(exc).strip()
+    return "operation_failed", message or "Операция завершилась с ошибкой."
+
+
+def _normalize_legacy_operation_error(operation: dict[str, object]) -> dict[str, object]:
+    if (
+        operation.get("state") == "error"
+        and operation.get("operation") == "optimize"
+        and operation.get("error_type") == "PermissionError"
+        and ".optimization-incomplete" in str(operation.get("message") or "")
+    ):
+        return {
+            **operation,
+            "error_code": "target_not_writable",
+            "message": (
+                "Не удалось создать optimized copy: папка назначения защищена от записи. "
+                "Новая попытка будет использовать доступное расположение."
+            ),
+        }
+    return operation
+
+
 def _background(settings: Settings, operation_name: str, callback: Callable[[], dict[str, object]]) -> None:
     key = _operation_key(settings)
     try:
@@ -241,9 +297,10 @@ def _background(settings: Settings, operation_name: str, callback: Callable[[], 
             operation=operation_name,
             phase="stopped_safely",
             percent=0,
-            message="Операция безопасно остановлена. Её можно продолжить.",
+            message=_interrupted_message(operation_name),
         )
     except Exception as exc:
+        error_code, message = _failure_details(exc)
         _write_operation(
             settings,
             state="error",
@@ -251,7 +308,8 @@ def _background(settings: Settings, operation_name: str, callback: Callable[[], 
             phase="error",
             percent=0,
             error_type=type(exc).__name__,
-            message=str(exc),
+            error_code=error_code,
+            message=message,
         )
     finally:
         with _operations_lock:
@@ -410,12 +468,14 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     source = _source_root(settings)
     target = _target_root(settings)
     active = settings.rewards_data_dir.resolve()
-    operation = _read_json(state_dir / OPERATION_STATUS) or {"state": "idle"}
+    operation = _normalize_legacy_operation_error(
+        _read_json(state_dir / OPERATION_STATUS) or {"state": "idle"}
+    )
     if operation.get("state") == "running" and not _operation_running(settings):
         operation = {
             **operation,
             "state": "interrupted",
-            "message": "Предыдущая операция была прервана. Её можно продолжить.",
+            "message": _interrupted_message(str(operation.get("operation") or "")),
         }
     analysis = _read_json(_analysis_summary(settings))
     target_status = _read_json(target / STATUS_FILE)
@@ -434,7 +494,11 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     predicted_target_bytes = int(forecast.get("predicted_total_bytes") or 0)
     target_bytes = int(target_result.get("destination_bytes") or optimized_index.get("bytes") or 0)
     available_bytes = _available_bytes(target.parent)
-    target_incomplete = bool(target_status and target_status.get("state") == "incomplete")
+    target_incomplete = bool(
+        target_status
+        and target_status.get("state") == "incomplete"
+        and (target / INCOMPLETE_MARKER).is_file()
+    )
     target_complete = bool((target / COMPLETE_MARKER).is_file() and target_status and target_status.get("state") == "complete")
     estimated_required_bytes, space_strategy = _estimated_required_bytes(
         analysis,
@@ -488,6 +552,12 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         "conversion_manifest_exists": (target / CONVERSION_MANIFEST).is_file(),
         "can_activate": bool((target / COMPLETE_MARKER).is_file() and health and health.get("passed")),
         "target_incomplete": target_incomplete,
-        "resume_available": bool(target_incomplete or operation.get("state") in {"cancelled", "interrupted", "error"}),
+        "resume_available": False,
+        "restart_available": target_incomplete,
+        "retry_available": bool(
+            operation.get("operation") == "optimize"
+            and operation.get("state") == "error"
+            and not target_incomplete
+        ),
         "running": _operation_running(settings),
     }

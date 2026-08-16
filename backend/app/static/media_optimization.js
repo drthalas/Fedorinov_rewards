@@ -46,7 +46,9 @@
     if (label) {
       if (running) label.textContent = "Операция выполняется. Можно оставить этот экран открытым.";
       else if (operation.state === "complete") label.textContent = "Операция завершена.";
-      else if (["cancelled", "interrupted"].includes(operation.state)) label.textContent = "Операция остановлена безопасно. Её можно продолжить.";
+      else if (["cancelled", "interrupted"].includes(operation.state)) {
+        label.textContent = operation.message || "Операция остановлена безопасно. Запустите действие заново.";
+      }
       else if (operation.state === "error") label.textContent = operation.message || "Операция завершилась с ошибкой.";
       else label.textContent = "Нет активной операции.";
     }

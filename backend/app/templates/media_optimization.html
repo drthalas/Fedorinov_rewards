@@ -84,9 +84,9 @@
           {% if snapshot.operation.state == "running" %}
             Операция выполняется. Можно оставить этот экран открытым.
           {% elif snapshot.operation.state in ["cancelled", "interrupted"] %}
-            Операция остановлена безопасно. Её можно продолжить.
+            {{ snapshot.operation.message|default("Операция остановлена безопасно. Запустите действие заново.") }}
           {% elif snapshot.operation.state == "error" %}
-            Операция завершилась с ошибкой. Данные исходной копии не изменены.
+            {{ snapshot.operation.message|default("Операция завершилась с ошибкой. Данные исходной копии не изменены.") }}
           {% elif snapshot.operation.state == "complete" %}
             Последняя операция завершена.
           {% else %}
@@ -127,9 +127,9 @@
             Создать отдельную optimized copy. Исходная база и изображения останутся без изменений.
           </label>
         {% endif %}
-        {% if snapshot.resume_available %}<input type="hidden" name="resume" value="true">{% endif %}
+        {% if snapshot.restart_available %}<input type="hidden" name="restart" value="true">{% endif %}
         <button class="button" type="submit" {% if snapshot.running or not snapshot.baseline_exists %}disabled{% endif %}>
-          {% if snapshot.resume_available %}Продолжить безопасно{% else %}Оптимизировать{% endif %}
+          {% if snapshot.restart_available %}Удалить незавершённую копию и начать заново{% elif snapshot.retry_available %}Повторить{% else %}Оптимизировать{% endif %}
         </button>
       </form>
 
@@ -139,6 +139,11 @@
     </div>
 
     <div class="media-action-facts">
+      {% if snapshot.restart_available %}
+        <p class="media-space-warning">
+          Текущий формат операции не поддерживает пофайловое продолжение. При повторном запуске незавершённая копия будет удалена и создана заново; исходные данные не изменятся.
+        </p>
+      {% endif %}
       <p><strong>Ожидаемый размер копии:</strong> {{ snapshot.predicted_target_bytes|format_bytes }}</p>
       <p><strong>Требуется свободного места:</strong> {{ snapshot.estimated_required_bytes|format_bytes }}</p>
       <p><strong>Свободно в расположении копии:</strong> {{ snapshot.available_bytes|format_bytes }}</p>

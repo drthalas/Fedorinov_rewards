@@ -71,7 +71,7 @@ async def media_optimization_optimize(request: Request) -> RedirectResponse:
         snapshot = workflow_snapshot(settings)
         if not snapshot["target_complete"] and str(form.get("confirm_separate_copy") or "").lower() != "true":
             raise MediaOptimizationWorkflowError("Подтвердите создание отдельной optimized copy")
-        restart = str(form.get("resume") or "").lower() == "true"
+        restart = str(form.get("restart") or "").lower() == "true"
         start_optimize(settings, restart_incomplete=restart)
     except (MediaOptimizationWorkflowError, WriteBlockedError, ValueError) as exc:
         return _redirect(error=str(exc))

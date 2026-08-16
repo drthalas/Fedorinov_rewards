@@ -17,6 +17,8 @@ from backend.app.services.media_optimization import (
     INCOMPLETE_MARKER,
     ConversionPolicy,
     OptimizationError,
+    OptimizationTargetNotWritableError,
+    _prepare_destination,
     build_optimized_copy,
 )
 from scripts.analyze_managed_media import run_analysis, sha256_file
@@ -151,6 +153,22 @@ class MediaOptimizationTests(unittest.TestCase):
                 self.source / "optimized",
                 ConversionPolicy(),
             )
+
+    def test_destination_write_denial_has_actionable_error_and_leaves_no_probe(self) -> None:
+        destination = self.root / "protected-target"
+        destination.mkdir()
+        real_open = Path.open
+
+        def deny_probe(path: Path, *args, **kwargs):
+            if path.name.startswith(".optimization-write-probe"):
+                raise PermissionError(13, "Access is denied", str(path))
+            return real_open(path, *args, **kwargs)
+
+        with patch.object(Path, "open", autospec=True, side_effect=deny_probe):
+            with self.assertRaisesRegex(OptimizationTargetNotWritableError, "защищена от записи"):
+                _prepare_destination(destination)
+
+        self.assertEqual(list(destination.iterdir()), [])
 
     def test_status_write_retries_transient_windows_replace_denial(self) -> None:
         destination = self.root / "optimization-status.json"

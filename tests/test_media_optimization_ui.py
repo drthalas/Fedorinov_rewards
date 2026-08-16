@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -82,6 +83,60 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 303)
         self.assertIn("error=", response.headers["location"])
 
+    def test_incomplete_copy_is_explicit_restart_not_resume(self) -> None:
+        self.settings.media_optimization_state_dir.mkdir(parents=True)
+        (self.settings.media_optimization_state_dir / "baseline").mkdir()
+        (self.settings.media_optimization_state_dir / "baseline/summary.json").write_text(
+            json.dumps({"inventory": {"bytes": 1}}),
+            encoding="utf-8",
+        )
+        self.settings.media_optimization_target_dir.mkdir(parents=True)
+        (self.settings.media_optimization_target_dir / ".optimization-incomplete").write_text(
+            "incomplete\n",
+            encoding="ascii",
+        )
+        (self.settings.media_optimization_target_dir / "optimization-status.json").write_text(
+            json.dumps({"state": "incomplete"}),
+            encoding="utf-8",
+        )
+        with patch.object(router, "get_settings", return_value=self.settings):
+            page = self.client.get("/maintenance/media-optimization")
+        self.assertIn("Удалить незавершённую копию и начать заново", page.text)
+        self.assertIn('name="restart" value="true"', page.text)
+        self.assertNotIn('name="resume"', page.text)
+        self.assertIn("не поддерживает пофайловое продолжение", page.text)
+
+        with (
+            patch.object(router, "get_settings", return_value=self.settings),
+            patch.object(router, "start_optimize") as start,
+        ):
+            response = self.client.post(
+                "/maintenance/media-optimization/optimize",
+                data={"confirm_separate_copy": "true", "restart": "true"},
+                follow_redirects=False,
+            )
+        self.assertEqual(response.status_code, 303)
+        start.assert_called_once_with(self.settings, restart_incomplete=True)
+
+    def test_operation_error_page_shows_actionable_reason(self) -> None:
+        self.settings.media_optimization_state_dir.mkdir(parents=True)
+        (self.settings.media_optimization_state_dir / "operation-status.json").write_text(
+            json.dumps(
+                {
+                    "state": "error",
+                    "operation": "optimize",
+                    "error_code": "target_not_writable",
+                    "message": "Не удалось создать optimized copy: папка назначения защищена от записи.",
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch.object(router, "get_settings", return_value=self.settings):
+            response = self.client.get("/maintenance/media-optimization")
+        self.assertIn("папка назначения защищена от записи", response.text)
+        self.assertIn("Повторить", response.text)
+        self.assertNotIn("Продолжить безопасно", response.text)
+
     def test_static_client_uses_shared_endpoints_and_recovers_controls_on_failure(self) -> None:
         script = (Path(__file__).resolve().parents[1] / "backend/app/static/media_optimization.js").read_text(
             encoding="utf-8"
@@ -91,6 +146,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("button.dataset.defaultDisabled", script)
         self.assertIn("if (observedRunning) schedulePoll()", script)
         self.assertIn("window.location.reload()", script)
+        self.assertNotIn("Её можно продолжить", script)
         self.assertNotIn("jpeg", script.lower())
         self.assertNotIn("quality", script.lower())
 

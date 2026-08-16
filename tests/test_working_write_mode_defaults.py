@@ -3,7 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-from backend.app.config import Settings, get_settings
+from backend.app.config import Settings, _default_media_optimization_target, get_settings
 from backend.app.services.write_guard import WriteBlockedError, ensure_dangerous_action_allowed, ensure_write_allowed
 from backend.app.version import APP_VERSION
 
@@ -66,6 +66,25 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
         self.assertTrue(settings.write_mode)
         ensure_write_allowed(settings)
         ensure_dangerous_action_allowed(settings)
+
+    def test_windows_media_optimization_target_is_app_owned_and_source_specific(self) -> None:
+        local_app_data = self._temporary_local_app_data()
+        first_source = Path("/fixtures/sergey-full/master")
+        second_source = Path("/fixtures/other/master")
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(local_app_data)}, clear=False):
+            first = _default_media_optimization_target(first_source, platform_name="nt")
+            repeated = _default_media_optimization_target(first_source, platform_name="nt")
+            second = _default_media_optimization_target(second_source, platform_name="nt")
+
+        self.assertEqual(first, repeated)
+        self.assertNotEqual(first, second)
+        self.assertEqual(first.parent.parent, local_app_data / "FedorinovRewards" / "media-optimization")
+        self.assertEqual(first.name, "optimized-data")
+        self.assertFalse(first.is_relative_to(first_source))
+
+    @staticmethod
+    def _temporary_local_app_data() -> Path:
+        return Path("/tmp/fedorinov-local-app-data")
 
     def test_dangerous_action_still_respects_read_only_and_write_mode(self) -> None:
         read_only = Settings(

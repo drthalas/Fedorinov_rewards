@@ -136,7 +136,8 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
             )
         snapshot = workflow.workflow_snapshot(self.settings)
         self.assertTrue(snapshot["target_incomplete"])
-        self.assertTrue(snapshot["resume_available"])
+        self.assertFalse(snapshot["resume_available"])
+        self.assertTrue(snapshot["restart_available"])
         self.assertFalse(snapshot["can_activate"])
         with self.assertRaisesRegex(workflow.MediaOptimizationWorkflowError, "не прошла"):
             workflow.activate_optimized_workspace(self.settings)
@@ -153,7 +154,50 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         )
         snapshot = workflow.workflow_snapshot(self.settings)
         self.assertEqual(snapshot["operation"]["state"], "interrupted")
-        self.assertTrue(snapshot["resume_available"])
+        self.assertFalse(snapshot["resume_available"])
+        self.assertFalse(snapshot["restart_available"])
+        self.assertIn("заново", snapshot["operation"]["message"])
+
+    def test_physical_legacy_marker_permission_error_becomes_actionable_retry(self) -> None:
+        self.state.mkdir(parents=True)
+        (self.state / workflow.OPERATION_STATUS).write_text(
+            json.dumps(
+                {
+                    "state": "error",
+                    "operation": "optimize",
+                    "error_type": "PermissionError",
+                    "message": "[Errno 13] Permission denied: 'C:/fixture/master-optimized/.optimization-incomplete'",
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        snapshot = workflow.workflow_snapshot(self.settings)
+
+        self.assertEqual(snapshot["operation"]["error_code"], "target_not_writable")
+        self.assertIn("доступное расположение", snapshot["operation"]["message"])
+        self.assertTrue(snapshot["retry_available"])
+        self.assertFalse(snapshot["restart_available"])
+        self.assertFalse(snapshot["resume_available"])
+
+    def test_optimize_uses_configured_working_database_when_media_root_database_differs(self) -> None:
+        working_database = self.root / "working-state/database/MyDatabase.sqlite"
+        working_database.parent.mkdir(parents=True)
+        working_database.write_bytes(self.database.read_bytes())
+        with closing(sqlite3.connect(working_database)) as connection:
+            connection.execute("insert into person(id, person_foto) values (2, null)")
+            connection.commit()
+        split_settings = self.settings.model_copy(update={"rewards_db_path": working_database})
+
+        workflow.run_check(split_settings)
+        workflow.run_optimize(split_settings)
+
+        with closing(sqlite3.connect(self.target / "database/MyDatabase.sqlite")) as connection:
+            optimized_count = int(connection.execute("select count(*) from person").fetchone()[0])
+        with closing(sqlite3.connect(self.database)) as connection:
+            root_count = int(connection.execute("select count(*) from person").fetchone()[0])
+        self.assertEqual(optimized_count, 2)
+        self.assertEqual(root_count, 1)
 
     def test_state_write_retries_transient_windows_replace_denial(self) -> None:
         destination = self.state / workflow.OPERATION_STATUS
@@ -205,11 +249,17 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(strategy, "full-copy")
 
     def test_background_error_and_cancel_finish_the_lifecycle(self) -> None:
-        with patch.object(workflow, "run_check", side_effect=RuntimeError("controlled failure")):
+        with patch.object(
+            workflow,
+            "run_check",
+            side_effect=workflow.OptimizationTargetNotWritableError("denied"),
+        ):
             workflow.start_check(self.settings)
             self._wait_for_state("error")
         status = json.loads((self.state / workflow.OPERATION_STATUS).read_text(encoding="utf-8"))
-        self.assertEqual(status["error_type"], "RuntimeError")
+        self.assertEqual(status["error_type"], "OptimizationTargetNotWritableError")
+        self.assertEqual(status["error_code"], "target_not_writable")
+        self.assertIn("защищена от записи", status["message"])
 
         def wait_until_cancelled(settings: Settings) -> dict[str, object]:
             while not workflow._is_cancelled(settings):

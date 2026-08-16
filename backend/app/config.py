@@ -1,7 +1,8 @@
-from pathlib import Path
-from typing import Optional
+import hashlib
 import json
 import os
+from pathlib import Path
+from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -101,6 +102,26 @@ def _env_optional_path(name: str, default: Path) -> Path:
     return Path(os.path.expandvars(raw_value)).expanduser()
 
 
+def _default_media_optimization_target(
+    configured_data_dir: Path,
+    *,
+    platform_name: str | None = None,
+) -> Path:
+    if (platform_name or os.name) == "nt":
+        local_app_data = os.getenv("LOCALAPPDATA", "").strip()
+        if local_app_data:
+            source_identity = str(configured_data_dir.resolve(strict=False)).replace("\\", "/").casefold()
+            source_digest = hashlib.sha256(source_identity.encode("utf-8")).hexdigest()[:12]
+            return (
+                Path(os.path.expandvars(local_app_data)).expanduser()
+                / "FedorinovRewards"
+                / "media-optimization"
+                / source_digest
+                / "optimized-data"
+            )
+    return configured_data_dir.parent / f"{configured_data_dir.name}-optimized"
+
+
 def _active_optimized_workspace(state_dir: Path, configured_data_dir: Path, target_dir: Path) -> Path:
     pointer = state_dir / "active-workspace.json"
     try:
@@ -136,7 +157,7 @@ def get_settings() -> Settings:
     )
     target_dir = _env_optional_path(
         "MEDIA_OPTIMIZATION_TARGET_DIR",
-        configured_data_dir.parent / f"{configured_data_dir.name}-optimized",
+        _default_media_optimization_target(configured_data_dir),
     )
     data_dir = _active_optimized_workspace(state_dir, configured_data_dir, target_dir)
     db_path = (
