@@ -5,6 +5,7 @@ import random
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from PIL import Image
@@ -21,7 +22,7 @@ class ManagedMediaAnalyzerTests(unittest.TestCase):
         for name in ("Source", "SourceMark", "default", "GuideImages"):
             (self.data / name).mkdir(parents=True)
         self.database = self.root / "MyDatabase.sqlite"
-        with sqlite3.connect(self.database) as connection:
+        with closing(sqlite3.connect(self.database)) as connection:
             connection.executescript(
                 """
                 create table person (
@@ -53,6 +54,7 @@ class ManagedMediaAnalyzerTests(unittest.TestCase):
                 "insert into rewards (id, front_foto) values (1, ?)",
                 (r"C:\fixture\Source\photo.jpeg",),
             )
+            connection.commit()
 
         opaque = Image.frombytes("RGB", (512, 512), random.Random(390).randbytes(512 * 512 * 3))
         opaque.save(self.data / "Source" / "opaque.jpg", format="PNG")
