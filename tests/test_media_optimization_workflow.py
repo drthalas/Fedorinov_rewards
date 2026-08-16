@@ -101,11 +101,18 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(sha256_file(self.database), source_db_sha)
         self.assertEqual(metadata_fingerprint(inventory_files(self.source)), source_media)
 
-        workflow.activate_optimized_workspace(self.settings)
+        with self.assertRaisesRegex(workflow.MediaOptimizationWorkflowError, "Сначала откройте"):
+            workflow.activate_optimized_workspace(self.settings)
+        workflow.preview_optimized_workspace(self.settings)
         self.assertEqual(
             _active_optimized_workspace(self.state, self.source, self.target),
             self.target.resolve(),
         )
+        pointer = json.loads((self.state / workflow.ACTIVE_WORKSPACE).read_text(encoding="utf-8"))
+        self.assertEqual(pointer["mode"], "preview")
+        workflow.activate_optimized_workspace(self.settings)
+        pointer = json.loads((self.state / workflow.ACTIVE_WORKSPACE).read_text(encoding="utf-8"))
+        self.assertEqual(pointer["mode"], "optimized")
         optimized_settings = self.settings.model_copy(
             update={
                 "rewards_data_dir": self.target,
@@ -123,6 +130,11 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(delta["missing"], 1)
         current_bytes = sum(item.size for item in inventory_files(self.target))
         self.assertEqual(workflow.workflow_snapshot(optimized_settings)["current_bytes"], current_bytes)
+
+        with self.assertRaisesRegex(workflow.MediaOptimizationWorkflowError, "Подтвердите возврат"):
+            workflow.activate_source_workspace(optimized_settings)
+        workflow.activate_source_workspace(optimized_settings, confirm_snapshot_rollback=True)
+        self.assertEqual(_active_optimized_workspace(self.state, self.source, self.target), self.source)
 
     def test_incomplete_copy_cannot_activate_and_can_restart_safely(self) -> None:
         workflow.run_check(self.settings)
@@ -144,7 +156,39 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
 
         result = workflow.run_optimize(self.settings, restart_incomplete=True)
         self.assertTrue(result["health_passed"])
-        self.assertTrue(workflow.workflow_snapshot(self.settings)["can_activate"])
+        self.assertTrue(workflow.workflow_snapshot(self.settings)["can_preview"])
+        self.assertFalse(workflow.workflow_snapshot(self.settings)["can_activate"])
+
+    def test_incremental_mode_converts_only_detected_delta_and_is_idempotent(self) -> None:
+        workflow.run_check(self.settings)
+        workflow.run_optimize(self.settings)
+        workflow.preview_optimized_workspace(self.settings)
+        workflow.activate_optimized_workspace(self.settings)
+        optimized = self.settings.model_copy(
+            update={
+                "rewards_data_dir": self.target,
+                "rewards_db_path": self.target / "database/MyDatabase.sqlite",
+            }
+        )
+        delta = self.target / "Source/1/delta.png"
+        Image.frombytes("RGB", (320, 320), random.Random(397).randbytes(320 * 320 * 3)).save(delta, format="PNG")
+        with closing(sqlite3.connect(optimized.rewards_db_path)) as connection:
+            connection.execute("update person set main_foto = ? where id = 1", ("Source/1/delta.png",))
+            connection.commit()
+
+        checked = workflow.run_check(optimized)
+        self.assertEqual(checked["new"], 1)
+        self.assertEqual(workflow.workflow_snapshot(optimized)["incremental_candidate_files"], 1)
+        result = workflow.run_incremental_optimize(optimized)
+        self.assertEqual(result["converted"], 1)
+        self.assertFalse(delta.exists())
+        self.assertTrue((self.target / "Source/1/delta.jpg").is_file())
+        with closing(sqlite3.connect(optimized.rewards_db_path)) as connection:
+            reference = connection.execute("select main_foto from person where id = 1").fetchone()[0]
+        self.assertEqual(reference, "Source/1/delta.jpg")
+        self.assertEqual(workflow.run_check(optimized)["decoded"], 0)
+        self.assertEqual(workflow.workflow_snapshot(optimized)["incremental_candidate_files"], 0)
+        self.assertTrue((self.source / "Source/1/photo.png").is_file())
 
     def test_interrupted_operation_state_is_recoverable(self) -> None:
         self.state.mkdir(parents=True)
@@ -247,6 +291,51 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
             )
         self.assertEqual(required, 2_000_000_000)
         self.assertEqual(strategy, "full-copy")
+
+    def test_space_budget_adds_ten_percent_and_exact_threshold_passes(self) -> None:
+        analysis_dir = self.state / workflow.ANALYSIS_DIR
+        analysis_dir.mkdir(parents=True)
+        (analysis_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "records": {"classifications": {"jpeg_candidate": {"bytes": 1_000_000_000}}},
+                    "quality_forecasts": {
+                        "90": {
+                            "predicted_total_bytes": 2_000_000_000,
+                            "predicted_saved_bytes": 800_000_000,
+                        }
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        additional = 200_000_000 + 128 * 1024 * 1024
+        required = additional + (additional * 10 + 99) // 100
+        with (
+            patch.object(workflow, "_same_filesystem", return_value=True),
+            patch.object(workflow, "_available_bytes", return_value=required),
+        ):
+            budget = workflow._optimization_space_budget(self.settings)
+        self.assertEqual(budget["estimated_additional_bytes"], additional)
+        self.assertEqual(budget["safety_reserve_bytes"], (additional * 10 + 99) // 100)
+        self.assertEqual(budget["required_free_space_bytes"], required)
+        self.assertTrue(budget["space_ok"])
+        workflow._require_optimization_space(budget)
+
+    def test_insufficient_space_is_rejected_before_target_creation(self) -> None:
+        workflow.run_check(self.settings)
+        with patch.object(workflow, "_available_bytes", return_value=1):
+            with self.assertRaises(workflow.MediaOptimizationInsufficientSpaceError):
+                workflow.start_optimize(self.settings)
+        self.assertFalse(self.target.exists())
+        self.assertFalse(workflow.workflow_snapshot(self.settings)["running"])
+
+    def test_running_space_guard_stops_when_reserve_is_crossed(self) -> None:
+        with patch.object(workflow, "_available_bytes", side_effect=[1_000, 99]):
+            guard = workflow._migration_space_guard(self.settings, 100)
+            guard(0, 1_000)
+            with self.assertRaises(workflow.MediaOptimizationInsufficientSpaceError):
+                guard(workflow.SPACE_GUARD_INTERVAL, 1_000)
 
     def test_background_error_and_cancel_finish_the_lifecycle(self) -> None:
         with patch.object(

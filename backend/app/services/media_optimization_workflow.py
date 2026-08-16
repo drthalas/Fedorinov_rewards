@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import json
 import os
 import shutil
@@ -14,7 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 from ..config import Settings
-from .managed_media_analysis import inventory_files, run_analysis
+from .managed_media_analysis import inventory_files, normalize_reference, quoted_identifier, run_analysis
 from .media_image_policy import JPEG_POLICY_VERSION
 from .media_optimization import (
     COMPLETE_MARKER,
@@ -24,6 +25,9 @@ from .media_optimization import (
     STATUS_FILE,
     OptimizationError,
     OptimizationTargetNotWritableError,
+    ConversionPolicy,
+    _convert_png,
+    _reference_rows,
     build_optimized_copy,
 )
 from .media_optimization_index import build_index_from_manifest, run_incremental_index
@@ -35,10 +39,38 @@ LAST_CHECK = "last-check.json"
 ANALYSIS_DIR = "baseline"
 SOURCE_INDEX = "source-index.sqlite"
 OPTIMIZED_INDEX = "optimized-index.sqlite"
+SPACE_RESERVE_PERCENT = 10
+SPACE_GUARD_INTERVAL = 64
+
+PHASE_LABELS = {
+    "inventory": "Проверка изображений",
+    "baseline": "Проверка изображений",
+    "preparation": "Подготовка",
+    "creating_copy": "Создание оптимизированной копии",
+    "optimizing_images": "Оптимизация изображений",
+    "checking_health": "Проверка базы и изображений",
+    "preparing_workspace": "Подготовка новой рабочей базы",
+    "complete": "Готово",
+    "stopped_safely": "Безопасная остановка",
+    "error": "Операция остановлена",
+}
 
 
 class MediaOptimizationWorkflowError(RuntimeError):
     pass
+
+
+class MediaOptimizationInsufficientSpaceError(MediaOptimizationWorkflowError):
+    def __init__(self, required: int, available: int) -> None:
+        self.required = required
+        self.available = available
+        missing = max(0, required - available)
+        super().__init__(
+            "Недостаточно свободного места для безопасной оптимизации. "
+            f"Требуется не менее {required / 1_000_000_000:.1f} ГБ, "
+            f"доступно {available / 1_000_000_000:.1f} ГБ. "
+            f"Освободите ещё минимум {missing / 1_000_000_000:.1f} ГБ и повторите проверку."
+        )
 
 
 @dataclass
@@ -149,9 +181,26 @@ def _progress_writer(settings: Settings, operation: str, phase: str) -> Callable
             state="running",
             operation=operation,
             phase=phase,
+            phase_label=PHASE_LABELS.get(phase, phase),
             processed=processed,
             total=total,
             percent=percent,
+        )
+
+    return write
+
+
+def _stage_writer(settings: Settings, operation: str) -> Callable[[str], None]:
+    def write(phase: str) -> None:
+        _write_operation(
+            settings,
+            state="running",
+            operation=operation,
+            phase=phase,
+            phase_label=PHASE_LABELS.get(phase, phase),
+            processed=0,
+            total=0,
+            percent=0,
         )
 
     return write
@@ -190,7 +239,7 @@ def run_check(settings: Settings) -> dict[str, object]:
     else:
         conversion_manifest = _target_root(settings) / CONVERSION_MANIFEST
         if not _analysis_manifest(settings).is_file() or not conversion_manifest.is_file():
-            raise MediaOptimizationWorkflowError("Нет данных для восстановления индекса optimized copy")
+            raise MediaOptimizationWorkflowError("Нет данных для восстановления индекса оптимизированной копии")
         result = build_index_from_manifest(
             data_root,
             _analysis_manifest(settings),
@@ -212,14 +261,25 @@ def run_optimize(settings: Settings, *, restart_incomplete: bool = False) -> dic
         raise MediaOptimizationWorkflowError("Сначала выполните проверку исходных изображений")
     if not source_database.is_file():
         raise MediaOptimizationWorkflowError("Рабочая база данных не найдена")
-    _write_operation(settings, state="running", operation="optimize", phase="copy", percent=0)
+    budget = _optimization_space_budget(settings)
+    _require_optimization_space(budget)
+    _write_operation(
+        settings,
+        state="running",
+        operation="optimize",
+        phase="preparation",
+        phase_label=PHASE_LABELS["preparation"],
+        percent=0,
+    )
     result = build_optimized_copy(
         source_root,
         source_database,
         _analysis_manifest(settings),
         target_root,
         restart_incomplete=restart_incomplete,
-        progress=_progress_writer(settings, "optimize", "copy"),
+        progress=_progress_writer(settings, "optimize", "optimizing_images"),
+        stage=_stage_writer(settings, "optimize"),
+        space_guard=_migration_space_guard(settings, int(budget["safety_reserve_bytes"])),
     )
     index_result = build_index_from_manifest(
         target_root,
@@ -236,34 +296,232 @@ def run_optimize(settings: Settings, *, restart_incomplete: bool = False) -> dic
     return payload
 
 
+def _incremental_candidates(index_path: Path) -> list[str]:
+    if not index_path.is_file():
+        raise MediaOptimizationWorkflowError("Сначала проверьте новые изображения")
+    with closing(sqlite3.connect(index_path)) as connection:
+        return [
+            str(row[0])
+            for row in connection.execute(
+                "select relative_path from media_objects "
+                "where status != 'missing' and decision = 'jpeg_candidate' "
+                "order by relative_path collate nocase"
+            )
+        ]
+
+
+def _incremental_target(relative_path: str, occupied: set[str]) -> str:
+    path = Path(relative_path)
+    if path.suffix.casefold() in {".jpg", ".jpeg", ".jpe", ".jfif"}:
+        return relative_path
+    candidate = path.with_suffix(".jpg").as_posix()
+    if candidate.casefold() in occupied:
+        suffix = hashlib.sha256(relative_path.encode("utf-8")).hexdigest()[:10]
+        candidate = path.with_name(f"{path.stem}.optimized-{suffix}.jpg").as_posix()
+    return candidate
+
+
+def _replace_incremental_references(database: Path, old_path: str, new_path: str) -> int:
+    if old_path == new_path:
+        return 0
+    updates = 0
+    connection = sqlite3.connect(database)
+    connection.row_factory = sqlite3.Row
+    try:
+        connection.execute("begin immediate")
+        for table, column, rowid, raw_value in list(_reference_rows(connection)):
+            normalized, state = normalize_reference(raw_value)
+            if state != "managed" or normalized is None or normalized.casefold() != old_path.casefold():
+                continue
+            connection.execute(
+                f"update {quoted_identifier(table)} set {quoted_identifier(column)} = ? where rowid = ?",
+                (new_path, rowid),
+            )
+            updates += 1
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
+    return updates
+
+
+def _incremental_health_check(data_root: Path, database: Path) -> dict[str, object]:
+    connection = sqlite3.connect(database)
+    connection.row_factory = sqlite3.Row
+    missing = external = 0
+    try:
+        integrity = str(connection.execute("pragma integrity_check").fetchone()[0])
+        foreign_keys = len(connection.execute("pragma foreign_key_check").fetchall())
+        for _, _, _, raw_value in _reference_rows(connection):
+            normalized, state = normalize_reference(raw_value)
+            if normalized is None and isinstance(raw_value, str) and raw_value.strip():
+                external += 1
+            elif state == "managed" and normalized and not (data_root / Path(normalized)).is_file():
+                missing += 1
+    finally:
+        connection.close()
+    passed = integrity == "ok" and foreign_keys == 0 and missing == 0 and external == 0
+    return {
+        "passed": passed,
+        "integrity_check": integrity,
+        "foreign_key_violations": foreign_keys,
+        "missing_referenced_paths": missing,
+        "external_references": external,
+        "incremental_checked_at": _now(),
+    }
+
+
+def run_incremental_optimize(settings: Settings) -> dict[str, object]:
+    active = settings.rewards_data_dir.resolve()
+    target = _target_root(settings)
+    if active != target or _workspace_pointer(settings).get("mode") != "optimized":
+        raise MediaOptimizationWorkflowError("Обработка новых изображений доступна только для рабочей оптимизированной копии")
+    index_path = _index_path(settings, active)
+    candidates = _incremental_candidates(index_path)
+    if not candidates:
+        raise MediaOptimizationWorkflowError("Новых или изменённых изображений для оптимизации нет")
+
+    occupied = {entry.relative_path.casefold() for entry in inventory_files(active)}
+    converted = updated_references = saved_bytes = 0
+    converted_paths: list[str] = []
+    started = time.perf_counter()
+    progress = _progress_writer(settings, "incremental_optimize", "optimizing_images")
+    _write_operation(
+        settings,
+        state="running",
+        operation="incremental_optimize",
+        phase="optimizing_images",
+        phase_label=PHASE_LABELS["optimizing_images"],
+        processed=0,
+        total=len(candidates),
+        percent=0,
+    )
+    try:
+        for index, relative_path in enumerate(candidates, start=1):
+            if _is_cancelled(settings):
+                raise InterruptedError("incremental media optimization cancelled")
+            source_path = (active / Path(relative_path)).resolve()
+            if active not in source_path.parents or not source_path.is_file():
+                raise MediaOptimizationWorkflowError(f"Файл для оптимизации не найден: {relative_path}")
+            target_relative = _incremental_target(relative_path, occupied)
+            target_path = (active / Path(target_relative)).resolve()
+            if active not in target_path.parents:
+                raise MediaOptimizationWorkflowError("Небезопасный путь incremental optimization")
+            source_size = source_path.stat().st_size
+            target_size, _ = _convert_png(source_path, target_path, ConversionPolicy())
+            try:
+                updated_references += _replace_incremental_references(
+                    settings.rewards_db_path.resolve(),
+                    relative_path,
+                    target_relative,
+                )
+            except Exception:
+                if target_path != source_path:
+                    target_path.unlink(missing_ok=True)
+                raise
+            if target_path != source_path:
+                source_path.unlink(missing_ok=True)
+                occupied.discard(relative_path.casefold())
+                occupied.add(target_relative.casefold())
+            converted += 1
+            converted_paths.append(target_relative)
+            saved_bytes += max(0, source_size - target_size)
+            progress(index, len(candidates))
+    except BaseException:
+        run_incremental_index(active, index_path, database=settings.rewards_db_path.resolve())
+        raise
+
+    _stage_writer(settings, "incremental_optimize")("checking_health")
+    index_result = run_incremental_index(active, index_path, database=settings.rewards_db_path.resolve())
+    health = {
+        **(_read_json(target / HEALTH_REPORT) or {}),
+        **_incremental_health_check(active, settings.rewards_db_path.resolve()),
+    }
+    _write_json(target / HEALTH_REPORT, health)
+    if not health["passed"]:
+        raise OptimizationError("incremental optimized copy health check failed")
+    payload = {
+        "mode": "incremental_optimize",
+        "converted": converted,
+        "updated_references": updated_references,
+        "saved_bytes": saved_bytes,
+        "converted_paths": converted_paths,
+        "health": health,
+        "index": index_result.as_dict(),
+        "elapsed_seconds": time.perf_counter() - started,
+        "completed_at": _now(),
+    }
+    _write_json(_state_dir(settings) / LAST_CHECK, {"mode": "delta", **index_result.as_dict(), "completed_at": _now()})
+    _write_operation(
+        settings,
+        state="complete",
+        operation="incremental_optimize",
+        phase="complete",
+        phase_label=PHASE_LABELS["complete"],
+        percent=100,
+        result=payload,
+    )
+    return payload
+
+
 def _interrupted_message(operation_name: str) -> str:
     if operation_name == "optimize":
         return (
             "Оптимизация остановлена безопасно. Незавершённую копию нельзя продолжить пофайлово; "
             "её можно удалить и создать заново."
         )
+    if operation_name == "incremental_optimize":
+        return "Операция остановлена безопасно. Уже обработанные файлы сохранены; продолжите с оставшихся файлов."
     return "Проверка остановлена безопасно. Запустите проверку заново."
 
 
 def _failure_details(exc: Exception) -> tuple[str, str]:
+    if isinstance(exc, MediaOptimizationInsufficientSpaceError):
+        required_gb = exc.required / 1_000_000_000
+        available_gb = exc.available / 1_000_000_000
+        missing_gb = max(0, exc.required - exc.available) / 1_000_000_000
+        return (
+            "insufficient_space",
+            "Недостаточно свободного места для безопасной оптимизации. "
+            f"Требуется не менее {required_gb:.1f} ГБ, доступно {available_gb:.1f} ГБ. "
+            f"Освободите ещё минимум {missing_gb:.1f} ГБ и повторите проверку.",
+        )
     if isinstance(exc, OptimizationTargetNotWritableError):
         return (
             "target_not_writable",
-            "Не удалось создать optimized copy: папка назначения защищена от записи. "
+            "Не удалось создать оптимизированную копию: папка назначения защищена от записи. "
             "Проверьте права на папку или выберите доступное расположение.",
+        )
+    if isinstance(exc, PermissionError) and getattr(exc, "winerror", None) == 32:
+        return (
+            "file_busy",
+            "Файл занят другой программой. Закройте окно просмотра этого файла и повторите попытку.",
         )
     if isinstance(exc, PermissionError):
         return (
-            "state_not_writable",
-            "Не удалось записать служебный статус операции. Проверьте права на папку приложения.",
+            "access_denied",
+            "Нет доступа к нужному каталогу или файлу. Проверьте права на рабочую папку.",
         )
     if isinstance(exc, OSError) and getattr(exc, "errno", None) == errno.ENOSPC:
-        return "insufficient_space", "Недостаточно свободного места для создания optimized copy."
+        return "insufficient_space", "Недостаточно свободного места для создания оптимизированной копии."
     if isinstance(exc, OptimizationError) and "analysis manifest does not match" in str(exc):
         return (
             "source_changed_after_check",
             "Состав исходных изображений изменился после проверки. Выполните «Проверить» ещё раз.",
         )
+    if isinstance(exc, FileNotFoundError):
+        return "path_error", "Не найден необходимый файл или каталог. Повторите проверку базы."
+    if isinstance(exc, OptimizationError) and "health check failed" in str(exc):
+        return (
+            "health_check_failed",
+            "Проверка базы или изображений не пройдена. Незавершённая копия не будет активирована.",
+        )
+    if isinstance(exc, OptimizationError):
+        return "media_error", str(exc).strip() or "Не удалось обработать одно из изображений."
+    if isinstance(exc, OSError):
+        return "filesystem_error", "Файловая система не смогла завершить операцию. Повторите попытку."
     message = str(exc).strip()
     return "operation_failed", message or "Операция завершилась с ошибкой."
 
@@ -279,7 +537,7 @@ def _normalize_legacy_operation_error(operation: dict[str, object]) -> dict[str,
             **operation,
             "error_code": "target_not_writable",
             "message": (
-                "Не удалось создать optimized copy: папка назначения защищена от записи. "
+                "Не удалось создать оптимизированную копию: папка назначения защищена от записи. "
                 "Новая попытка будет использовать доступное расположение."
             ),
         }
@@ -301,11 +559,14 @@ def _background(settings: Settings, operation_name: str, callback: Callable[[], 
         )
     except Exception as exc:
         error_code, message = _failure_details(exc)
+        current = _read_json(_state_dir(settings) / OPERATION_STATUS) or {}
+        failed_phase = str(current.get("phase") or "error")
         _write_operation(
             settings,
             state="error",
             operation=operation_name,
-            phase="error",
+            phase=failed_phase,
+            phase_label=PHASE_LABELS.get(failed_phase, "Операция остановлена"),
             percent=0,
             error_type=type(exc).__name__,
             error_code=error_code,
@@ -338,11 +599,20 @@ def start_check(settings: Settings) -> None:
 
 
 def start_optimize(settings: Settings, *, restart_incomplete: bool = False) -> None:
+    _require_optimization_space(_optimization_space_budget(settings))
     _start(
         settings,
         "optimize",
         lambda: run_optimize(settings, restart_incomplete=restart_incomplete),
     )
+
+
+def start_incremental_optimize(settings: Settings) -> None:
+    if settings.rewards_data_dir.resolve() != _target_root(settings):
+        raise MediaOptimizationWorkflowError("Обработка новых изображений доступна только для рабочей оптимизированной копии")
+    if not _incremental_candidates(_index_path(settings, settings.rewards_data_dir.resolve())):
+        raise MediaOptimizationWorkflowError("Новых или изменённых изображений для оптимизации нет")
+    _start(settings, "incremental_optimize", lambda: run_incremental_optimize(settings))
 
 
 def cancel_operation(settings: Settings) -> bool:
@@ -355,35 +625,70 @@ def cancel_operation(settings: Settings) -> bool:
     return True
 
 
-def activate_optimized_workspace(settings: Settings) -> None:
+def _verified_target(settings: Settings) -> Path:
     target = _target_root(settings)
     status = _read_json(target / STATUS_FILE) or {}
     health = _read_json(target / HEALTH_REPORT) or {}
     if not (target / COMPLETE_MARKER).is_file() or status.get("state") != "complete" or not health.get("passed"):
-        raise MediaOptimizationWorkflowError("Optimized copy не прошла полную проверку")
+        raise MediaOptimizationWorkflowError("Оптимизированная копия не прошла полную проверку")
+    return target
+
+
+def _workspace_pointer(settings: Settings) -> dict[str, object]:
+    return _read_json(_state_dir(settings) / ACTIVE_WORKSPACE) or {}
+
+
+def preview_optimized_workspace(settings: Settings) -> None:
+    target = _verified_target(settings)
     _write_json(
         _state_dir(settings) / ACTIVE_WORKSPACE,
         {
             "workspace": str(target),
             "source": str(_source_root(settings)),
+            "mode": "preview",
+            "previewed_at": _now(),
+            "snapshot_created_at": _file_mtime(target / STATUS_FILE),
+            "policy_version": JPEG_POLICY_VERSION,
+        },
+    )
+
+
+def activate_optimized_workspace(settings: Settings) -> None:
+    target = _verified_target(settings)
+    pointer = _workspace_pointer(settings)
+    if Path(str(pointer.get("workspace") or "")).resolve() != target or pointer.get("mode") != "preview":
+        raise MediaOptimizationWorkflowError("Сначала откройте оптимизированную копию для проверки")
+    _write_json(
+        _state_dir(settings) / ACTIVE_WORKSPACE,
+        {
+            **pointer,
+            "workspace": str(target),
+            "source": str(_source_root(settings)),
+            "mode": "optimized",
             "activated_at": _now(),
             "policy_version": JPEG_POLICY_VERSION,
         },
     )
 
 
-def activate_source_workspace(settings: Settings) -> None:
+def activate_source_workspace(settings: Settings, *, confirm_snapshot_rollback: bool = False) -> None:
+    pointer = _workspace_pointer(settings)
+    if pointer.get("mode") == "optimized" and not confirm_snapshot_rollback:
+        raise MediaOptimizationWorkflowError(
+            "Подтвердите возврат к сохранённой исходной копии: более поздние изменения в ней отсутствуют"
+        )
     (_state_dir(settings) / ACTIVE_WORKSPACE).unlink(missing_ok=True)
 
 
 def _index_summary(index_path: Path) -> dict[str, object]:
     if not index_path.is_file():
-        return {"exists": False, "indexed": 0, "bytes": 0, "missing": 0}
+        return {"exists": False, "indexed": 0, "bytes": 0, "missing": 0, "candidates": 0}
     with closing(sqlite3.connect(index_path)) as connection:
-        indexed, total_bytes, missing = connection.execute(
+        indexed, total_bytes, missing, candidates = connection.execute(
             "select count(*), "
             "coalesce(sum(case when status != 'missing' then size else 0 end), 0), "
-            "sum(case when status = 'missing' then 1 else 0 end) "
+            "sum(case when status = 'missing' then 1 else 0 end), "
+            "sum(case when status != 'missing' and decision = 'jpeg_candidate' then 1 else 0 end) "
             "from media_objects"
         ).fetchone()
         metadata = {
@@ -397,6 +702,7 @@ def _index_summary(index_path: Path) -> dict[str, object]:
         "indexed": int(indexed),
         "bytes": int(total_bytes),
         "missing": int(missing or 0),
+        "candidates": int(candidates or 0),
         **metadata,
     }
 
@@ -456,6 +762,51 @@ def _estimated_required_bytes(
     return converted_bytes + overhead, "same-volume-hardlinks"
 
 
+def _optimization_space_budget(settings: Settings) -> dict[str, int | str | bool]:
+    analysis = _read_json(_analysis_summary(settings))
+    forecast = dict((analysis or {}).get("quality_forecasts", {}).get("90") or {})
+    predicted_target_bytes = int(forecast.get("predicted_total_bytes") or 0)
+    additional, strategy = _estimated_required_bytes(
+        analysis,
+        _source_root(settings),
+        _target_root(settings),
+        predicted_target_bytes,
+    )
+    reserve = (additional * SPACE_RESERVE_PERCENT + 99) // 100 if additional else 0
+    required = additional + reserve
+    available = _available_bytes(_target_root(settings).parent)
+    shortfall = max(0, required - available)
+    return {
+        "estimated_additional_bytes": additional,
+        "safety_reserve_bytes": reserve,
+        "required_free_space_bytes": required,
+        "available_bytes": available,
+        "space_shortfall_bytes": shortfall,
+        "space_strategy": strategy,
+        "space_ok": bool(required and available >= required),
+    }
+
+
+def _require_optimization_space(budget: dict[str, int | str | bool]) -> None:
+    required = int(budget["required_free_space_bytes"])
+    available = int(budget["available_bytes"])
+    if required <= 0:
+        raise MediaOptimizationWorkflowError("Сначала выполните проверку исходных изображений")
+    if available < required:
+        raise MediaOptimizationInsufficientSpaceError(required, available)
+
+
+def _migration_space_guard(settings: Settings, safety_reserve_bytes: int) -> Callable[[int, int], None]:
+    def check(processed: int, total: int) -> None:
+        if processed not in {0, total} and processed % SPACE_GUARD_INTERVAL:
+            return
+        available = _available_bytes(_target_root(settings).parent)
+        if available < safety_reserve_bytes:
+            raise MediaOptimizationInsufficientSpaceError(safety_reserve_bytes, available)
+
+    return check
+
+
 def _file_mtime(path: Path) -> str | None:
     try:
         return datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
@@ -468,6 +819,7 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     source = _source_root(settings)
     target = _target_root(settings)
     active = settings.rewards_data_dir.resolve()
+    pointer = _workspace_pointer(settings)
     operation = _normalize_legacy_operation_error(
         _read_json(state_dir / OPERATION_STATUS) or {"state": "idle"}
     )
@@ -477,6 +829,13 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
             "state": "interrupted",
             "message": _interrupted_message(str(operation.get("operation") or "")),
         }
+    operation = {
+        **operation,
+        "phase_label": PHASE_LABELS.get(
+            str(operation.get("phase") or ""),
+            str(operation.get("phase_label") or "Ожидание"),
+        ),
+    }
     analysis = _read_json(_analysis_summary(settings))
     target_status = _read_json(target / STATUS_FILE)
     health = _read_json(target / HEALTH_REPORT)
@@ -493,29 +852,84 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     changed_count = int(last_delta.get("new") or 0) + int(last_delta.get("changed") or 0)
     predicted_target_bytes = int(forecast.get("predicted_total_bytes") or 0)
     target_bytes = int(target_result.get("destination_bytes") or optimized_index.get("bytes") or 0)
-    available_bytes = _available_bytes(target.parent)
     target_incomplete = bool(
         target_status
         and target_status.get("state") == "incomplete"
         and (target / INCOMPLETE_MARKER).is_file()
     )
     target_complete = bool((target / COMPLETE_MARKER).is_file() and target_status and target_status.get("state") == "complete")
-    estimated_required_bytes, space_strategy = _estimated_required_bytes(
-        analysis,
-        source,
-        target,
-        predicted_target_bytes,
-    )
+    budget = _optimization_space_budget(settings)
     current_bytes = (
         int(current_index.get("bytes") or 0)
         if current_index.get("exists")
         else int(inventory.get("bytes") or 0) if analysis else None
     )
+    pointer_mode = str(pointer.get("mode") or "optimized") if active == target else "source"
+    workspace_state = pointer_mode if pointer_mode in {"preview", "optimized"} else "source"
+    classifications = dict(dict((analysis or {}).get("records") or {}).get("classifications") or {})
+    candidate_summary = dict(classifications.get("jpeg_candidate") or {})
+    warning_files = sum(
+        int(dict(values).get("files") or 0)
+        for name, values in classifications.items()
+        if str(name).startswith(("corrupt", "unsupported", "extension_mismatch"))
+    )
+    missing_references = int(dict((analysis or {}).get("references") or {}).get("missing_reference_occurrences") or 0)
+    snapshot_created_at = _file_mtime(target / STATUS_FILE)
+    source_status = "Рабочая" if workspace_state == "source" else "Резервная"
+    if workspace_state == "preview":
+        target_workspace_status = "Проверка"
+    elif workspace_state == "optimized":
+        target_workspace_status = "Рабочая"
+    elif target_incomplete:
+        target_workspace_status = "Незавершённая"
+    elif target_complete and health and health.get("passed"):
+        target_workspace_status = "Готова"
+    elif target_status:
+        target_workspace_status = "Ошибка"
+    else:
+        target_workspace_status = "Не создана"
+    workspaces = [
+        {
+            "key": "source",
+            "label": "Исходная до оптимизации" if target_status else "Текущая рабочая база",
+            "status": source_status,
+            "created_at": snapshot_created_at or _file_mtime(settings.rewards_db_path),
+            "bytes": int(inventory.get("bytes") or target_result.get("source_bytes") or 0),
+            "optimization_status": "Не оптимизирована",
+            "active": workspace_state == "source",
+        }
+    ]
+    if target_status or target_complete:
+        workspaces.append(
+            {
+                "key": "optimized",
+                "label": f"Оптимизированная {snapshot_created_at[:10] if snapshot_created_at else ''}".strip(),
+                "status": target_workspace_status,
+                "created_at": snapshot_created_at,
+                "bytes": target_bytes,
+                "optimization_status": "Оптимизирована" if target_complete else "Не завершена",
+                "active": workspace_state in {"preview", "optimized"},
+            }
+        )
+    resume_available = bool(
+        operation.get("operation") in {"check", "incremental_optimize"}
+        and operation.get("state") in {"interrupted", "error"}
+        and current_index.get("exists")
+    )
     return {
         "source_workspace": str(source),
         "target_workspace": str(target),
         "active_workspace": str(active),
-        "workspace_state": "optimized" if active == target else "source",
+        "workspace_state": workspace_state,
+        "workspace_label": (
+            "Оптимизированная копия: режим проверки"
+            if workspace_state == "preview"
+            else "Рабочая база оптимизирована"
+            if workspace_state == "optimized"
+            else "Текущая рабочая база"
+        ),
+        "workspace_optimization_status": "Оптимизирована" if workspace_state in {"preview", "optimized"} else "Не оптимизирована",
+        "workspaces": workspaces,
         "operation": operation,
         "analysis": analysis,
         "baseline_exists": bool(analysis),
@@ -528,12 +942,12 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         "current_bytes": current_bytes,
         "predicted_saved_bytes": int(forecast.get("predicted_saved_bytes") or 0),
         "predicted_target_bytes": predicted_target_bytes,
-        "estimated_required_bytes": estimated_required_bytes,
-        "space_strategy": space_strategy,
-        "available_bytes": available_bytes,
-        "estimated_space_ok": bool(
-            not estimated_required_bytes or target_complete or available_bytes >= estimated_required_bytes
-        ),
+        "candidate_files": int(candidate_summary.get("files") or 0),
+        "warning_files": warning_files,
+        "missing_references": missing_references,
+        **budget,
+        "estimated_required_bytes": int(budget["required_free_space_bytes"]),
+        "estimated_space_ok": bool(target_complete or budget["space_ok"]),
         "new_files": int(last_delta.get("new") or 0),
         "changed_files": int(last_delta.get("changed") or 0),
         "delta_files": changed_count,
@@ -550,14 +964,20 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         "health": health,
         "health_passed": bool(health and health.get("passed")),
         "conversion_manifest_exists": (target / CONVERSION_MANIFEST).is_file(),
-        "can_activate": bool((target / COMPLETE_MARKER).is_file() and health and health.get("passed")),
+        "can_preview": bool(target_complete and health and health.get("passed") and workspace_state == "source"),
+        "can_activate": bool(target_complete and health and health.get("passed") and workspace_state == "preview"),
+        "can_return_from_preview": workspace_state == "preview",
+        "rollback_confirmation_required": workspace_state == "optimized",
+        "snapshot_created_at": snapshot_created_at,
         "target_incomplete": target_incomplete,
-        "resume_available": False,
+        "resume_available": resume_available,
         "restart_available": target_incomplete,
         "retry_available": bool(
             operation.get("operation") == "optimize"
             and operation.get("state") == "error"
             and not target_incomplete
         ),
+        "incremental_mode": workspace_state == "optimized",
+        "incremental_candidate_files": int(current_index.get("candidates") or 0),
         "running": _operation_running(settings),
     }

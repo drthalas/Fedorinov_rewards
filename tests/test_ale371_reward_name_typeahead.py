@@ -47,7 +47,7 @@ class RewardNameTypeaheadContractTests(unittest.TestCase):
     def test_typeahead_release_uses_a_fresh_static_cache_key(self) -> None:
         templates = (ROOT / "backend/app/routers/templates.py").read_text(encoding="utf-8")
         self.assertIn(
-            'STATIC_ASSET_VERSION = "20260815-ale393-1"',
+            'STATIC_ASSET_VERSION = "20260816-ale397-1"',
             templates,
         )
 

@@ -11,7 +11,9 @@ from ..services.media_optimization_workflow import (
     activate_optimized_workspace,
     activate_source_workspace,
     cancel_operation,
+    preview_optimized_workspace,
     start_check,
+    start_incremental_optimize,
     start_optimize,
     workflow_snapshot,
 )
@@ -69,13 +71,24 @@ async def media_optimization_optimize(request: Request) -> RedirectResponse:
         ensure_write_allowed(settings)
         form = await request.form()
         snapshot = workflow_snapshot(settings)
-        if not snapshot["target_complete"] and str(form.get("confirm_separate_copy") or "").lower() != "true":
-            raise MediaOptimizationWorkflowError("Подтвердите создание отдельной optimized copy")
+        if snapshot["target_complete"] and not snapshot["target_incomplete"]:
+            raise MediaOptimizationWorkflowError("Оптимизированная копия уже создана")
         restart = str(form.get("restart") or "").lower() == "true"
         start_optimize(settings, restart_incomplete=restart)
     except (MediaOptimizationWorkflowError, WriteBlockedError, ValueError) as exc:
         return _redirect(error=str(exc))
     return _redirect(status="Оптимизация запущена.")
+
+
+@router.post("/preview")
+def media_optimization_preview() -> RedirectResponse:
+    settings = get_settings()
+    try:
+        ensure_write_allowed(settings)
+        preview_optimized_workspace(settings)
+    except (MediaOptimizationWorkflowError, WriteBlockedError, ValueError) as exc:
+        return _redirect(error=str(exc))
+    return RedirectResponse("/legacy?tab=rewards", status_code=303)
 
 
 @router.post("/cancel")
@@ -85,23 +98,34 @@ def media_optimization_cancel() -> RedirectResponse:
     return _redirect(status="Остановка запрошена. Текущий файл будет завершён безопасно.")
 
 
+@router.post("/optimize-incremental")
+def media_optimization_incremental() -> RedirectResponse:
+    settings = get_settings()
+    try:
+        ensure_write_allowed(settings)
+        start_incremental_optimize(settings)
+    except (MediaOptimizationWorkflowError, WriteBlockedError, ValueError) as exc:
+        return _redirect(error=str(exc))
+    return _redirect(status="Оптимизация новых изображений запущена.")
+
+
 @router.post("/activate")
 def media_optimization_activate() -> RedirectResponse:
     settings = get_settings()
     try:
-        ensure_write_allowed(settings)
         activate_optimized_workspace(settings)
-    except (MediaOptimizationWorkflowError, WriteBlockedError, ValueError) as exc:
+    except (MediaOptimizationWorkflowError, ValueError) as exc:
         return _redirect(error=str(exc))
-    return _redirect(status="Проверенная optimized copy активирована.")
+    return _redirect(status="Оптимизированная копия стала рабочей.")
 
 
 @router.post("/activate-source")
-def media_optimization_activate_source() -> RedirectResponse:
+async def media_optimization_activate_source(request: Request) -> RedirectResponse:
     settings = get_settings()
     try:
-        ensure_write_allowed(settings)
-        activate_source_workspace(settings)
-    except (WriteBlockedError, ValueError) as exc:
+        form = await request.form()
+        confirmed = str(form.get("confirm_snapshot_rollback") or "").lower() == "true"
+        activate_source_workspace(settings, confirm_snapshot_rollback=confirmed)
+    except (MediaOptimizationWorkflowError, ValueError) as exc:
         return _redirect(error=str(exc))
-    return _redirect(status="Активна исходная рабочая копия.")
+    return _redirect(status="Активна сохранённая исходная копия.")

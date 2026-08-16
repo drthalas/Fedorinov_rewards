@@ -184,7 +184,7 @@ def _prepare_destination(target: Path) -> None:
                 pass
         if isinstance(exc, PermissionError) or exc.errno in {errno.EACCES, errno.EPERM, errno.EROFS}:
             raise OptimizationTargetNotWritableError(
-                "Не удалось создать optimized copy: папка назначения защищена от записи. "
+                "Не удалось создать оптимизированную копию: папка назначения защищена от записи. "
                 "Проверьте права на папку или выберите доступное расположение."
             ) from exc
         raise
@@ -400,6 +400,8 @@ def build_optimized_copy(
     restart_incomplete: bool = False,
     interrupt_after: int | None = None,
     progress: Callable[[int, int], None] | None = None,
+    stage: Callable[[str], None] | None = None,
+    space_guard: Callable[[int, int], None] | None = None,
 ) -> BuildResult:
     policy = policy or ConversionPolicy()
     source, target = _safe_destination(source_root, destination)
@@ -417,12 +419,16 @@ def build_optimized_copy(
             raise OptimizationError("destination is not empty")
         shutil.rmtree(target)
 
+    if stage is not None:
+        stage("preparation")
+    if space_guard is not None:
+        space_guard(0, len(records))
     _prepare_destination(target)
     try:
         (target / INCOMPLETE_MARKER).write_text("incomplete\n", encoding="ascii")
     except PermissionError as exc:
         raise OptimizationTargetNotWritableError(
-            "Не удалось создать optimized copy: папка назначения защищена от записи. "
+            "Не удалось создать оптимизированную копию: папка назначения защищена от записи. "
             "Проверьте права на папку или выберите доступное расположение."
         ) from exc
     started = time.perf_counter()
@@ -437,6 +443,8 @@ def build_optimized_copy(
 
     target_mapping = _target_paths(records)
     destination_database = target / "database" / "MyDatabase.sqlite"
+    if stage is not None:
+        stage("creating_copy")
     _copy_database(source_database, destination_database)
     _status(
         target,
@@ -453,6 +461,8 @@ def build_optimized_copy(
     conversion_records: list[dict[str, object]] = []
     manifest_output = target / CONVERSION_MANIFEST
     try:
+        if stage is not None:
+            stage("optimizing_images")
         with manifest_output.open("w", encoding="utf-8", newline="\n") as output:
             for index, record in enumerate(records, start=1):
                 source_relative = str(record["relative_path"])
@@ -506,6 +516,8 @@ def build_optimized_copy(
                 output.flush()
                 if progress:
                     progress(index, len(records))
+                if space_guard is not None:
+                    space_guard(index, len(records))
                 if index % 250 == 0:
                     _status(
                         target,
@@ -520,6 +532,8 @@ def build_optimized_copy(
                 if interrupt_after is not None and index >= interrupt_after:
                     raise InterruptedError("injected optimization interruption")
 
+        if stage is not None:
+            stage("checking_health")
         _, repaired_missing = _update_copied_references(
             destination_database,
             target_mapping,
@@ -536,6 +550,8 @@ def build_optimized_copy(
         if not health["passed"]:
             raise OptimizationError("optimized copy health check failed")
 
+        if stage is not None:
+            stage("preparing_workspace")
         source_db_after = sha256_file(source_database)
         source_files_after = inventory_files(source)
         source_media_after = metadata_fingerprint(source_files_after)

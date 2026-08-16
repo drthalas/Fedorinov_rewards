@@ -1,5 +1,7 @@
 from pathlib import Path
+import json
 import os
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -82,6 +84,46 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
         self.assertEqual(first.name, "optimized-data")
         self.assertFalse(first.is_relative_to(first_source))
 
+    def test_optimized_preview_is_forced_read_only_until_explicit_activation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            target = root / "target"
+            state = root / "state"
+            for path in (source / "database", target / "database", state):
+                path.mkdir(parents=True)
+            (source / "database/MyDatabase.sqlite").write_bytes(b"source")
+            (target / "database/MyDatabase.sqlite").write_bytes(b"target")
+            (target / ".optimization-complete").write_text("complete\n", encoding="ascii")
+            (target / "health-report.json").write_text(json.dumps({"passed": True}), encoding="utf-8")
+            pointer = state / "active-workspace.json"
+            pointer.write_text(
+                json.dumps({"workspace": str(target), "mode": "preview"}),
+                encoding="utf-8",
+            )
+            environment = {
+                "REWARDS_DATA_DIR": str(source),
+                "REWARDS_DB_PATH": str(source / "database/MyDatabase.sqlite"),
+                "MEDIA_OPTIMIZATION_STATE_DIR": str(state),
+                "MEDIA_OPTIMIZATION_TARGET_DIR": str(target),
+                "READ_ONLY": "false",
+                "WRITE_MODE": "true",
+            }
+            with patch.dict(os.environ, environment, clear=False):
+                preview = get_settings()
+            self.assertEqual(preview.rewards_data_dir, target.resolve())
+            self.assertTrue(preview.read_only)
+            self.assertFalse(preview.write_mode)
+
+            pointer.write_text(
+                json.dumps({"workspace": str(target), "mode": "optimized"}),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, environment, clear=False):
+                active = get_settings()
+            self.assertFalse(active.read_only)
+            self.assertTrue(active.write_mode)
+
     @staticmethod
     def _temporary_local_app_data() -> Path:
         return Path("/tmp/fedorinov-local-app-data")
@@ -116,7 +158,7 @@ class WorkingWriteModeDefaultsTests(unittest.TestCase):
             )
 
     def test_app_version_is_current_release(self) -> None:
-        self.assertEqual(APP_VERSION, "2.0.13")
+        self.assertEqual(APP_VERSION, "2.0.14")
 
 
 if __name__ == "__main__":

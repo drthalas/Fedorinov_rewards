@@ -144,6 +144,34 @@ class MediaOptimizationTests(unittest.TestCase):
         )
         self.assertTrue(result.health_passed)
 
+    def test_build_reports_real_stages_and_checks_space_during_copy(self) -> None:
+        stages: list[str] = []
+        guarded: list[tuple[int, int]] = []
+        destination = self.root / "staged"
+
+        result = build_optimized_copy(
+            self.source,
+            self.database,
+            self.manifest,
+            destination,
+            stage=stages.append,
+            space_guard=lambda processed, total: guarded.append((processed, total)),
+        )
+
+        self.assertTrue(result.health_passed)
+        self.assertEqual(
+            stages,
+            [
+                "preparation",
+                "creating_copy",
+                "optimizing_images",
+                "checking_health",
+                "preparing_workspace",
+            ],
+        )
+        self.assertEqual(guarded[0][0], 0)
+        self.assertEqual(guarded[-1][0], guarded[-1][1])
+
     def test_destination_inside_source_is_rejected(self) -> None:
         with self.assertRaisesRegex(OptimizationError, "outside"):
             build_optimized_copy(

@@ -10,6 +10,9 @@
   const percent = root.querySelector("[data-operation-percent]");
   const label = root.querySelector("[data-operation-label]");
   const detail = root.querySelector("[data-operation-detail]");
+  const operationPanel = root.querySelector("[data-operation-panel]");
+  const stageList = root.querySelector("[data-operation-stages]");
+  const stageItems = Array.from(root.querySelectorAll("[data-operation-stages] [data-stage]"));
   const cancelForm = root.querySelector("[data-cancel-form]");
   let pollTimer = null;
   let observedRunning = root.querySelector("[data-operation-state]")?.dataset.operationState === "running";
@@ -32,10 +35,23 @@
     });
   }
 
+  function updateStages(activePhase, state) {
+    const activeIndex = stageItems.findIndex((item) => item.dataset.stage === activePhase);
+    stageItems.forEach((item, index) => {
+      item.classList.toggle("is-active", state === "running" && index === activeIndex);
+      item.classList.toggle("is-complete", activeIndex > index || state === "complete");
+    });
+  }
+
   function updateOperation(snapshot) {
     const operation = snapshot.operation || { state: "idle" };
     const running = operation.state === "running";
     const value = Number(operation.percent || 0);
+    if (operationPanel) {
+      operationPanel.hidden = !running && !["error", "cancelled", "interrupted"].includes(operation.state);
+      operationPanel.dataset.operationState = operation.state;
+    }
+    if (stageList) stageList.hidden = operation.operation !== "optimize";
     if (progress) progress.value = value;
     if (percent) percent.textContent = `${value}%`;
     if (detail) {
@@ -44,7 +60,7 @@
         : "Статус обновляется автоматически.";
     }
     if (label) {
-      if (running) label.textContent = "Операция выполняется. Можно оставить этот экран открытым.";
+      if (running) label.textContent = `Этап: ${operation.phase_label || "Выполнение"}`;
       else if (operation.state === "complete") label.textContent = "Операция завершена.";
       else if (["cancelled", "interrupted"].includes(operation.state)) {
         label.textContent = operation.message || "Операция остановлена безопасно. Запустите действие заново.";
@@ -52,6 +68,7 @@
       else if (operation.state === "error") label.textContent = operation.message || "Операция завершилась с ошибкой.";
       else label.textContent = "Нет активной операции.";
     }
+    updateStages(operation.phase, operation.state);
     if (cancelForm) cancelForm.hidden = !running;
     setFormsDisabled(running);
     if (running) observedRunning = true;
@@ -100,7 +117,7 @@
         const error = finalUrl.searchParams.get("error");
         if (!response.ok || error) throw new Error(error || `HTTP ${response.status}`);
         if (form.hasAttribute("data-reload-after")) {
-          window.location.reload();
+          window.location.assign(finalUrl.href);
           return;
         }
         observedRunning = !form.hasAttribute("data-cancel-form");

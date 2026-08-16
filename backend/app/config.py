@@ -122,26 +122,37 @@ def _default_media_optimization_target(
     return configured_data_dir.parent / f"{configured_data_dir.name}-optimized"
 
 
-def _active_optimized_workspace(state_dir: Path, configured_data_dir: Path, target_dir: Path) -> Path:
+def _active_workspace_selection(
+    state_dir: Path,
+    configured_data_dir: Path,
+    target_dir: Path,
+) -> tuple[Path, str]:
     pointer = state_dir / "active-workspace.json"
     try:
         payload = json.loads(pointer.read_text(encoding="utf-8"))
         workspace = Path(str(payload.get("workspace") or "")).expanduser().resolve()
     except (OSError, ValueError, TypeError):
-        return configured_data_dir
+        return configured_data_dir, "source"
     if workspace != target_dir.resolve():
-        return configured_data_dir
+        return configured_data_dir, "source"
     if not (workspace / ".optimization-complete").is_file():
-        return configured_data_dir
+        return configured_data_dir, "source"
     if not (workspace / "database" / "MyDatabase.sqlite").is_file():
-        return configured_data_dir
+        return configured_data_dir, "source"
     try:
         health = json.loads((workspace / "health-report.json").read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
-        return configured_data_dir
+        return configured_data_dir, "source"
     if not isinstance(health, dict) or not health.get("passed"):
-        return configured_data_dir
-    return workspace
+        return configured_data_dir, "source"
+    mode = str(payload.get("mode") or "optimized")
+    if mode not in {"preview", "optimized"}:
+        return configured_data_dir, "source"
+    return workspace, mode
+
+
+def _active_optimized_workspace(state_dir: Path, configured_data_dir: Path, target_dir: Path) -> Path:
+    return _active_workspace_selection(state_dir, configured_data_dir, target_dir)[0]
 
 
 def get_settings() -> Settings:
@@ -159,7 +170,7 @@ def get_settings() -> Settings:
         "MEDIA_OPTIMIZATION_TARGET_DIR",
         _default_media_optimization_target(configured_data_dir),
     )
-    data_dir = _active_optimized_workspace(state_dir, configured_data_dir, target_dir)
+    data_dir, workspace_mode = _active_workspace_selection(state_dir, configured_data_dir, target_dir)
     db_path = (
         data_dir / "database" / "MyDatabase.sqlite"
         if data_dir.resolve() != configured_data_dir.resolve()
@@ -170,8 +181,8 @@ def get_settings() -> Settings:
         rewards_db_path=db_path,
         app_host=os.getenv("APP_HOST", "127.0.0.1"),
         app_port=_env_int("APP_PORT", "8080"),
-        read_only=_env_bool("READ_ONLY", "false"),
-        write_mode=_env_bool("WRITE_MODE", "true"),
+        read_only=_env_bool("READ_ONLY", "false") or workspace_mode == "preview",
+        write_mode=_env_bool("WRITE_MODE", "true") and workspace_mode != "preview",
         update_check_enabled=_env_bool("UPDATE_CHECK_ENABLED", "true"),
         update_manifest_url=os.getenv(
             "UPDATE_MANIFEST_URL",
