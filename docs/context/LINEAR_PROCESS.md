@@ -125,6 +125,8 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
+После принятого product gate release-candidate stage публикует exact artifact в remote Owner candidate channel на Mac mini и не подключается к physical Windows. Permanent Owner `Public Current` получает stable channel endpoint только один раз по отдельному разрешению; последующие RC не требуют изменения `.env`, запуска runtime/Edge или visibility-проверки силами Codex. Production channel остаётся неизменным до manual Owner PASS и отдельной publication authorization.
+
 После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 
 ## Timing telemetry

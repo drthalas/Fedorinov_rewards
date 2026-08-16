@@ -39,3 +39,15 @@
 - [ ] Фотографии отображаются или показывается понятный placeholder.
 - [ ] После обновления приложение перезапускается само и показывает новую версию.
 - [ ] Перед release проверены PID, install root и версия через локальный runtime identity.
+
+## Permanent Owner candidate channel
+
+One-time bootstrap выполняется только по отдельному Owner-разрешению:
+
+- [ ] Сохранён backup `.env` permanent `Public Current`.
+- [ ] `UPDATE_MANIFEST_URL` указывает на `http://Mac-mini-hermes.local:18387/latest.json`.
+- [ ] В «О программе» Owner вручную запускает проверку и видит exact candidate version.
+- [ ] Codex не подключался к physical Windows на release-candidate stage.
+- [ ] Production channel Сергея остаётся публичным GitHub `latest.json`.
+
+Полная процедура и rollback: `docs/OWNER_CANDIDATE_CHANNEL.md`.

@@ -42,6 +42,28 @@ dist/latest.json
 
 `latest.json` contains version, release date, public ZIP URL, SHA256, and notes.
 
+## Owner candidate stage
+
+После accepted product/VM gate release-candidate stage не повторяет full suite,
+Windows VM или product regression. Он публикует exact ZIP в постоянный LAN-only
+Owner channel на Mac mini:
+
+```sh
+python3 scripts/publish_owner_candidate_channel.py \
+  --artifact dist/FedorinovRewards_WebPreview_vX.Y.Z.zip \
+  --manifest dist/latest.json \
+  --candidate-commit FULL_MERGED_MAIN_SHA \
+  --candidate-version X.Y.Z \
+  --candidate-sha256 EXACT_SHA256 \
+  --candidate-size EXACT_SIZE \
+  --public-version CURRENT_PUBLIC_VERSION
+```
+
+Этот этап не подключается к physical Windows, не меняет его `.env`, не запускает
+runtime/Edge и не проверяет updater visibility. Permanent Owner `Public Current`
+настраивается на stable endpoint один раз по отдельному разрешению. См.
+`docs/OWNER_CANDIDATE_CHANNEL.md`.
+
 ## Safety check
 
 ```sh
