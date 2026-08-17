@@ -9,14 +9,17 @@
 
 {% block content %}
 <section class="media-optimization-page" data-media-optimization data-status-url="/maintenance/media-optimization/status">
+  {% set first_run_unchecked = not snapshot.baseline_exists and not snapshot.target_status and snapshot.workspace_state == "source" %}
   <header class="media-optimization-heading">
     <div>
       <p class="media-optimization-eyebrow">Обслуживание данных</p>
       <h1>Оптимизация изображений</h1>
     </div>
-    <span class="media-workspace-badge{% if snapshot.workspace_state == 'optimized' %} is-optimized{% elif snapshot.workspace_state == 'preview' %} is-preview{% endif %}">
-      {{ snapshot.workspace_label }}
-    </span>
+    {% if not first_run_unchecked %}
+      <span class="media-workspace-badge{% if snapshot.workspace_state == 'optimized' %} is-optimized{% elif snapshot.workspace_state == 'preview' %} is-preview{% endif %}">
+        {{ snapshot.workspace_label }}
+      </span>
+    {% endif %}
   </header>
 
   {% if status_message %}<div class="media-optimization-notice is-success" role="status">{{ status_message }}</div>{% endif %}
@@ -26,6 +29,7 @@
   {% endif %}
   <div class="media-optimization-notice" data-operation-message role="status" aria-live="polite" hidden></div>
 
+  {% if not first_run_unchecked %}
   <section class="media-current-workspace" aria-labelledby="media-current-title">
     <div class="media-section-heading">
       <div>
@@ -40,6 +44,7 @@
       <div><dt>Используется сейчас</dt><dd>Да</dd></div>
     </dl>
   </section>
+  {% endif %}
 
   <section class="media-operation-panel" data-operation-panel data-operation-state="{{ snapshot.operation.state }}" {% if not snapshot.running and snapshot.operation.state not in ["error", "cancelled", "interrupted"] %}hidden{% endif %}>
     <div class="media-section-heading">
@@ -117,10 +122,11 @@
     </div>
   </section>
   {% elif not snapshot.baseline_exists %}
-  <section class="media-first-step" aria-labelledby="media-first-step-title">
+  {% if not snapshot.running %}
+  <section class="media-first-step" aria-labelledby="media-first-step-title" data-first-run-action>
     <div class="media-section-heading">
       <div>
-        <h2 id="media-first-step-title">1. Проверить базу</h2>
+        <h2 id="media-first-step-title">Сначала проверьте изображения</h2>
         <p>Проверка анализирует изображения и рассчитывает возможную экономию. Данные и изображения не изменяются.</p>
       </div>
     </div>
@@ -131,6 +137,7 @@
       {% if snapshot.resume_available %}<span class="media-inline-status">Проверка продолжит индексирование с сохранённого состояния.</span>{% endif %}
     </div>
   </section>
+  {% endif %}
   {% else %}
   <section class="media-analysis-result" aria-labelledby="media-analysis-title">
     <div class="media-section-heading">
@@ -222,6 +229,7 @@
   </section>
   {% endif %}
 
+  {% if snapshot.target_complete or snapshot.workspace_state in ["preview", "optimized"] %}
   <section class="media-workspaces" aria-labelledby="media-workspaces-title">
     <div class="media-section-heading">
       <div>
@@ -257,5 +265,6 @@
       <div><dt>Активная</dt><dd>{{ snapshot.active_workspace }}</dd></div>
     </dl>
   </details>
+  {% endif %}
 </section>
 {% endblock %}

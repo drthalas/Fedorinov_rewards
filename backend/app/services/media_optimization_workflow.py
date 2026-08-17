@@ -55,6 +55,12 @@ PHASE_LABELS = {
     "error": "Операция остановлена",
 }
 
+INITIAL_OPERATION_PHASES = {
+    "check": "inventory",
+    "optimize": "preparation",
+    "incremental_optimize": "optimizing_images",
+}
+
 
 class MediaOptimizationWorkflowError(RuntimeError):
     pass
@@ -591,7 +597,25 @@ def _start(settings: Settings, operation_name: str, callback: Callable[[], dict[
             daemon=True,
         )
         _operations[key] = _ActiveOperation(thread=thread, cancel=cancel)
-        thread.start()
+        initial_phase = INITIAL_OPERATION_PHASES[operation_name]
+        try:
+            # The POST contract is observable: status must be durable before the
+            # worker can be delayed by Windows thread scheduling.
+            _write_operation(
+                settings,
+                state="running",
+                operation=operation_name,
+                phase=initial_phase,
+                phase_label=PHASE_LABELS[initial_phase],
+                processed=0,
+                total=0,
+                percent=0,
+            )
+            thread.start()
+        except Exception as exc:
+            _operations.pop(key, None)
+            _, message = _failure_details(exc)
+            raise MediaOptimizationWorkflowError(message) from exc
 
 
 def start_check(settings: Settings) -> None:
@@ -837,6 +861,7 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         ),
     }
     analysis = _read_json(_analysis_summary(settings))
+    baseline_exists = bool(analysis)
     target_status = _read_json(target / STATUS_FILE)
     health = _read_json(target / HEALTH_REPORT)
     last_check = _read_json(state_dir / LAST_CHECK)
@@ -895,7 +920,7 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
             "status": source_status,
             "created_at": snapshot_created_at or _file_mtime(settings.rewards_db_path),
             "bytes": int(inventory.get("bytes") or target_result.get("source_bytes") or 0),
-            "optimization_status": "Не оптимизирована",
+            "optimization_status": "Не оптимизирована" if baseline_exists else "Не проверено",
             "active": workspace_state == "source",
         }
     ]
@@ -928,11 +953,17 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
             if workspace_state == "optimized"
             else "Текущая рабочая база"
         ),
-        "workspace_optimization_status": "Оптимизирована" if workspace_state in {"preview", "optimized"} else "Не оптимизирована",
+        "workspace_optimization_status": (
+            "Оптимизирована"
+            if workspace_state in {"preview", "optimized"}
+            else "Не оптимизирована"
+            if baseline_exists
+            else "Не проверено"
+        ),
         "workspaces": workspaces,
         "operation": operation,
         "analysis": analysis,
-        "baseline_exists": bool(analysis),
+        "baseline_exists": baseline_exists,
         "baseline_at": _file_mtime(_analysis_summary(settings)),
         "current_index": current_index,
         "source_index": source_index,

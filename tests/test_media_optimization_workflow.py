@@ -4,6 +4,7 @@ import json
 import random
 import sqlite3
 import tempfile
+import threading
 import time
 import unittest
 from contextlib import closing
@@ -360,6 +361,34 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
             self.assertTrue(workflow.cancel_operation(self.settings))
             self._wait_for_state("cancelled")
         self.assertFalse(workflow.workflow_snapshot(self.settings)["running"])
+
+    def test_start_check_publishes_running_before_background_work_begins(self) -> None:
+        entered = threading.Event()
+        release = threading.Event()
+
+        def blocked_check(settings: Settings) -> dict[str, object]:
+            entered.set()
+            release.wait(timeout=2)
+            workflow._write_operation(
+                settings,
+                state="complete",
+                operation="check",
+                phase="complete",
+                percent=100,
+            )
+            return {}
+
+        with patch.object(workflow, "run_check", side_effect=blocked_check):
+            workflow.start_check(self.settings)
+            self.assertTrue(entered.wait(timeout=1))
+            try:
+                snapshot = workflow.workflow_snapshot(self.settings)
+                self.assertEqual(snapshot["operation"]["state"], "running")
+                self.assertEqual(snapshot["operation"]["operation"], "check")
+                self.assertEqual(snapshot["operation"]["phase"], "inventory")
+            finally:
+                release.set()
+                self._wait_for_state("complete")
 
     def test_active_pointer_accepts_only_configured_verified_target(self) -> None:
         self.state.mkdir(parents=True)

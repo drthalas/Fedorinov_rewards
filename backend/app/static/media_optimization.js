@@ -14,6 +14,7 @@
   const stageList = root.querySelector("[data-operation-stages]");
   const stageItems = Array.from(root.querySelectorAll("[data-operation-stages] [data-stage]"));
   const cancelForm = root.querySelector("[data-cancel-form]");
+  const firstRunAction = root.querySelector("[data-first-run-action]");
   let pollTimer = null;
   let observedRunning = root.querySelector("[data-operation-state]")?.dataset.operationState === "running";
 
@@ -70,6 +71,7 @@
     }
     updateStages(operation.phase, operation.state);
     if (cancelForm) cancelForm.hidden = !running;
+    if (firstRunAction) firstRunAction.hidden = running;
     setFormsDisabled(running);
     if (running) observedRunning = true;
     if (!running && observedRunning) {

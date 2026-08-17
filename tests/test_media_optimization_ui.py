@@ -68,7 +68,12 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertNotIn("Создать оптимизированную копию", response.text)
         self.assertNotIn("confirm_separate_copy", response.text)
         self.assertIn("Данные и изображения не изменяются", response.text)
-        self.assertIn("Текущая рабочая база", response.text)
+        self.assertNotIn("Текущая рабочая база", response.text)
+        self.assertNotIn("Не оптимизирована", response.text)
+        self.assertNotIn("Не проверено", response.text)
+        self.assertNotIn("1. Проверить базу", response.text)
+        self.assertNotIn("Рабочие копии", response.text)
+        self.assertEqual(response.text.count("Проверить возможность оптимизации"), 1)
         self.assertNotIn("<dd data-metric=\"current_bytes\">0 Б</dd>", response.text)
         self.assertNotIn("Сделать эту копию рабочей", response.text)
 
@@ -117,6 +122,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Безопасный режим", response.text)
         self.assertIn("Создать оптимизированную копию", response.text)
         self.assertIn("Включая запас 10%", response.text)
+        self.assertNotIn("Рабочие копии", response.text)
         self.assertNotIn("confirm_separate_copy", response.text)
 
     def test_insufficient_space_disables_safe_copy_action(self) -> None:
@@ -230,6 +236,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("window.location.assign(finalUrl.href)", script)
         self.assertIn("operation.phase_label", script)
         self.assertIn("updateStages", script)
+        self.assertIn("firstRunAction.hidden = running", script)
         self.assertNotIn("Её можно продолжить", script)
         self.assertNotIn("jpeg", script.lower())
         self.assertNotIn("quality", script.lower())
