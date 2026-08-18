@@ -248,11 +248,25 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('class="summary-filter-actions"', summary_section)
 
     def test_summary_filter_cascade_contains_all_branches_for_js(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.executemany(
+                "insert into guide_lev_3 values (?, ?, ?)",
+                [
+                    (3, 1, "Янтарная награда"),
+                    (4, 1, "армейская награда"),
+                    (5, 1, "Ёлочная награда"),
+                ],
+            )
+
         cascade = summary_filter_cascade(self.db_path)
         self.assertEqual({row["id"] for row in cascade["countries"]}, {1, 2})
         self.assertEqual({row["id"] for row in cascade["categories"]}, {1, 2})
         self.assertEqual({row["id"] for row in cascade["subcategories"]}, {1, 2})
-        self.assertEqual({row["id"] for row in cascade["names"]}, {1, 2})
+        self.assertEqual({row["id"] for row in cascade["names"]}, {1, 2, 3, 4, 5})
+        self.assertEqual(
+            [row["name"] for row in cascade["names"] if int(row["idl"]) == 1],
+            ["армейская награда", "Ёлочная награда", "Орден Тестовый", "Янтарная награда"],
+        )
 
     def test_csv_export_text_uses_utf8_bom(self) -> None:
         rows = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))

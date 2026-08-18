@@ -73,7 +73,11 @@ def summary_filter_options(db_path: Path, filters: SummaryFilters | None = None)
 
 
 def summary_filter_cascade(db_path: Path) -> dict[str, list[dict[str, object]]]:
-    return guide_cascade_data(db_path)
+    cascade = guide_cascade_data(db_path)
+    return {
+        **cascade,
+        "names": sorted(cascade["names"], key=guide_name_sort_key),
+    }
 
 
 def parse_optional_int(value: object) -> int | None:
