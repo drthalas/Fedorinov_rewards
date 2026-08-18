@@ -66,21 +66,22 @@
       const reference = references.get(String(nameSelect.value || "")) || {};
       const value = reference.id_link == null ? "" : String(reference.id_link);
       const link = form.querySelector("[data-reward-reference-link]");
-      if (link) link.value = value;
-      const action = form.querySelector("[data-reward-reference-link-action]");
-      if (!action) {
+      const empty = form.querySelector("[data-reward-reference-link-empty]");
+      if (!link || !empty) {
         return;
       }
       const url = safeExternalUrl(value);
       if (url) {
-        action.href = url;
-        action.hidden = false;
-        action.removeAttribute("aria-disabled");
+        link.textContent = value;
+        link.href = url;
+        link.hidden = false;
+        empty.hidden = true;
         return;
       }
-      action.removeAttribute("href");
-      action.hidden = true;
-      action.setAttribute("aria-disabled", "true");
+      link.textContent = "";
+      link.removeAttribute("href");
+      link.hidden = true;
+      empty.hidden = false;
     }
 
     function refreshCategories(selectedValue) {

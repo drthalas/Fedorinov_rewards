@@ -22,8 +22,10 @@ class RewardReferenceCascadeTests(unittest.TestCase):
         self.assertIn('name="reference_subcategory_id"', template)
         self.assertIn('name="id_name"', template)
         self.assertIn("data-reward-reference-link", template)
+        self.assertIn("data-reward-reference-link-empty", template)
         self.assertNotIn('name="id_link"', template)
-        self.assertIn('readonly aria-readonly="true"', template)
+        self.assertNotIn("data-reward-reference-link-action", template)
+        self.assertNotIn(">Открыть</a>", template)
 
     def test_filter_values_cannot_override_canonical_reward_lineage(self) -> None:
         data = reward_data_from_mapping(
@@ -64,13 +66,14 @@ const country = new FakeSelect();
 const category = new FakeSelect();
 const subcategory = new FakeSelect();
 const name = new FakeSelect();
-const link = { value: "" };
-const linkAction = {
+const link = {
+  textContent: "",
   hidden: true,
   attributes: {},
   setAttribute(name, value) { this.attributes[name] = String(value); },
   removeAttribute(name) { delete this.attributes[name]; if (name === "href") delete this.href; },
 };
+const linkEmpty = { hidden: false };
 const references = [
   { id_gos: 1, gos: "СССР", id_catigory: 10, category: "Боевые", id_sub_catigory: 100, subcategory: "Ордена", id_name: 1000, name: "Орден Кутузова I степени", id_link: "https://reference.example/kutuzov" },
   { id_gos: 1, gos: "СССР", id_catigory: 10, category: "Боевые", id_sub_catigory: 101, subcategory: "Медали", id_name: 1001, name: "Медаль За отвагу", id_link: "" },
@@ -88,7 +91,7 @@ const form = {
       "[data-reward-reference-filter='category']": category,
       "[data-reward-reference-filter='subcategory']": subcategory,
       "[data-reward-reference-link]": link,
-      "[data-reward-reference-link-action]": linkAction,
+      "[data-reward-reference-link-empty]": linkEmpty,
     }[selector] || null;
   },
 };
@@ -105,30 +108,36 @@ category.change("10");
 subcategory.change("100");
 const filteredNames = name.options.filter((option) => option.value).map((option) => option.textContent);
 name.change("1000");
-const validLink = link.value;
-const validActionHref = linkAction.href;
-const validActionHidden = linkAction.hidden;
+const validLink = link.textContent;
+const validLinkHref = link.href;
+const validLinkHidden = link.hidden;
+const validEmptyHidden = linkEmpty.hidden;
 subcategory.change("101");
 name.change("1001");
-const emptyActionHasHref = Object.prototype.hasOwnProperty.call(linkAction, "href");
-const emptyActionHidden = linkAction.hidden;
+const emptyLinkHasHref = Object.prototype.hasOwnProperty.call(link, "href");
+const emptyLinkHidden = link.hidden;
+const emptyPlaceholderHidden = linkEmpty.hidden;
 name.change("1002");
-const invalidLink = link.value;
-const invalidActionHasHref = Object.prototype.hasOwnProperty.call(linkAction, "href");
-const invalidActionHidden = linkAction.hidden;
+const invalidLinkText = link.textContent;
+const invalidLinkHasHref = Object.prototype.hasOwnProperty.call(link, "href");
+const invalidLinkHidden = link.hidden;
+const invalidPlaceholderHidden = linkEmpty.hidden;
 process.stdout.write(JSON.stringify({
   countries: country.options.filter((option) => option.value).map((option) => option.textContent),
   categories: category.options.filter((option) => option.value).map((option) => option.textContent),
   subcategories: subcategory.options.filter((option) => option.value).map((option) => option.textContent),
   filteredNames,
   validLink,
-  validActionHref,
-  validActionHidden,
-  emptyActionHasHref,
-  emptyActionHidden,
-  invalidLink,
-  invalidActionHasHref,
-  invalidActionHidden,
+  validLinkHref,
+  validLinkHidden,
+  validEmptyHidden,
+  emptyLinkHasHref,
+  emptyLinkHidden,
+  emptyPlaceholderHidden,
+  invalidLinkText,
+  invalidLinkHasHref,
+  invalidLinkHidden,
+  invalidPlaceholderHidden,
 }));
 '''
         with TemporaryDirectory() as tmp:
@@ -147,20 +156,23 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(result["subcategories"], ["Медали", "Ордена"])
         self.assertEqual(result["filteredNames"], ["Орден Кутузова I степени"])
         self.assertEqual(result["validLink"], "https://reference.example/kutuzov")
-        self.assertEqual(result["validActionHref"], "https://reference.example/kutuzov")
-        self.assertFalse(result["validActionHidden"])
-        self.assertFalse(result["emptyActionHasHref"])
-        self.assertTrue(result["emptyActionHidden"])
-        self.assertEqual(result["invalidLink"], "javascript:alert(1)")
-        self.assertFalse(result["invalidActionHasHref"])
-        self.assertTrue(result["invalidActionHidden"])
+        self.assertEqual(result["validLinkHref"], "https://reference.example/kutuzov")
+        self.assertFalse(result["validLinkHidden"])
+        self.assertTrue(result["validEmptyHidden"])
+        self.assertFalse(result["emptyLinkHasHref"])
+        self.assertTrue(result["emptyLinkHidden"])
+        self.assertFalse(result["emptyPlaceholderHidden"])
+        self.assertEqual(result["invalidLinkText"], "")
+        self.assertFalse(result["invalidLinkHasHref"])
+        self.assertTrue(result["invalidLinkHidden"])
+        self.assertFalse(result["invalidPlaceholderHidden"])
 
-    def test_empty_or_invalid_reference_link_has_no_action(self) -> None:
+    def test_empty_or_invalid_reference_link_has_no_navigation(self) -> None:
         script = self.read("backend/app/static/reward_reference_fields.js")
 
-        self.assertIn('action.hidden = true', script)
-        self.assertIn('action.setAttribute("aria-disabled", "true")', script)
-        self.assertIn('action.removeAttribute("href")', script)
+        self.assertIn('link.hidden = true', script)
+        self.assertIn('empty.hidden = false', script)
+        self.assertIn('link.removeAttribute("href")', script)
         self.assertNotIn('new URL(String(value || ""),', script)
 
 

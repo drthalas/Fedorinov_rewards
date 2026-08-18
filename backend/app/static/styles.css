@@ -7200,22 +7200,36 @@ body.legacy-rewards-theme::after {
 }
 
 .cavalier-reward-form-page .reward-reference-link-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  margin: 0;
-}
-
-.cavalier-reward-form-page .reward-reference-link-action {
+  display: flex;
   align-items: center;
-  justify-content: center;
   min-height: 42px;
-  padding-inline: 13px;
-  white-space: nowrap;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid #4a4035;
+  border-radius: 2px;
+  background: #171411;
 }
 
-.cavalier-reward-form-page .reward-reference-link-action[hidden] {
-  display: none;
+.cavalier-reward-form-page .reward-reference-link-value {
+  min-width: 0;
+  color: #d8d0c3;
+  overflow-wrap: anywhere;
+  text-decoration-color: #71634d;
+}
+
+.cavalier-reward-form-page .reward-reference-link-value:hover,
+.cavalier-reward-form-page .reward-reference-link-value:focus-visible {
+  color: #f0ddba;
+  text-decoration-color: #b99358;
+}
+
+.cavalier-reward-form-page .reward-reference-link-value:focus-visible {
+  outline: 2px solid #987547;
+  outline-offset: 3px;
+}
+
+.cavalier-reward-form-page .reward-reference-link-empty {
+  color: #8f877a;
 }
 
 .cavalier-reward-form-page .photo-manage-actions > form {
