@@ -79,7 +79,7 @@ class CavalierRelatedVisualTests(unittest.TestCase):
         search_form = template.split('class="legacy-search-form', 1)[1].split("</form>", 1)[0]
         self.assertEqual(search_form.count("data-styled-select"), 2)
         summary_form = template.split('class="summary-filter-form', 1)[1].split("</form>", 1)[0]
-        self.assertEqual(summary_form.count("data-styled-select"), 5)
+        self.assertEqual(summary_form.count("data-styled-select"), 4)
 
     def test_guides_and_legacy_tabs_share_stable_desktop_shell_geometry(self) -> None:
         styles = self.read("backend/app/static/styles.css")
