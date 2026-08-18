@@ -236,6 +236,17 @@ class SummaryTests(unittest.TestCase):
         )
         self.assertEqual({int(row["id"]) for row in options["names"]}, {1, 3, 4, 5})
 
+    def test_summary_template_omits_only_the_extra_filter(self) -> None:
+        template = (Path(__file__).resolve().parents[1] / "backend/app/templates/legacy.html").read_text(encoding="utf-8")
+        summary_section = template.split('{% elif tab == "summary" %}', 1)[1].split(
+            '{% elif tab == "about" %}', 1
+        )[0]
+
+        self.assertNotIn("<span>Дополнительно</span>", summary_section)
+        for label in ("Страна", "Категория", "Подкатегория", "Наименование", "Знаки"):
+            self.assertIn(f"<span>{label}</span>", summary_section)
+        self.assertIn('class="summary-filter-actions"', summary_section)
+
     def test_summary_filter_cascade_contains_all_branches_for_js(self) -> None:
         cascade = summary_filter_cascade(self.db_path)
         self.assertEqual({row["id"] for row in cascade["countries"]}, {1, 2})
