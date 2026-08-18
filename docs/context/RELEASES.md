@@ -75,9 +75,29 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 
 Не отправлять Telegram, если release/latest.json не проверены.
 
+## v2.0.15
+
+Статус: Owner release candidate, не опубликован.
+
+Дата подготовки: 2026-08-18.
+
+Тип: summary and reward-reference UI patch.
+
+Состав:
+
+- Алфавитная сортировка наименований наград в справочнике и каскадном фильтре «Сводной таблицы».
+- Удаление ненужного поля «Дополнительно» только из «Сводной таблицы».
+- Непосредственная кликабельная ссылка на Монетный двор при сохранённом производном readonly-значении.
+
+Release gate:
+
+- Candidate lineage начинается от exact public `v2.0.13` и содержит только ALE-398, ALE-399 и ALE-400.
+- Exact artifact публикуется в изолированный Owner candidate channel до integration в `main`.
+- Merge в `main`, production tag/GitHub Release, public `latest.json` и Telegram разрешены только после ручного Owner updater/product PASS и отдельной команды.
+
 ## v2.0.13
 
-Статус: release candidate, не опубликован.
+Статус: выпущено.
 
 Дата подготовки: 2026-08-13.
 
