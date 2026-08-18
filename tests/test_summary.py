@@ -214,6 +214,28 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual([row["id"] for row in subcategory_options["names"]], [1])
         self.assertNotIn(2, [row["id"] for row in subcategory_options["names"]])
 
+    def test_summary_reward_names_are_alphabetical_and_stable(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.executemany(
+                "insert into guide_lev_3 values (?, ?, ?)",
+                [
+                    (3, 1, "Янтарная награда"),
+                    (4, 1, "армейская награда"),
+                    (5, 1, "Ёлочная награда"),
+                ],
+            )
+
+        options = summary_filter_options(
+            self.db_path,
+            normalized_summary_filters(country_id=1, category_id=1, subcategory_id=1),
+        )
+
+        self.assertEqual(
+            [row["name"] for row in options["names"]],
+            ["армейская награда", "Ёлочная награда", "Орден Тестовый", "Янтарная награда"],
+        )
+        self.assertEqual({int(row["id"]) for row in options["names"]}, {1, 3, 4, 5})
+
     def test_summary_filter_cascade_contains_all_branches_for_js(self) -> None:
         cascade = summary_filter_cascade(self.db_path)
         self.assertEqual({row["id"] for row in cascade["countries"]}, {1, 2})

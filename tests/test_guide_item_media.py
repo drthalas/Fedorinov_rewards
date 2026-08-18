@@ -120,6 +120,25 @@ class GuideItemMediaTests(unittest.TestCase):
         self.assertNotIn("rating_rank", self._columns(0))
         self.assertNotIn("image_path", self._columns(0))
 
+    def test_reward_names_are_sorted_within_their_tree_branch(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            connection.executemany(
+                "insert into guide_lev_3 (id, idl, name) values (?, ?, ?)",
+                [
+                    (2, 1, "Янтарная награда"),
+                    (3, 1, "армейская награда"),
+                    (4, 1, "Ёлочная награда"),
+                ],
+            )
+
+        names = guide_tree(self.db_path)[0]["children"][0]["children"][0]["children"]
+
+        self.assertEqual(
+            [item["name"] for item in names],
+            ["армейская награда", "Ёлочная награда", "Орден тестовый", "Янтарная награда"],
+        )
+        self.assertEqual({int(item["id"]) for item in names}, {1, 2, 3, 4})
+
     def test_rating_rank_accepts_empty_or_positive_integer(self) -> None:
         empty = guide_level_data_from_mapping(0, {"name": "Без рейтинга", "rating_rank": ""})
         rated = guide_level_data_from_mapping(0, {"name": "С рейтингом", "rating_rank": "12"})

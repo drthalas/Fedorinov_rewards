@@ -3,6 +3,13 @@ from pathlib import Path
 from .common import fetch_all, fetch_one
 
 
+def guide_name_sort_key(row: dict[str, object]) -> tuple[str, int]:
+    return (
+        str(row.get("name") or "").casefold().replace("ё", "е"),
+        int(row.get("id") or 0),
+    )
+
+
 def _rank_guide_select(db_path: Path) -> str:
     columns = {row["name"] for row in fetch_all(db_path, "pragma table_info(guide)")}
     image_path = "image_path" if "image_path" in columns else "null"
@@ -11,7 +18,7 @@ def _rank_guide_select(db_path: Path) -> str:
 
 def list_rank_guide(db_path: Path) -> list[dict[str, object]]:
     rows = fetch_all(db_path, _rank_guide_select(db_path) + " order by id")
-    return sorted(rows, key=lambda row: (str(row.get("name") or "").casefold().replace("ё", "е"), int(row.get("id") or 0)))
+    return sorted(rows, key=guide_name_sort_key)
 
 
 def get_rank_guide_item(db_path: Path, rank_id: int) -> dict[str, object] | None:
@@ -111,6 +118,8 @@ def guide_tree(db_path: Path) -> list[dict[str, object]]:
                 "children": children(level + 1, int(row["id"]), (*ancestor_keys, guide_key)) if level < 4 else [],
             }
             nodes.append(node)
+        if level == 3:
+            nodes.sort(key=guide_name_sort_key)
         return nodes
 
     return children(0, -1)

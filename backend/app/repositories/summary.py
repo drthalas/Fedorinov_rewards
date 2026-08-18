@@ -8,7 +8,7 @@ import io
 
 from ..db import open_readonly_connection, row_to_dict
 from ..services.display import format_date
-from .guides import guide_cascade_data, guide_cascade_options, list_guide_level
+from .guides import guide_cascade_data, guide_cascade_options, guide_name_sort_key, list_guide_level
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ def summary_guide_options(db_path: Path) -> dict[str, list[dict[str, object]]]:
         "countries": list_guide_level(db_path, 0),
         "categories": list_guide_level(db_path, 1),
         "subcategories": list_guide_level(db_path, 2),
-        "names": list_guide_level(db_path, 3),
+        "names": sorted(list_guide_level(db_path, 3), key=guide_name_sort_key),
         "extras": list_guide_level(db_path, 4),
     }
 
@@ -67,7 +67,7 @@ def summary_filter_options(db_path: Path, filters: SummaryFilters | None = None)
         "countries": cascade["gos"],
         "categories": cascade["categories"],
         "subcategories": cascade["subcategories"],
-        "names": cascade["names"],
+        "names": sorted(cascade["names"], key=guide_name_sort_key),
         "extras": list_guide_level(db_path, 4),
     }
 
