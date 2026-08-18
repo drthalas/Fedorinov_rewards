@@ -44,9 +44,12 @@
 
 One-time bootstrap выполняется только по отдельному Owner-разрешению:
 
+- [ ] Candidate собран из exact accepted feature/release HEAD; до этой ручной проверки `main` не менялся.
 - [ ] Сохранён backup `.env` permanent `Public Current`.
 - [ ] `UPDATE_MANIFEST_URL` указывает на `http://Mac-mini-hermes.local:18387/latest.json`.
 - [ ] В «О программе» Owner вручную запускает проверку и видит exact candidate version.
+- [ ] Owner сам выполняет updater/product acceptance и явно сообщает PASS или FAIL.
+- [ ] Merge в `main` и production publication не начинаются без Owner PASS и отдельного разрешения.
 - [ ] Codex не подключался к physical Windows на release-candidate stage.
 - [ ] Production channel Сергея остаётся публичным GitHub `latest.json`.
 

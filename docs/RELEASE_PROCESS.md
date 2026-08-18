@@ -44,15 +44,23 @@ dist/latest.json
 
 ## Owner candidate stage
 
-После accepted product/VM gate release-candidate stage не повторяет full suite,
-Windows VM или product regression. Он публикует exact ZIP в постоянный LAN-only
-Owner channel на Mac mini:
+После accepted product/VM gate release-candidate stage работает из exact accepted
+feature/release HEAD. До Owner updater/product PASS этот HEAD не интегрируется в
+`main`: `main` продолжает представлять последнюю Owner-accepted production line.
+
+На candidate branch:
+
+1. Зафиксировать exact accepted HEAD и ancestry.
+2. Подготовить next patch version и release metadata.
+3. Собрать exact ZIP и выполнить только необходимые version/manifest/SHA/package/parity/static checks.
+4. Не повторять full suite, Windows VM или product regression без конкретного mismatch/blocker.
+5. Опубликовать exact ZIP в постоянный LAN-only Owner channel на Mac mini:
 
 ```sh
 python3 scripts/publish_owner_candidate_channel.py \
   --artifact dist/FedorinovRewards_WebPreview_vX.Y.Z.zip \
   --manifest dist/latest.json \
-  --candidate-commit FULL_MERGED_MAIN_SHA \
+  --candidate-commit EXACT_ACCEPTED_FEATURE_OR_RELEASE_HEAD \
   --candidate-version X.Y.Z \
   --candidate-sha256 EXACT_SHA256 \
   --candidate-size EXACT_SIZE \
@@ -63,6 +71,22 @@ python3 scripts/publish_owner_candidate_channel.py \
 runtime/Edge и не проверяет updater visibility. Permanent Owner `Public Current`
 настраивается на stable endpoint один раз по отдельному разрешению. См.
 `docs/OWNER_CANDIDATE_CHANNEL.md`.
+
+Если Owner отклоняет candidate, исправления продолжаются вне `main`, после чего
+публикуется новый exact candidate. Revert rejected candidate в `main` не нужен.
+
+## Owner PASS, controlled merge and publication
+
+Только после manual Owner updater/product PASS и отдельного разрешения:
+
+1. Интегрировать exact accepted candidate HEAD в `main` через разрешённый PR/merge/FF.
+2. Проверить ancestry, local/remote parity и совпадение resulting tree с accepted candidate tree.
+3. При conflict, tree drift или artifact mismatch остановиться; не публиковать и не пересобирать молча.
+4. Не повторять full suite, Windows VM, physical updater или product acceptance, уже пройденные exact candidate.
+5. Использовать тот же проверенный artifact без пересборки для tag/GitHub Release, production `latest.json`, public byte/SHA parity и Telegram.
+
+Это короткая publication stage по ALE-379. Maintenance permanent `Public Current`
+не блокирует publication и оформляется отдельно при необходимости.
 
 ## Safety check
 
@@ -90,7 +114,8 @@ The ZIP must not contain:
 
 ### GitHub Actions
 
-Recommended release path:
+Этот раздел применяется только после Owner PASS и controlled integration exact
+candidate в `main`. Recommended publication path:
 
 1. Push the committed version to `main`.
 2. Open GitHub -> Actions -> Manual Release.

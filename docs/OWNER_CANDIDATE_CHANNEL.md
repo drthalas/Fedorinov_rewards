@@ -9,6 +9,10 @@
 
 Release-candidate stage обновляет только файлы на Mac mini. Он не подключается к physical Windows, не меняет там `.env`, не запускает приложение или Edge и не проверяет UI. Permanent physical `Public Current` настраивается на endpoint один раз; все последующие candidates появляются там без действий Codex на ноутбуке.
 
+Owner candidate создаётся из exact accepted feature/release HEAD **до** его merge в `main`. На этом этапе `main` остаётся последней Owner-accepted production line. Если Owner отклоняет candidate, corrective work продолжается в той же feature/release lineage, а `main` не требует revert rejected candidate.
+
+Только после manual Owner updater/product PASS и отдельного разрешения exact accepted candidate HEAD контролируемо интегрируется в `main` с ancestry/tree/parity verification. Короткая production publication использует тот же проверенный ZIP без пересборки. Если integration меняет candidate tree или обнаруживает mismatch, publication останавливается и требуется новый candidate gate.
+
 ## Canonical endpoint
 
 ```text
@@ -60,14 +64,14 @@ launchctl bootout gui/$(id -u) "$HOME/Library/LaunchAgents/com.fedorinov.owner-c
 python3 scripts/publish_owner_candidate_channel.py \
   --artifact dist/FedorinovRewards_WebPreview_vX.Y.Z.zip \
   --manifest dist/latest.json \
-  --candidate-commit FULL_MERGED_MAIN_SHA \
+  --candidate-commit EXACT_ACCEPTED_FEATURE_OR_RELEASE_HEAD \
   --candidate-version X.Y.Z \
   --candidate-sha256 EXACT_SHA256 \
   --candidate-size EXACT_SIZE \
   --public-version CURRENT_PUBLIC_VERSION
 ```
 
-Publisher проверяет commit/version, filename, package version, size, SHA256, source manifest и фактическую production version. Artifact записывается первым; `latest.json` атомарно заменяется последним. Любой mismatch останавливает публикацию до смены manifest.
+Publisher проверяет accepted candidate commit/version, filename, package version, size, SHA256, source manifest и фактическую production version. Он не требует, чтобы candidate commit уже находился в `main`. Artifact записывается первым; `latest.json` атомарно заменяется последним. Любой mismatch останавливает публикацию до смены manifest.
 
 ## One-time physical bootstrap
 
@@ -100,3 +104,5 @@ REMOTE CHANNEL READY — ONE-TIME PHYSICAL BOOTSTRAP OWNER AUTHORIZATION REQUIRE
 ```text
 OWNER CANDIDATE CHANNEL READY — vX.Y.Z PUBLISHED FOR OWNER ONLY
 ```
+
+Этот статус не означает merge в `main` или production publication. Следующий переход разрешён только после ручного Owner updater/product PASS.

@@ -115,7 +115,8 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 - Работать только в ветке из Description. `main` изменять только отдельной явно разрешённой merge/release-задачей.
 - Corrective iteration — отдельный commit в той же feature-ветке; не amend-ить и не переписывать опубликованную историю.
 - Commit/push переводят feature-задачу в `Needs Test`, но не в `Done`.
-- Owner PASS означает, что feature принята и может быть переведена в `Done`, если в ней не осталось feature work. При необходимости после этого создаётся или авторизуется отдельная controlled merge issue.
+- Owner feature/preview PASS фиксирует exact accepted HEAD и разрешает подготовить Owner candidate вне `main`; сам по себе он не разрешает merge в `main`.
+- Только manual Owner updater/product PASS exact candidate и отдельное разрешение позволяют controlled integration этого HEAD в `main` и production publication.
 - Owner FAIL переводит issue в `Needs Fix`; corrective commit не заменяет acceptance.
 - Не переводить каждую feature автоматически в «Готово к релизу»: merge и release остаются отдельными контролируемыми задачами с явным authorization.
 
@@ -125,7 +126,9 @@ Runtime identity и блок `OWNER QA URL` обязательны только 
 
 Merge и release — отдельные issue и выполняются только при явном Owner authorization в актуальном Description. Version bump, tag, GitHub Release, `latest.json`, package publication и Telegram не выполнять в feature/bug issue без отдельного разрешения.
 
-После принятого product gate release-candidate stage публикует exact artifact в remote Owner candidate channel на Mac mini и не подключается к physical Windows. Permanent Owner `Public Current` получает stable channel endpoint только один раз по отдельному разрешению; последующие RC не требуют изменения `.env`, запуска runtime/Edge или visibility-проверки силами Codex. Production channel остаётся неизменным до manual Owner PASS и отдельной publication authorization.
+После принятого product gate release-candidate stage из exact accepted feature/release HEAD собирает и публикует artifact в remote Owner candidate channel на Mac mini **до** merge в `main`. Permanent Owner `Public Current` получает stable channel endpoint только один раз по отдельному разрешению; последующие RC не требуют изменения `.env`, запуска runtime/Edge или visibility-проверки силами Codex. `main` и production channel остаются на последней Owner-accepted production line до manual Owner updater/product PASS и отдельной merge/publication authorization.
+
+Если Owner candidate получает FAIL, corrective work продолжается в feature/release lineage, не затрагивая `main`. После PASS exact accepted candidate HEAD контролируемо интегрируется в `main` с ancestry/tree/parity verification; короткая publication stage использует тот же проверенный artifact без повторения full suite, VM/physical updater или product acceptance. Любой integration drift или artifact mismatch блокирует publication и требует evidence-based corrective path.
 
 После релиза создать или обновить Owner QA issue с проверкой обновления, новых функций, рабочей записи и замечаний. После Owner acceptance связанные задачи можно переводить в `Done` по их фактическому scope.
 

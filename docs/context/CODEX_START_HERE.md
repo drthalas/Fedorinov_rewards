@@ -19,7 +19,8 @@
 - При конфликте остановиться и сообщить о нём, не угадывать.
 - Не трогать реальные DB/media и не коммитить secrets, `.env`, `.venv`, DB/media, backups, logs, screenshots или generated artifacts без явного разрешения.
 - Merge, release, version/tag, `latest.json`, package publication, Telegram и real updater apply разрешены только отдельным актуальным Description.
-- Owner release-candidate публикуется через remote channel на Mac mini. Обычный RC stage не подключается к physical Windows и не меняет его `.env`/runtime/UI; one-time bootstrap требует отдельного Owner-разрешения.
+- Owner release-candidate собирается из exact accepted feature/release HEAD и публикуется через remote channel на Mac mini **до** merge в `main`. Пока Owner не выполнил manual updater/product gate и отдельно не разрешил merge/publication, `main` остаётся последней Owner-accepted production line.
+- Обычный RC stage не подключается к physical Windows и не меняет его `.env`/runtime/UI; one-time bootstrap требует отдельного Owner-разрешения. После Owner PASS exact candidate HEAD контролируемо интегрируется в `main`, а уже проверенный artifact используется без пересборки в короткой publication stage.
 - В release/Telegram-инструкциях штатный post-update сценарий — автоматический перезапуск; `start_windows.bat` указывать только как fallback, если приложение не открылось самостоятельно.
 
 ## Краткий workflow
