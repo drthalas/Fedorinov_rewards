@@ -18,6 +18,9 @@ class RewardReferenceContractTests(unittest.TestCase):
         self.assertNotIn('name="id_link"', template)
         self.assertIn("data-reward-reference-link", template)
         self.assertIn('readonly aria-readonly="true"', template)
+        self.assertIn("data-reward-reference-link-action", template)
+        self.assertIn('target="_blank" rel="noopener noreferrer"', template)
+        self.assertIn("safe_external_url(reward_reference.id_link)", template)
         for instance_field in ("number", "date_purchase", "price_purchase", "price_now", "instock"):
             self.assertIn(f'name="{instance_field}"', template)
 
@@ -30,6 +33,8 @@ class RewardReferenceContractTests(unittest.TestCase):
         self.assertIn('nameSelect.addEventListener("change", updateDerivedFields)', script)
         self.assertIn('document.addEventListener("legacy:content-updated"', script)
         self.assertIn('reference.id_link == null ? "" : String(reference.id_link)', script)
+        self.assertIn('parsed.protocol === "http:" || parsed.protocol === "https:"', script)
+        self.assertIn('action.removeAttribute("href")', script)
 
     def test_base_loads_reward_reference_sync(self) -> None:
         base = (ROOT / "backend/app/templates/base.html").read_text(encoding="utf-8")

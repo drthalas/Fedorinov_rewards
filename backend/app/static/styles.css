@@ -7199,6 +7199,25 @@ body.legacy-rewards-theme::after {
   outline-offset: 3px;
 }
 
+.cavalier-reward-form-page .reward-reference-link-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin: 0;
+}
+
+.cavalier-reward-form-page .reward-reference-link-action {
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding-inline: 13px;
+  white-space: nowrap;
+}
+
+.cavalier-reward-form-page .reward-reference-link-action[hidden] {
+  display: none;
+}
+
 .cavalier-reward-form-page .photo-manage-actions > form {
   display: inline-flex;
   margin: 0;

@@ -65,9 +65,16 @@ const category = new FakeSelect();
 const subcategory = new FakeSelect();
 const name = new FakeSelect();
 const link = { value: "" };
+const linkAction = {
+  hidden: true,
+  attributes: {},
+  setAttribute(name, value) { this.attributes[name] = String(value); },
+  removeAttribute(name) { delete this.attributes[name]; if (name === "href") delete this.href; },
+};
 const references = [
   { id_gos: 1, gos: "СССР", id_catigory: 10, category: "Боевые", id_sub_catigory: 100, subcategory: "Ордена", id_name: 1000, name: "Орден Кутузова I степени", id_link: "https://reference.example/kutuzov" },
   { id_gos: 1, gos: "СССР", id_catigory: 10, category: "Боевые", id_sub_catigory: 101, subcategory: "Медали", id_name: 1001, name: "Медаль За отвагу", id_link: "" },
+  { id_gos: 1, gos: "СССР", id_catigory: 10, category: "Боевые", id_sub_catigory: 101, subcategory: "Медали", id_name: 1002, name: "Медаль Некорректная", id_link: "javascript:alert(1)" },
   { id_gos: 2, gos: "Россия", id_catigory: 20, category: "Государственные", id_sub_catigory: 200, subcategory: "Ордена", id_name: 2000, name: "Орден Мужества", id_link: "https://reference.example/courage" },
 ];
 const jsonNode = { textContent: JSON.stringify(references) };
@@ -81,6 +88,7 @@ const form = {
       "[data-reward-reference-filter='category']": category,
       "[data-reward-reference-filter='subcategory']": subcategory,
       "[data-reward-reference-link]": link,
+      "[data-reward-reference-link-action]": linkAction,
     }[selector] || null;
   },
 };
@@ -97,12 +105,30 @@ category.change("10");
 subcategory.change("100");
 const filteredNames = name.options.filter((option) => option.value).map((option) => option.textContent);
 name.change("1000");
+const validLink = link.value;
+const validActionHref = linkAction.href;
+const validActionHidden = linkAction.hidden;
+subcategory.change("101");
+name.change("1001");
+const emptyActionHasHref = Object.prototype.hasOwnProperty.call(linkAction, "href");
+const emptyActionHidden = linkAction.hidden;
+name.change("1002");
+const invalidLink = link.value;
+const invalidActionHasHref = Object.prototype.hasOwnProperty.call(linkAction, "href");
+const invalidActionHidden = linkAction.hidden;
 process.stdout.write(JSON.stringify({
   countries: country.options.filter((option) => option.value).map((option) => option.textContent),
   categories: category.options.filter((option) => option.value).map((option) => option.textContent),
   subcategories: subcategory.options.filter((option) => option.value).map((option) => option.textContent),
   filteredNames,
-  link: link.value,
+  validLink,
+  validActionHref,
+  validActionHidden,
+  emptyActionHasHref,
+  emptyActionHidden,
+  invalidLink,
+  invalidActionHasHref,
+  invalidActionHidden,
 }));
 '''
         with TemporaryDirectory() as tmp:
@@ -120,7 +146,22 @@ process.stdout.write(JSON.stringify({
         self.assertEqual(result["categories"], ["Боевые"])
         self.assertEqual(result["subcategories"], ["Медали", "Ордена"])
         self.assertEqual(result["filteredNames"], ["Орден Кутузова I степени"])
-        self.assertEqual(result["link"], "https://reference.example/kutuzov")
+        self.assertEqual(result["validLink"], "https://reference.example/kutuzov")
+        self.assertEqual(result["validActionHref"], "https://reference.example/kutuzov")
+        self.assertFalse(result["validActionHidden"])
+        self.assertFalse(result["emptyActionHasHref"])
+        self.assertTrue(result["emptyActionHidden"])
+        self.assertEqual(result["invalidLink"], "javascript:alert(1)")
+        self.assertFalse(result["invalidActionHasHref"])
+        self.assertTrue(result["invalidActionHidden"])
+
+    def test_empty_or_invalid_reference_link_has_no_action(self) -> None:
+        script = self.read("backend/app/static/reward_reference_fields.js")
+
+        self.assertIn('action.hidden = true', script)
+        self.assertIn('action.setAttribute("aria-disabled", "true")', script)
+        self.assertIn('action.removeAttribute("href")', script)
+        self.assertNotIn('new URL(String(value || ""),', script)
 
 
 if __name__ == "__main__":

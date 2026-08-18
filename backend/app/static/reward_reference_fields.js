@@ -14,6 +14,18 @@
     }
   }
 
+  function safeExternalUrl(value) {
+    try {
+      const parsed = new URL(String(value || ""));
+      if ((parsed.protocol === "http:" || parsed.protocol === "https:") && parsed.host) {
+        return parsed.href;
+      }
+    } catch (_error) {
+      return "";
+    }
+    return "";
+  }
+
   function initRewardReferenceFields(form) {
     if (!form || form.dataset.rewardReferenceReady === "true") {
       return;
@@ -52,8 +64,23 @@
 
     function updateDerivedFields() {
       const reference = references.get(String(nameSelect.value || "")) || {};
+      const value = reference.id_link == null ? "" : String(reference.id_link);
       const link = form.querySelector("[data-reward-reference-link]");
-      if (link) link.value = reference.id_link == null ? "" : String(reference.id_link);
+      if (link) link.value = value;
+      const action = form.querySelector("[data-reward-reference-link-action]");
+      if (!action) {
+        return;
+      }
+      const url = safeExternalUrl(value);
+      if (url) {
+        action.href = url;
+        action.hidden = false;
+        action.removeAttribute("aria-disabled");
+        return;
+      }
+      action.removeAttribute("href");
+      action.hidden = true;
+      action.setAttribute("aria-disabled", "true");
     }
 
     function refreshCategories(selectedValue) {

@@ -63,9 +63,13 @@
         </select>
       </label>
     </div>
+    {% set reference_link_url = safe_external_url(reward_reference.id_link) %}
     <label>
       <span>Ссылка на Монетный двор / справочник</span>
-      <input value="{{ reward_reference.id_link or '' }}" data-reward-reference-link data-reward-reference-field="id_link" readonly aria-readonly="true">
+      <span class="reward-reference-link-control">
+        <input value="{{ reward_reference.id_link or '' }}" data-reward-reference-link data-reward-reference-field="id_link" readonly aria-readonly="true">
+        <a class="button secondary-button reward-reference-link-action" data-reward-reference-link-action target="_blank" rel="noopener noreferrer" {% if reference_link_url %}href="{{ reference_link_url }}"{% else %}hidden aria-disabled="true"{% endif %}>Открыть</a>
+      </span>
     </label>
   </fieldset>
 
