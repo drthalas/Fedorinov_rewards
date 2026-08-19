@@ -59,6 +59,19 @@ REFERENCE_COLUMNS = {
     "guide_lev_3": ("image_path",),
     "guide_lev_4": ("image_path",),
 }
+REFERENCE_GROUP_LABELS = {
+    "person": "Фото кавалеров",
+    "rewards": "Фото и документы наград",
+    "mark": "Фото знаков",
+    "person_media": "Дополнительные файлы кавалеров",
+    "guide": "Изображения справочника",
+    "guide_lev_0": "Изображения справочника",
+    "guide_lev_1": "Изображения справочника",
+    "guide_lev_2": "Изображения справочника",
+    "guide_lev_3": "Изображения справочника",
+    "guide_lev_4": "Изображения справочника",
+}
+MISSING_REFERENCE_PLACEHOLDER = "default/nofoto.jpg"
 RASTER_EXTENSION_FORMATS = {
     ".bmp": "BMP",
     ".gif": "GIF",
@@ -295,6 +308,61 @@ def load_references(database: Path) -> tuple[Counter[str], dict[str, object]]:
         "invalid_or_external": dict(sorted(invalid.items())),
         "inspected_columns": sorted(inspected_columns),
         "database_open_mode": "mode=ro&immutable=1; PRAGMA query_only=ON",
+    }
+
+
+def missing_reference_diagnostics(
+    database: Path,
+    present_paths: set[str],
+    records: Sequence[dict[str, object]],
+) -> dict[str, object]:
+    missing_paths: set[str] = set()
+    groups: Counter[str] = Counter()
+    fields: Counter[str] = Counter()
+    occurrences = 0
+    with closing(readonly_connection(database)) as connection:
+        table_rows = connection.execute("select name from sqlite_master where type = 'table'").fetchall()
+        tables = {row["name"] for row in table_rows}
+        for table, desired_columns in REFERENCE_COLUMNS.items():
+            if table not in tables:
+                continue
+            info = connection.execute(f"pragma table_info({quoted_identifier(table)})").fetchall()
+            columns = {row["name"] for row in info}
+            for column in desired_columns:
+                if column not in columns:
+                    continue
+                query = (
+                    f"select {quoted_identifier(column)} as media_path "
+                    f"from {quoted_identifier(table)} where {quoted_identifier(column)} is not null"
+                )
+                for row in connection.execute(query):
+                    normalized, state = normalize_reference(row["media_path"])
+                    if state != "managed" or normalized is None or normalized.casefold() in present_paths:
+                        continue
+                    occurrences += 1
+                    missing_paths.add(normalized.casefold())
+                    groups[REFERENCE_GROUP_LABELS[table]] += 1
+                    fields[f"{table}.{column}"] += 1
+
+    records_by_path = {str(record["relative_path"]).casefold(): record for record in records}
+    placeholder = records_by_path.get(MISSING_REFERENCE_PLACEHOLDER.casefold())
+    placeholder_present = MISSING_REFERENCE_PLACEHOLDER.casefold() in present_paths
+    placeholder_decodable = bool(placeholder and placeholder.get("decode_status") == "decoded")
+    repair_ready = not occurrences or (placeholder_present and placeholder_decodable)
+    return {
+        "missing_reference_occurrences": occurrences,
+        "missing_reference_unique_paths": len(missing_paths),
+        "missing_reference_groups": [
+            {"label": label, "occurrences": count}
+            for label, count in sorted(groups.items())
+        ],
+        "missing_reference_fields": dict(sorted(fields.items())),
+        "missing_reference_repair_policy": "replace_with_default_placeholder_in_optimized_copy",
+        "missing_reference_placeholder": MISSING_REFERENCE_PLACEHOLDER,
+        "missing_reference_placeholder_present": placeholder_present,
+        "missing_reference_placeholder_decodable": placeholder_decodable,
+        "missing_reference_repair_ready": repair_ready,
+        "missing_reference_blocks_copy": bool(occurrences and not repair_ready),
     }
 
 
@@ -641,7 +709,7 @@ def run_analysis(
     media_after = metadata_fingerprint(files_after)
     record_summary = summarize_records(records)
     present_paths = {item.relative_path.casefold() for item in files_before}
-    missing_references = sum(count for path, count in references.items() if path not in present_paths)
+    missing_references = missing_reference_diagnostics(database, present_paths, records)
     total_bytes = sum(item.size for item in files_before)
     summary: dict[str, object] = {
         "schema_version": 1,
@@ -655,7 +723,7 @@ def run_analysis(
         "records": record_summary,
         "references": {
             **reference_summary,
-            "missing_reference_occurrences": missing_references,
+            **missing_references,
         },
         "classification_policy": {
             "jpeg_candidate": (

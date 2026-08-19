@@ -263,35 +263,14 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
         self.assertEqual(json.loads(destination.read_text(encoding="utf-8")), {"state": "complete"})
         self.assertEqual(list(self.state.glob("*.tmp")), [])
 
-    def test_same_volume_space_estimate_counts_new_jpeg_bytes_not_hardlinks(self) -> None:
-        analysis = {
-            "records": {"classifications": {"jpeg_candidate": {"bytes": 1_000_000_000}}},
-            "quality_forecasts": {"90": {"predicted_saved_bytes": 800_000_000}},
-        }
-        with patch.object(workflow, "_same_filesystem", return_value=True):
-            required, strategy = workflow._estimated_required_bytes(
-                analysis,
-                self.source,
-                self.target,
-                2_000_000_000,
-            )
-        self.assertEqual(required, 200_000_000 + 128 * 1024 * 1024)
-        self.assertEqual(strategy, "same-volume-hardlinks")
-
-    def test_cross_volume_space_estimate_requires_full_logical_copy(self) -> None:
-        analysis = {
-            "records": {"classifications": {"jpeg_candidate": {"bytes": 1_000_000_000}}},
-            "quality_forecasts": {"90": {"predicted_saved_bytes": 800_000_000}},
-        }
-        with patch.object(workflow, "_same_filesystem", return_value=False):
-            required, strategy = workflow._estimated_required_bytes(
-                analysis,
-                self.source,
-                self.target,
-                2_000_000_000,
-            )
-        self.assertEqual(required, 2_000_000_000)
-        self.assertEqual(strategy, "full-copy")
+    def test_space_estimate_budgets_full_copy_even_when_hardlinks_are_available(self) -> None:
+        required, support, strategy = workflow._estimated_required_bytes(
+            2_000_000_000,
+            25_000_000,
+        )
+        self.assertEqual(support, 25_000_000 + workflow.SPACE_SERVICE_OVERHEAD_BYTES)
+        self.assertEqual(required, 2_000_000_000 + support)
+        self.assertEqual(strategy, "full-copy-conservative")
 
     def test_space_budget_adds_ten_percent_and_exact_threshold_passes(self) -> None:
         analysis_dir = self.state / workflow.ANALYSIS_DIR
@@ -310,16 +289,17 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-        additional = 200_000_000 + 128 * 1024 * 1024
+        database_bytes = self.database.stat().st_size
+        support = database_bytes + workflow.SPACE_SERVICE_OVERHEAD_BYTES
+        additional = 2_000_000_000 + support
         required = additional + (additional * 10 + 99) // 100
-        with (
-            patch.object(workflow, "_same_filesystem", return_value=True),
-            patch.object(workflow, "_available_bytes", return_value=required),
-        ):
+        with patch.object(workflow, "_available_bytes", return_value=required):
             budget = workflow._optimization_space_budget(self.settings)
         self.assertEqual(budget["estimated_additional_bytes"], additional)
+        self.assertEqual(budget["copy_support_bytes"], support)
         self.assertEqual(budget["safety_reserve_bytes"], (additional * 10 + 99) // 100)
         self.assertEqual(budget["required_free_space_bytes"], required)
+        self.assertEqual(budget["space_strategy"], "full-copy-conservative")
         self.assertTrue(budget["space_ok"])
         workflow._require_optimization_space(budget)
 
@@ -330,6 +310,48 @@ class MediaOptimizationWorkflowTests(unittest.TestCase):
                 workflow.start_optimize(self.settings)
         self.assertFalse(self.target.exists())
         self.assertFalse(workflow.workflow_snapshot(self.settings)["running"])
+
+    def test_missing_reference_without_decodable_placeholder_blocks_before_target_creation(self) -> None:
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute("update person set main_foto = ? where id = 1", ("Source/1/missing.jpg",))
+            connection.commit()
+        (self.source / "default/nofoto.jpg").unlink()
+        workflow.run_check(self.settings)
+
+        snapshot = workflow.workflow_snapshot(self.settings)
+        self.assertEqual(snapshot["missing_references"], 1)
+        self.assertEqual(snapshot["missing_reference_unique_paths"], 1)
+        self.assertTrue(snapshot["reference_repair_blocking"])
+        self.assertFalse(snapshot["safe_copy_ready"])
+        with self.assertRaisesRegex(workflow.MediaOptimizationMissingReferenceError, "Нет фото"):
+            workflow.start_optimize(self.settings)
+        self.assertFalse(self.target.exists())
+
+    def test_missing_reference_is_repaired_only_in_verified_copy_when_placeholder_is_valid(self) -> None:
+        with closing(sqlite3.connect(self.database)) as connection:
+            connection.execute("update person set main_foto = ? where id = 1", ("Source/1/missing.jpg",))
+            connection.commit()
+        source_db_sha = sha256_file(self.database)
+        workflow.run_check(self.settings)
+
+        snapshot = workflow.workflow_snapshot(self.settings)
+        self.assertEqual(snapshot["missing_reference_groups"], [{"label": "Фото кавалеров", "occurrences": 1}])
+        self.assertTrue(snapshot["reference_repair_ready"])
+        self.assertTrue(snapshot["safe_copy_ready"])
+        result = workflow.run_optimize(self.settings)
+
+        self.assertEqual(result["repaired_missing_references"], 1)
+        self.assertEqual(sha256_file(self.database), source_db_sha)
+        with closing(sqlite3.connect(self.database)) as source_connection:
+            self.assertEqual(
+                source_connection.execute("select main_foto from person where id = 1").fetchone()[0],
+                "Source/1/missing.jpg",
+            )
+        with closing(sqlite3.connect(self.target / "database/MyDatabase.sqlite")) as target_connection:
+            self.assertEqual(
+                target_connection.execute("select main_foto from person where id = 1").fetchone()[0],
+                "default/nofoto.jpg",
+            )
 
     def test_running_space_guard_stops_when_reserve_is_crossed(self) -> None:
         with patch.object(workflow, "_available_bytes", side_effect=[1_000, 99]):

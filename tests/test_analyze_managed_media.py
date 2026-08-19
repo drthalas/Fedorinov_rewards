@@ -103,6 +103,13 @@ class ManagedMediaAnalyzerTests(unittest.TestCase):
         self.assertEqual(summary["records"]["png_alpha"]["actual_transparency_files"], 1)
         self.assertEqual(summary["records"]["png_alpha"]["opaque_alpha_channel_files"], 1)
         self.assertEqual(summary["references"]["missing_reference_occurrences"], 1)
+        self.assertEqual(summary["references"]["missing_reference_unique_paths"], 1)
+        self.assertEqual(
+            summary["references"]["missing_reference_groups"],
+            [{"label": "Фото кавалеров", "occurrences": 1}],
+        )
+        self.assertFalse(summary["references"]["missing_reference_repair_ready"])
+        self.assertTrue(summary["references"]["missing_reference_blocks_copy"])
         self.assertEqual(summary["quality_forecasts"]["90"]["eligible_candidate_count"], 2)
         self.assertTrue((self.output / "media_manifest.jsonl").is_file())
         self.assertTrue((self.output / "summary.json").is_file())
@@ -119,6 +126,16 @@ class ManagedMediaAnalyzerTests(unittest.TestCase):
         records = [json.loads(line) for line in first_manifest.splitlines()]
         broken = next(record for record in records if record["relative_path"].endswith("broken.png"))
         self.assertEqual(broken["decode_status"], "corrupt_or_unsupported")
+
+    def test_decodable_default_placeholder_makes_missing_reference_repair_safe(self) -> None:
+        Image.new("RGB", (16, 16), "gray").save(self.data / "default/nofoto.jpg", format="JPEG")
+        summary = run_analysis(self.data, self.database, self.output, estimate_sample_size=2)
+
+        self.assertEqual(summary["references"]["missing_reference_occurrences"], 1)
+        self.assertTrue(summary["references"]["missing_reference_placeholder_present"])
+        self.assertTrue(summary["references"]["missing_reference_placeholder_decodable"])
+        self.assertTrue(summary["references"]["missing_reference_repair_ready"])
+        self.assertFalse(summary["references"]["missing_reference_blocks_copy"])
 
     def test_output_inside_source_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "must not be inside"):

@@ -153,8 +153,19 @@
       <div><span>Можно освободить</span><strong>{{ snapshot.predicted_saved_bytes|format_bytes }}</strong></div>
       <div><span>К обработке</span><strong>{{ snapshot.candidate_files }}</strong></div>
     </div>
-    {% if snapshot.warning_files or snapshot.missing_references %}
-      <div class="media-optimization-notice is-warning">Предупреждения: файлов {{ snapshot.warning_files }}, отсутствующих ссылок {{ snapshot.missing_references }}. Они не будут автоматически активированы без успешной проверки целостности.</div>
+    {% if snapshot.warning_files %}
+      <div class="media-optimization-notice is-warning">Не удалось проверить файлов: {{ snapshot.warning_files }}. Новая копия не станет рабочей без успешной проверки целостности.</div>
+    {% endif %}
+    {% if snapshot.missing_references and snapshot.reference_repair_ready %}
+      <div class="media-optimization-notice is-warning">
+        <strong>Найдены старые ссылки на отсутствующие файлы: {{ snapshot.missing_references }}{% if snapshot.missing_reference_unique_paths != snapshot.missing_references %} (уникальных файлов: {{ snapshot.missing_reference_unique_paths }}){% endif %}.</strong>
+        {% if snapshot.missing_reference_groups %}
+          Затронуто: {% for group in snapshot.missing_reference_groups %}{{ group.label }} — {{ group.occurrences }}{% if not loop.last %}; {% endif %}{% endfor %}.
+        {% endif %}
+        Исходная база не изменится. В новой копии эти ссылки будут заменены штатным изображением «Нет фото», после чего база и изображения пройдут полную проверку. Это предупреждение не мешает созданию копии.
+      </div>
+    {% elif snapshot.reference_repair_blocking %}
+      <div class="media-optimization-notice is-error" role="alert"><strong>Создание копии заблокировано.</strong> В базе есть ссылки на отсутствующие изображения, а штатное изображение «Нет фото» не найдено или не читается. Восстановите его и повторите проверку.</div>
     {% endif %}
   </section>
 
@@ -162,20 +173,29 @@
   <section class="media-safe-copy" aria-labelledby="media-safe-copy-title">
     <div class="media-section-heading">
       <div>
-        <h2 id="media-safe-copy-title">2. Создать оптимизированную копию</h2>
-        <p>Первый запуск всегда выполняется в безопасном режиме.</p>
+        <h2 id="media-safe-copy-title">Создать и оптимизировать копию</h2>
+        <p>Одна операция создаст отдельную копию, оптимизирует её и проверит результат.</p>
       </div>
     </div>
     <div class="media-safe-mode">
       <strong>Безопасный режим</strong>
-      <p>Будет создана новая оптимизированная копия. Текущая база и изображения останутся без изменений и будут доступны для возврата.</p>
+      <p>Текущая база останется рабочей и не изменится. После завершения вы отдельно откроете новую копию для проверки и только затем сможете сделать её рабочей.</p>
     </div>
+    <ol class="media-stage-list">
+      <li>Создать отдельную копию</li>
+      <li>Оптимизировать изображения</li>
+      <li>Проверить базу и изображения</li>
+      <li>Открыть новую копию для проверки</li>
+      <li>Сделать её рабочей отдельным подтверждением</li>
+    </ol>
     <dl class="media-space-facts">
-      <div><dt>Ожидаемый размер копии</dt><dd>{{ snapshot.predicted_target_bytes|format_bytes }}</dd></div>
-      <div><dt>Требуется свободного места</dt><dd>{{ snapshot.required_free_space_bytes|format_bytes }}</dd></div>
-      <div><dt>Включая запас 10%</dt><dd>{{ snapshot.safety_reserve_bytes|format_bytes }}</dd></div>
+      <div><dt>Изображения в новой копии</dt><dd>{{ snapshot.predicted_target_bytes|format_bytes }}</dd></div>
+      <div><dt>База и служебные данные</dt><dd>{{ snapshot.copy_support_bytes|format_bytes }}</dd></div>
+      <div><dt>Запас 10%</dt><dd>{{ snapshot.safety_reserve_bytes|format_bytes }}</dd></div>
+      <div><dt>Всего требуется</dt><dd>{{ snapshot.required_free_space_bytes|format_bytes }}</dd></div>
       <div><dt>Доступно</dt><dd>{{ snapshot.available_bytes|format_bytes }}</dd></div>
     </dl>
+    <p class="media-inline-status">Проверка места рассчитана для полной отдельной копии. Возможная экономия файловой системы не уменьшает безопасный минимум.</p>
     {% if not snapshot.estimated_space_ok %}
       <div class="media-optimization-notice is-error" role="alert"><strong>Недостаточно свободного места для безопасной оптимизации.</strong> Требуется не менее {{ snapshot.required_free_space_bytes|format_bytes }}, доступно {{ snapshot.available_bytes|format_bytes }}. Освободите ещё минимум {{ snapshot.space_shortfall_bytes|format_bytes }} и повторите проверку.</div>
     {% endif %}
@@ -183,9 +203,9 @@
       <div class="media-optimization-notice is-warning">Незавершённую копию нельзя продолжить пофайлово. Она будет удалена и создана заново; исходные данные не изменятся.</div>
     {% endif %}
     <div class="media-action-row">
-      <form method="post" action="/maintenance/media-optimization/optimize" data-optimization-form data-pending-label="Начинаем…">
+      <form method="post" action="/maintenance/media-optimization/optimize" data-optimization-form data-pending-label="Создаём и оптимизируем…">
         {% if snapshot.restart_available %}<input type="hidden" name="restart" value="true">{% endif %}
-        <button class="button" type="submit" {% if snapshot.running or not snapshot.estimated_space_ok %}disabled{% endif %}>{% if snapshot.restart_available %}Удалить незавершённую копию и начать заново{% elif snapshot.retry_available %}Повторить создание копии{% else %}Создать оптимизированную копию{% endif %}</button>
+        <button class="button" type="submit" {% if snapshot.running or not snapshot.safe_copy_ready %}disabled{% endif %}>{% if snapshot.restart_available %}Удалить незавершённую копию и начать заново{% elif snapshot.retry_available %}Повторить создание и оптимизацию{% else %}Создать и оптимизировать копию{% endif %}</button>
       </form>
       <form method="post" action="/maintenance/media-optimization/check" data-optimization-form data-pending-label="Проверяем…">
         <button class="button secondary-button" type="submit" {% if snapshot.running %}disabled{% endif %}>Повторить проверку</button>
@@ -200,7 +220,7 @@
     <div class="media-section-heading">
       <div>
         <h2 id="media-report-title">Оптимизированная копия готова</h2>
-        <p>Сначала откройте её для проверки. Рабочей она станет только после отдельного подтверждения.</p>
+        <p>Текущая рабочая база ещё не переключена. Сначала откройте новую копию для проверки; рабочей она станет только после отдельного подтверждения.</p>
       </div>
       <span class="media-health-state{% if snapshot.health_passed %} is-healthy{% endif %}">{% if snapshot.health_passed %}Проверка целостности пройдена{% else %}Активация запрещена{% endif %}</span>
     </div>

@@ -15,7 +15,13 @@ from pathlib import Path
 from typing import Callable
 
 from ..config import Settings
-from .managed_media_analysis import inventory_files, normalize_reference, quoted_identifier, run_analysis
+from .managed_media_analysis import (
+    MISSING_REFERENCE_PLACEHOLDER,
+    inventory_files,
+    normalize_reference,
+    quoted_identifier,
+    run_analysis,
+)
 from .media_image_policy import JPEG_POLICY_VERSION
 from .media_optimization import (
     COMPLETE_MARKER,
@@ -41,6 +47,7 @@ SOURCE_INDEX = "source-index.sqlite"
 OPTIMIZED_INDEX = "optimized-index.sqlite"
 SPACE_RESERVE_PERCENT = 10
 SPACE_GUARD_INTERVAL = 64
+SPACE_SERVICE_OVERHEAD_BYTES = 128 * 1024 * 1024
 
 PHASE_LABELS = {
     "inventory": "Проверка изображений",
@@ -77,6 +84,10 @@ class MediaOptimizationInsufficientSpaceError(MediaOptimizationWorkflowError):
             f"доступно {available / 1_000_000_000:.1f} ГБ. "
             f"Освободите ещё минимум {missing / 1_000_000_000:.1f} ГБ и повторите проверку."
         )
+
+
+class MediaOptimizationMissingReferenceError(MediaOptimizationWorkflowError):
+    pass
 
 
 @dataclass
@@ -269,6 +280,7 @@ def run_optimize(settings: Settings, *, restart_incomplete: bool = False) -> dic
         raise MediaOptimizationWorkflowError("Рабочая база данных не найдена")
     budget = _optimization_space_budget(settings)
     _require_optimization_space(budget)
+    _require_reference_repair_ready(settings)
     _write_operation(
         settings,
         state="running",
@@ -494,6 +506,8 @@ def _failure_details(exc: Exception) -> tuple[str, str]:
             f"Требуется не менее {required_gb:.1f} ГБ, доступно {available_gb:.1f} ГБ. "
             f"Освободите ещё минимум {missing_gb:.1f} ГБ и повторите проверку.",
         )
+    if isinstance(exc, MediaOptimizationMissingReferenceError):
+        return "missing_reference_placeholder", str(exc)
     if isinstance(exc, OptimizationTargetNotWritableError):
         return (
             "target_not_writable",
@@ -624,6 +638,7 @@ def start_check(settings: Settings) -> None:
 
 def start_optimize(settings: Settings, *, restart_incomplete: bool = False) -> None:
     _require_optimization_space(_optimization_space_budget(settings))
+    _require_reference_repair_ready(settings)
     _start(
         settings,
         "optimize",
@@ -741,60 +756,29 @@ def _available_bytes(path: Path) -> int:
         return 0
 
 
-def _same_filesystem(first: Path, second: Path) -> bool:
-    first_drive = os.path.splitdrive(str(first.resolve()))[0].casefold()
-    second_drive = os.path.splitdrive(str(second.resolve()))[0].casefold()
-    if first_drive or second_drive:
-        return bool(first_drive and first_drive == second_drive)
-
-    def existing_ancestor(path: Path) -> Path:
-        candidate = path.resolve()
-        while not candidate.exists() and candidate != candidate.parent:
-            candidate = candidate.parent
-        return candidate
-
-    try:
-        return os.stat(existing_ancestor(first)).st_dev == os.stat(existing_ancestor(second)).st_dev
-    except OSError:
-        return False
-
-
 def _estimated_required_bytes(
-    analysis: dict[str, object] | None,
-    source: Path,
-    target: Path,
     predicted_target_bytes: int,
-) -> tuple[int, str]:
-    if not analysis or not predicted_target_bytes:
-        return predicted_target_bytes, "full-copy"
-    if not _same_filesystem(source, target.parent):
-        return predicted_target_bytes, "full-copy"
-
-    records = dict(analysis.get("records") or {})
-    classifications = dict(records.get("classifications") or {})
-    candidates = dict(classifications.get("jpeg_candidate") or {})
-    candidate_source_bytes = int(candidates.get("bytes") or 0)
-    forecast = dict((analysis.get("quality_forecasts") or {}).get("90") or {})
-    predicted_saved_bytes = int(forecast.get("predicted_saved_bytes") or 0)
-    converted_bytes = max(0, candidate_source_bytes - predicted_saved_bytes)
-    if not candidate_source_bytes or not converted_bytes:
-        return predicted_target_bytes, "full-copy"
-
-    # Same-volume unchanged media use hardlinks; reserve only converted bytes
-    # plus bounded space for the copied DB, manifests, index and filesystem variance.
-    overhead = max(128 * 1024 * 1024, converted_bytes // 50)
-    return converted_bytes + overhead, "same-volume-hardlinks"
+    database_bytes: int,
+) -> tuple[int, int, str]:
+    if not predicted_target_bytes:
+        return 0, 0, "full-copy-conservative"
+    support_bytes = max(0, database_bytes) + SPACE_SERVICE_OVERHEAD_BYTES
+    # Budget for the complete logical copy even when same-volume hardlinks are
+    # available. The transfer layer may safely fall back to a physical copy.
+    return predicted_target_bytes + support_bytes, support_bytes, "full-copy-conservative"
 
 
 def _optimization_space_budget(settings: Settings) -> dict[str, int | str | bool]:
     analysis = _read_json(_analysis_summary(settings))
     forecast = dict((analysis or {}).get("quality_forecasts", {}).get("90") or {})
     predicted_target_bytes = int(forecast.get("predicted_total_bytes") or 0)
-    additional, strategy = _estimated_required_bytes(
-        analysis,
-        _source_root(settings),
-        _target_root(settings),
+    try:
+        database_bytes = settings.rewards_db_path.resolve().stat().st_size
+    except OSError:
+        database_bytes = 0
+    additional, support, strategy = _estimated_required_bytes(
         predicted_target_bytes,
+        database_bytes,
     )
     reserve = (additional * SPACE_RESERVE_PERCENT + 99) // 100 if additional else 0
     required = additional + reserve
@@ -802,6 +786,9 @@ def _optimization_space_budget(settings: Settings) -> dict[str, int | str | bool
     shortfall = max(0, required - available)
     return {
         "estimated_additional_bytes": additional,
+        "database_copy_bytes": database_bytes,
+        "service_overhead_bytes": SPACE_SERVICE_OVERHEAD_BYTES if predicted_target_bytes else 0,
+        "copy_support_bytes": support,
         "safety_reserve_bytes": reserve,
         "required_free_space_bytes": required,
         "available_bytes": available,
@@ -809,6 +796,41 @@ def _optimization_space_budget(settings: Settings) -> dict[str, int | str | bool
         "space_strategy": strategy,
         "space_ok": bool(required and available >= required),
     }
+
+
+def _reference_repair_status(settings: Settings) -> dict[str, object]:
+    analysis = _read_json(_analysis_summary(settings)) or {}
+    references = dict(analysis.get("references") or {})
+    missing = int(references.get("missing_reference_occurrences") or 0)
+    unique = int(references.get("missing_reference_unique_paths") or missing)
+    groups = references.get("missing_reference_groups")
+    if not isinstance(groups, list):
+        groups = []
+    if not missing:
+        ready = True
+    elif "missing_reference_repair_ready" in references:
+        ready = bool(references.get("missing_reference_repair_ready"))
+    else:
+        ready = (_source_root(settings) / MISSING_REFERENCE_PLACEHOLDER).is_file()
+    return {
+        "missing_references": missing,
+        "missing_reference_unique_paths": unique,
+        "missing_reference_groups": groups,
+        "reference_repair_placeholder": str(
+            references.get("missing_reference_placeholder") or MISSING_REFERENCE_PLACEHOLDER
+        ),
+        "reference_repair_ready": ready,
+        "reference_repair_blocking": bool(missing and not ready),
+    }
+
+
+def _require_reference_repair_ready(settings: Settings) -> None:
+    status = _reference_repair_status(settings)
+    if status["reference_repair_blocking"]:
+        raise MediaOptimizationMissingReferenceError(
+            "В базе есть ссылки на отсутствующие изображения, но стандартное изображение «Нет фото» "
+            "не найдено или не читается. Восстановите стандартное изображение и повторите проверку."
+        )
 
 
 def _require_optimization_space(budget: dict[str, int | str | bool]) -> None:
@@ -884,6 +906,7 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
     )
     target_complete = bool((target / COMPLETE_MARKER).is_file() and target_status and target_status.get("state") == "complete")
     budget = _optimization_space_budget(settings)
+    reference_status = _reference_repair_status(settings)
     current_bytes = (
         int(current_index.get("bytes") or 0)
         if current_index.get("exists")
@@ -898,7 +921,6 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         for name, values in classifications.items()
         if str(name).startswith(("corrupt", "unsupported", "extension_mismatch"))
     )
-    missing_references = int(dict((analysis or {}).get("references") or {}).get("missing_reference_occurrences") or 0)
     snapshot_created_at = _file_mtime(target / STATUS_FILE)
     source_status = "Рабочая" if workspace_state == "source" else "Резервная"
     if workspace_state == "preview":
@@ -975,10 +997,14 @@ def workflow_snapshot(settings: Settings) -> dict[str, object]:
         "predicted_target_bytes": predicted_target_bytes,
         "candidate_files": int(candidate_summary.get("files") or 0),
         "warning_files": warning_files,
-        "missing_references": missing_references,
+        **reference_status,
         **budget,
         "estimated_required_bytes": int(budget["required_free_space_bytes"]),
         "estimated_space_ok": bool(target_complete or budget["space_ok"]),
+        "safe_copy_ready": bool(
+            target_complete
+            or (budget["space_ok"] and not reference_status["reference_repair_blocking"])
+        ),
         "new_files": int(last_delta.get("new") or 0),
         "changed_files": int(last_delta.get("changed") or 0),
         "delta_files": changed_count,

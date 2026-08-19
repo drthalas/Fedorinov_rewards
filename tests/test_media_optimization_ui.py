@@ -65,7 +65,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Обслуживание данных", response.text)
         self.assertIn("Оптимизация изображений", response.text)
         self.assertIn("Проверить возможность оптимизации", response.text)
-        self.assertNotIn("Создать оптимизированную копию", response.text)
+        self.assertNotIn("Создать и оптимизировать копию", response.text)
         self.assertNotIn("confirm_separate_copy", response.text)
         self.assertIn("Данные и изображения не изменяются", response.text)
         self.assertNotIn("Текущая рабочая база", response.text)
@@ -120,8 +120,12 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Результат проверки", response.text)
         self.assertIn("Можно освободить", response.text)
         self.assertIn("Безопасный режим", response.text)
-        self.assertIn("Создать оптимизированную копию", response.text)
-        self.assertIn("Включая запас 10%", response.text)
+        self.assertIn("Создать и оптимизировать копию", response.text)
+        self.assertIn("Сделать её рабочей отдельным подтверждением", response.text)
+        self.assertIn("Всего требуется", response.text)
+        self.assertIn("Запас 10%", response.text)
+        self.assertIn("полной отдельной копии", response.text)
+        self.assertNotIn("2. Создать", response.text)
         self.assertNotIn("Рабочие копии", response.text)
         self.assertNotIn("confirm_separate_copy", response.text)
 
@@ -135,7 +139,58 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Недостаточно свободного места", response.text)
         self.assertRegex(
             response.text,
-            r'<button class="button" type="submit" disabled>Создать оптимизированную копию</button>',
+            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
+        )
+
+    def test_missing_references_explain_non_blocking_repair_and_affected_groups(self) -> None:
+        self.write_baseline()
+        summary = self.settings.media_optimization_state_dir / "baseline/summary.json"
+        payload = json.loads(summary.read_text(encoding="utf-8"))
+        payload["references"] = {
+            "missing_reference_occurrences": 193,
+            "missing_reference_unique_paths": 193,
+            "missing_reference_groups": [
+                {"label": "Фото кавалеров", "occurrences": 5},
+                {"label": "Фото и документы наград", "occurrences": 188},
+            ],
+            "missing_reference_repair_ready": True,
+        }
+        summary.write_text(json.dumps(payload), encoding="utf-8")
+        with (
+            patch.object(router, "get_settings", return_value=self.settings),
+            patch.object(workflow, "_available_bytes", return_value=2_000_000_000),
+        ):
+            response = self.client.get("/maintenance/media-optimization")
+        self.assertIn("старые ссылки на отсутствующие файлы: 193", response.text)
+        self.assertIn("Фото кавалеров — 5", response.text)
+        self.assertIn("Фото и документы наград — 188", response.text)
+        self.assertIn("будут заменены штатным изображением «Нет фото»", response.text)
+        self.assertIn("Это предупреждение не мешает созданию копии", response.text)
+        self.assertNotRegex(
+            response.text,
+            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
+        )
+
+    def test_missing_references_without_placeholder_block_copy_action(self) -> None:
+        self.write_baseline()
+        summary = self.settings.media_optimization_state_dir / "baseline/summary.json"
+        payload = json.loads(summary.read_text(encoding="utf-8"))
+        payload["references"] = {
+            "missing_reference_occurrences": 193,
+            "missing_reference_unique_paths": 193,
+            "missing_reference_groups": [{"label": "Фото и документы наград", "occurrences": 193}],
+            "missing_reference_repair_ready": False,
+        }
+        summary.write_text(json.dumps(payload), encoding="utf-8")
+        with (
+            patch.object(router, "get_settings", return_value=self.settings),
+            patch.object(workflow, "_available_bytes", return_value=2_000_000_000),
+        ):
+            response = self.client.get("/maintenance/media-optimization")
+        self.assertIn("Создание копии заблокировано", response.text)
+        self.assertRegex(
+            response.text,
+            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
         )
 
     def test_preview_activation_and_rollback_routes_use_explicit_states(self) -> None:
