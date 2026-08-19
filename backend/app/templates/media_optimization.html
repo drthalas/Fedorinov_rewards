@@ -205,7 +205,7 @@
     <div class="media-action-row">
       <form method="post" action="/maintenance/media-optimization/optimize" data-optimization-form data-pending-label="Создаём и оптимизируем…">
         {% if snapshot.restart_available %}<input type="hidden" name="restart" value="true">{% endif %}
-        <button class="button" type="submit" {% if snapshot.running or not snapshot.safe_copy_ready %}disabled{% endif %}>{% if snapshot.restart_available %}Удалить незавершённую копию и начать заново{% elif snapshot.retry_available %}Повторить создание и оптимизацию{% else %}Создать и оптимизировать копию{% endif %}</button>
+        <button class="button" type="submit" data-primary-safe-copy-action {% if snapshot.running or not snapshot.safe_copy_ready %}disabled{% endif %}>{% if snapshot.restart_available %}Удалить незавершённую копию и начать заново{% elif snapshot.retry_available %}Повторить создание и оптимизацию{% else %}Создать и оптимизировать копию{% endif %}</button>
       </form>
       <form method="post" action="/maintenance/media-optimization/check" data-optimization-form data-pending-label="Проверяем…">
         <button class="button secondary-button" type="submit" {% if snapshot.running %}disabled{% endif %}>Повторить проверку</button>

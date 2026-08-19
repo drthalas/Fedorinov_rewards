@@ -125,6 +125,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Всего требуется", response.text)
         self.assertIn("Запас 10%", response.text)
         self.assertIn("полной отдельной копии", response.text)
+        self.assertIn("data-primary-safe-copy-action", response.text)
         self.assertNotIn("2. Создать", response.text)
         self.assertNotIn("Рабочие копии", response.text)
         self.assertNotIn("confirm_separate_copy", response.text)
@@ -139,7 +140,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Недостаточно свободного места", response.text)
         self.assertRegex(
             response.text,
-            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
+            r'<button class="button" type="submit" data-primary-safe-copy-action disabled>Создать и оптимизировать копию</button>',
         )
 
     def test_missing_references_explain_non_blocking_repair_and_affected_groups(self) -> None:
@@ -168,7 +169,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Это предупреждение не мешает созданию копии", response.text)
         self.assertNotRegex(
             response.text,
-            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
+            r'<button class="button" type="submit" data-primary-safe-copy-action disabled>Создать и оптимизировать копию</button>',
         )
 
     def test_missing_references_without_placeholder_block_copy_action(self) -> None:
@@ -190,7 +191,7 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("Создание копии заблокировано", response.text)
         self.assertRegex(
             response.text,
-            r'<button class="button" type="submit" disabled>Создать и оптимизировать копию</button>',
+            r'<button class="button" type="submit" data-primary-safe-copy-action disabled>Создать и оптимизировать копию</button>',
         )
 
     def test_preview_activation_and_rollback_routes_use_explicit_states(self) -> None:
@@ -288,6 +289,10 @@ class MediaOptimizationUiTests(unittest.TestCase):
         self.assertIn("button.dataset.defaultDisabled", script)
         self.assertIn("if (observedRunning) schedulePoll()", script)
         self.assertIn("window.location.reload()", script)
+        self.assertIn('window.sessionStorage.setItem(revealNextActionKey, "true")', script)
+        self.assertIn('[data-primary-safe-copy-action]:not(:disabled)', script)
+        self.assertIn('action.scrollIntoView({ block: "center", inline: "nearest" })', script)
+        self.assertIn("rememberCompletedAnalysis();\n      window.location.reload()", script)
         self.assertIn("window.location.assign(finalUrl.href)", script)
         self.assertIn("operation.phase_label", script)
         self.assertIn("updateStages", script)

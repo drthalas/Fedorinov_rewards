@@ -15,6 +15,7 @@
   const stageItems = Array.from(root.querySelectorAll("[data-operation-stages] [data-stage]"));
   const cancelForm = root.querySelector("[data-cancel-form]");
   const firstRunAction = root.querySelector("[data-first-run-action]");
+  const revealNextActionKey = "media-optimization-reveal-next-action";
   let pollTimer = null;
   let observedRunning = root.querySelector("[data-operation-state]")?.dataset.operationState === "running";
 
@@ -41,6 +42,30 @@
     stageItems.forEach((item, index) => {
       item.classList.toggle("is-active", state === "running" && index === activeIndex);
       item.classList.toggle("is-complete", activeIndex > index || state === "complete");
+    });
+  }
+
+  function rememberCompletedAnalysis() {
+    try {
+      window.sessionStorage.setItem(revealNextActionKey, "true");
+    } catch (_error) {
+      // The result page still reloads normally when session storage is unavailable.
+    }
+  }
+
+  function revealCompletedAnalysisAction() {
+    let shouldReveal = false;
+    try {
+      shouldReveal = window.sessionStorage.getItem(revealNextActionKey) === "true";
+      window.sessionStorage.removeItem(revealNextActionKey);
+    } catch (_error) {
+      return;
+    }
+    if (!shouldReveal) return;
+    const action = root.querySelector("[data-primary-safe-copy-action]:not(:disabled)");
+    if (!action) return;
+    window.requestAnimationFrame(() => {
+      action.scrollIntoView({ block: "center", inline: "nearest" });
     });
   }
 
@@ -75,6 +100,7 @@
     setFormsDisabled(running);
     if (running) observedRunning = true;
     if (!running && observedRunning) {
+      rememberCompletedAnalysis();
       window.location.reload();
       return;
     }
@@ -139,5 +165,6 @@
     });
   });
 
+  revealCompletedAnalysisAction();
   if (observedRunning) schedulePoll();
 })();
