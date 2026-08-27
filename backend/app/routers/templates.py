@@ -20,7 +20,7 @@ from ..services.notifications import transient_notifications
 templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templates")
 
 
-STATIC_ASSET_VERSION = "20260827-ale407-text-editors"
+STATIC_ASSET_VERSION = "20260827-ale407-compact-icons"
 
 
 def static_url(path: str) -> str:

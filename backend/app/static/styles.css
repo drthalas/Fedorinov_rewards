@@ -1623,9 +1623,9 @@ th {
 .person-text-field-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 26px;
+  justify-content: flex-start;
+  gap: 3px;
+  min-height: 18px;
   margin-bottom: 4px;
 }
 
@@ -1637,27 +1637,39 @@ th {
   margin: 0;
 }
 
-.person-text-expand-button {
-  display: inline-grid;
-  width: 26px;
-  min-width: 26px;
-  height: 26px;
-  min-height: 26px;
+.cavalier-page-theme .person-text-expand-button {
+  appearance: none;
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
   padding: 0;
-  place-items: center;
-  color: #d2cabd;
-  border: 1px solid #66563f;
-  border-radius: 2px;
-  background: #23231f;
-  font-size: 17px;
+  align-items: center;
+  justify-content: center;
+  color: #a99e8c;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
   line-height: 1;
+  opacity: 0.78;
   cursor: pointer;
 }
 
-.person-text-expand-button:hover,
-.person-text-expand-button:focus-visible {
+.cavalier-page-theme .person-text-expand-button:hover,
+.cavalier-page-theme .person-text-expand-button:focus-visible {
   color: #f0ddba;
-  border-color: #987547;
+  border: 0;
+  background: transparent;
+  opacity: 1;
+}
+
+.cavalier-page-theme .person-text-expand-button:focus-visible {
+  outline: 1px solid #987547;
+  outline-offset: 1px;
 }
 
 .biography-editor-dialog[hidden] {

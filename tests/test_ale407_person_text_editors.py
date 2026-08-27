@@ -15,6 +15,7 @@ class PersonTextEditorTests(unittest.TestCase):
 
     def test_create_and_edit_markup_use_two_compact_text_editor_controls(self) -> None:
         template = self.read("backend/app/templates/person_form.html")
+        script = self.read("backend/app/static/person_edit_draft.js")
 
         self.assertEqual(template.count('data-person-text-editor="'), 2)
         self.assertEqual(template.count("data-person-text-toggle"), 2)
@@ -25,17 +26,26 @@ class PersonTextEditorTests(unittest.TestCase):
         self.assertIn("Комментарий / заметки", template)
         self.assertIn('name="biography"', template)
         self.assertIn('name="comment"', template)
-        self.assertNotIn(">Развернуть</button>", template)
+        self.assertNotIn("Развернуть", template)
+        self.assertNotIn("Развернуть", script)
+        self.assertNotIn('class="sr-only"', template)
+        self.assertEqual(template.count("Открыть увеличенный редактор:"), 2)
         self.assertNotIn('{% if mode == "edit" %}\n          <button class="biography-expand-button"', template)
 
-    def test_control_is_icon_sized_and_does_not_change_collapsed_field_height(self) -> None:
+    def test_control_is_a_borderless_inline_icon_without_button_chrome(self) -> None:
         styles = self.read("backend/app/static/styles.css")
+        rule = styles.split(".cavalier-page-theme .person-text-expand-button {", 1)[1].split("}", 1)[0]
 
         self.assertIn(".person-text-expand-button", styles)
-        self.assertIn("width: 26px;", styles)
-        self.assertIn("height: 26px;", styles)
+        self.assertIn("width: 16px;", rule)
+        self.assertIn("height: 16px;", rule)
+        self.assertIn("border: 0;", rule)
+        self.assertIn("background: transparent;", rule)
+        self.assertIn("box-shadow: none;", rule)
+        self.assertNotIn("26px", rule)
         self.assertIn(".person-text-field-heading", styles)
         self.assertIn("align-items: center;", styles)
+        self.assertIn("justify-content: flex-start;", styles)
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_two_editors_keep_independent_live_drafts(self) -> None:

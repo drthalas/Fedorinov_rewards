@@ -27,7 +27,7 @@ class PersonEditDraftTests(unittest.TestCase):
         self.assertIn("data-person-photo-upload", photo_template)
         self.assertEqual(photo_template.count("data-person-photo-mutation"), 2)
         self.assertLess(base.index("person_edit_draft.js"), base.index("clipboard_paste.js"))
-        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale407-text-editors"', templates_router)
+        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale407-compact-icons"', templates_router)
 
     def test_biography_container_is_large_scrollable_and_scoped(self) -> None:
         styles = self.read("backend/app/static/styles.css")

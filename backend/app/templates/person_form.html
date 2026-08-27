@@ -71,9 +71,8 @@
       <div class="person-text-field" data-person-text-editor="biography">
         <div class="person-text-field-heading">
           <label for="person-biography"><span>Краткая биография</span></label>
-          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Краткая биография" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-biography-dialog" title="Развернуть поле: Краткая биография">
+          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Краткая биография" aria-label="Открыть увеличенный редактор: Краткая биография" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-biography-dialog">
             <span aria-hidden="true" data-person-text-icon>⤢</span>
-            <span class="sr-only">Развернуть поле: Краткая биография</span>
           </button>
         </div>
         <textarea class="biography-textarea" id="person-biography" name="biography" rows="4" data-person-text-source>{{ person.biography or '' }}</textarea>
@@ -81,9 +80,8 @@
       <div class="person-text-field" data-person-text-editor="comment">
         <div class="person-text-field-heading">
           <label for="person-comment"><span>Комментарий / заметки</span></label>
-          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Комментарий / заметки" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-comment-dialog" title="Развернуть поле: Комментарий / заметки">
+          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Комментарий / заметки" aria-label="Открыть увеличенный редактор: Комментарий / заметки" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-comment-dialog">
             <span aria-hidden="true" data-person-text-icon>⤢</span>
-            <span class="sr-only">Развернуть поле: Комментарий / заметки</span>
           </button>
         </div>
         <textarea id="person-comment" name="comment" rows="3" data-person-text-source>{{ person.comment or '' }}</textarea>

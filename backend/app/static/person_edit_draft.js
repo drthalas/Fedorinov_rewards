@@ -153,7 +153,7 @@
       dialog.hidden = true;
       document.body.classList.remove("biography-editor-open");
       trigger.setAttribute("aria-expanded", "false");
-      trigger.setAttribute("title", `Развернуть поле: ${label}`);
+      trigger.setAttribute("aria-label", `Открыть увеличенный редактор: ${label}`);
       if (icon) icon.textContent = "⤢";
       focusWithoutScroll(trigger);
     }
@@ -167,7 +167,7 @@
       dialog.hidden = false;
       document.body.classList.add("biography-editor-open");
       trigger.setAttribute("aria-expanded", "true");
-      trigger.setAttribute("title", `Свернуть поле: ${label}`);
+      trigger.setAttribute("aria-label", `Закрыть увеличенный редактор: ${label}`);
       if (icon) icon.textContent = "⤡";
       focusWithoutScroll(expanded);
     }
