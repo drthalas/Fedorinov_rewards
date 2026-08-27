@@ -1620,6 +1620,136 @@ th {
   align-items: start;
 }
 
+.biography-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.person-biography-field {
+  min-width: 0;
+}
+
+.biography-field-heading label {
+  margin: 0;
+}
+
+.biography-expand-button {
+  width: auto;
+  min-height: 26px;
+  padding: 3px 8px;
+  color: #d2cabd;
+  border: 1px solid #66563f;
+  border-radius: 2px;
+  background: #23231f;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.biography-expand-button:hover,
+.biography-expand-button:focus-visible {
+  color: #f0ddba;
+  border-color: #987547;
+}
+
+.biography-editor-dialog[hidden] {
+  display: none;
+}
+
+.biography-editor-dialog {
+  position: fixed;
+  z-index: 12000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 68%);
+}
+
+.biography-editor-panel {
+  display: grid;
+  grid-template-rows: auto minmax(260px, 1fr) auto;
+  width: min(920px, calc(100vw - 48px));
+  height: min(76vh, 720px);
+  min-height: 420px;
+  padding: 20px;
+  color: #eee4d4;
+  border: 1px solid #786342;
+  border-radius: 4px;
+  background: #181a17;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+}
+
+.biography-editor-header,
+.biography-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.biography-editor-header h2 {
+  margin: 0 0 14px;
+  color: #d6b277;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+}
+
+.biography-editor-close {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.biography-editor-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 0;
+  padding: 12px;
+  resize: none;
+  overflow-y: auto;
+  color: #ddd5c7;
+  border: 1px solid #514b40;
+  border-radius: 2px;
+  background: #0f110f;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.biography-editor-textarea:focus {
+  border-color: #967447;
+  outline: 2px solid rgb(171 128 70 / 12%);
+}
+
+.biography-editor-actions {
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
+body.biography-editor-open {
+  overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .biography-editor-dialog {
+    padding: 12px;
+  }
+
+  .biography-editor-panel {
+    width: calc(100vw - 24px);
+    height: min(84vh, 720px);
+    min-height: 340px;
+    padding: 14px;
+  }
+}
+
 .form-grid.two-columns.person-links-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }

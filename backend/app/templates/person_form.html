@@ -23,7 +23,7 @@
   <div class="person-edit-main">
 {% endif %}
 
-<form id="person-primary-form" class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form data-write-feedback data-write-pending-label="Сохраняем…">
+<form id="person-primary-form" class="edit-form legacy-edit-form person-edit-form compact-person-form cavalier-form-card" method="post" action="{% if mode == 'create' %}/persons/new{% else %}/persons/{{ person.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-person-form{% if mode == 'edit' %} data-person-edit-draft data-person-id="{{ person.id }}"{% endif %} data-write-feedback data-write-pending-label="Сохраняем…">
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
   {% if mode == 'create' %}<input type="hidden" name="draft_token" value="{{ draft_token }}">{% endif %}
   {% if post_create %}<input type="hidden" name="post_create" value="1">{% endif %}
@@ -68,10 +68,15 @@
   <fieldset class="form-section compact-text-section person-notes-section">
     <legend>Биография и заметки</legend>
     <div class="form-grid two-columns person-notes-grid">
-      <label>
-        <span>Краткая биография</span>
-        <textarea class="biography-textarea" name="biography" rows="4">{{ person.biography or '' }}</textarea>
-      </label>
+      <div class="person-biography-field">
+        <div class="biography-field-heading">
+          <label for="person-biography"><span>Краткая биография</span></label>
+          {% if mode == "edit" %}
+          <button class="biography-expand-button" type="button" data-biography-expand aria-haspopup="dialog" aria-controls="person-biography-dialog" title="Развернуть биографию">Развернуть</button>
+          {% endif %}
+        </div>
+        <textarea class="biography-textarea" id="person-biography" name="biography" rows="4"{% if mode == "edit" %} data-biography-draft{% endif %}>{{ person.biography or '' }}</textarea>
+      </div>
       <label>
         <span>Комментарий / заметки</span>
         <textarea name="comment" rows="3">{{ person.comment or '' }}</textarea>
@@ -174,6 +179,21 @@
   </div>
   {% endif %}
 </section>
+{% endif %}
+
+{% if mode == "edit" and settings.write_mode %}
+<div class="biography-editor-dialog" id="person-biography-dialog" data-biography-dialog role="dialog" aria-modal="true" aria-labelledby="person-biography-dialog-title" hidden>
+  <section class="biography-editor-panel">
+    <header class="biography-editor-header">
+      <h2 id="person-biography-dialog-title">Биография</h2>
+      <button class="biography-editor-close" type="button" data-biography-close aria-label="Закрыть увеличенный редактор" title="Закрыть">×</button>
+    </header>
+    <textarea class="biography-editor-textarea" data-biography-expanded-draft aria-label="Биография в увеличенном редакторе"></textarea>
+    <div class="biography-editor-actions">
+      <button type="button" data-biography-close>Готово</button>
+    </div>
+  </section>
+</div>
 {% endif %}
 </section>
 {% endblock %}

@@ -367,6 +367,10 @@
         throw new Error("Сохранение фотографии уже выполняется.");
       }
     }
+    var personDraft = window.FedorinovPersonEditDraft;
+    if (personDraft && typeof personDraft.captureForPhoto === "function") {
+      personDraft.captureForPhoto(button);
+    }
     rememberPendingClipboardImage(image, ["status=photo_updated", "media_cleanup=failed"]);
     var response;
     try {

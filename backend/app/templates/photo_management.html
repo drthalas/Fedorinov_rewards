@@ -18,7 +18,7 @@
       </div>
       <p class="photo-manage-label">{{ photo.label }}</p>
       <div class="photo-manage-actions">
-        <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data" data-write-feedback data-write-pending-label="Сохраняем фото…">
+        <form class="photo-upload-form" method="post" action="/photos/upload" enctype="multipart/form-data"{% if photo_entity_type == 'person' %} data-person-photo-upload{% endif %} data-write-feedback data-write-pending-label="Сохраняем фото…">
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">
           <input type="hidden" name="entity_id" value="{{ photo_entity_id }}">
           <input type="hidden" name="photo_field" value="{{ photo.field }}">
