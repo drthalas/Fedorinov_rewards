@@ -68,19 +68,26 @@
   <fieldset class="form-section compact-text-section person-notes-section">
     <legend>Биография и заметки</legend>
     <div class="form-grid two-columns person-notes-grid">
-      <div class="person-biography-field">
-        <div class="biography-field-heading">
+      <div class="person-text-field" data-person-text-editor="biography">
+        <div class="person-text-field-heading">
           <label for="person-biography"><span>Краткая биография</span></label>
-          {% if mode == "edit" %}
-          <button class="biography-expand-button" type="button" data-biography-expand aria-haspopup="dialog" aria-controls="person-biography-dialog" title="Развернуть биографию">Развернуть</button>
-          {% endif %}
+          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Краткая биография" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-biography-dialog" title="Развернуть поле: Краткая биография">
+            <span aria-hidden="true" data-person-text-icon>⤢</span>
+            <span class="sr-only">Развернуть поле: Краткая биография</span>
+          </button>
         </div>
-        <textarea class="biography-textarea" id="person-biography" name="biography" rows="4"{% if mode == "edit" %} data-biography-draft{% endif %}>{{ person.biography or '' }}</textarea>
+        <textarea class="biography-textarea" id="person-biography" name="biography" rows="4" data-person-text-source>{{ person.biography or '' }}</textarea>
       </div>
-      <label>
-        <span>Комментарий / заметки</span>
-        <textarea name="comment" rows="3">{{ person.comment or '' }}</textarea>
-      </label>
+      <div class="person-text-field" data-person-text-editor="comment">
+        <div class="person-text-field-heading">
+          <label for="person-comment"><span>Комментарий / заметки</span></label>
+          <button class="person-text-expand-button" type="button" data-person-text-toggle data-person-text-label="Комментарий / заметки" aria-haspopup="dialog" aria-expanded="false" aria-controls="person-comment-dialog" title="Развернуть поле: Комментарий / заметки">
+            <span aria-hidden="true" data-person-text-icon>⤢</span>
+            <span class="sr-only">Развернуть поле: Комментарий / заметки</span>
+          </button>
+        </div>
+        <textarea id="person-comment" name="comment" rows="3" data-person-text-source>{{ person.comment or '' }}</textarea>
+      </div>
     </div>
   </fieldset>
 
@@ -181,16 +188,28 @@
 </section>
 {% endif %}
 
-{% if mode == "edit" and settings.write_mode %}
-<div class="biography-editor-dialog" id="person-biography-dialog" data-biography-dialog role="dialog" aria-modal="true" aria-labelledby="person-biography-dialog-title" hidden>
+{% if mode in ("create", "edit") and settings.write_mode %}
+<div class="biography-editor-dialog" id="person-biography-dialog" data-person-text-dialog="biography" role="dialog" aria-modal="true" aria-labelledby="person-biography-dialog-title" hidden>
   <section class="biography-editor-panel">
     <header class="biography-editor-header">
-      <h2 id="person-biography-dialog-title">Биография</h2>
-      <button class="biography-editor-close" type="button" data-biography-close aria-label="Закрыть увеличенный редактор" title="Закрыть">×</button>
+      <h2 id="person-biography-dialog-title">Краткая биография</h2>
+      <button class="biography-editor-close" type="button" data-person-text-close aria-label="Свернуть поле: Краткая биография" title="Свернуть поле">⤡</button>
     </header>
-    <textarea class="biography-editor-textarea" data-biography-expanded-draft aria-label="Биография в увеличенном редакторе"></textarea>
+    <textarea class="biography-editor-textarea" data-person-text-expanded aria-label="Краткая биография в увеличенном редакторе"></textarea>
     <div class="biography-editor-actions">
-      <button type="button" data-biography-close>Готово</button>
+      <button type="button" data-person-text-close>Готово</button>
+    </div>
+  </section>
+</div>
+<div class="biography-editor-dialog" id="person-comment-dialog" data-person-text-dialog="comment" role="dialog" aria-modal="true" aria-labelledby="person-comment-dialog-title" hidden>
+  <section class="biography-editor-panel">
+    <header class="biography-editor-header">
+      <h2 id="person-comment-dialog-title">Комментарий / заметки</h2>
+      <button class="biography-editor-close" type="button" data-person-text-close aria-label="Свернуть поле: Комментарий / заметки" title="Свернуть поле">⤡</button>
+    </header>
+    <textarea class="biography-editor-textarea" data-person-text-expanded aria-label="Комментарий / заметки в увеличенном редакторе"></textarea>
+    <div class="biography-editor-actions">
+      <button type="button" data-person-text-close>Готово</button>
     </div>
   </section>
 </div>

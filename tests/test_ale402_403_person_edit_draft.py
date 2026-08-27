@@ -20,14 +20,14 @@ class PersonEditDraftTests(unittest.TestCase):
         templates_router = self.read("backend/app/routers/templates.py")
 
         self.assertIn('data-person-edit-draft data-person-id="{{ person.id }}"', template)
-        self.assertIn("data-biography-expand", template)
-        self.assertIn("data-biography-draft", template)
-        self.assertIn("data-biography-dialog", template)
-        self.assertIn("data-biography-expanded-draft", template)
+        self.assertEqual(template.count("data-person-text-toggle"), 2)
+        self.assertEqual(template.count("data-person-text-source"), 2)
+        self.assertEqual(template.count('data-person-text-dialog="'), 2)
+        self.assertEqual(template.count("data-person-text-expanded"), 2)
         self.assertIn("data-person-photo-upload", photo_template)
         self.assertEqual(photo_template.count("data-person-photo-mutation"), 2)
         self.assertLess(base.index("person_edit_draft.js"), base.index("clipboard_paste.js"))
-        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale403-404-corrective-2"', templates_router)
+        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale407-text-editors"', templates_router)
 
     def test_biography_container_is_large_scrollable_and_scoped(self) -> None:
         styles = self.read("backend/app/static/styles.css")
@@ -325,19 +325,28 @@ source.disabled = false;
 source.checked = true;
 source.dispatchEvent = () => {};
 const trigger = interactive();
+trigger.dataset = { personTextLabel: "Краткая биография" };
+trigger.querySelector = () => null;
 const expanded = interactive();
 const close = interactive();
 const dialog = interactive();
 dialog.hidden = true;
-dialog.querySelector = (selector) => selector === "[data-biography-expanded-draft]" ? expanded : null;
-dialog.querySelectorAll = (selector) => selector === "[data-biography-close]" ? [close] : [];
+dialog.querySelector = (selector) => selector === "[data-person-text-expanded]" ? expanded : null;
+dialog.querySelectorAll = (selector) => selector === "[data-person-text-close]" ? [close] : [];
+const field = interactive();
+field.dataset = { personTextEditor: "biography" };
+field.querySelector = (selector) => ({
+  "[data-person-text-source]": source,
+  "[data-person-text-toggle]": trigger,
+}[selector] || null);
 const form = interactive();
 form.dataset = { personId: "42" };
-form.querySelector = (selector) => ({
-  "[data-biography-draft]": source,
-  "[data-biography-expand]": trigger,
-}[selector] || null);
-form.querySelectorAll = (selector) => selector === "input[name], select[name], textarea[name]" ? [source] : [];
+form.querySelector = () => null;
+form.querySelectorAll = (selector) => {
+  if (selector === "[data-person-text-editor]") return [field];
+  if (selector === "input[name], select[name], textarea[name]") return [source];
+  return [];
+};
 
 global.window = global;
 window.location = { pathname: "/persons/42/edit", search: "" };
@@ -346,8 +355,9 @@ global.document = {
   readyState: "loading",
   body: { classList: { add(value) { this.value = value; }, remove() { this.value = ""; } } },
   querySelector(selector) {
+    if (selector === "form[data-person-form]") return form;
     if (selector === "form[data-person-edit-draft]") return form;
-    if (selector === "[data-biography-dialog]") return dialog;
+    if (selector === '[data-person-text-dialog="biography"]') return dialog;
     return null;
   },
   addEventListener(type, callback) { documentListeners[type] = callback; },

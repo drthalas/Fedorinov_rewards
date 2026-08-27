@@ -8,6 +8,10 @@
     return document.querySelector("form[data-person-edit-draft]");
   }
 
+  function personForm() {
+    return document.querySelector("form[data-person-form]");
+  }
+
   function formState(form) {
     const values = {};
     const checked = {};
@@ -125,14 +129,17 @@
     }
   }
 
-  function initBiography(form) {
-    const source = form && form.querySelector("[data-biography-draft]");
-    const trigger = form && form.querySelector("[data-biography-expand]");
-    const dialog = document.querySelector("[data-biography-dialog]");
-    const expanded = dialog && dialog.querySelector("[data-biography-expanded-draft]");
+  function initTextEditor(form, field) {
+    const editorKey = field && field.dataset.personTextEditor;
+    const source = field && field.querySelector("[data-person-text-source]");
+    const trigger = field && field.querySelector("[data-person-text-toggle]");
+    const dialog = editorKey && document.querySelector(`[data-person-text-dialog="${editorKey}"]`);
+    const expanded = dialog && dialog.querySelector("[data-person-text-expanded]");
     if (!source || !trigger || !dialog || !expanded) return;
 
     let draftValue = source.value;
+    const icon = trigger.querySelector && trigger.querySelector("[data-person-text-icon]");
+    const label = trigger.dataset.personTextLabel || "текст";
 
     function setDraft(value, origin) {
       draftValue = String(value || "");
@@ -146,21 +153,29 @@
       dialog.hidden = true;
       document.body.classList.remove("biography-editor-open");
       trigger.setAttribute("aria-expanded", "false");
+      trigger.setAttribute("title", `Развернуть поле: ${label}`);
+      if (icon) icon.textContent = "⤢";
       focusWithoutScroll(trigger);
     }
 
     function open() {
+      if (!dialog.hidden) {
+        close();
+        return;
+      }
       setDraft(source.value, source);
       dialog.hidden = false;
       document.body.classList.add("biography-editor-open");
       trigger.setAttribute("aria-expanded", "true");
+      trigger.setAttribute("title", `Свернуть поле: ${label}`);
+      if (icon) icon.textContent = "⤡";
       focusWithoutScroll(expanded);
     }
 
     source.addEventListener("input", () => setDraft(source.value, source));
     expanded.addEventListener("input", () => setDraft(expanded.value, expanded));
     trigger.addEventListener("click", open);
-    dialog.querySelectorAll("[data-biography-close]").forEach((button) => button.addEventListener("click", close));
+    dialog.querySelectorAll("[data-person-text-close]").forEach((button) => button.addEventListener("click", close));
     dialog.addEventListener("click", (event) => {
       if (event.target === dialog) close();
     });
@@ -172,6 +187,11 @@
     });
     form.addEventListener("submit", () => setDraft(draftValue, expanded));
     setDraft(source.value, source);
+  }
+
+  function initTextEditors(form) {
+    if (!form) return;
+    form.querySelectorAll("[data-person-text-editor]").forEach((field) => initTextEditor(form, field));
   }
 
   document.addEventListener("submit", (event) => {
@@ -190,9 +210,10 @@
   });
 
   function init() {
-    const form = editForm();
-    restoreAfterPhoto(form);
-    initBiography(form);
+    const edit = editForm();
+    const form = personForm();
+    restoreAfterPhoto(edit);
+    initTextEditors(form);
   }
 
   if (document.readyState === "loading") {

@@ -1620,36 +1620,42 @@ th {
   align-items: start;
 }
 
-.biography-field-heading {
+.person-text-field-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 26px;
+  margin-bottom: 4px;
 }
 
-.person-biography-field {
+.person-text-field {
   min-width: 0;
 }
 
-.biography-field-heading label {
+.person-text-field-heading label {
   margin: 0;
 }
 
-.biography-expand-button {
-  width: auto;
+.person-text-expand-button {
+  display: inline-grid;
+  width: 26px;
+  min-width: 26px;
+  height: 26px;
   min-height: 26px;
-  padding: 3px 8px;
+  padding: 0;
+  place-items: center;
   color: #d2cabd;
   border: 1px solid #66563f;
   border-radius: 2px;
   background: #23231f;
-  font: inherit;
-  font-size: 12px;
+  font-size: 17px;
+  line-height: 1;
   cursor: pointer;
 }
 
-.biography-expand-button:hover,
-.biography-expand-button:focus-visible {
+.person-text-expand-button:hover,
+.person-text-expand-button:focus-visible {
   color: #f0ddba;
   border-color: #987547;
 }
