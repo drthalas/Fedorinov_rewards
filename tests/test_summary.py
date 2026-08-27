@@ -1,11 +1,13 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlencode
-import asyncio
+from io import BytesIO
 import os
 import sqlite3
 import unittest
 from unittest.mock import patch
+from xml.etree import ElementTree as ET
+from zipfile import ZipFile
 
 from backend.app.main import app
 from backend.app.repositories.summary import (
@@ -16,18 +18,18 @@ from backend.app.repositories.summary import (
     summary_csv_text,
     summary_matrix,
     summary_matrix_csv_text,
+    summary_matrix_table,
     summary_rows,
+    summary_table,
 )
 from backend.app.routers.legacy import (
     legacy_index,
-    summary_csv,
-    summary_csv_save,
-    summary_matrix_csv,
-    summary_matrix_csv_save,
+    summary_matrix_xlsx,
     summary_matrix_pdf,
     summary_pdf,
+    summary_xlsx,
 )
-from backend.app.services.save_dialog import SaveDialogCancelled
+from backend.app.services.summary_xlsx import MAX_COLUMN_WIDTH, XLSX_MEDIA_TYPE, summary_matrix_xlsx_bytes, summary_xlsx_bytes
 
 
 class FakeRequest:
@@ -345,20 +347,60 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(first_line.startswith("\ufeffФИО;Звание / специальность;Дата рождения"))
         self.assertNotIn("ФИО,Звание / специальность", first_line)
 
-    def test_summary_csv_route_returns_csv_response(self) -> None:
-        response = summary_csv(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
+    def test_summary_xlsx_route_returns_workbook_response(self) -> None:
+        response = summary_xlsx(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("text/csv", response.media_type)
-        self.assertIn("Орден Тестовый", response.body.decode("utf-8"))
+        self.assertEqual(response.media_type, XLSX_MEDIA_TYPE)
+        self.assertTrue(response.body.startswith(b"PK"))
+        self.assertIn('filename="summary.xlsx"', response.headers["content-disposition"])
 
-    def test_summary_matrix_csv_route_returns_csv_response(self) -> None:
-        response = summary_matrix_csv(country_id="", category_id="", subcategory_id="", name_id="1", extra="", include_marks="")
+    def test_summary_matrix_xlsx_route_returns_workbook_response(self) -> None:
+        response = summary_matrix_xlsx(country_id="", category_id="", subcategory_id="", name_id="1", extra="", include_marks="")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("text/csv", response.media_type)
-        text = response.body.decode("utf-8")
-        self.assertTrue(text.startswith("\ufeff"))
-        self.assertIn("ФИО", text)
-        self.assertIn("Орден Тестовый", text)
+        self.assertEqual(response.media_type, XLSX_MEDIA_TYPE)
+        self.assertTrue(response.body.startswith(b"PK"))
+        self.assertIn('filename="summary_matrix.xlsx"', response.headers["content-disposition"])
+
+    def test_xlsx_content_matches_current_summary_and_matrix_values(self) -> None:
+        rows = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+
+        summary_workbook_rows = self._xlsx_rows(summary_xlsx_bytes(rows))
+        matrix_workbook_rows = self._xlsx_rows(summary_matrix_xlsx_bytes(matrix))
+        summary_headers, summary_values = summary_table(rows)
+        matrix_headers, matrix_values = summary_matrix_table(matrix)
+
+        self.assertEqual(summary_workbook_rows, [[str(value) for value in summary_headers], *[[str(value) for value in row] for row in summary_values]])
+        self.assertEqual(matrix_workbook_rows, [[str(value) for value in matrix_headers], *[[str(value) for value in row] for row in matrix_values]])
+
+    def test_xlsx_columns_use_bounded_auto_width_and_wrapped_cells(self) -> None:
+        rows = summary_rows(self.db_path, normalized_summary_filters(include_marks=True))
+        rows[0]["name"] = "Очень длинное наименование " * 20
+        blob = summary_xlsx_bytes(rows)
+        with ZipFile(BytesIO(blob)) as archive:
+            worksheet = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+            styles = ET.fromstring(archive.read("xl/styles.xml"))
+        namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        widths = [float(column.attrib["width"]) for column in worksheet.findall("x:cols/x:col", namespace)]
+        self.assertTrue(widths)
+        self.assertLessEqual(max(widths), MAX_COLUMN_WIDTH)
+        self.assertEqual(widths[3], MAX_COLUMN_WIDTH)
+        self.assertTrue(styles.findall(".//x:alignment[@wrapText='1']", namespace))
+
+    @staticmethod
+    def _xlsx_rows(blob: bytes) -> list[list[str]]:
+        with ZipFile(BytesIO(blob)) as archive:
+            worksheet = ET.fromstring(archive.read("xl/worksheets/sheet1.xml"))
+        namespace = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        rows = []
+        for row in worksheet.findall("x:sheetData/x:row", namespace):
+            values = []
+            for cell in row.findall("x:c", namespace):
+                inline_text = cell.find("x:is/x:t", namespace)
+                numeric = cell.find("x:v", namespace)
+                values.append((inline_text.text if inline_text is not None else numeric.text if numeric is not None else "") or "")
+            rows.append(values)
+        return rows
 
     def test_matrix_total_row_stays_last_in_csv_after_sort(self) -> None:
         matrix = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="fio", sort_dir="desc")
@@ -391,24 +433,7 @@ class SummaryTests(unittest.TestCase):
         with patch("backend.app.services.summary_pdf.SUMMARY_MATRIX_MAX_COLUMNS", 5):
             response = summary_matrix_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="")
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Таблица слишком широкая для PDF", response.body.decode("utf-8"))
-
-    def test_summary_matrix_csv_save_writes_selected_path(self) -> None:
-        selected_path = self.root / "exports" / "matrix.csv"
-        request = FakeRequest({"name_id": "1", "return_to": "/legacy?tab=summary"})
-        with patch("backend.app.routers.legacy.choose_save_path", return_value=selected_path):
-            response = asyncio.run(summary_matrix_csv_save(request))
-        self.assertEqual(response.status_code, 303)
-        self.assertTrue(selected_path.exists())
-        self.assertIn("ФИО", selected_path.read_text(encoding="utf-8"))
-
-    def test_summary_csv_save_cancel_does_not_write(self) -> None:
-        selected_path = self.root / "exports" / "summary.csv"
-        request = FakeRequest({"return_to": "/legacy?tab=summary"})
-        with patch("backend.app.routers.legacy.choose_save_path", side_effect=SaveDialogCancelled("cancel")):
-            response = asyncio.run(summary_csv_save(request))
-        self.assertEqual(response.status_code, 303)
-        self.assertFalse(selected_path.exists())
+        self.assertIn("Таблица слишком широкая для PDF. Используйте фильтры или XLSX.", response.body.decode("utf-8"))
 
     def test_legacy_summary_tab_does_not_auto_build_result(self) -> None:
         with (
@@ -467,14 +492,14 @@ class SummaryTests(unittest.TestCase):
         legacy_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/legacy" and "GET" in getattr(route, "methods", set())
         ]
-        csv_routes = [
-            route for route in app.routes if getattr(route, "path", None) == "/summary.csv" and "GET" in getattr(route, "methods", set())
+        xlsx_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary.xlsx" and "GET" in getattr(route, "methods", set())
         ]
-        csv_head_routes = [
-            route for route in app.routes if getattr(route, "path", None) == "/summary.csv" and "HEAD" in getattr(route, "methods", set())
+        xlsx_head_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary.xlsx" and "HEAD" in getattr(route, "methods", set())
         ]
-        matrix_csv_routes = [
-            route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.csv" and "GET" in getattr(route, "methods", set())
+        matrix_xlsx_routes = [
+            route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.xlsx" and "GET" in getattr(route, "methods", set())
         ]
         summary_pdf_routes = [
             route for route in app.routes if getattr(route, "path", None) == "/summary.pdf" and "GET" in getattr(route, "methods", set())
@@ -483,13 +508,14 @@ class SummaryTests(unittest.TestCase):
             route for route in app.routes if getattr(route, "path", None) == "/summary_matrix.pdf" and "GET" in getattr(route, "methods", set())
         ]
         self.assertTrue(legacy_routes)
-        self.assertTrue(csv_routes)
-        self.assertTrue(csv_head_routes)
-        self.assertTrue(matrix_csv_routes)
+        self.assertTrue(xlsx_routes)
+        self.assertTrue(xlsx_head_routes)
+        self.assertTrue(matrix_xlsx_routes)
+        self.assertFalse([route for route in app.routes if getattr(route, "path", None) in {"/summary.csv", "/summary_matrix.csv"}])
         self.assertTrue(summary_pdf_routes)
         self.assertTrue(matrix_pdf_routes)
 
-    def test_summary_csv_buttons_use_browser_save_as_forms(self) -> None:
+    def test_summary_xlsx_buttons_use_browser_save_as_forms(self) -> None:
         template = (Path(__file__).resolve().parents[1] / "backend" / "app" / "templates" / "legacy.html").read_text(encoding="utf-8")
         save_as = (Path(__file__).resolve().parents[1] / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
         self.assertIn('name="summary_applied" value="1"', template)
@@ -497,18 +523,20 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("{% if summary_has_result %}", template)
         self.assertIn("{% if not summary_has_result %}", template)
         self.assertIn('href="{{ summary_reset_url }}"', template)
-        self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form', template)
-        self.assertIn('data-save-as-filename="summary_matrix.csv"', template)
-        self.assertIn('id="summary-save-form" method="get" action="/summary.csv" data-save-as-form', template)
-        self.assertIn('data-save-as-filename="summary.csv"', template)
+        self.assertIn('id="summary-matrix-save-form" method="get" action="/summary_matrix.xlsx" data-save-as-form', template)
+        self.assertIn('data-save-as-filename="summary_matrix.xlsx"', template)
+        self.assertIn('id="summary-save-form" method="get" action="/summary.xlsx" data-save-as-form', template)
+        self.assertIn('data-save-as-filename="summary.xlsx"', template)
+        self.assertIn('data-save-as-success-message="XLSX сохранён." data-save-as-open-copy="true"', template)
+        self.assertIn('id="summary-export-status" class="save-as-status summary-export-status"', template)
         self.assertIn('id="summary-pdf-save-form" method="get" action="{{ \'/summary_matrix.pdf\' if summary_mode == \'matrix\' else \'/summary.pdf\' }}" data-save-as-form', template)
         self.assertIn('data-save-as-filename="{{ \'summary_matrix.pdf\' if summary_mode == \'matrix\' else \'summary.pdf\' }}"', template)
         self.assertIn('data-save-as-mime="application/pdf"', template)
         self.assertIn('form="summary-pdf-save-form">PDF</button>', template)
-        self.assertIn("Браузер не передаёт приложению путь выбранной папки", save_as)
         self.assertIn("Открыть копию файла", save_as)
-        self.assertNotIn('action="/summary_matrix.csv/save"', template)
-        self.assertNotIn('action="/summary.csv/save"', template)
+        self.assertIn('form.getAttribute("data-save-as-open-copy") === "true"', save_as)
+        self.assertNotIn("CSV шахматка", template)
+        self.assertNotIn("CSV свод", template)
         self.assertNotIn("PDF-экспорт будет добавлен следующим этапом", template)
         self.assertNotIn("disabled-button\">PDF", template)
 

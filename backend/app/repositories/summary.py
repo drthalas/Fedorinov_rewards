@@ -239,26 +239,32 @@ def summary_totals(rows: list[dict[str, object]]) -> dict[str, int]:
     return totals
 
 
+def summary_table(rows: list[dict[str, object]]) -> tuple[list[str], list[list[object]]]:
+    values = [
+        [
+            row.get("country") or "—",
+            row.get("category") or "—",
+            row.get("subcategory") or "—",
+            row.get("name") or "—",
+            row.get("total") or 0,
+            row.get("in_stock") or 0,
+            row.get("not_in_stock") or 0,
+            row.get("price_purchase_sum") or 0,
+            row.get("price_now_sum") or 0,
+            row.get("last_purchase_date") or "",
+        ]
+        for row in rows
+    ]
+    return list(SUMMARY_CSV_HEADERS), values
+
+
 def summary_csv_text(rows: list[dict[str, object]]) -> str:
+    headers, values = summary_table(rows)
     output = io.StringIO()
     output.write("\ufeff")
     writer = csv.writer(output, delimiter=";")
-    writer.writerow(SUMMARY_CSV_HEADERS)
-    for row in rows:
-        writer.writerow(
-            [
-                row.get("country") or "—",
-                row.get("category") or "—",
-                row.get("subcategory") or "—",
-                row.get("name") or "—",
-                row.get("total") or 0,
-                row.get("in_stock") or 0,
-                row.get("not_in_stock") or 0,
-                row.get("price_purchase_sum") or 0,
-                row.get("price_now_sum") or 0,
-                row.get("last_purchase_date") or "",
-            ]
-        )
+    writer.writerow(headers)
+    writer.writerows(values)
     return output.getvalue()
 
 
@@ -407,10 +413,7 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
     }
 
 
-def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
-    output = io.StringIO()
-    output.write("\ufeff")
-    writer = csv.writer(output, delimiter=";")
+def summary_matrix_table(matrix: dict[str, object]) -> tuple[list[str], list[list[object]]]:
     photo_columns = list(matrix.get("photo_columns") or [])
     reward_columns = list(matrix.get("reward_columns") or [])
     show_numbers = bool(matrix.get("show_numbers"))
@@ -420,17 +423,17 @@ def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
     if show_numbers:
         headers.append("Номера")
     headers.append("Итого наград")
-    writer.writerow(headers)
+    values = []
     for row in matrix.get("rows") or []:
-        values = [row.get("fio") or "—", row.get("rank_name") or "—", format_date(row.get("birthday"))]
+        row_values = [row.get("fio") or "—", row.get("rank_name") or "—", format_date(row.get("birthday"))]
         photo_flags = row.get("photo_flags") or {}
         reward_counts = row.get("reward_counts") or {}
-        values.extend(int(photo_flags.get(column["field"], 0)) for column in photo_columns)
-        values.extend(int(reward_counts.get(int(column["id"]), 0)) for column in reward_columns)
+        row_values.extend(int(photo_flags.get(column["field"], 0)) for column in photo_columns)
+        row_values.extend(int(reward_counts.get(int(column["id"]), 0)) for column in reward_columns)
         if show_numbers:
-            values.append(row.get("numbers") or "")
-        values.append(int(row.get("row_total") or 0))
-        writer.writerow(values)
+            row_values.append(row.get("numbers") or "")
+        row_values.append(int(row.get("row_total") or 0))
+        values.append(row_values)
     totals = ["Итого", f"Кавалеров: {matrix.get('person_total') or 0}", ""]
     photo_totals = matrix.get("photo_totals") or {}
     reward_totals = matrix.get("reward_totals") or {}
@@ -439,5 +442,15 @@ def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
     if show_numbers:
         totals.append("")
     totals.append(int(matrix.get("reward_total") or 0))
-    writer.writerow(totals)
+    values.append(totals)
+    return headers, values
+
+
+def summary_matrix_csv_text(matrix: dict[str, object]) -> str:
+    headers, values = summary_matrix_table(matrix)
+    output = io.StringIO()
+    output.write("\ufeff")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(headers)
+    writer.writerows(values)
     return output.getvalue()

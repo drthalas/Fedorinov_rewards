@@ -90,7 +90,7 @@ def generate_summary_matrix_pdf(db_path: Path, filters: SummaryFilters) -> Summa
     headers.append("Итого наград")
 
     if len(headers) > SUMMARY_MATRIX_MAX_COLUMNS:
-        raise SummaryPDFTooWide("Таблица слишком широкая для PDF. Используйте фильтры или CSV.")
+        raise SummaryPDFTooWide("Таблица слишком широкая для PDF. Используйте фильтры или XLSX.")
 
     story_rows = []
     for row in matrix.get("rows") or []:

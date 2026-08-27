@@ -680,14 +680,14 @@
             <button class="summary-primary-action" type="submit">Показать</button>
             <a class="button secondary-button summary-secondary-action" href="{{ summary_reset_url }}" data-summary-reset>Сброс</a>
             {% if summary_has_result %}
-            <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">CSV шахматка</button>
-            <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">CSV свод</button>
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">XLSX шахматка</button>
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">XLSX свод</button>
             <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form">PDF</button>
             {% endif %}
           </div>
         </form>
         {% if summary_has_result %}
-        <form id="summary-matrix-save-form" method="get" action="/summary_matrix.csv" data-save-as-form data-save-as-filename="summary_matrix.csv" data-save-as-mime="text/csv">
+        <form id="summary-matrix-save-form" method="get" action="/summary_matrix.xlsx" data-save-as-form data-save-as-filename="summary_matrix.xlsx" data-save-as-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-save-as-status="#summary-export-status" data-save-as-success-message="XLSX сохранён." data-save-as-open-copy="true">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
@@ -695,7 +695,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <form id="summary-save-form" method="get" action="/summary.csv" data-save-as-form data-save-as-filename="summary.csv" data-save-as-mime="text/csv">
+        <form id="summary-save-form" method="get" action="/summary.xlsx" data-save-as-form data-save-as-filename="summary.xlsx" data-save-as-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-save-as-status="#summary-export-status" data-save-as-success-message="XLSX сохранён." data-save-as-open-copy="true">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
@@ -711,6 +711,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
+        <div id="summary-export-status" class="save-as-status summary-export-status" role="status" aria-live="polite" hidden></div>
         {% endif %}
         {% if not summary_has_result %}
         <section class="notice summary-start-notice">Выберите фильтры и нажмите «Показать».</section>
@@ -722,7 +723,7 @@
         </div>
         {% if summary_mode == "matrix" %}
         {% if summary_matrix.wide_warning %}
-        <section class="notice">Выбрано много наград, таблица может быть широкой. Используйте фильтры или CSV.</section>
+        <section class="notice">Выбрано много наград, таблица может быть широкой. Используйте фильтры или XLSX.</section>
         {% endif %}
         {% if summary_matrix.include_marks_note %}
         <p class="secondary">Знаки не привязаны к кавалерам, поэтому в шахматке учитываются только награды. Для знаков используйте режим “Свод по наградам”.</p>

@@ -7213,6 +7213,42 @@ body.legacy-rewards-theme::after {
   background: linear-gradient(180deg, #3e563b, #30472f);
 }
 
+.legacy-summary-tab .summary-export-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  color: #d6cdbf;
+  border: 1px solid #65563f;
+  border-radius: 2px;
+  background: #211e19;
+}
+
+.legacy-summary-tab .summary-export-status[hidden] {
+  display: none;
+}
+
+.legacy-summary-tab .summary-export-status.notice-success {
+  color: #d6cdbf;
+  border-color: #7a633f;
+  background: #29231b;
+}
+
+.legacy-summary-tab .summary-export-status .save-as-open-copy-link {
+  color: #e6c98f;
+  font-weight: 600;
+  text-decoration-color: #987547;
+}
+
+.legacy-summary-tab .summary-export-status .save-as-open-copy-link:hover,
+.legacy-summary-tab .summary-export-status .save-as-open-copy-link:focus-visible {
+  color: #f0ddba;
+  text-decoration-color: #c49759;
+}
+
 /* ALE-249: standalone cavalier pages scroll inside the fixed archive shell. */
 @media (min-width: 1181px) {
   body.guide-theme.cavalier-page-theme .page {
@@ -7360,6 +7396,40 @@ body.legacy-rewards-theme::after {
 
 .cavalier-reward-form-page .reward-reference-link-empty {
   color: #8f877a;
+}
+
+.cavalier-reward-form-page .reward-edit-workspace {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.15fr) minmax(360px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.cavalier-reward-form-page .reward-edit-main,
+.cavalier-reward-form-page .reward-edit-photos {
+  min-width: 0;
+}
+
+.cavalier-reward-form-page .reward-edit-main .form-grid.two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cavalier-reward-form-page .reward-edit-photos .photo-manage-section {
+  margin-top: 0;
+}
+
+.cavalier-reward-form-page .reward-edit-photos .photo-manage-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 980px) {
+  .cavalier-reward-form-page .reward-edit-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cavalier-reward-form-page .reward-edit-main .form-grid.two-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .cavalier-reward-form-page .photo-manage-actions > form {

@@ -27,6 +27,7 @@
       ".zip": "ZIP-архив",
       ".pdf": "PDF",
       ".csv": "CSV",
+      ".xlsx": "Excel",
     };
     if (!extension) {
       return [];
@@ -51,6 +52,9 @@
     }
     if (extension === ".csv") {
       return "text/csv";
+    }
+    if (extension === ".xlsx") {
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
     return "application/octet-stream";
   }
@@ -120,6 +124,9 @@
     const customMessage = form.getAttribute("data-save-as-success-message");
     if (customMessage) {
       setMessage(form, customMessage, "success");
+      if (form.getAttribute("data-save-as-open-copy") === "true") {
+        appendOpenCopyLink(form, blob, filename);
+      }
       return;
     }
     if (mode === "fallback") {

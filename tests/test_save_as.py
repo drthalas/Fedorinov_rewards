@@ -52,8 +52,10 @@ class BrowserSaveAsTests(unittest.TestCase):
         custom_branch = source.split('const customMessage = form.getAttribute("data-save-as-success-message")', 1)[1]
         custom_branch = custom_branch.split('if (mode === "fallback")', 1)[0]
         self.assertIn('setMessage(form, customMessage, "success")', custom_branch)
+        self.assertIn('form.getAttribute("data-save-as-open-copy") === "true"', custom_branch)
+        self.assertIn("appendOpenCopyLink(form, blob, filename)", custom_branch)
         self.assertIn("return;", custom_branch)
-        self.assertNotIn("appendOpenCopyLink", custom_branch)
+        self.assertNotIn("data-save-as-open-copy", actions)
         self.assertNotIn("Открыть папку", source)
         self.assertEqual(source.count("link.click()"), 1)
 

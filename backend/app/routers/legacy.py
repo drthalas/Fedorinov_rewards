@@ -32,18 +32,16 @@ from ..repositories.summary import (
     summary_filter_options,
     normalized_summary_filters,
     summary_matrix,
-    summary_matrix_csv_text,
-    summary_csv_text,
     summary_rows,
     summary_totals,
 )
 from ..services.app_settings import AppSettingsError, program_title, save_program_title
 from ..services.display import has_media_path
 from ..services.update_checker import check_for_updates
-from ..services.save_dialog import SaveDialogCancelled, SaveDialogError, choose_save_path
 from ..services.person_files import person_archive_filename, person_folder_image_items
 from ..services.notifications import status_message
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
+from ..services.summary_xlsx import XLSX_MEDIA_TYPE, summary_matrix_xlsx_bytes, summary_xlsx_bytes
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
 from ..version import APP_NAME, APP_VERSION, APP_VERSION_DATE
 from .templates import templates
@@ -280,17 +278,6 @@ def _with_error(url: str, error: str) -> str:
     if error:
         query.append(("error", error))
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
-
-
-def _write_csv_to_chosen_path(default_filename: str, title: str, content: str) -> Path:
-    target_path = choose_save_path(
-        default_filename=default_filename,
-        title=title,
-        filetypes=(("CSV", "*.csv"), ("Все файлы", "*.*")),
-    )
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(content, encoding="utf-8")
-    return target_path
 
 
 def _rewards_query_params(
@@ -692,10 +679,8 @@ def legacy_index(
         "matrix_sort": active_matrix_sort,
         "matrix_dir": active_matrix_dir,
         "summary_matrix_sort": {"sort": active_matrix_sort, "dir": active_matrix_dir, "urls": {}, "photo_urls": {}, "reward_urls": {}},
-        "summary_csv_url": "/summary.csv",
         "summary_matrix": None,
         "summary_pagination": None,
-        "summary_matrix_csv_url": "/summary_matrix.csv",
         "summary_matrix_mode_url": "/legacy?tab=summary&summary_mode=matrix",
         "summary_aggregate_mode_url": "/legacy?tab=summary&summary_mode=aggregate",
         "summary_reset_url": "/legacy?tab=summary",
@@ -776,15 +761,6 @@ def legacy_index(
 
         context["summary"] = _legacy_summary(settings.rewards_db_path)
         context["summary_has_result"] = True
-        context["summary_csv_url"] = str(
-            URL(path="/summary.csv").include_query_params(**_summary_query_params(context["summary_filters"]))
-        )
-        context["summary_matrix_csv_url"] = str(
-            URL(path="/summary_matrix.csv").include_query_params(
-                **_summary_query_params(context["summary_filters"])
-            )
-        )
-
         if active_summary_mode == "matrix":
             matrix = summary_matrix(
                 settings.rewards_db_path,
@@ -1004,8 +980,8 @@ async def legacy_about_title_update(request: Request):
     return RedirectResponse(_with_message(return_to, "Название программы сохранено."), status_code=303)
 
 
-@router.get("/summary.csv")
-def summary_csv(
+@router.get("/summary.xlsx")
+def summary_xlsx(
     country_id: str | None = None,
     category_id: str | None = None,
     subcategory_id: str | None = None,
@@ -1026,38 +1002,14 @@ def summary_csv(
         )
         rows = summary_rows(settings.rewards_db_path, filters)
     return Response(
-        content=summary_csv_text(rows),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
+        content=summary_xlsx_bytes(rows),
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="summary.xlsx"'},
     )
 
 
-@router.post("/summary.csv/save")
-async def summary_csv_save(request: Request):
-    form_values = await _read_form(request)
-    return_to = str(form_values.get("return_to") or "/legacy?tab=summary&summary_mode=aggregate")
-    filters = normalized_summary_filters(
-        country_id=str(form_values.get("country_id") or ""),
-        category_id=str(form_values.get("category_id") or ""),
-        subcategory_id=str(form_values.get("subcategory_id") or ""),
-        name_id=str(form_values.get("name_id") or ""),
-        extra=str(form_values.get("extra") or ""),
-        include_marks=str(form_values.get("include_marks") or ""),
-    )
-    settings = get_settings()
-    rows = summary_rows(settings.rewards_db_path, filters) if settings.db_exists else []
-    try:
-        path = _write_csv_to_chosen_path("summary.csv", "Сохранить CSV сводной таблицы", summary_csv_text(rows))
-    except SaveDialogCancelled:
-        return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
-    except SaveDialogError:
-        logger.exception("Could not open summary CSV save dialog")
-        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
-    return RedirectResponse(_with_message(return_to, "CSV сохранён."), status_code=303)
-
-
-@router.head("/summary.csv")
-def summary_csv_head(
+@router.head("/summary.xlsx")
+def summary_xlsx_head(
     country_id: str | None = None,
     category_id: str | None = None,
     subcategory_id: str | None = None,
@@ -1075,8 +1027,8 @@ def summary_csv_head(
     )
     return Response(
         status_code=200,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="summary.csv"'},
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="summary.xlsx"'},
     )
 
 
@@ -1131,8 +1083,8 @@ def summary_pdf_head(
     return Response(status_code=200, media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="summary.pdf"'})
 
 
-@router.get("/summary_matrix.csv")
-def summary_matrix_csv(
+@router.get("/summary_matrix.xlsx")
+def summary_matrix_xlsx(
     country_id: str | None = None,
     category_id: str | None = None,
     subcategory_id: str | None = None,
@@ -1153,9 +1105,9 @@ def summary_matrix_csv(
         )
         matrix = summary_matrix(settings.rewards_db_path, filters)
     return Response(
-        content=summary_matrix_csv_text(matrix),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
+        content=summary_matrix_xlsx_bytes(matrix),
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="summary_matrix.xlsx"'},
     )
 
 
@@ -1216,36 +1168,8 @@ def summary_matrix_pdf_head(
     )
 
 
-@router.post("/summary_matrix.csv/save")
-async def summary_matrix_csv_save(request: Request):
-    form_values = await _read_form(request)
-    return_to = str(form_values.get("return_to") or "/legacy?tab=summary&summary_mode=matrix")
-    filters = normalized_summary_filters(
-        country_id=str(form_values.get("country_id") or ""),
-        category_id=str(form_values.get("category_id") or ""),
-        subcategory_id=str(form_values.get("subcategory_id") or ""),
-        name_id=str(form_values.get("name_id") or ""),
-        extra=str(form_values.get("extra") or ""),
-        include_marks=str(form_values.get("include_marks") or ""),
-    )
-    settings = get_settings()
-    matrix = (
-        summary_matrix(settings.rewards_db_path, filters)
-        if settings.db_exists
-        else {"photo_columns": [], "reward_columns": [], "rows": [], "photo_totals": {}, "reward_totals": {}, "person_total": 0, "reward_total": 0}
-    )
-    try:
-        path = _write_csv_to_chosen_path("summary_matrix.csv", "Сохранить CSV шахматки", summary_matrix_csv_text(matrix))
-    except SaveDialogCancelled:
-        return RedirectResponse(_with_message(return_to, "Сохранение CSV отменено."), status_code=303)
-    except SaveDialogError:
-        logger.exception("Could not open summary matrix CSV save dialog")
-        return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
-    return RedirectResponse(_with_message(return_to, "CSV сохранён."), status_code=303)
-
-
-@router.head("/summary_matrix.csv")
-def summary_matrix_csv_head(
+@router.head("/summary_matrix.xlsx")
+def summary_matrix_xlsx_head(
     country_id: str | None = None,
     category_id: str | None = None,
     subcategory_id: str | None = None,
@@ -1263,8 +1187,8 @@ def summary_matrix_csv_head(
     )
     return Response(
         status_code=200,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="summary_matrix.csv"'},
+        media_type=XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": 'attachment; filename="summary_matrix.xlsx"'},
     )
 
 

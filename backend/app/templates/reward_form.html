@@ -28,6 +28,8 @@
 
 {% set form_return_path = request.url.path ~ ('?return_to=' ~ return_to|urlencode if return_to else '') %}
 
+<div class="reward-edit-workspace">
+<div class="reward-edit-main">
 <form class="edit-form legacy-edit-form cavalier-form-card" method="post" action="{% if mode == 'draft' %}/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}{% elif mode == 'create' %}/persons/{{ person.id }}/rewards/new{% else %}/rewards/{{ reward.id }}/edit{% endif %}" autocomplete="off" data-managed-validation data-reward-duplicate-check data-reward-reference-derived data-current-reward-id="{% if mode == 'edit' %}{{ reward.id }}{% endif %}" data-write-feedback data-write-pending-label="Сохраняем…">
   <script type="application/json" data-reward-reference-options>{{ reward_references|tojson }}</script>
   <input type="hidden" name="return_to" value="{{ return_to or '' }}">
@@ -113,6 +115,8 @@
     {% endif %}
   </div>
 </form>
+</div>
+<aside class="reward-edit-photos">
 {% if mode == "draft" %}
 <section class="photo-manage-section" data-person-draft data-draft-token="{{ draft_token }}" data-draft-photo-base="/persons/new/draft/{{ draft_token }}/rewards/{{ reward_token }}/photos">
   <h2>Фотографии</h2>
@@ -140,5 +144,7 @@
   {% include "photo_management.html" %}
 {% endwith %}
 {% endif %}
+</aside>
+</div>
 </section>
 {% endblock %}
