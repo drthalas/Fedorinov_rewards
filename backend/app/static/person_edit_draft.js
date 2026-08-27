@@ -8,14 +8,24 @@
     return document.querySelector("form[data-person-edit-draft]");
   }
 
-  function formValues(form) {
+  function formState(form) {
     const values = {};
+    const checked = {};
     form.querySelectorAll("input[name], select[name], textarea[name]").forEach((control) => {
       if (control.disabled || control.type === "hidden" || control.type === "file") return;
-      if ((control.type === "checkbox" || control.type === "radio") && !control.checked) return;
+      if (control.type === "checkbox") {
+        checked[control.name] = Boolean(control.checked);
+        values[control.name] = control.value;
+        return;
+      }
+      if (control.type === "radio") {
+        if (!Object.prototype.hasOwnProperty.call(checked, control.name)) checked[control.name] = "";
+        if (!control.checked) return;
+        checked[control.name] = control.value;
+      }
       values[control.name] = control.value;
     });
-    return values;
+    return { values, checked };
   }
 
   function storageKey(personId) {
@@ -33,15 +43,16 @@
     }
   }
 
-  function captureForPhoto(trigger) {
-    if (!trigger || trigger.getAttribute("data-entity-type") !== "person") return false;
+  function captureForPerson(personId) {
     const form = editForm();
-    if (!form || String(form.dataset.personId || "") !== trigger.getAttribute("data-entity-id")) return false;
+    if (!form || String(form.dataset.personId || "") !== String(personId || "")) return false;
+    const state = formState(form);
     try {
       window.sessionStorage.setItem(storageKey(form.dataset.personId), JSON.stringify({
         pathname: window.location.pathname,
         personId: String(form.dataset.personId || ""),
-        values: formValues(form),
+        values: state.values,
+        checked: state.checked,
         savedAt: Date.now(),
       }));
       return true;
@@ -50,9 +61,21 @@
     }
   }
 
+  function captureForPhoto(trigger) {
+    if (!trigger || trigger.getAttribute("data-entity-type") !== "person") return false;
+    return captureForPerson(trigger.getAttribute("data-entity-id"));
+  }
+
+  function captureForPhotoForm(photoForm) {
+    if (!photoForm || String(photoForm.dataset.personId || "") === "") return false;
+    return captureForPerson(photoForm.dataset.personId);
+  }
+
   function hasPhotoResult() {
     const params = new URLSearchParams(window.location.search || "");
-    return params.get("status") === "photo_updated" || params.get("media_cleanup") === "failed";
+    return params.get("status") === "photo_updated" ||
+      params.get("status") === "photo_cleared" ||
+      params.get("media_cleanup") === "failed";
   }
 
   function restoreAfterPhoto(form) {
@@ -75,8 +98,18 @@
       return false;
     }
     form.querySelectorAll("input[name], select[name], textarea[name]").forEach((control) => {
-      if (!Object.prototype.hasOwnProperty.call(snapshot.values, control.name)) return;
-      control.value = String(snapshot.values[control.name]);
+      let restored = false;
+      if (control.type === "checkbox" && snapshot.checked && Object.prototype.hasOwnProperty.call(snapshot.checked, control.name)) {
+        control.checked = Boolean(snapshot.checked[control.name]);
+        restored = true;
+      } else if (control.type === "radio" && snapshot.checked && Object.prototype.hasOwnProperty.call(snapshot.checked, control.name)) {
+        control.checked = String(snapshot.checked[control.name]) === String(control.value);
+        restored = true;
+      } else if (Object.prototype.hasOwnProperty.call(snapshot.values, control.name)) {
+        control.value = String(snapshot.values[control.name]);
+        restored = true;
+      }
+      if (!restored) return;
       control.dispatchEvent(new Event("input", { bubbles: true }));
       control.dispatchEvent(new Event("change", { bubbles: true }));
     });
@@ -144,9 +177,8 @@
   document.addEventListener("submit", (event) => {
     const form = event.target;
     if (!form || !form.matches) return;
-    if (form.matches("form[data-person-photo-upload]")) {
-      const trigger = form.querySelector("[data-person-photo-trigger]");
-      captureForPhoto(trigger);
+    if (form.matches("form[data-person-photo-upload]") || form.matches("form[data-person-photo-mutation]")) {
+      captureForPhotoForm(form);
     } else if (form.matches("form[data-person-edit-draft]")) {
       clearSnapshot();
     }

@@ -25,8 +25,9 @@ class PersonEditDraftTests(unittest.TestCase):
         self.assertIn("data-biography-dialog", template)
         self.assertIn("data-biography-expanded-draft", template)
         self.assertIn("data-person-photo-upload", photo_template)
+        self.assertEqual(photo_template.count("data-person-photo-mutation"), 2)
         self.assertLess(base.index("person_edit_draft.js"), base.index("clipboard_paste.js"))
-        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale402-403-1"', templates_router)
+        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale403-404-corrective-2"', templates_router)
 
     def test_biography_container_is_large_scrollable_and_scoped(self) -> None:
         styles = self.read("backend/app/static/styles.css")
@@ -44,7 +45,9 @@ class PersonEditDraftTests(unittest.TestCase):
         self.assertIn('form.matches("form[data-person-photo-upload]")', controller)
         self.assertIn("personDraft.captureForPhoto(button)", clipboard)
         self.assertIn('params.get("status") === "photo_updated"', controller)
+        self.assertIn('params.get("status") === "photo_cleared"', controller)
         self.assertIn('params.get("media_cleanup") === "failed"', controller)
+        self.assertIn("responseUrl.pathname + responseUrl.search + responseUrl.hash", clipboard)
         self.assertNotIn("localStorage", controller)
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
@@ -71,8 +74,10 @@ const controls = [
   control("link1", "https://draft.example/one"),
   control("biography", "Draft biography\nsecond paragraph", "textarea"),
   control("comment", "Draft comment", "textarea"),
+  control("active", "1", "checkbox"),
   control("return_to", "/legacy", "hidden"),
 ];
+controls.find((item) => item.name === "active").checked = false;
 const form = {
   dataset: { personId: "42" },
   querySelectorAll(selector) {
@@ -109,9 +114,11 @@ eval(source);
 const api = window.FedorinovPersonEditDraft;
 const firstCapture = api.captureForPhoto(trigger);
 controls.forEach((item) => { if (item.type !== "hidden") item.value = `persisted-${item.name}`; });
+controls.find((item) => item.name === "active").checked = true;
 window.location.search = "?status=photo_updated";
 listeners.DOMContentLoaded();
 const afterFirst = Object.fromEntries(controls.filter((item) => item.type !== "hidden").map((item) => [item.name, item.value]));
+const activeAfterFirst = controls.find((item) => item.name === "active").checked;
 
 controls.find((item) => item.name === "fio").value = "Second draft name";
 controls.find((item) => item.name === "biography").value = "Second draft biography";
@@ -123,7 +130,7 @@ window.location.search = "?media_cleanup=failed";
 listeners.DOMContentLoaded();
 const afterSecond = Object.fromEntries(controls.filter((item) => item.type !== "hidden").map((item) => [item.name, item.value]));
 
-process.stdout.write(JSON.stringify({ firstCapture, secondCapture, afterFirst, afterSecond, storageEmpty: storage.size === 0 }));
+process.stdout.write(JSON.stringify({ firstCapture, secondCapture, afterFirst, afterSecond, activeAfterFirst, storageEmpty: storage.size === 0 }));
 '''
         with TemporaryDirectory() as tmp:
             runner_path = Path(tmp) / "person_edit_draft_runner.js"
@@ -141,10 +148,88 @@ process.stdout.write(JSON.stringify({ firstCapture, secondCapture, afterFirst, a
         self.assertEqual(result["afterFirst"]["fio"], "Draft Name")
         self.assertEqual(result["afterFirst"]["biography"], "Draft biography\nsecond paragraph")
         self.assertEqual(result["afterFirst"]["comment"], "Draft comment")
+        self.assertFalse(result["activeAfterFirst"])
         self.assertEqual(result["afterSecond"]["fio"], "Second draft name")
         self.assertEqual(result["afterSecond"]["biography"], "Second draft biography")
         self.assertEqual(result["afterSecond"]["comment"], "Second draft comment")
         self.assertTrue(result["storageEmpty"])
+
+    @unittest.skipUnless(shutil.which("node"), "node is not installed")
+    def test_clear_photo_submit_captures_and_restores_the_whole_draft(self) -> None:
+        script_path = ROOT / "backend/app/static/person_edit_draft.js"
+        runner = r'''
+const fs = require("fs");
+const source = fs.readFileSync(process.argv[2], "utf8");
+const listeners = {};
+const storage = new Map();
+function control(name, value, type = "text", checked = true) {
+  return { name, value, type, checked, disabled: false, dispatchEvent() {} };
+}
+const controls = [
+  control("fio", "Unsaved name"),
+  control("biography", "Unsaved biography", "textarea"),
+  control("comment", "Unsaved comment", "textarea"),
+  control("instock", "1", "checkbox", false),
+];
+const editForm = {
+  dataset: { personId: "42" },
+  querySelectorAll(selector) { return selector === "input[name], select[name], textarea[name]" ? controls : []; },
+  querySelector() { return null; },
+  addEventListener() {},
+};
+const clearForm = {
+  dataset: { personId: "42" },
+  matches(selector) { return selector === "form[data-person-photo-mutation]"; },
+};
+global.window = global;
+window.location = { pathname: "/persons/42/edit", search: "" };
+window.sessionStorage = {
+  getItem(key) { return storage.get(key) || null; },
+  setItem(key, value) { storage.set(key, String(value)); },
+  removeItem(key) { storage.delete(key); },
+};
+global.document = {
+  readyState: "loading",
+  body: { classList: { add() {}, remove() {} } },
+  querySelector(selector) { return selector === "form[data-person-edit-draft]" ? editForm : null; },
+  addEventListener(type, callback) { listeners[type] = callback; },
+};
+eval(source);
+listeners.submit({ target: clearForm });
+controls[0].value = "Persisted name";
+controls[1].value = "Persisted biography";
+controls[2].value = "Persisted comment";
+controls[3].checked = true;
+window.location.search = "?status=photo_cleared";
+listeners.DOMContentLoaded();
+process.stdout.write(JSON.stringify({
+  fio: controls[0].value,
+  biography: controls[1].value,
+  comment: controls[2].value,
+  instock: controls[3].checked,
+  storageEmpty: storage.size === 0,
+}));
+'''
+        with TemporaryDirectory() as tmp:
+            runner_path = Path(tmp) / "person_edit_clear_photo_runner.js"
+            runner_path.write_text(runner, encoding="utf-8")
+            completed = subprocess.run(
+                ["node", str(runner_path), str(script_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(
+            json.loads(completed.stdout),
+            {
+                "fio": "Unsaved name",
+                "biography": "Unsaved biography",
+                "comment": "Unsaved comment",
+                "instock": False,
+                "storageEmpty": True,
+            },
+        )
 
     @unittest.skipUnless(shutil.which("node"), "node is not installed")
     def test_restore_runs_before_later_defer_scripts_consume_success_query(self) -> None:

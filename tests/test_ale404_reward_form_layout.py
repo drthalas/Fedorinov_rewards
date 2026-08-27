@@ -44,10 +44,15 @@ class RewardFormDesktopLayoutTests(unittest.TestCase):
         scoped = styles.split(".cavalier-reward-form-page .reward-edit-workspace", 1)[1]
 
         self.assertIn("grid-template-columns: minmax(520px, 1.15fr) minmax(360px, 0.85fr)", scoped)
+        self.assertIn("align-items: stretch", scoped)
         self.assertIn(".cavalier-reward-form-page .reward-edit-main .form-grid.two-columns", scoped)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr))", scoped)
         self.assertIn(".cavalier-reward-form-page .reward-edit-photos .photo-manage-section", scoped)
         self.assertIn("margin-top: 0", scoped)
+        self.assertIn("height: 100%", scoped)
+        self.assertIn("padding: 14px", scoped)
+        self.assertIn("min-height: 36px", scoped)
+        self.assertIn("margin-bottom: 4px", scoped)
         self.assertIn("@media (max-width: 980px)", scoped)
         responsive = scoped.split("@media (max-width: 980px)", 1)[1]
         self.assertIn("grid-template-columns: minmax(0, 1fr)", responsive)

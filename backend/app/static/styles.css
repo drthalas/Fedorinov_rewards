@@ -7402,12 +7402,20 @@ body.legacy-rewards-theme::after {
   display: grid;
   grid-template-columns: minmax(520px, 1.15fr) minmax(360px, 0.85fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .cavalier-reward-form-page .reward-edit-main,
 .cavalier-reward-form-page .reward-edit-photos {
+  display: flex;
   min-width: 0;
+}
+
+.cavalier-reward-form-page .reward-edit-main > .cavalier-form-card,
+.cavalier-reward-form-page .reward-edit-photos > .photo-manage-section {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .cavalier-reward-form-page .reward-edit-main .form-grid.two-columns {
@@ -7422,9 +7430,99 @@ body.legacy-rewards-theme::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+@media (min-width: 981px) {
+  .cavalier-reward-form-page {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .cavalier-reward-form-page > h1 {
+    min-height: 70px;
+    margin-top: -18px;
+    margin-bottom: 10px;
+    padding-top: 20px;
+    padding-bottom: 14px;
+  }
+
+  .cavalier-reward-form-page > .secondary,
+  .cavalier-reward-form-page .local-back-nav {
+    margin-bottom: 10px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card fieldset {
+    padding: 12px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card label > span {
+    margin-bottom: 4px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card label {
+    margin-bottom: 4px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card input,
+  .cavalier-reward-form-page .reward-reference-link-control {
+    min-height: 36px;
+  }
+
+  .cavalier-reward-form-page .reward-reference-link-control {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .cavalier-reward-form-page .cavalier-form-card .actions {
+    padding-top: 10px;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-manage-section {
+    padding-bottom: 10px;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-manage-section > h2 {
+    min-height: 36px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-manage-grid {
+    gap: 8px;
+    padding: 0 10px;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-manage-card {
+    padding: 8px;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-frame {
+    height: clamp(96px, 11vh, 120px);
+    aspect-ratio: auto;
+  }
+
+  .cavalier-reward-form-page .reward-edit-photos .photo-manage-label {
+    margin: 5px 0;
+  }
+}
+
 @media (max-width: 980px) {
   .cavalier-reward-form-page .reward-edit-workspace {
     grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .cavalier-reward-form-page .reward-edit-main,
+  .cavalier-reward-form-page .reward-edit-photos {
+    display: block;
+  }
+
+  .cavalier-reward-form-page .reward-edit-main > .cavalier-form-card,
+  .cavalier-reward-form-page .reward-edit-photos > .photo-manage-section {
+    height: auto;
   }
 
   .cavalier-reward-form-page .reward-edit-main .form-grid.two-columns {

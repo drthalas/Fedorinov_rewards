@@ -404,7 +404,7 @@
     consumePendingClipboardImage(image.fingerprint);
     var target = new URL(returnUrl, window.location.href);
     if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
-      window.history.replaceState(null, "", target.pathname + target.search + target.hash);
+      window.history.replaceState(null, "", responseUrl.pathname + responseUrl.search + responseUrl.hash);
       window.location.reload();
       return;
     }
