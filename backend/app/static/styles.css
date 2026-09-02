@@ -7487,6 +7487,11 @@ body.legacy-rewards-theme::after {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.cavalier-reward-form-page .cavalier-form-card label > span > .required-marker {
+  display: inline;
+  margin: 0;
+}
+
 .cavalier-reward-form-page .reward-edit-photos .photo-manage-section {
   margin-top: 0;
 }
