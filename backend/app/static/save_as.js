@@ -122,7 +122,44 @@
     }, 300000);
   }
 
-  function showSavedMessage(form, blob, filename, mode) {
+  function appendNativeOpenCopyAction(form, blob, filename, openCopyToken) {
+    const endpoint = form.getAttribute("data-save-as-native-open-url");
+    if (!endpoint || !openCopyToken) {
+      appendOpenCopyLink(form, blob, filename);
+      return;
+    }
+    const target = saveStatusTarget(form);
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "save-as-open-copy-link";
+    action.textContent = "Открыть копию файла";
+    if (filename) {
+      action.setAttribute("aria-label", "Открыть копию файла " + filename);
+    }
+    action.addEventListener("click", async function () {
+      action.disabled = true;
+      try {
+        const body = new FormData();
+        body.set("open_copy_token", openCopyToken);
+        const response = await fetch(endpoint, {
+          method: "POST",
+          credentials: "same-origin",
+          body,
+        });
+        if (!response.ok) {
+          const message = (await response.text()).trim() || "Не удалось открыть копию файла.";
+          throw new Error(message);
+        }
+      } catch (error) {
+        setMessage(form, error && error.message ? error.message : "Не удалось открыть копию файла.", "error");
+      } finally {
+        action.disabled = false;
+      }
+    });
+    target.appendChild(action);
+  }
+
+  function showSavedMessage(form, blob, filename, mode, openCopyToken) {
     if (form.getAttribute("data-save-as-open-copy-only") === "true") {
       const target = saveStatusTarget(form);
       if (target._saveAsTimer) {
@@ -133,7 +170,7 @@
       target.hidden = false;
       target.classList.remove("notice-error");
       target.classList.add("notice-success");
-      appendOpenCopyLink(form, blob, filename);
+      appendNativeOpenCopyAction(form, blob, filename, openCopyToken);
       return;
     }
     const customMessage = form.getAttribute("data-save-as-success-message");
@@ -288,22 +325,23 @@
     const blob = await response.blob();
     const headerFilename = filenameFromContentDisposition(response.headers.get("Content-Disposition"));
     const filename = fallbackFilename || headerFilename || "download";
-    return { blob, filename };
+    const openCopyToken = response.headers.get("X-Fedorinov-Open-Copy-Token") || "";
+    return { blob, filename, openCopyToken };
   }
 
   async function saveResponse(fileHandle, request, pickerFilename) {
     const response = await fetchFileResponse(request);
-    const { blob, filename } = await responseBlobAndFilename(response, pickerFilename);
+    const { blob, filename, openCopyToken } = await responseBlobAndFilename(response, pickerFilename);
     await writeFileHandle(fileHandle, blob);
-    return { blob, filename };
+    return { blob, filename, openCopyToken };
   }
 
   async function downloadWithFallback(form, request, fallbackFilename) {
     setMessage(form, "Подготовка обычной загрузки файла...", "");
     const response = await fetchFileResponse(request);
-    const { blob, filename } = await responseBlobAndFilename(response, fallbackFilename);
+    const { blob, filename, openCopyToken } = await responseBlobAndFilename(response, fallbackFilename);
     fallbackDownload(blob, filename);
-    return { blob, filename };
+    return { blob, filename, openCopyToken };
   }
 
   function fallbackFileLabel(filename) {
@@ -314,7 +352,7 @@
     const label = fallbackFileLabel(fallbackFilename);
     setMessage(form, `Не удалось открыть окно сохранения. ${label} будет скачан обычным способом.`, "");
     const result = await downloadWithFallback(form, request, fallbackFilename);
-    showSavedMessage(form, result.blob, result.filename, "fallback");
+    showSavedMessage(form, result.blob, result.filename, "fallback", result.openCopyToken);
     return result;
   }
 
@@ -349,7 +387,7 @@
       setMessage(form, "Ваш браузер не поддерживает выбор места сохранения. Файл будет скачан обычным способом.", "");
       try {
         const result = await downloadWithFallback(form, request, pickerFilename);
-        showSavedMessage(form, result.blob, result.filename, "fallback");
+        showSavedMessage(form, result.blob, result.filename, "fallback", result.openCopyToken);
       } catch (error) {
         setMessage(form, error && error.message ? error.message : "Не удалось скачать файл.", "error");
       } finally {
@@ -404,7 +442,7 @@
     setMessage(form, "Подготовка файла...", "");
     try {
       const result = await saveResponse(fileHandle, request, pickerFilename);
-      showSavedMessage(form, result.blob, result.filename, "picker");
+      showSavedMessage(form, result.blob, result.filename, "picker", result.openCopyToken);
     } catch (error) {
       const message = saveDialogErrorMessage(error);
       setMessage(form, message || (error && error.message ? error.message : "Не удалось сохранить файл."), "error");

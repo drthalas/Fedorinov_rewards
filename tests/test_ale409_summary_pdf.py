@@ -1,8 +1,17 @@
+from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
+
+from PIL import Image
 
 from backend.app.repositories.summary import SUMMARY_MATRIX_PHOTO_COLUMNS, SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS
 from backend.app.services.summary_pdf import (
+    SUMMARY_PDF_CELL_PADDING,
+    SUMMARY_PDF_IMAGE_SPACING,
+    _pdf_ready_image_bytes,
+    _summary_pdf_column_widths,
+    _summary_pdf_per_image_height,
     normalize_summary_pdf_media_fields,
     normalize_summary_pdf_sort,
     sort_summary_pdf_rows,
@@ -80,17 +89,56 @@ class SummaryPDFOptionsTests(unittest.TestCase):
         self.assertNotIn("Итого наград", card_builder)
         self.assertNotIn("reward_counts", card_builder)
 
+    def test_pdf_media_limits_fit_actual_cells_and_combined_row_height(self) -> None:
+        from reportlab.lib.units import mm
+
+        widths = _summary_pdf_column_widths(1134, 8, True, mm)
+        self.assertAlmostEqual(sum(widths), 1134)
+        for photo_width in widths[2:]:
+            image_width = min(40 * mm, photo_width - SUMMARY_PDF_CELL_PADDING)
+            self.assertLessEqual(image_width + SUMMARY_PDF_CELL_PADDING, photo_width)
+
+        image_count = 4
+        total_height = 50 * mm
+        per_image = _summary_pdf_per_image_height(total_height, image_count)
+        occupied = per_image * image_count + SUMMARY_PDF_IMAGE_SPACING * (image_count - 1)
+        self.assertLessEqual(occupied, total_height)
+
+    def test_pdf_ready_image_is_bounded_without_mutating_source(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "large.png"
+            Image.new("RGB", (2400, 1600), (70, 90, 110)).save(path)
+            before = path.read_bytes()
+
+            content = _pdf_ready_image_bytes(path, 600, 400)
+
+            with Image.open(BytesIO(content)) as prepared:
+                self.assertLessEqual(prepared.width, 600)
+                self.assertLessEqual(prepared.height, 400)
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_pdf_typography_uses_larger_bold_identity_and_filters(self) -> None:
+        source = (ROOT / "backend/app/services/summary_pdf.py").read_text(encoding="utf-8")
+        self.assertIn('name="CardIdentity"', source)
+        self.assertIn("fontName=bold_font_name, fontSize=11.5", source)
+        self.assertIn('name="CardFilters"', source)
+        self.assertIn("fontName=bold_font_name, fontSize=12", source)
+
     def test_pdf_post_save_exposes_only_styled_open_copy_action(self) -> None:
         template = (ROOT / "backend/app/templates/legacy.html").read_text(encoding="utf-8")
         save_as = (ROOT / "backend/app/static/save_as.js").read_text(encoding="utf-8")
 
         pdf_form = template.split('id="summary-pdf-save-form"', 1)[1].split("</form>", 1)[0]
         self.assertIn('data-save-as-open-copy-only="true"', pdf_form)
+        self.assertIn('data-save-as-native-open-url="/summary/open-copy"', pdf_form)
         self.assertIn('data-save-as-status="#summary-export-status"', pdf_form)
         open_only = save_as.split('data-save-as-open-copy-only', 1)[1].split("const customMessage", 1)[0]
         self.assertIn("target.replaceChildren()", open_only)
-        self.assertIn("appendOpenCopyLink(form, blob, filename)", open_only)
+        self.assertIn("appendNativeOpenCopyAction(form, blob, filename, openCopyToken)", open_only)
+        self.assertNotIn("appendOpenCopyLink(form, blob, filename)", open_only)
         self.assertNotIn("Браузер не передаёт", open_only)
+        self.assertIn('body.set("open_copy_token", openCopyToken)', save_as)
+        self.assertIn('response.headers.get("X-Fedorinov-Open-Copy-Token")', save_as)
 
 
 if __name__ == "__main__":

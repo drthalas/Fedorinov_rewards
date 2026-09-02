@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 from io import BytesIO
+from math import ceil
 from pathlib import Path
 import re
 from typing import Iterable
@@ -24,6 +25,10 @@ from .media import resolve_media
 
 
 SUMMARY_MATRIX_MAX_COLUMNS = 130
+SUMMARY_PDF_IMAGE_DPI = 300
+SUMMARY_PDF_JPEG_QUALITY = 95
+SUMMARY_PDF_CELL_PADDING = 8
+SUMMARY_PDF_IMAGE_SPACING = 4
 
 
 class SummaryPDFError(ValueError):
@@ -181,13 +186,14 @@ def _build_summary_cards_pdf(
     visible_column_count = len(columns) + 1 + int(include_reward_number)
     page_size = landscape(A4 if visible_column_count <= 3 else A3)
     margin = 10 * mm
-    font_name = _register_pdf_font(pdfmetrics, TTFont)
+    font_name, bold_font_name = _register_pdf_font_pair(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
     for style in styles.byName.values():
         style.fontName = font_name
-    styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=12))
-    styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=12))
-    styles.add(ParagraphStyle(name="CardFilters", parent=styles["BodyText"], fontName=font_name, fontSize=11, leading=14))
+    styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=bold_font_name, fontSize=11, leading=13))
+    styles.add(ParagraphStyle(name="CardIdentity", parent=styles["BodyText"], fontName=bold_font_name, fontSize=11.5, leading=14))
+    styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=10.5, leading=12.5))
+    styles.add(ParagraphStyle(name="CardFilters", parent=styles["BodyText"], fontName=bold_font_name, fontSize=12, leading=15))
 
     doc = SimpleDocTemplate(
         buffer,
@@ -198,6 +204,16 @@ def _build_summary_cards_pdf(
         bottomMargin=margin,
         title="Сводная таблица",
     )
+    available_width = page_size[0] - margin * 2
+    widths = _summary_pdf_column_widths(
+        available_width,
+        len(columns),
+        include_reward_number,
+        mm,
+    )
+    card_width = widths[0]
+    photo_widths = widths[2:] if include_reward_number else widths[1:]
+    image_cache: dict[tuple[str, int, int], bytes] = {}
     story: list[object] = []
     guide_image = _summary_pdf_header_image(
         settings,
@@ -205,6 +221,7 @@ def _build_summary_cards_pdf(
         Image,
         38 * mm,
         38 * mm,
+        image_cache,
     )
     if guide_image is not None:
         story.extend([guide_image, Spacer(1, 6)])
@@ -235,12 +252,13 @@ def _build_summary_cards_pdf(
                 settings,
                 paths.get("person_foto"),
                 identity,
-                styles["CardBody"],
+                styles["CardIdentity"],
                 Paragraph,
                 Image,
                 Spacer,
-                48 * mm,
+                min(48 * mm, card_width - SUMMARY_PDF_CELL_PADDING),
                 36 * mm,
+                image_cache,
             )
         ]
         if include_reward_number:
@@ -251,7 +269,7 @@ def _build_summary_cards_pdf(
                 )
             )
         reward_paths = row.get("reward_photo_paths") or {}
-        for field, _label in columns:
+        for column_index, (field, _label) in enumerate(columns):
             raw_paths = reward_paths.get(field) if field in dict(SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS) else paths.get(field)
             cells.append(
                 _summary_pdf_images_cell(
@@ -261,24 +279,13 @@ def _build_summary_cards_pdf(
                     Paragraph,
                     Image,
                     Spacer,
-                    40 * mm,
-                    36 * mm,
+                    min(40 * mm, photo_widths[column_index] - SUMMARY_PDF_CELL_PADDING),
+                    50 * mm,
+                    image_cache,
                 )
             )
         table_data.append(cells)
 
-    available_width = page_size[0] - margin * 2
-    card_width = min(58 * mm, available_width)
-    remaining_count = len(columns) + int(include_reward_number)
-    media_width = (available_width - card_width) / remaining_count if remaining_count else 0
-    widths = [card_width]
-    if include_reward_number:
-        widths.append(min(38 * mm, media_width))
-        remaining_width = available_width - card_width - widths[-1]
-        photo_width = remaining_width / len(columns) if columns else 0
-        widths.extend([photo_width] * len(columns))
-    else:
-        widths.extend([media_width] * len(columns))
     table = Table(table_data, colWidths=widths, repeatRows=1)
     table.setStyle(
         TableStyle(
@@ -299,7 +306,34 @@ def _build_summary_cards_pdf(
     return SummaryPDFResult(content=buffer.getvalue(), filename="summary_matrix.pdf")
 
 
-def _summary_pdf_image_cell(settings, raw_path, heading, style, Paragraph, Image, Spacer, max_width, max_height):
+def _summary_pdf_column_widths(available_width, media_count, include_reward_number, mm):
+    card_width = min(58 * mm, available_width)
+    remaining_count = media_count + int(include_reward_number)
+    media_width = (available_width - card_width) / remaining_count if remaining_count else 0
+    widths = [card_width]
+    if include_reward_number:
+        number_width = min(38 * mm, media_width)
+        widths.append(number_width)
+        remaining_width = available_width - card_width - number_width
+        photo_width = remaining_width / media_count if media_count else 0
+        widths.extend([photo_width] * media_count)
+    else:
+        widths.extend([media_width] * media_count)
+    return widths
+
+
+def _summary_pdf_image_cell(
+    settings,
+    raw_path,
+    heading,
+    style,
+    Paragraph,
+    Image,
+    Spacer,
+    max_width,
+    max_height,
+    image_cache,
+):
     content: list[object] = []
     if heading:
         content.extend([Paragraph(_p(heading), style), Spacer(1, 4)])
@@ -308,43 +342,121 @@ def _summary_pdf_image_cell(settings, raw_path, heading, style, Paragraph, Image
         content.append(Paragraph("Нет фото", style))
         return content
     try:
-        image = Image(resolution.serving_path)
-        image._restrictSize(max_width, max_height)
+        image = _summary_pdf_image(
+            resolution.serving_path,
+            Image,
+            max_width,
+            max_height,
+            image_cache,
+        )
         content.append(image)
     except Exception:
         content.append(Paragraph("Нет фото", style))
     return content
 
 
-def _summary_pdf_images_cell(settings, raw_paths, style, Paragraph, Image, Spacer, max_width, max_height):
+def _summary_pdf_images_cell(
+    settings,
+    raw_paths,
+    style,
+    Paragraph,
+    Image,
+    Spacer,
+    max_width,
+    max_total_height,
+    image_cache,
+):
     values = raw_paths if isinstance(raw_paths, (list, tuple)) else [raw_paths]
-    content: list[object] = []
+    paths = []
     for raw_path in values:
         resolution = resolve_media(settings, raw_path)
-        if resolution.fallback:
-            continue
+        if not resolution.fallback:
+            paths.append(resolution.serving_path)
+    if not paths:
+        return [Paragraph("Нет фото", style)]
+
+    content: list[object] = []
+    per_image_height = _summary_pdf_per_image_height(max_total_height, len(paths))
+    for path in paths:
         try:
-            image = Image(resolution.serving_path)
-            image._restrictSize(max_width, max_height)
+            image = _summary_pdf_image(
+                path,
+                Image,
+                max_width,
+                per_image_height,
+                image_cache,
+            )
             if content:
-                content.append(Spacer(1, 4))
+                content.append(Spacer(1, SUMMARY_PDF_IMAGE_SPACING))
             content.append(image)
         except Exception:
             continue
     return content or [Paragraph("Нет фото", style)]
 
 
-def _summary_pdf_header_image(settings, raw_path, Image, max_width, max_height):
+def _summary_pdf_per_image_height(max_total_height, image_count):
+    if image_count <= 0:
+        return 0
+    return max(
+        1,
+        (max_total_height - SUMMARY_PDF_IMAGE_SPACING * (image_count - 1)) / image_count,
+    )
+
+
+def _summary_pdf_header_image(settings, raw_path, Image, max_width, max_height, image_cache):
     resolution = resolve_media(settings, raw_path)
     if resolution.fallback:
         return None
     try:
-        image = Image(resolution.serving_path)
-        image._restrictSize(max_width, max_height)
+        image = _summary_pdf_image(
+            resolution.serving_path,
+            Image,
+            max_width,
+            max_height,
+            image_cache,
+        )
         image.hAlign = "LEFT"
         return image
     except Exception:
         return None
+
+
+def _summary_pdf_image(path, Image, max_width, max_height, image_cache):
+    safe_width = max(1, float(max_width))
+    safe_height = max(1, float(max_height))
+    pixel_width = max(1, ceil(safe_width * SUMMARY_PDF_IMAGE_DPI / 72))
+    pixel_height = max(1, ceil(safe_height * SUMMARY_PDF_IMAGE_DPI / 72))
+    cache_key = (str(path).casefold(), pixel_width, pixel_height)
+    content = image_cache.get(cache_key)
+    if content is None:
+        content = _pdf_ready_image_bytes(Path(path), pixel_width, pixel_height)
+        image_cache[cache_key] = content
+    image = Image(BytesIO(content))
+    image._restrictSize(safe_width, safe_height)
+    return image
+
+
+def _pdf_ready_image_bytes(path: Path, pixel_width: int, pixel_height: int) -> bytes:
+    from PIL import Image as PILImage
+    from PIL import ImageOps
+
+    with PILImage.open(path) as source:
+        image = ImageOps.exif_transpose(source)
+        image.load()
+        image.thumbnail((pixel_width, pixel_height), PILImage.Resampling.LANCZOS)
+        buffer = BytesIO()
+        has_alpha = "A" in image.getbands() or "transparency" in image.info
+        if has_alpha:
+            image.save(buffer, format="PNG", compress_level=3)
+        else:
+            image.convert("RGB").save(
+                buffer,
+                format="JPEG",
+                quality=SUMMARY_PDF_JPEG_QUALITY,
+                subsampling=0,
+                optimize=False,
+            )
+        return buffer.getvalue()
 
 
 def _build_pdf(
@@ -477,6 +589,21 @@ def _register_pdf_font(pdfmetrics, TTFont) -> str:
     return "Helvetica"
 
 
+def _register_pdf_font_pair(pdfmetrics, TTFont) -> tuple[str, str]:
+    for regular_path, bold_path in _font_pair_candidates():
+        if not regular_path.exists():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("SummaryFont", str(regular_path)))
+            if bold_path.exists():
+                pdfmetrics.registerFont(TTFont("SummaryFontBold", str(bold_path)))
+                return "SummaryFont", "SummaryFontBold"
+            return "SummaryFont", "SummaryFont"
+        except Exception:
+            continue
+    return "Helvetica", "Helvetica-Bold"
+
+
 def _font_candidates() -> list[Path]:
     return [
         Path("C:/Windows/Fonts/arial.ttf"),
@@ -485,6 +612,22 @@ def _font_candidates() -> list[Path]:
         Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
         Path("/System/Library/Fonts/Supplemental/Arial Unicode.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+    ]
+
+
+def _font_pair_candidates() -> list[tuple[Path, Path]]:
+    return [
+        (Path("C:/Windows/Fonts/arial.ttf"), Path("C:/Windows/Fonts/arialbd.ttf")),
+        (Path("C:/Windows/Fonts/tahoma.ttf"), Path("C:/Windows/Fonts/tahomabd.ttf")),
+        (Path("/Library/Fonts/Arial.ttf"), Path("/Library/Fonts/Arial Bold.ttf")),
+        (
+            Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+            Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+        ),
+        (
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+        ),
     ]
 
 

@@ -7256,8 +7256,15 @@ body.legacy-rewards-theme::after {
 }
 
 .legacy-summary-tab .summary-export-status .save-as-open-copy-link {
+  appearance: none;
+  margin: 0;
+  padding: 0;
   color: #e6c98f;
+  border: 0;
+  background: transparent;
+  font: inherit;
   font-weight: 600;
+  cursor: pointer;
   text-decoration-color: #987547;
 }
 
@@ -7265,6 +7272,11 @@ body.legacy-rewards-theme::after {
 .legacy-summary-tab .summary-export-status .save-as-open-copy-link:focus-visible {
   color: #f0ddba;
   text-decoration-color: #c49759;
+}
+
+.legacy-summary-tab .summary-export-status .save-as-open-copy-link:disabled {
+  cursor: progress;
+  opacity: 0.65;
 }
 
 .summary-pdf-options-dialog {

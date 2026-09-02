@@ -707,7 +707,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form data-save-as-filename="{{ 'summary_matrix.pdf' if summary_mode == 'matrix' else 'summary.pdf' }}" data-save-as-mime="application/pdf" data-save-as-status="#summary-export-status" data-save-as-open-copy-only="true">
+        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form data-save-as-filename="{{ 'summary_matrix.pdf' if summary_mode == 'matrix' else 'summary.pdf' }}" data-save-as-mime="application/pdf" data-save-as-status="#summary-export-status" data-save-as-open-copy-only="true" data-save-as-native-open-url="/summary/open-copy">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">

@@ -3,7 +3,7 @@ import logging
 import subprocess
 from urllib.parse import parse_qs, parse_qsl, urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Form, Request, Response
 from fastapi.responses import RedirectResponse
 from starlette.datastructures import URL
 
@@ -37,6 +37,12 @@ from ..repositories.summary import (
 )
 from ..services.app_settings import AppSettingsError, program_title, save_program_title
 from ..services.display import has_media_path
+from ..services.generated_copy import (
+    OPEN_COPY_HEADER,
+    GeneratedCopyError,
+    open_generated_pdf,
+    stage_generated_pdf,
+)
 from ..services.update_checker import check_for_updates
 from ..services.person_files import person_archive_filename, person_folder_image_items
 from ..services.notifications import status_message
@@ -65,6 +71,15 @@ LEGACY_PERSON_PHOTO_LABELS = {
     "Фото наградной книжки, сторона 1": "Наградная книжка, сторона 1",
     "Фото наградной книжки, сторона 2": "Наградная книжка, сторона 2",
 }
+
+
+def _pdf_download_response(result) -> Response:
+    headers = {"Content-Disposition": f'attachment; filename="{result.filename}"'}
+    try:
+        headers[OPEN_COPY_HEADER] = stage_generated_pdf(result.content)
+    except OSError:
+        logger.exception("Could not stage generated PDF for native open-copy")
+    return Response(content=result.content, media_type="application/pdf", headers=headers)
 
 
 def _photo_path_key(path: object) -> str:
@@ -1056,11 +1071,7 @@ def summary_pdf(
         result = generate_summary_pdf(settings.rewards_db_path, filters)
     except SummaryPDFError as exc:
         return Response(content=str(exc), status_code=500, media_type="text/plain; charset=utf-8")
-    return Response(
-        content=result.content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
-    )
+    return _pdf_download_response(result)
 
 
 @router.head("/summary.pdf")
@@ -1146,11 +1157,7 @@ def summary_matrix_pdf(
         return Response(content=str(exc), status_code=400, media_type="text/plain; charset=utf-8")
     except SummaryPDFError as exc:
         return Response(content=str(exc), status_code=500, media_type="text/plain; charset=utf-8")
-    return Response(
-        content=result.content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{result.filename}"'},
-    )
+    return _pdf_download_response(result)
 
 
 @router.head("/summary_matrix.pdf")
@@ -1178,6 +1185,22 @@ def summary_matrix_pdf_head(
         media_type="application/pdf",
         headers={"Content-Disposition": 'attachment; filename="summary_matrix.pdf"'},
     )
+
+
+@router.post("/summary/open-copy")
+def summary_open_copy(open_copy_token: str = Form(...)):
+    try:
+        open_generated_pdf(open_copy_token)
+    except GeneratedCopyError as exc:
+        return Response(content=str(exc), status_code=404, media_type="text/plain; charset=utf-8")
+    except OSError:
+        logger.exception("Could not open generated PDF with the system handler")
+        return Response(
+            content="Не удалось открыть копию PDF в системном приложении.",
+            status_code=500,
+            media_type="text/plain; charset=utf-8",
+        )
+    return {"status": "opened"}
 
 
 @router.head("/summary_matrix.xlsx")

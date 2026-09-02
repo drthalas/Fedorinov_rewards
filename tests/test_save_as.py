@@ -23,7 +23,8 @@ class BrowserSaveAsTests(unittest.TestCase):
         submit_handler = source.split('document.addEventListener("submit"', 1)[1]
         picker_index = submit_handler.index("fileHandle = await openSaveFilePicker")
         save_index = submit_handler.index("await saveResponse")
-        fetch_index = source.index("const response = await fetch")
+        fetch_definition_index = source.index("async function fetchFileResponse")
+        fetch_index = source.index("const response = await fetch(url, options)", fetch_definition_index)
         picker_definition_index = source.index("return await window.showSaveFilePicker")
         self.assertLess(picker_index, save_index)
         self.assertLess(picker_definition_index, fetch_index)
@@ -47,7 +48,7 @@ class BrowserSaveAsTests(unittest.TestCase):
     def test_save_as_success_is_compact_and_does_not_offer_a_second_download(self) -> None:
         source = (ROOT / "backend" / "app" / "static" / "save_as.js").read_text(encoding="utf-8")
         actions = (ROOT / "backend" / "app" / "templates" / "_person_file_actions.html").read_text(encoding="utf-8")
-        self.assertIn("function showSavedMessage(form, blob, filename, mode)", source)
+        self.assertIn("function showSavedMessage(form, blob, filename, mode, openCopyToken)", source)
         self.assertIn('data-save-as-success-message="Архив сохранён."', actions)
         custom_branch = source.split('const customMessage = form.getAttribute("data-save-as-success-message")', 1)[1]
         custom_branch = custom_branch.split('if (mode === "fallback")', 1)[0]

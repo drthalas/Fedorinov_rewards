@@ -448,11 +448,13 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(data_lines[-1].startswith("Итого;"))
 
     def test_summary_pdf_route_returns_pdf_response(self) -> None:
-        response = summary_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
+        with patch("backend.app.routers.legacy.stage_generated_pdf", return_value="a" * 32):
+            response = summary_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="true")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.media_type, "application/pdf")
         self.assertTrue(response.body.startswith(b"%PDF"))
         self.assertIn('filename="summary.pdf"', response.headers["content-disposition"])
+        self.assertEqual(response.headers["x-fedorinov-open-copy-token"], "a" * 32)
 
     def test_summary_matrix_pdf_route_returns_pdf_response(self) -> None:
         png = base64.b64decode(
@@ -479,21 +481,23 @@ class SummaryTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(png)
 
-        response = summary_matrix_pdf(
-            country_id="",
-            category_id="",
-            subcategory_id="",
-            name_id="1",
-            extra="",
-            include_marks="",
-            media_columns="front_foto,back_foto",
-            include_reward_number="true",
-            pdf_sort="reward_number",
-        )
+        with patch("backend.app.routers.legacy.stage_generated_pdf", return_value="b" * 32):
+            response = summary_matrix_pdf(
+                country_id="",
+                category_id="",
+                subcategory_id="",
+                name_id="1",
+                extra="",
+                include_marks="",
+                media_columns="front_foto,back_foto",
+                include_reward_number="true",
+                pdf_sort="reward_number",
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.media_type, "application/pdf")
         self.assertTrue(response.body.startswith(b"%PDF"))
         self.assertIn('filename="summary_matrix.pdf"', response.headers["content-disposition"])
+        self.assertEqual(response.headers["x-fedorinov-open-copy-token"], "b" * 32)
         self.assertGreaterEqual(response.body.count(b"/Subtype /Image"), 2)
         self.assertFalse((self.root / "generated").exists())
 
