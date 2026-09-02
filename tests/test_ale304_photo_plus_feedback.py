@@ -95,7 +95,7 @@ process.stdout.write(JSON.stringify({ first, second, pending, restored }));
 
     def test_static_cache_key_changes_with_photo_feedback(self) -> None:
         templates = self.read("backend/app/routers/templates.py")
-        self.assertIn('STATIC_ASSET_VERSION = "20260827-ale407-compact-icons"', templates)
+        self.assertIn('STATIC_ASSET_VERSION = "20260902-ale409-summary-pdf"', templates)
 
 
 if __name__ == "__main__":

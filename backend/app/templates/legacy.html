@@ -682,7 +682,11 @@
             {% if summary_has_result %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-matrix-save-form">XLSX шахматка</button>
             <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">XLSX свод</button>
+            {% if summary_mode == "matrix" %}
+            <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form" data-summary-pdf-options-open>Сформировать PDF</button>
+            {% else %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form">PDF</button>
+            {% endif %}
             {% endif %}
           </div>
         </form>
@@ -710,7 +714,29 @@
           <input type="hidden" name="name_id" value="{{ summary_filters.name_id or '' }}">
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
+          {% if summary_mode == "matrix" %}<input type="hidden" name="media_columns" value="" data-summary-pdf-media-columns>{% endif %}
         </form>
+        {% if summary_mode == "matrix" %}
+        <dialog class="summary-pdf-options-dialog" data-summary-pdf-options-dialog aria-labelledby="summary-pdf-options-title">
+          <div class="summary-pdf-options-panel">
+            <h2 id="summary-pdf-options-title">Состав PDF</h2>
+            <label class="summary-pdf-option summary-pdf-option-required">
+              <input type="checkbox" checked disabled>
+              <span>Кавалер</span>
+            </label>
+            {% for column in summary_matrix.photo_columns if column.field != "person_foto" %}
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>
+              <span>{{ column.label }}</span>
+            </label>
+            {% endfor %}
+            <div class="summary-pdf-options-actions">
+              <button class="button secondary-button" type="button" data-summary-pdf-options-cancel>Отмена</button>
+              <button class="button" type="button" data-summary-pdf-options-confirm>Сформировать</button>
+            </div>
+          </div>
+        </dialog>
+        {% endif %}
         <div id="summary-export-status" class="save-as-status summary-export-status" role="status" aria-live="polite" hidden></div>
         {% endif %}
         {% if not summary_has_result %}

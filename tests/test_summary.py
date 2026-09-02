@@ -290,6 +290,8 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(matrix["reward_columns"][0]["name"], "Орден Тестовый")
         self.assertEqual(matrix["rows"][0]["photo_flags"]["person_foto"], 1)
         self.assertEqual(matrix["rows"][1]["photo_flags"]["person_foto"], 0)
+        self.assertEqual(matrix["rows"][0]["photo_paths"]["person_foto"], "Source/1/person.jpg")
+        self.assertEqual(matrix["rows"][0]["photo_paths"]["rewards_foto"], "Source/1/rewards.jpg")
         self.assertEqual(matrix["reward_total"], 2)
 
     def test_matrix_sorting_by_visible_columns(self) -> None:
@@ -431,7 +433,15 @@ class SummaryTests(unittest.TestCase):
 
     def test_too_wide_summary_matrix_pdf_is_handled_gracefully(self) -> None:
         with patch("backend.app.services.summary_pdf.SUMMARY_MATRIX_MAX_COLUMNS", 5):
-            response = summary_matrix_pdf(country_id="", category_id="", subcategory_id="", name_id="", extra="", include_marks="")
+            response = summary_matrix_pdf(
+                country_id="",
+                category_id="",
+                subcategory_id="",
+                name_id="",
+                extra="",
+                include_marks="",
+                media_columns="main_foto,rewards_foto,book1_foto,book2_foto,card1_foto",
+            )
         self.assertEqual(response.status_code, 400)
         self.assertIn("Таблица слишком широкая для PDF. Используйте фильтры или XLSX.", response.body.decode("utf-8"))
 
@@ -532,7 +542,7 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('id="summary-pdf-save-form" method="get" action="{{ \'/summary_matrix.pdf\' if summary_mode == \'matrix\' else \'/summary.pdf\' }}" data-save-as-form', template)
         self.assertIn('data-save-as-filename="{{ \'summary_matrix.pdf\' if summary_mode == \'matrix\' else \'summary.pdf\' }}"', template)
         self.assertIn('data-save-as-mime="application/pdf"', template)
-        self.assertIn('form="summary-pdf-save-form">PDF</button>', template)
+        self.assertIn('data-summary-pdf-options-open>Сформировать PDF</button>', template)
         self.assertIn("Открыть копию файла", save_as)
         self.assertIn('form.getAttribute("data-save-as-open-copy") === "true"', save_as)
         self.assertNotIn("CSV шахматка", template)

@@ -390,6 +390,10 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
                 "fio": person.get("fio") or "—",
                 "rank_name": person.get("rank_name") or "—",
                 "birthday": person.get("birthday") or "",
+                "photo_paths": {
+                    field: person.get(field) or ""
+                    for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS
+                },
                 "photo_flags": photo_flags,
                 "reward_counts": reward_counts,
                 "numbers": numbers.get((person_id, selected_name_id), "") if selected_name_id is not None else "",

@@ -4,9 +4,12 @@ from dataclasses import dataclass
 from html import escape
 from io import BytesIO
 from pathlib import Path
+from typing import Iterable
 
+from ..config import Settings
 from ..repositories.summary import (
     SUMMARY_CSV_HEADERS,
+    SUMMARY_MATRIX_PHOTO_COLUMNS,
     SummaryFilters,
     summary_guide_options,
     summary_matrix,
@@ -14,6 +17,7 @@ from ..repositories.summary import (
     summary_totals,
 )
 from .display import format_birth_year, format_date, format_money
+from .media import resolve_media
 
 
 SUMMARY_MATRIX_MAX_COLUMNS = 130
@@ -76,53 +80,155 @@ def generate_summary_pdf(db_path: Path, filters: SummaryFilters) -> SummaryPDFRe
     )
 
 
-def generate_summary_matrix_pdf(db_path: Path, filters: SummaryFilters) -> SummaryPDFResult:
-    matrix = summary_matrix(db_path, filters)
-    photo_columns = list(matrix.get("photo_columns") or [])
-    reward_columns = list(matrix.get("reward_columns") or [])
-    show_numbers = bool(matrix.get("show_numbers"))
+def normalize_summary_pdf_media_fields(values: Iterable[str] | str | None) -> tuple[str, ...]:
+    allowed = {field for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS if field != "person_foto"}
+    raw_values = values.split(",") if isinstance(values, str) else values or ()
+    selected: list[str] = []
+    for raw_value in raw_values:
+        field = str(raw_value or "").strip()
+        if field in allowed and field not in selected:
+            selected.append(field)
+    return tuple(selected)
 
-    headers = ["ФИО", "Звание / специальность", "Год рождения"]
-    headers.extend(str(column["label"]) for column in photo_columns)
-    headers.extend(str(column["name"]) for column in reward_columns)
-    if show_numbers:
-        headers.append("Номера")
-    headers.append("Итого наград")
 
-    if len(headers) > SUMMARY_MATRIX_MAX_COLUMNS:
+def generate_summary_matrix_pdf(
+    settings: Settings,
+    filters: SummaryFilters,
+    media_fields: Iterable[str] | str | None = None,
+) -> SummaryPDFResult:
+    matrix = summary_matrix(settings.rewards_db_path, filters)
+    selected_fields = normalize_summary_pdf_media_fields(media_fields)
+    photo_labels = dict(SUMMARY_MATRIX_PHOTO_COLUMNS)
+    columns = [(field, photo_labels[field]) for field in selected_fields]
+
+    if len(columns) + 1 > SUMMARY_MATRIX_MAX_COLUMNS:
         raise SummaryPDFTooWide("Таблица слишком широкая для PDF. Используйте фильтры или XLSX.")
+    return _build_summary_cards_pdf(settings, filters, matrix, columns)
 
-    story_rows = []
-    for row in matrix.get("rows") or []:
-        photo_flags = row.get("photo_flags") or {}
-        reward_counts = row.get("reward_counts") or {}
-        values = [row.get("fio") or "—", row.get("rank_name") or "—", format_birth_year(row.get("birthday"))]
-        values.extend(int(photo_flags.get(column["field"], 0)) for column in photo_columns)
-        values.extend(int(reward_counts.get(int(column["id"]), 0)) for column in reward_columns)
-        if show_numbers:
-            values.append(row.get("numbers") or "")
-        values.append(int(row.get("row_total") or 0))
-        story_rows.append(values)
 
-    totals = ["Итого", f"Кавалеров: {matrix.get('person_total') or 0}", ""]
-    photo_totals = matrix.get("photo_totals") or {}
-    reward_totals = matrix.get("reward_totals") or {}
-    totals.extend(int(photo_totals.get(column["field"], 0)) for column in photo_columns)
-    totals.extend(int(reward_totals.get(int(column["id"]), 0)) for column in reward_columns)
-    if show_numbers:
-        totals.append("")
-    totals.append(int(matrix.get("reward_total") or 0))
-    story_rows.append(totals)
+def _build_summary_cards_pdf(
+    settings: Settings,
+    filters: SummaryFilters,
+    matrix: dict[str, object],
+    columns: list[tuple[str, str]],
+) -> SummaryPDFResult:
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A3, A4, landscape
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    except ImportError as exc:
+        raise SummaryPDFError("PDF-библиотека reportlab не установлена.") from exc
 
-    return _build_pdf(
-        title="Шахматка по кавалерам",
-        filters=filters,
-        db_path=db_path,
-        headers=headers,
-        rows=story_rows,
-        filename="summary_matrix.pdf",
-        compact=True,
+    buffer = BytesIO()
+    page_size = landscape(A4 if len(columns) <= 2 else A3)
+    margin = 10 * mm
+    font_name = _register_pdf_font(pdfmetrics, TTFont)
+    styles = getSampleStyleSheet()
+    for style in styles.byName.values():
+        style.fontName = font_name
+    styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=font_name, fontSize=8, leading=10))
+    styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=7, leading=9))
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=page_size,
+        rightMargin=margin,
+        leftMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin,
+        title="Сводная таблица",
     )
+    story: list[object] = [
+        Paragraph(_p(_filters_text(settings.rewards_db_path, filters)), styles["CardBody"]),
+        Spacer(1, 6),
+    ]
+    table_data: list[list[object]] = [
+        [Paragraph("Кавалер", styles["CardHeader"])]
+        + [Paragraph(_p(label), styles["CardHeader"]) for _field, label in columns]
+    ]
+    for row in matrix.get("rows") or []:
+        paths = row.get("photo_paths") or {}
+        identity = ", ".join(
+            value
+            for value in (
+                str(row.get("fio") or "—"),
+                str(row.get("rank_name") or "—"),
+                format_birth_year(row.get("birthday")),
+            )
+            if value and value != "—"
+        )
+        cells: list[object] = [
+            _summary_pdf_image_cell(
+                settings,
+                paths.get("person_foto"),
+                identity,
+                styles["CardBody"],
+                Paragraph,
+                Image,
+                Spacer,
+                48 * mm,
+                36 * mm,
+            )
+        ]
+        cells.extend(
+            _summary_pdf_image_cell(
+                settings,
+                paths.get(field),
+                "",
+                styles["CardBody"],
+                Paragraph,
+                Image,
+                Spacer,
+                40 * mm,
+                36 * mm,
+            )
+            for field, _label in columns
+        )
+        table_data.append(cells)
+
+    available_width = page_size[0] - margin * 2
+    card_width = min(58 * mm, available_width)
+    media_width = (available_width - card_width) / len(columns) if columns else 0
+    widths = [card_width] + ([media_width] * len(columns))
+    table = Table(table_data, colWidths=widths, repeatRows=1)
+    table.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), font_name),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#d8ead7")),
+                ("GRID", (0, 0), (-1, -1), 0.35, colors.lightgrey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]
+        )
+    )
+    story.append(table)
+    doc.build(story)
+    return SummaryPDFResult(content=buffer.getvalue(), filename="summary_matrix.pdf")
+
+
+def _summary_pdf_image_cell(settings, raw_path, heading, style, Paragraph, Image, Spacer, max_width, max_height):
+    content: list[object] = []
+    if heading:
+        content.extend([Paragraph(_p(heading), style), Spacer(1, 4)])
+    resolution = resolve_media(settings, raw_path)
+    if resolution.fallback:
+        content.append(Paragraph("Нет фото", style))
+        return content
+    try:
+        image = Image(resolution.serving_path)
+        image._restrictSize(max_width, max_height)
+        content.append(image)
+    except Exception:
+        content.append(Paragraph("Нет фото", style))
+    return content
 
 
 def _build_pdf(

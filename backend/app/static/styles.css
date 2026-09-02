@@ -7267,6 +7267,53 @@ body.legacy-rewards-theme::after {
   text-decoration-color: #c49759;
 }
 
+.summary-pdf-options-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  color: #eee4d4;
+  border: 1px solid #786342;
+  border-radius: 4px;
+  background: #181a17;
+  box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
+}
+
+.summary-pdf-options-dialog::backdrop {
+  background: rgb(0 0 0 / 68%);
+}
+
+.summary-pdf-options-panel {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+}
+
+.summary-pdf-options-panel h2 {
+  margin: 0 0 4px;
+  color: #d6b277;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+}
+
+.summary-pdf-option {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 28px;
+  color: #d8d2c7;
+}
+
+.summary-pdf-option-required {
+  color: #ead8b7;
+}
+
+.summary-pdf-options-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 /* ALE-249: standalone cavalier pages scroll inside the fixed archive shell. */
 @media (min-width: 1181px) {
   body.guide-theme.cavalier-page-theme .page {
