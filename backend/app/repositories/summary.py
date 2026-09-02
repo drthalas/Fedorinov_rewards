@@ -8,7 +8,13 @@ import io
 
 from ..db import open_readonly_connection, row_to_dict
 from ..services.display import format_date
-from .guides import guide_cascade_data, guide_cascade_options, guide_name_sort_key, list_guide_level
+from .guides import (
+    get_guide_level_item,
+    guide_cascade_data,
+    guide_cascade_options,
+    guide_name_sort_key,
+    list_guide_level,
+)
 
 
 @dataclass(frozen=True)
@@ -42,6 +48,11 @@ SUMMARY_MATRIX_PHOTO_COLUMNS = [
     ("book2_foto", "Фото наградной книжки, сторона 2"),
     ("card1_foto", "Фото учётной карточки, страница 1"),
     ("card2_foto", "Фото учётной карточки, страница 2"),
+]
+
+SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS = [
+    ("front_foto", "Фото аверс"),
+    ("back_foto", "Фото реверс"),
 ]
 
 
@@ -364,6 +375,28 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
             tuple(reward_params),
         ).fetchall()
 
+        reward_table_columns = {
+            str(row["name"])
+            for row in connection.execute("pragma table_info(rewards)").fetchall()
+        }
+        reward_photo_expressions = [
+            f"r.{field}" if field in reward_table_columns else f"null as {field}"
+            for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS
+        ]
+        reward_detail_rows = connection.execute(
+            f"""
+            select
+                r.id,
+                r.person_id,
+                coalesce(nullif(trim(cast(r.number as text)), ''), '') as number,
+                {', '.join(reward_photo_expressions)}
+            from rewards r
+            {reward_where}
+            order by r.id
+            """,
+            tuple(reward_params),
+        ).fetchall()
+
     counts: dict[tuple[int, int], int] = {}
     numbers: dict[tuple[int, int], str] = {}
     for row in count_rows:
@@ -371,8 +404,25 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
         counts[key] = int(row["count"] or 0)
         numbers[key] = str(row["numbers"] or "").strip()
 
+    reward_numbers: dict[int, list[str]] = {}
+    reward_photo_paths: dict[int, dict[str, list[str]]] = {}
+    for detail_row in reward_detail_rows:
+        person_id = int(detail_row["person_id"])
+        number = str(detail_row["number"] or "").strip()
+        if number:
+            reward_numbers.setdefault(person_id, []).append(number)
+        person_paths = reward_photo_paths.setdefault(
+            person_id,
+            {field: [] for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS},
+        )
+        for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS:
+            path = str(detail_row[field] or "").strip()
+            if path and path not in person_paths[field]:
+                person_paths[field].append(path)
+
     photo_totals = {field: 0 for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS}
     reward_totals = {column_id: 0 for column_id in reward_column_ids}
+    reward_photo_totals = {field: 0 for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS}
     person_rows: list[dict[str, object]] = []
     selected_name_id = filters.name_id
     for person_row in person_rows_sql:
@@ -384,6 +434,16 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
         reward_counts = {column_id: counts.get((person_id, column_id), 0) for column_id in reward_column_ids}
         for column_id, value in reward_counts.items():
             reward_totals[column_id] += int(value)
+        person_reward_photo_paths = reward_photo_paths.get(
+            person_id,
+            {field: [] for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS},
+        )
+        reward_photo_flags = {
+            field: int(bool(person_reward_photo_paths.get(field)))
+            for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS
+        }
+        for field, value in reward_photo_flags.items():
+            reward_photo_totals[field] += value
         person_rows.append(
             {
                 "id": person_id,
@@ -395,25 +455,44 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
                     for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS
                 },
                 "photo_flags": photo_flags,
+                "reward_photo_paths": person_reward_photo_paths,
+                "reward_photo_flags": reward_photo_flags,
                 "reward_counts": reward_counts,
                 "numbers": numbers.get((person_id, selected_name_id), "") if selected_name_id is not None else "",
+                "pdf_reward_numbers": reward_numbers.get(person_id, []),
                 "row_total": sum(int(value) for value in reward_counts.values()),
             }
         )
 
     sorted_person_rows = _sort_matrix_rows(person_rows, sort_by, sort_dir)
 
+    selected_reward_guide = (
+        get_guide_level_item(db_path, 3, selected_name_id)
+        if selected_name_id is not None
+        else None
+    )
+
     return {
         "photo_columns": [{"field": field, "label": label} for field, label in SUMMARY_MATRIX_PHOTO_COLUMNS],
+        "reward_photo_columns": [
+            {"field": field, "label": label}
+            for field, label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS
+        ],
         "reward_columns": reward_columns,
         "rows": sorted_person_rows,
         "photo_totals": photo_totals,
+        "reward_photo_totals": reward_photo_totals,
         "reward_totals": reward_totals,
         "person_total": len(person_rows),
         "reward_total": sum(int(value) for value in reward_totals.values()),
         "show_numbers": selected_name_id is not None,
         "wide_warning": len(reward_columns) > 12,
         "include_marks_note": filters.include_marks,
+        "selected_reward_image_path": (
+            str(selected_reward_guide.get("image_path") or "").strip()
+            if selected_reward_guide
+            else ""
+        ),
     }
 
 

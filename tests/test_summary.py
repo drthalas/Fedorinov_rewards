@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 from xml.etree import ElementTree as ET
 from zipfile import ZipFile
+import base64
 
 from backend.app.main import app
 from backend.app.repositories.summary import (
@@ -333,6 +334,42 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("A-1", row["numbers"])
         self.assertIn("A-2", row["numbers"])
 
+    def test_matrix_exposes_filtered_reward_photos_and_selected_guide_image(self) -> None:
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute("alter table rewards add column front_foto text")
+            connection.execute("alter table rewards add column back_foto text")
+            connection.execute("alter table guide_lev_3 add column image_path text")
+            connection.execute(
+                "update rewards set front_foto = ?, back_foto = ? where id = 10",
+                ("Source/1/10/front.jpg", "Source/1/10/back.jpg"),
+            )
+            connection.execute(
+                "update guide_lev_3 set image_path = ? where id = 1",
+                ("GuideImages/reward.jpg",),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+        ivanov = next(row for row in matrix["rows"] if row["id"] == 1)
+        petrov = next(row for row in matrix["rows"] if row["id"] == 2)
+
+        self.assertEqual(
+            matrix["reward_photo_columns"],
+            [
+                {"field": "front_foto", "label": "Фото аверс"},
+                {"field": "back_foto", "label": "Фото реверс"},
+            ],
+        )
+        self.assertEqual(ivanov["reward_photo_flags"], {"front_foto": 1, "back_foto": 1})
+        self.assertEqual(ivanov["reward_photo_paths"]["front_foto"], ["Source/1/10/front.jpg"])
+        self.assertEqual(petrov["reward_photo_flags"], {"front_foto": 0, "back_foto": 0})
+        self.assertEqual(matrix["reward_photo_totals"], {"front_foto": 1, "back_foto": 1})
+        self.assertEqual(matrix["selected_reward_image_path"], "GuideImages/reward.jpg")
+        self.assertEqual(ivanov["pdf_reward_numbers"], ["A-1"])
+
     def test_matrix_csv_uses_bom_and_contains_columns(self) -> None:
         matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
         text = summary_matrix_csv_text(matrix)
@@ -418,11 +455,46 @@ class SummaryTests(unittest.TestCase):
         self.assertIn('filename="summary.pdf"', response.headers["content-disposition"])
 
     def test_summary_matrix_pdf_route_returns_pdf_response(self) -> None:
-        response = summary_matrix_pdf(country_id="", category_id="", subcategory_id="", name_id="1", extra="", include_marks="")
+        png = base64.b64decode(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        )
+        connection = sqlite3.connect(self.db_path)
+        try:
+            connection.execute("alter table rewards add column front_foto text")
+            connection.execute("alter table rewards add column back_foto text")
+            connection.execute("alter table guide_lev_3 add column image_path text")
+            connection.execute(
+                "update rewards set front_foto = ?, back_foto = ? where id = 10",
+                ("Source/1/10/front.png", "Source/1/10/back.png"),
+            )
+            connection.execute(
+                "update guide_lev_3 set image_path = ? where id = 1",
+                ("GuideImages/reward.png",),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        for relative in ("Source/1/10/front.png", "Source/1/10/back.png", "GuideImages/reward.png"):
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(png)
+
+        response = summary_matrix_pdf(
+            country_id="",
+            category_id="",
+            subcategory_id="",
+            name_id="1",
+            extra="",
+            include_marks="",
+            media_columns="front_foto,back_foto",
+            include_reward_number="true",
+            pdf_sort="reward_number",
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.media_type, "application/pdf")
         self.assertTrue(response.body.startswith(b"%PDF"))
         self.assertIn('filename="summary_matrix.pdf"', response.headers["content-disposition"])
+        self.assertGreaterEqual(response.body.count(b"/Subtype /Image"), 2)
         self.assertFalse((self.root / "generated").exists())
 
     def test_summary_pdf_filters_are_accepted_without_422(self) -> None:

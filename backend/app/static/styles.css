@@ -7307,6 +7307,21 @@ body.legacy-rewards-theme::after {
   color: #ead8b7;
 }
 
+.summary-pdf-sort-options {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid #51452f;
+}
+
+.summary-pdf-sort-options legend {
+  padding: 0 8px 0 0;
+  color: #d6b277;
+  font-weight: 600;
+}
+
 .summary-pdf-options-actions {
   display: flex;
   justify-content: flex-end;

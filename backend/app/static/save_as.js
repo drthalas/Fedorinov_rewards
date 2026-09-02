@@ -113,7 +113,9 @@
     if (filename) {
       link.setAttribute("aria-label", "Открыть копию файла " + filename);
     }
-    target.appendChild(document.createTextNode(" "));
+    if (target.hasChildNodes()) {
+      target.appendChild(document.createTextNode(" "));
+    }
     target.appendChild(link);
     window.setTimeout(function () {
       URL.revokeObjectURL(openUrl);
@@ -121,6 +123,19 @@
   }
 
   function showSavedMessage(form, blob, filename, mode) {
+    if (form.getAttribute("data-save-as-open-copy-only") === "true") {
+      const target = saveStatusTarget(form);
+      if (target._saveAsTimer) {
+        window.clearTimeout(target._saveAsTimer);
+        target._saveAsTimer = null;
+      }
+      target.replaceChildren();
+      target.hidden = false;
+      target.classList.remove("notice-error");
+      target.classList.add("notice-success");
+      appendOpenCopyLink(form, blob, filename);
+      return;
+    }
     const customMessage = form.getAttribute("data-save-as-success-message");
     if (customMessage) {
       setMessage(form, customMessage, "success");

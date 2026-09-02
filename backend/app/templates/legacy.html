@@ -707,7 +707,7 @@
           <input type="hidden" name="extra" value="{{ summary_filters.extra }}">
           <input type="hidden" name="include_marks" value="{{ 'true' if summary_filters.include_marks else '' }}">
         </form>
-        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form data-save-as-filename="{{ 'summary_matrix.pdf' if summary_mode == 'matrix' else 'summary.pdf' }}" data-save-as-mime="application/pdf">
+        <form id="summary-pdf-save-form" method="get" action="{{ '/summary_matrix.pdf' if summary_mode == 'matrix' else '/summary.pdf' }}" data-save-as-form data-save-as-filename="{{ 'summary_matrix.pdf' if summary_mode == 'matrix' else 'summary.pdf' }}" data-save-as-mime="application/pdf" data-save-as-status="#summary-export-status" data-save-as-open-copy-only="true">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">
           <input type="hidden" name="subcategory_id" value="{{ summary_filters.subcategory_id or '' }}">
@@ -724,12 +724,33 @@
               <input type="checkbox" checked disabled>
               <span>Кавалер</span>
             </label>
+            <label class="summary-pdf-option">
+              <input type="checkbox" name="include_reward_number" value="true" form="summary-pdf-save-form">
+              <span>Номер награды</span>
+            </label>
             {% for column in summary_matrix.photo_columns if column.field != "person_foto" %}
             <label class="summary-pdf-option">
               <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>
               <span>{{ column.label }}</span>
             </label>
             {% endfor %}
+            {% for column in summary_matrix.reward_photo_columns %}
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>
+              <span>{{ column.label }}</span>
+            </label>
+            {% endfor %}
+            <fieldset class="summary-pdf-sort-options">
+              <legend>Сортировка</legend>
+              <label class="summary-pdf-option">
+                <input type="radio" name="pdf_sort" value="fio" form="summary-pdf-save-form" checked>
+                <span>По ФИО</span>
+              </label>
+              <label class="summary-pdf-option">
+                <input type="radio" name="pdf_sort" value="reward_number" form="summary-pdf-save-form">
+                <span>По номеру награды</span>
+              </label>
+            </fieldset>
             <div class="summary-pdf-options-actions">
               <button class="button secondary-button" type="button" data-summary-pdf-options-cancel>Отмена</button>
               <button class="button" type="button" data-summary-pdf-options-confirm>Сформировать</button>
@@ -765,6 +786,9 @@
                 {% set sort_key = 'photo:' ~ column.field %}
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.photo_urls.get(column.field) }}">{{ column.label }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 {% endfor %}
+                {% for column in summary_matrix.reward_photo_columns %}
+                <th>{{ column.label }}</th>
+                {% endfor %}
                 {% for column in summary_matrix.reward_columns %}
                 {% set sort_key = 'reward:' ~ column.id %}
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.reward_urls.get(column.id|string) }}">{{ column.name|dash }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
@@ -782,6 +806,9 @@
                 {% for column in summary_matrix.photo_columns %}
                 <td class="number-cell {{ 'stock-yes' if row.photo_flags.get(column.field) else 'stock-no' }}">{{ row.photo_flags.get(column.field, 0) }}</td>
                 {% endfor %}
+                {% for column in summary_matrix.reward_photo_columns %}
+                <td class="number-cell {{ 'stock-yes' if row.reward_photo_flags.get(column.field) else 'stock-no' }}">{{ row.reward_photo_flags.get(column.field, 0) }}</td>
+                {% endfor %}
                 {% for column in summary_matrix.reward_columns %}
                 {% set count = row.reward_counts.get(column.id, 0) %}
                 <td class="number-cell {{ 'stock-yes' if count else 'stock-no' }}">{{ count }}</td>
@@ -798,6 +825,9 @@
                 <td>—</td>
                 {% for column in summary_matrix.photo_columns %}
                 <td class="number-cell">{{ summary_matrix.photo_totals.get(column.field, 0) }}</td>
+                {% endfor %}
+                {% for column in summary_matrix.reward_photo_columns %}
+                <td class="number-cell">{{ summary_matrix.reward_photo_totals.get(column.field, 0) }}</td>
                 {% endfor %}
                 {% for column in summary_matrix.reward_columns %}
                 <td class="number-cell">{{ summary_matrix.reward_totals.get(column.id, 0) }}</td>

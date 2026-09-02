@@ -4,12 +4,15 @@ from dataclasses import dataclass
 from html import escape
 from io import BytesIO
 from pathlib import Path
+import re
 from typing import Iterable
+import unicodedata
 
 from ..config import Settings
 from ..repositories.summary import (
     SUMMARY_CSV_HEADERS,
     SUMMARY_MATRIX_PHOTO_COLUMNS,
+    SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS,
     SummaryFilters,
     summary_guide_options,
     summary_matrix,
@@ -81,7 +84,11 @@ def generate_summary_pdf(db_path: Path, filters: SummaryFilters) -> SummaryPDFRe
 
 
 def normalize_summary_pdf_media_fields(values: Iterable[str] | str | None) -> tuple[str, ...]:
-    allowed = {field for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS if field != "person_foto"}
+    allowed = {
+        field
+        for field, _label in (*SUMMARY_MATRIX_PHOTO_COLUMNS, *SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS)
+        if field != "person_foto"
+    }
     raw_values = values.split(",") if isinstance(values, str) else values or ()
     selected: list[str] = []
     for raw_value in raw_values:
@@ -91,19 +98,63 @@ def normalize_summary_pdf_media_fields(values: Iterable[str] | str | None) -> tu
     return tuple(selected)
 
 
+def normalize_summary_pdf_sort(value: object) -> str:
+    return "reward_number" if str(value or "").strip() == "reward_number" else "fio"
+
+
+def _fio_sort_key(value: object) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    return normalized.replace("ё", "е")
+
+
+def _reward_number_sort_key(value: object) -> tuple[tuple[int, object], ...]:
+    normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
+    return tuple(
+        (0, int(part)) if part.isdigit() else (1, part)
+        for part in re.split(r"(\d+)", normalized)
+        if part
+    )
+
+
+def sort_summary_pdf_rows(rows: Iterable[dict[str, object]], sort_by: object) -> list[dict[str, object]]:
+    selected_sort = normalize_summary_pdf_sort(sort_by)
+    rows_list = list(rows)
+    if selected_sort == "fio":
+        return sorted(rows_list, key=lambda row: (_fio_sort_key(row.get("fio")), int(row.get("id") or 0)))
+
+    def number_key(row: dict[str, object]) -> tuple[object, ...]:
+        numbers = [str(value).strip() for value in row.get("pdf_reward_numbers") or [] if str(value).strip()]
+        if not numbers:
+            return (1, (), _fio_sort_key(row.get("fio")), int(row.get("id") or 0))
+        first = min(numbers, key=_reward_number_sort_key)
+        return (0, _reward_number_sort_key(first), _fio_sort_key(row.get("fio")), int(row.get("id") or 0))
+
+    return sorted(rows_list, key=number_key)
+
+
 def generate_summary_matrix_pdf(
     settings: Settings,
     filters: SummaryFilters,
     media_fields: Iterable[str] | str | None = None,
+    include_reward_number: object = False,
+    sort_by: object = "fio",
 ) -> SummaryPDFResult:
     matrix = summary_matrix(settings.rewards_db_path, filters)
     selected_fields = normalize_summary_pdf_media_fields(media_fields)
-    photo_labels = dict(SUMMARY_MATRIX_PHOTO_COLUMNS)
+    photo_labels = dict((*SUMMARY_MATRIX_PHOTO_COLUMNS, *SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS))
     columns = [(field, photo_labels[field]) for field in selected_fields]
+    show_reward_number = str(include_reward_number or "").strip().lower() in {"1", "true", "on", "yes"}
 
-    if len(columns) + 1 > SUMMARY_MATRIX_MAX_COLUMNS:
+    if len(columns) + 1 + int(show_reward_number) > SUMMARY_MATRIX_MAX_COLUMNS:
         raise SummaryPDFTooWide("Таблица слишком широкая для PDF. Используйте фильтры или XLSX.")
-    return _build_summary_cards_pdf(settings, filters, matrix, columns)
+    return _build_summary_cards_pdf(
+        settings,
+        filters,
+        matrix,
+        columns,
+        include_reward_number=show_reward_number,
+        sort_by=normalize_summary_pdf_sort(sort_by),
+    )
 
 
 def _build_summary_cards_pdf(
@@ -111,6 +162,9 @@ def _build_summary_cards_pdf(
     filters: SummaryFilters,
     matrix: dict[str, object],
     columns: list[tuple[str, str]],
+    *,
+    include_reward_number: bool,
+    sort_by: str,
 ) -> SummaryPDFResult:
     try:
         from reportlab.lib import colors
@@ -124,14 +178,16 @@ def _build_summary_cards_pdf(
         raise SummaryPDFError("PDF-библиотека reportlab не установлена.") from exc
 
     buffer = BytesIO()
-    page_size = landscape(A4 if len(columns) <= 2 else A3)
+    visible_column_count = len(columns) + 1 + int(include_reward_number)
+    page_size = landscape(A4 if visible_column_count <= 3 else A3)
     margin = 10 * mm
     font_name = _register_pdf_font(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
     for style in styles.byName.values():
         style.fontName = font_name
-    styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=font_name, fontSize=8, leading=10))
-    styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=7, leading=9))
+    styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=12))
+    styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=12))
+    styles.add(ParagraphStyle(name="CardFilters", parent=styles["BodyText"], fontName=font_name, fontSize=11, leading=14))
 
     doc = SimpleDocTemplate(
         buffer,
@@ -142,15 +198,28 @@ def _build_summary_cards_pdf(
         bottomMargin=margin,
         title="Сводная таблица",
     )
-    story: list[object] = [
-        Paragraph(_p(_filters_text(settings.rewards_db_path, filters)), styles["CardBody"]),
-        Spacer(1, 6),
-    ]
-    table_data: list[list[object]] = [
-        [Paragraph("Кавалер", styles["CardHeader"])]
-        + [Paragraph(_p(label), styles["CardHeader"]) for _field, label in columns]
-    ]
-    for row in matrix.get("rows") or []:
+    story: list[object] = []
+    guide_image = _summary_pdf_header_image(
+        settings,
+        matrix.get("selected_reward_image_path"),
+        Image,
+        38 * mm,
+        38 * mm,
+    )
+    if guide_image is not None:
+        story.extend([guide_image, Spacer(1, 6)])
+    story.extend(
+        [
+            Paragraph(_p(_filters_text(settings.rewards_db_path, filters)), styles["CardFilters"]),
+            Spacer(1, 8),
+        ]
+    )
+    header = [Paragraph("Кавалер", styles["CardHeader"])]
+    if include_reward_number:
+        header.append(Paragraph("Номер награды", styles["CardHeader"]))
+    header.extend(Paragraph(_p(label), styles["CardHeader"]) for _field, label in columns)
+    table_data: list[list[object]] = [header]
+    for row in sort_summary_pdf_rows(matrix.get("rows") or [], sort_by):
         paths = row.get("photo_paths") or {}
         identity = ", ".join(
             value
@@ -174,26 +243,42 @@ def _build_summary_cards_pdf(
                 36 * mm,
             )
         ]
-        cells.extend(
-            _summary_pdf_image_cell(
-                settings,
-                paths.get(field),
-                "",
-                styles["CardBody"],
-                Paragraph,
-                Image,
-                Spacer,
-                40 * mm,
-                36 * mm,
+        if include_reward_number:
+            cells.append(
+                Paragraph(
+                    _p(", ".join(str(value) for value in row.get("pdf_reward_numbers") or []) or "—"),
+                    styles["CardBody"],
+                )
             )
-            for field, _label in columns
-        )
+        reward_paths = row.get("reward_photo_paths") or {}
+        for field, _label in columns:
+            raw_paths = reward_paths.get(field) if field in dict(SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS) else paths.get(field)
+            cells.append(
+                _summary_pdf_images_cell(
+                    settings,
+                    raw_paths,
+                    styles["CardBody"],
+                    Paragraph,
+                    Image,
+                    Spacer,
+                    40 * mm,
+                    36 * mm,
+                )
+            )
         table_data.append(cells)
 
     available_width = page_size[0] - margin * 2
     card_width = min(58 * mm, available_width)
-    media_width = (available_width - card_width) / len(columns) if columns else 0
-    widths = [card_width] + ([media_width] * len(columns))
+    remaining_count = len(columns) + int(include_reward_number)
+    media_width = (available_width - card_width) / remaining_count if remaining_count else 0
+    widths = [card_width]
+    if include_reward_number:
+        widths.append(min(38 * mm, media_width))
+        remaining_width = available_width - card_width - widths[-1]
+        photo_width = remaining_width / len(columns) if columns else 0
+        widths.extend([photo_width] * len(columns))
+    else:
+        widths.extend([media_width] * len(columns))
     table = Table(table_data, colWidths=widths, repeatRows=1)
     table.setStyle(
         TableStyle(
@@ -229,6 +314,37 @@ def _summary_pdf_image_cell(settings, raw_path, heading, style, Paragraph, Image
     except Exception:
         content.append(Paragraph("Нет фото", style))
     return content
+
+
+def _summary_pdf_images_cell(settings, raw_paths, style, Paragraph, Image, Spacer, max_width, max_height):
+    values = raw_paths if isinstance(raw_paths, (list, tuple)) else [raw_paths]
+    content: list[object] = []
+    for raw_path in values:
+        resolution = resolve_media(settings, raw_path)
+        if resolution.fallback:
+            continue
+        try:
+            image = Image(resolution.serving_path)
+            image._restrictSize(max_width, max_height)
+            if content:
+                content.append(Spacer(1, 4))
+            content.append(image)
+        except Exception:
+            continue
+    return content or [Paragraph("Нет фото", style)]
+
+
+def _summary_pdf_header_image(settings, raw_path, Image, max_width, max_height):
+    resolution = resolve_media(settings, raw_path)
+    if resolution.fallback:
+        return None
+    try:
+        image = Image(resolution.serving_path)
+        image._restrictSize(max_width, max_height)
+        image.hAlign = "LEFT"
+        return image
+    except Exception:
+        return None
 
 
 def _build_pdf(

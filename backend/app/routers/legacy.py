@@ -1120,6 +1120,8 @@ def summary_matrix_pdf(
     extra: str = "",
     include_marks: str | None = None,
     media_columns: str = "",
+    include_reward_number: str | None = None,
+    pdf_sort: str = "fio",
 ):
     settings = get_settings()
     filters = normalized_summary_filters(
@@ -1133,7 +1135,13 @@ def summary_matrix_pdf(
     if not settings.db_exists:
         return Response(content=b"", media_type="application/pdf", headers={"Content-Disposition": 'attachment; filename="summary_matrix.pdf"'})
     try:
-        result = generate_summary_matrix_pdf(settings, filters, media_columns)
+        result = generate_summary_matrix_pdf(
+            settings,
+            filters,
+            media_columns,
+            include_reward_number=include_reward_number,
+            sort_by=pdf_sort,
+        )
     except SummaryPDFTooWide as exc:
         return Response(content=str(exc), status_code=400, media_type="text/plain; charset=utf-8")
     except SummaryPDFError as exc:
@@ -1154,6 +1162,8 @@ def summary_matrix_pdf_head(
     extra: str = "",
     include_marks: str | None = None,
     media_columns: str = "",
+    include_reward_number: str | None = None,
+    pdf_sort: str = "fio",
 ):
     normalized_summary_filters(
         country_id=country_id,
