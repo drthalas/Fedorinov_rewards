@@ -216,7 +216,7 @@
     });
   }
 
-  async function imageBlobFromClipboard() {
+  async function sourceImageBlobFromClipboard() {
     if (!navigator.clipboard || !navigator.clipboard.read) {
       throw new Error("Вставка из буфера недоступна в этом браузере. Используйте кнопку +.");
     }
@@ -226,31 +226,43 @@
       for (var j = 0; j < item.types.length; j += 1) {
         var type = item.types[j];
         if (type.indexOf("image/") === 0) {
-          var blob = await item.getType(type);
-          var fingerprint = await fingerprintImageBlob(blob);
-          var jpegBlob = await jpegBlobFromClipboardBlob(blob);
-          return { blob: jpegBlob, type: "image/jpeg", fingerprint: fingerprint };
+          return item.getType(type);
         }
       }
     }
     throw new Error("В буфере обмена нет изображения.");
   }
 
-  function imageBlobFromClipboardWithTimeout(timeoutMs) {
+  async function prepareClipboardImage(blob) {
+    var fingerprint = await fingerprintImageBlob(blob);
+    var jpegBlob = await jpegBlobFromClipboardBlob(blob);
+    return { blob: jpegBlob, type: "image/jpeg", fingerprint: fingerprint };
+  }
+
+  async function imageBlobFromClipboard() {
+    return prepareClipboardImage(await sourceImageBlobFromClipboard());
+  }
+
+  function sourceImageBlobFromClipboardWithTimeout(timeoutMs) {
     return new Promise(function (resolve, reject) {
       var requestedTimeout = Number(timeoutMs) || CLIPBOARD_ATTEMPT_TIMEOUT_MS;
       var boundedTimeout = Math.min(Math.max(1, requestedTimeout), CLIPBOARD_ATTEMPT_HARD_CEILING_MS);
       var timeout = window.setTimeout(function () {
         reject(new Error("Буфер обмена не ответил вовремя."));
       }, boundedTimeout);
-      imageBlobFromClipboard().then(function (image) {
+      sourceImageBlobFromClipboard().then(function (blob) {
         window.clearTimeout(timeout);
-        resolve(image);
+        resolve(blob);
       }, function (error) {
         window.clearTimeout(timeout);
         reject(error);
       });
     });
+  }
+
+  async function imageBlobFromClipboardWithTimeout(timeoutMs) {
+    var sourceBlob = await sourceImageBlobFromClipboardWithTimeout(timeoutMs);
+    return prepareClipboardImage(sourceBlob);
   }
 
   async function freshImageBlobFromClipboardWithTimeout(timeoutMs) {
@@ -268,7 +280,11 @@
   }
 
   function normalizedPageSearch(search) {
-    return new URLSearchParams(search || "").toString();
+    var params = new URLSearchParams(search || "");
+    ["status", "message", "error", "created", "media_cleanup"].forEach(function (key) {
+      params.delete(key);
+    });
+    return params.toString();
   }
 
   function rememberPhotoInteraction(button) {
@@ -403,12 +419,16 @@
     }
     consumePendingClipboardImage(image.fingerprint);
     var target = new URL(returnUrl, window.location.href);
-    if (reloadSamePage && target.pathname === window.location.pathname && target.search === window.location.search) {
+    if (
+      reloadSamePage &&
+      target.pathname === window.location.pathname &&
+      normalizedPageSearch(target.search) === normalizedPageSearch(window.location.search)
+    ) {
       window.history.replaceState(null, "", responseUrl.pathname + responseUrl.search + responseUrl.hash);
       window.location.reload();
       return;
     }
-    window.location.href = returnUrl;
+    window.location.href = responseUrl.pathname + responseUrl.search + responseUrl.hash;
   }
 
   function openPersonFilePicker(button) {
