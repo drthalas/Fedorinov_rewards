@@ -493,6 +493,11 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
             if selected_reward_guide
             else ""
         ),
+        "selected_reward_name": (
+            str(selected_reward_guide.get("name") or "").strip()
+            if selected_reward_guide
+            else ""
+        ),
     }
 
 

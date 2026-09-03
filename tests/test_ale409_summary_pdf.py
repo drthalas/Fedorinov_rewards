@@ -66,7 +66,7 @@ class SummaryPDFOptionsTests(unittest.TestCase):
         self.assertIn("data-summary-pdf-options-confirm", template)
         self.assertIn('<span>Кавалер</span>', template)
         self.assertIn("checked disabled", template)
-        self.assertIn('column.field != "person_foto"', template)
+        self.assertIn('column.field not in ["person_foto"', template)
         self.assertIn('name="include_reward_number" value="true" form="summary-pdf-save-form"', template)
         self.assertIn('name="pdf_sort" value="fio" form="summary-pdf-save-form" checked', template)
         self.assertIn('name="pdf_sort" value="reward_number" form="summary-pdf-save-form"', template)

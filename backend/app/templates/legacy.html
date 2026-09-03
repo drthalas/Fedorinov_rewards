@@ -728,12 +728,20 @@
               <input type="checkbox" name="include_reward_number" value="true" form="summary-pdf-save-form">
               <span>Номер награды</span>
             </label>
-            {% for column in summary_matrix.photo_columns if column.field != "person_foto" %}
+            {% for column in summary_matrix.photo_columns if column.field not in ["person_foto", "book1_foto", "book2_foto", "card1_foto", "card2_foto"] %}
             <label class="summary-pdf-option">
               <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>
               <span>{{ column.label }}</span>
             </label>
             {% endfor %}
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="book1_foto,book2_foto" data-summary-pdf-media-option>
+              <span>Фото наградной книжки</span>
+            </label>
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="card1_foto,card2_foto" data-summary-pdf-media-option>
+              <span>Фото учётной карточки</span>
+            </label>
             {% for column in summary_matrix.reward_photo_columns %}
             <label class="summary-pdf-option">
               <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>

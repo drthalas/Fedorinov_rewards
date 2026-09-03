@@ -30,6 +30,7 @@ from backend.app.routers.legacy import (
     summary_pdf,
     summary_xlsx,
 )
+from backend.app.services import summary_pdf as summary_pdf_service
 from backend.app.services.summary_xlsx import MAX_COLUMN_WIDTH, XLSX_MEDIA_TYPE, summary_matrix_xlsx_bytes, summary_xlsx_bytes
 
 
@@ -368,6 +369,7 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(petrov["reward_photo_flags"], {"front_foto": 0, "back_foto": 0})
         self.assertEqual(matrix["reward_photo_totals"], {"front_foto": 1, "back_foto": 1})
         self.assertEqual(matrix["selected_reward_image_path"], "GuideImages/reward.jpg")
+        self.assertEqual(matrix["selected_reward_name"], "Орден Тестовый")
         self.assertEqual(ivanov["pdf_reward_numbers"], ["A-1"])
 
     def test_matrix_csv_uses_bom_and_contains_columns(self) -> None:
@@ -473,15 +475,43 @@ class SummaryTests(unittest.TestCase):
                 "update guide_lev_3 set image_path = ? where id = 1",
                 ("GuideImages/reward.png",),
             )
+            connection.execute(
+                """
+                update person
+                set book1_foto = ?, book2_foto = ?, card1_foto = ?, card2_foto = ?
+                where id = 1
+                """,
+                (
+                    "Source/1/book1.png",
+                    "Source/1/book2.png",
+                    "Source/1/card1.png",
+                    "Source/1/card2.png",
+                ),
+            )
             connection.commit()
         finally:
             connection.close()
-        for relative in ("Source/1/10/front.png", "Source/1/10/back.png", "GuideImages/reward.png"):
+        for relative in (
+            "Source/1/10/front.png",
+            "Source/1/10/back.png",
+            "Source/1/book1.png",
+            "Source/1/book2.png",
+            "Source/1/card1.png",
+            "Source/1/card2.png",
+            "GuideImages/reward.png",
+        ):
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(png)
 
-        with patch("backend.app.routers.legacy.stage_generated_pdf", return_value="b" * 32):
+        with (
+            patch("backend.app.routers.legacy.stage_generated_pdf", return_value="b" * 32),
+            patch.object(
+                summary_pdf_service,
+                "_summary_pdf_image",
+                wraps=summary_pdf_service._summary_pdf_image,
+            ) as image_mock,
+        ):
             response = summary_matrix_pdf(
                 country_id="",
                 category_id="",
@@ -489,7 +519,7 @@ class SummaryTests(unittest.TestCase):
                 name_id="1",
                 extra="",
                 include_marks="",
-                media_columns="front_foto,back_foto",
+                media_columns="book1_foto,book2_foto,card1_foto,card2_foto,front_foto,back_foto",
                 include_reward_number="true",
                 pdf_sort="reward_number",
             )
@@ -498,6 +528,18 @@ class SummaryTests(unittest.TestCase):
         self.assertTrue(response.body.startswith(b"%PDF"))
         self.assertIn('filename="summary_matrix.pdf"', response.headers["content-disposition"])
         self.assertEqual(response.headers["x-fedorinov-open-copy-token"], "b" * 32)
+        rendered_names = {Path(call.args[0]).name for call in image_mock.call_args_list}
+        self.assertTrue(
+            {
+                "book1.png",
+                "book2.png",
+                "card1.png",
+                "card2.png",
+                "front.png",
+                "back.png",
+                "reward.png",
+            }.issubset(rendered_names)
+        )
         self.assertGreaterEqual(response.body.count(b"/Subtype /Image"), 2)
         self.assertFalse((self.root / "generated").exists())
 

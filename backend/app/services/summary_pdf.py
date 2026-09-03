@@ -227,7 +227,10 @@ def _build_summary_cards_pdf(
         story.extend([guide_image, Spacer(1, 6)])
     story.extend(
         [
-            Paragraph(_p(_filters_text(settings.rewards_db_path, filters)), styles["CardFilters"]),
+            Paragraph(
+                _p(_summary_pdf_header_text(settings.rewards_db_path, filters, matrix)),
+                styles["CardFilters"],
+            ),
             Spacer(1, 8),
         ]
     )
@@ -566,6 +569,17 @@ def _filters_text(db_path: Path, filters: SummaryFilters) -> str:
     visible = [f"{label}: {value}" for label, value in parts if value]
     visible.append(f"Знаки: {'да' if filters.include_marks else 'нет'}")
     return "Фильтры: " + ("; ".join(visible) if visible else "все записи")
+
+
+def _summary_pdf_header_text(
+    db_path: Path,
+    filters: SummaryFilters,
+    matrix: dict[str, object],
+) -> str:
+    selected_reward_name = str(matrix.get("selected_reward_name") or "").strip()
+    if filters.name_id is not None and selected_reward_name:
+        return f"{selected_reward_name} (всего: {len(matrix.get('rows') or [])})"
+    return _filters_text(db_path, filters)
 
 
 def _lookup_name(rows: list[dict[str, object]], value: object) -> str:
