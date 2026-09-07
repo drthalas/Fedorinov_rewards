@@ -96,10 +96,7 @@
         <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric" autocomplete="off">
       </label>
     </div>
-    <label class="checkbox-row">
-      <input name="instock" type="checkbox" {% if reward.instock %}checked{% endif %}>
-      <span>В наличии</span>
-    </label>
+    <input name="instock" type="hidden" value="{{ 'true' if reward.instock else '' }}">
   </fieldset>
 
   {% for photo in photo_controls %}

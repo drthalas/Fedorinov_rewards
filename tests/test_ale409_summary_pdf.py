@@ -70,7 +70,7 @@ class SummaryPDFOptionsTests(unittest.TestCase):
         self.assertIn('name="include_reward_number" value="true" form="summary-pdf-save-form"', template)
         self.assertIn('name="pdf_sort" value="fio" form="summary-pdf-save-form" checked', template)
         self.assertIn('name="pdf_sort" value="reward_number" form="summary-pdf-save-form"', template)
-        self.assertIn("summary_matrix.reward_photo_columns", template)
+        self.assertIn('value="front_foto,back_foto"', template)
         self.assertIn("event.preventDefault()", script)
         self.assertIn("form.requestSubmit(trigger)", script)
         self.assertIn("closeDialog();\n    form.requestSubmit(trigger);", script)

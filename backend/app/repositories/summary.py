@@ -55,6 +55,15 @@ SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS = [
     ("back_foto", "Фото реверс"),
 ]
 
+# PDF-only aliases distinguish reward documents from the same person field names.
+SUMMARY_PDF_REWARD_PHOTO_FIELDS = {
+    "front_foto": ("front_foto", "Фото аверс"),
+    "back_foto": ("back_foto", "Фото реверс"),
+    "reward_book1_foto": ("book1_foto", "Дополнительный документ 1"),
+    "reward_book2_foto": ("book2_foto", "Дополнительный документ 2"),
+    "reward_list": ("reward_list", "Фото наградного листа"),
+}
+
 
 def summary_guide_options(db_path: Path) -> dict[str, list[dict[str, object]]]:
     return {
@@ -380,8 +389,8 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
             for row in connection.execute("pragma table_info(rewards)").fetchall()
         }
         reward_photo_expressions = [
-            f"r.{field}" if field in reward_table_columns else f"null as {field}"
-            for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS
+            f"r.{source} as {field}" if source in reward_table_columns else f"null as {field}"
+            for field, (source, _label) in SUMMARY_PDF_REWARD_PHOTO_FIELDS.items()
         ]
         reward_detail_rows = connection.execute(
             f"""
@@ -413,9 +422,9 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
             reward_numbers.setdefault(person_id, []).append(number)
         person_paths = reward_photo_paths.setdefault(
             person_id,
-            {field: [] for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS},
+            {field: [] for field in SUMMARY_PDF_REWARD_PHOTO_FIELDS},
         )
-        for field, _label in SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS:
+        for field in SUMMARY_PDF_REWARD_PHOTO_FIELDS:
             path = str(detail_row[field] or "").strip()
             if path and path not in person_paths[field]:
                 person_paths[field].append(path)

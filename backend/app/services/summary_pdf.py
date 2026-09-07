@@ -14,6 +14,7 @@ from ..repositories.summary import (
     SUMMARY_CSV_HEADERS,
     SUMMARY_MATRIX_PHOTO_COLUMNS,
     SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS,
+    SUMMARY_PDF_REWARD_PHOTO_FIELDS,
     SummaryFilters,
     summary_guide_options,
     summary_matrix,
@@ -94,6 +95,7 @@ def normalize_summary_pdf_media_fields(values: Iterable[str] | str | None) -> tu
         for field, _label in (*SUMMARY_MATRIX_PHOTO_COLUMNS, *SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS)
         if field != "person_foto"
     }
+    allowed.update(SUMMARY_PDF_REWARD_PHOTO_FIELDS)
     raw_values = values.split(",") if isinstance(values, str) else values or ()
     selected: list[str] = []
     for raw_value in raw_values:
@@ -147,6 +149,7 @@ def generate_summary_matrix_pdf(
     matrix = summary_matrix(settings.rewards_db_path, filters)
     selected_fields = normalize_summary_pdf_media_fields(media_fields)
     photo_labels = dict((*SUMMARY_MATRIX_PHOTO_COLUMNS, *SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS))
+    photo_labels.update({field: label for field, (_source, label) in SUMMARY_PDF_REWARD_PHOTO_FIELDS.items()})
     columns = [(field, photo_labels[field]) for field in selected_fields]
     show_reward_number = str(include_reward_number or "").strip().lower() in {"1", "true", "on", "yes"}
 
@@ -273,7 +276,7 @@ def _build_summary_cards_pdf(
             )
         reward_paths = row.get("reward_photo_paths") or {}
         for column_index, (field, _label) in enumerate(columns):
-            raw_paths = reward_paths.get(field) if field in dict(SUMMARY_MATRIX_REWARD_PHOTO_COLUMNS) else paths.get(field)
+            raw_paths = reward_paths.get(field) if field in SUMMARY_PDF_REWARD_PHOTO_FIELDS else paths.get(field)
             cells.append(
                 _summary_pdf_images_cell(
                     settings,

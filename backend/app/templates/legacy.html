@@ -742,12 +742,18 @@
               <input type="checkbox" value="card1_foto,card2_foto" data-summary-pdf-media-option>
               <span>Фото учётной карточки</span>
             </label>
-            {% for column in summary_matrix.reward_photo_columns %}
             <label class="summary-pdf-option">
-              <input type="checkbox" value="{{ column.field }}" data-summary-pdf-media-option>
-              <span>{{ column.label }}</span>
+              <input type="checkbox" value="front_foto,back_foto" data-summary-pdf-media-option>
+              <span>Фото награды</span>
             </label>
-            {% endfor %}
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="reward_book1_foto,reward_book2_foto" data-summary-pdf-media-option>
+              <span>Фото дополнительных документов</span>
+            </label>
+            <label class="summary-pdf-option">
+              <input type="checkbox" value="reward_list" data-summary-pdf-media-option>
+              <span>Фото наградного листа</span>
+            </label>
             <fieldset class="summary-pdf-sort-options">
               <legend>Сортировка</legend>
               <label class="summary-pdf-option">

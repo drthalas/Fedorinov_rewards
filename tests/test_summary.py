@@ -335,6 +335,20 @@ class SummaryTests(unittest.TestCase):
         self.assertIn("A-1", row["numbers"])
         self.assertIn("A-2", row["numbers"])
 
+    def test_pdf_reward_documents_do_not_replace_person_documents(self) -> None:
+        with sqlite3.connect(self.db_path) as connection:
+            for field in ("book1_foto", "book2_foto", "reward_list"):
+                connection.execute(f"alter table rewards add column {field} text")
+            connection.execute("update person set book1_foto='Source/1/person-book.jpg' where id=1")
+            connection.execute("update rewards set book1_foto='Source/1/reward-doc1.jpg', book2_foto='Source/1/reward-doc2.jpg', reward_list='Source/1/list.jpg' where person_id=1")
+        matrix = summary_matrix(self.db_path, normalized_summary_filters())
+        person = next(row for row in matrix["rows"] if row["id"] == 1)
+        self.assertEqual(person["photo_paths"]["book1_foto"], "Source/1/person-book.jpg")
+        self.assertEqual(person["reward_photo_paths"]["reward_book1_foto"], ["Source/1/reward-doc1.jpg"])
+        self.assertEqual(person["reward_photo_paths"]["reward_book2_foto"], ["Source/1/reward-doc2.jpg"])
+        self.assertEqual(person["reward_photo_paths"]["reward_list"], ["Source/1/list.jpg"])
+        self.assertEqual([col["field"] for col in matrix["reward_photo_columns"]], ["front_foto", "back_foto"])
+
     def test_matrix_exposes_filtered_reward_photos_and_selected_guide_image(self) -> None:
         connection = sqlite3.connect(self.db_path)
         try:

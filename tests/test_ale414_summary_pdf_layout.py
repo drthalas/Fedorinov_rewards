@@ -26,7 +26,7 @@ class SummaryPDFLayoutTests(unittest.TestCase):
             'column.field not in ["person_foto", "book1_foto", "book2_foto", "card1_foto", "card2_foto"]',
             selector,
         )
-        self.assertIn("summary_matrix.reward_photo_columns", selector)
+        self.assertIn('value="front_foto,back_foto"', selector)
 
     def test_grouped_values_expand_to_existing_media_slots_in_order(self) -> None:
         self.assertEqual(
