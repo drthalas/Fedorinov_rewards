@@ -80,6 +80,10 @@ class BookletDossierTests(unittest.TestCase):
             elif isinstance(item, PDFImage):
                 images.append(item)
             elif isinstance(item, Table):
+                if item.repeatRows == 1:
+                    item.wrap(516, 700)
+                    fragments = item.split(516, 80)
+                    self.assertTrue(not fragments or all(len(part._cellvalues) > 1 for part in fragments))
                 for row in item._cellvalues:
                     for cell in row:
                         collect(cell)

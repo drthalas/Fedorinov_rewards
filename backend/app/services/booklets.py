@@ -200,10 +200,10 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     ink = colors.HexColor("#302d27")
     rule = colors.HexColor("#b8ac95")
     styles.add(ParagraphStyle(name="BookletTitle", parent=styles["Title"], fontName=bold_font, fontSize=23, leading=26, alignment=0, textColor=ink))
-    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink))
+    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink, keepWithNext=True))
     styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=13, textColor=ink))
     styles.add(ParagraphStyle(name="BookletCaption", parent=styles["BookletBody"], fontSize=8, leading=10, textColor=colors.HexColor("#655d4f")))
-    styles.add(ParagraphStyle(name="BookletReward", parent=styles["BookletHeading"], borderWidth=0.5, borderColor=rule, borderPadding=6, spaceBefore=16))
+    styles.add(ParagraphStyle(name="BookletReward", parent=styles["BookletHeading"], spaceBefore=0, spaceAfter=0))
 
     doc = SimpleDocTemplate(
         str(output_path),
@@ -219,7 +219,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
 
     def gallery(entries, columns=2, max_height=80 * mm):
         if not entries:
-            return
+            return []
         columns = min(columns, len(entries))
         width = doc.width / columns
         cells = []
@@ -229,6 +229,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
             except (OSError, ValueError):
                 continue
             cells.append([photo, Spacer(1, 4), Paragraph(_p(entry["label"]), styles["BookletCaption"])])
+        rows = []
         for offset in range(0, len(cells), columns):
             row = cells[offset:offset + columns]
             row += [""] * (columns - len(row))
@@ -239,7 +240,8 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
             ]))
-            story.append(table)
+            rows.append(table)
+        return rows
 
     story.append(Paragraph("БУКЛЕТ КАВАЛЕРА", styles["BookletCaption"]))
     story.append(Paragraph(_p(person.get("fio")), styles["BookletTitle"]))
@@ -247,7 +249,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     if identity:
         story.append(Paragraph(_p(" · ".join(identity)), styles["BookletBody"]))
     story.append(Spacer(1, 10))
-    gallery(context["identity_photos"], columns=3, max_height=70 * mm)
+    story.extend(gallery(context["identity_photos"], columns=3, max_height=70 * mm))
 
     story.append(Paragraph("Все награды кавалера", styles["BookletHeading"]))
     for group in context["reward_photo_groups"]:
@@ -266,10 +268,22 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     _add_text_block(story, styles, Paragraph, "Краткая биография", person.get("biography"))
     if context["person_documents"]:
         story.append(Paragraph("Документы кавалера", styles["BookletHeading"]))
-        gallery(context["person_documents"])
+        story.extend(gallery(context["person_documents"]))
     for group in context["reward_photo_groups"]:
-        story.append(Paragraph(_p(group["title"]), styles["BookletReward"]))
-        gallery(group["photos"])
+        title = Paragraph(_p(group["title"]), styles["BookletReward"])
+        rows = [[title], *[[row] for row in gallery(group["photos"])]]
+        article = Table(rows, colWidths=[doc.width], repeatRows=1)
+        article.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, rule),
+            ("LINEBELOW", (0, 0), (-1, 0), 0.5, rule),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING", (0, 0), (-1, 0), 6),
+            ("RIGHTPADDING", (0, 0), (-1, 0), 6),
+            ("TOPPADDING", (0, 0), (-1, 0), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+        ]))
+        story.extend([Spacer(1, 12), article])
     _add_links(story, styles, Paragraph, context["links"])
     _add_text_block(story, styles, Paragraph, "Комментарий / заметки", person.get("comment"))
 
