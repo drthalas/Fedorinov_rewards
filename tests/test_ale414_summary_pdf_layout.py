@@ -64,10 +64,9 @@ class SummaryPDFLayoutTests(unittest.TestCase):
                 "existing filters",
             )
 
-    def test_landscape_and_accepted_render_profile_remain_frozen(self) -> None:
+    def test_accepted_render_profile_remains_frozen(self) -> None:
         source = (ROOT / "backend/app/services/summary_pdf.py").read_text(encoding="utf-8")
 
-        self.assertIn("page_size = landscape(A4 if visible_column_count <= 3 else A3)", source)
         self.assertEqual(SUMMARY_PDF_IMAGE_DPI, 200)
         self.assertIn("subsampling=0", source)
         self.assertIn("image._restrictSize(safe_width, safe_height)", source)

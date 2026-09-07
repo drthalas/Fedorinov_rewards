@@ -186,15 +186,14 @@ def _build_summary_cards_pdf(
         raise SummaryPDFError("PDF-библиотека reportlab не установлена.") from exc
 
     buffer = BytesIO()
-    visible_column_count = len(columns) + 1 + int(include_reward_number)
-    page_size = landscape(A4 if visible_column_count <= 3 else A3)
+    page_size = A4
     margin = 10 * mm
     font_name, bold_font_name = _register_pdf_font_pair(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
     for style in styles.byName.values():
         style.fontName = font_name
     styles.add(ParagraphStyle(name="CardHeader", parent=styles["BodyText"], fontName=bold_font_name, fontSize=11, leading=13))
-    styles.add(ParagraphStyle(name="CardIdentity", parent=styles["BodyText"], fontName=bold_font_name, fontSize=11.5, leading=14))
+    styles.add(ParagraphStyle(name="CardIdentity", parent=styles["BodyText"], fontName=bold_font_name, fontSize=12, leading=14))
     styles.add(ParagraphStyle(name="CardBody", parent=styles["BodyText"], fontName=font_name, fontSize=10.5, leading=12.5))
     styles.add(ParagraphStyle(name="CardFilters", parent=styles["BodyText"], fontName=bold_font_name, fontSize=12, leading=15))
 
@@ -244,12 +243,12 @@ def _build_summary_cards_pdf(
     table_data: list[list[object]] = [header]
     for row in sort_summary_pdf_rows(matrix.get("rows") or [], sort_by):
         paths = row.get("photo_paths") or {}
-        identity = ", ".join(
+        birth_year = format_birth_year(row.get("birthday"))
+        identity_details = ", ".join(
             value
             for value in (
-                str(row.get("fio") or "—"),
                 str(row.get("rank_name") or "—"),
-                format_birth_year(row.get("birthday")),
+                f"{birth_year} г.р." if birth_year and birth_year != "—" else "",
             )
             if value and value != "—"
         )
@@ -257,15 +256,20 @@ def _build_summary_cards_pdf(
             _summary_pdf_image_cell(
                 settings,
                 paths.get("person_foto"),
-                identity,
+                "",
                 styles["CardIdentity"],
                 Paragraph,
                 Image,
                 Spacer,
-                min(48 * mm, card_width - SUMMARY_PDF_CELL_PADDING),
+                card_width - SUMMARY_PDF_CELL_PADDING,
                 36 * mm,
                 image_cache,
             )
+        ]
+        cells[0][0:0] = [
+            Paragraph(_p(row.get("fio")), styles["CardIdentity"]),
+            Paragraph(_p(identity_details), styles["CardBody"]),
+            Spacer(1, 4),
         ]
         if include_reward_number:
             cells.append(
@@ -285,7 +289,7 @@ def _build_summary_cards_pdf(
                     Paragraph,
                     Image,
                     Spacer,
-                    min(40 * mm, photo_widths[column_index] - SUMMARY_PDF_CELL_PADDING),
+                    photo_widths[column_index] - SUMMARY_PDF_CELL_PADDING,
                     50 * mm,
                     image_cache,
                 )
@@ -487,7 +491,7 @@ def _build_pdf(
         raise SummaryPDFError("PDF-библиотека reportlab не установлена.") from exc
 
     buffer = BytesIO()
-    page_size = _page_size(len(headers), compact, landscape(A3), landscape(A4))
+    page_size = _page_size(len(headers), compact, landscape(A3), A4)
     margin = 8 * mm if compact else 10 * mm
     font_name = _register_pdf_font(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()

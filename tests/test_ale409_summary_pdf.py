@@ -120,7 +120,7 @@ class SummaryPDFOptionsTests(unittest.TestCase):
     def test_pdf_typography_uses_larger_bold_identity_and_filters(self) -> None:
         source = (ROOT / "backend/app/services/summary_pdf.py").read_text(encoding="utf-8")
         self.assertIn('name="CardIdentity"', source)
-        self.assertIn("fontName=bold_font_name, fontSize=11.5", source)
+        self.assertIn("fontName=bold_font_name, fontSize=12", source)
         self.assertIn('name="CardFilters"', source)
         self.assertIn("fontName=bold_font_name, fontSize=12", source)
 
