@@ -96,7 +96,7 @@
         <input name="price_now" value="{{ reward.price_now or '' }}" inputmode="numeric" autocomplete="off">
       </label>
     </div>
-    <input name="instock" type="hidden" value="{{ 'true' if reward.instock else '' }}">
+    <input name="instock" type="hidden" value="{{ reward.instock or '' }}">
   </fieldset>
 
   {% for photo in photo_controls %}

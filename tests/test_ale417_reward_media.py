@@ -3,6 +3,8 @@ import unittest
 
 from backend.app.services.photos import REWARD_PHOTO_FIELDS, PERSON_PHOTO_FIELDS
 from backend.app.services.summary_pdf import normalize_summary_pdf_media_fields
+from backend.app.repositories.rewards_write import reward_data_from_mapping
+from jinja2 import Environment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,7 +14,11 @@ class RewardMediaPresentationTests(unittest.TestCase):
         template = (ROOT / "backend/app/templates/reward_form.html").read_text(encoding="utf-8")
         self.assertNotIn('name="instock" type="checkbox"', template)
         self.assertNotIn("В наличии", template)
-        self.assertIn('name="instock" type="hidden" value="{{ \'true\' if reward.instock else \'\' }}"', template)
+        self.assertIn('name="instock" type="hidden" value="{{ reward.instock or \'\' }}"', template)
+        field = Environment().from_string("{{ reward.instock or '' }}")
+        for value, expected in [(0, False), (1, True), ("0", False), ("1", True), ("false", False), ("true", True), (None, False)]:
+            rendered = field.render(reward={"instock": value})
+            self.assertEqual(reward_data_from_mapping({"instock": rendered}).instock, expected)
 
     def test_only_reward_document_labels_change(self):
         reward = {item.field: item for item in REWARD_PHOTO_FIELDS}
