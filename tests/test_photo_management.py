@@ -129,7 +129,7 @@ class PhotoManagementTests(unittest.TestCase):
         row = {"person_foto": replacement, "main_foto": "Source/1/neighbor.jpg"}
         controls = photo_items("person", row)
         self.assertEqual(controls[0]["label"], "Фото кавалера")
-        self.assertEqual(controls[1]["label"], "Главное фото")
+        self.assertEqual(controls[1]["label"], "Дополнительное фото")
 
         clear_photo(self.settings(), "person", 1, "person_foto")
         self.assertIsNone(self.fetch_value("person", 1, "person_foto"))

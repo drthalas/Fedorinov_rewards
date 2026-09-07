@@ -57,7 +57,8 @@ class PersonBookletTests(unittest.TestCase):
 
     def _create_db(self) -> None:
         (self.root / "Source" / "1").mkdir(parents=True)
-        (self.root / "Source" / "1" / "FotoPerson.jpg").write_bytes(b"fake jpg")
+        from PIL import Image
+        Image.new("RGB", (120, 160), "grey").save(self.root / "Source" / "1" / "FotoPerson.jpg")
         with sqlite3.connect(self.db_path) as connection:
             connection.execute("create table guide (id integer primary key, name text)")
             for level in range(4):

@@ -12,7 +12,7 @@ from ..repositories.persons import get_person, list_person_rewards
 from .display import format_birth_year, format_bool, format_date, format_money, has_media_path, safe_external_url
 from .media import resolve_media
 from .person_files import _safe_filename
-from .photos import PERSON_PHOTO_FIELDS, REWARD_PHOTO_FIELDS
+from .photos import PERSON_PHOTO_FIELDS, REWARD_PHOTO_FIELDS, PhotoField
 
 
 class BookletError(ValueError):
@@ -142,18 +142,26 @@ def person_booklet_context(settings: Settings, person_id: int, return_to: str = 
     person = get_person(settings.rewards_db_path, person_id)
     if person is None:
         raise BookletError("Награжденный не найден.")
-    rewards = list_person_rewards(settings.rewards_db_path, person_id)
+    rewards = list_person_rewards(settings.rewards_db_path, person_id, ranked=True)
+    photos = _photo_entries(settings, person, PERSON_PHOTO_FIELDS)
+    by_field = {photo["field"]: photo for photo in photos}
+    groups = []
+    for reward in rewards:
+        reference = _photo_entries(settings, reward, [PhotoField("reward_image_path", "Изображение награды", "")])[0]
+        groups.append({
+            "reward": reward,
+            "title": f"{reward.get('name') or 'Награда'}, № {reward.get('number') or '—'}",
+            "reference": reference,
+            "photos": [photo for photo in _photo_entries(settings, reward, REWARD_PHOTO_FIELDS) if photo["available"]],
+        })
     return {
         "person": person,
         "rewards": rewards,
-        "person_photos": _photo_entries(settings, person, PERSON_PHOTO_FIELDS),
-        "reward_photo_groups": [
-            {
-                "reward": reward,
-                "photos": _photo_entries(settings, reward, REWARD_PHOTO_FIELDS),
-            }
-            for reward in rewards
-        ],
+        "birth_line": f"{format_birth_year(person['birthday'])} года рождения" if person.get("birthday") else "",
+        "person_photos": photos,
+        "identity_photos": [by_field[field] for field in ("person_foto", "main_foto", "rewards_foto") if by_field[field]["available"]],
+        "person_documents": [by_field[field] for field in ("card1_foto", "card2_foto", "book1_foto", "book2_foto") if by_field[field]["available"]],
+        "reward_photo_groups": groups,
         "links": _person_links(person),
         "return_to": return_to,
     }
@@ -162,9 +170,6 @@ def person_booklet_context(settings: Settings, person_id: int, return_to: str = 
 def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path: Path | None = None) -> BookletPDFResult:
     context = person_booklet_context(settings, person_id)
     person = context["person"]
-    rewards = context["rewards"]
-    person_photos = context["person_photos"]
-    reward_photo_groups = context["reward_photo_groups"]
 
     try:
         from reportlab.lib import colors
@@ -173,7 +178,8 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         from reportlab.lib.units import mm
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from .summary_pdf import _summary_pdf_image
     except ImportError as exc:
         raise BookletError("PDF-библиотека reportlab не установлена. Используйте печать страницы буклета в PDF.") from exc
 
@@ -187,13 +193,17 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         filename = output_path.name
 
-    font_name = _register_pdf_font(pdfmetrics, TTFont)
+    font_name, bold_font = _register_booklet_serif(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
     for style in styles.byName.values():
         style.fontName = font_name
-    styles.add(ParagraphStyle(name="BookletTitle", parent=styles["Title"], fontName=font_name, fontSize=20, leading=24))
-    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=font_name, fontSize=13, leading=16))
-    styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=9, leading=12))
+    ink = colors.HexColor("#302d27")
+    rule = colors.HexColor("#b8ac95")
+    styles.add(ParagraphStyle(name="BookletTitle", parent=styles["Title"], fontName=bold_font, fontSize=23, leading=26, alignment=0, textColor=ink))
+    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink))
+    styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=13, textColor=ink))
+    styles.add(ParagraphStyle(name="BookletCaption", parent=styles["BookletBody"], fontSize=8, leading=10, textColor=colors.HexColor("#655d4f")))
+    styles.add(ParagraphStyle(name="BookletReward", parent=styles["BookletHeading"], borderWidth=0.5, borderColor=rule, borderPadding=6, spaceBefore=16))
 
     doc = SimpleDocTemplate(
         str(output_path),
@@ -205,57 +215,77 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         title=f"Буклет кавалера - {person.get('fio') or person_id}",
     )
     story: list[object] = []
+    image_cache = {}
 
-    story.append(Paragraph("Буклет кавалера", styles["BookletTitle"]))
-    story.append(Paragraph(_p(person.get("fio")), styles["Heading1"]))
-    story.append(_key_value_table(
-        [
-            ("ФИО", person.get("fio")),
-            ("Звание / специальность", person.get("rank_name")),
-            ("Год рождения", format_birth_year(person.get("birthday"))),
-        ],
-        Paragraph,
-        Table,
-        TableStyle,
-        colors,
-        styles,
-    ))
-    _add_text_block(story, styles, Paragraph, "Краткая биография", person.get("biography"))
-    _add_text_block(story, styles, Paragraph, "Комментарий / заметки", person.get("comment"))
-    _add_links(story, styles, Paragraph, context["links"])
-    _add_photos(story, styles, Paragraph, Image, person_photos)
+    def gallery(entries, columns=2, max_height=80 * mm):
+        if not entries:
+            return
+        columns = min(columns, len(entries))
+        width = doc.width / columns
+        cells = []
+        for entry in entries:
+            try:
+                photo = _summary_pdf_image(entry["resolved_path"], Image, width - 12, max_height, image_cache)
+            except (OSError, ValueError):
+                continue
+            cells.append([photo, Spacer(1, 4), Paragraph(_p(entry["label"]), styles["BookletCaption"])])
+        for offset in range(0, len(cells), columns):
+            row = cells[offset:offset + columns]
+            row += [""] * (columns - len(row))
+            table = Table([row], colWidths=[width] * columns, hAlign="LEFT")
+            table.setStyle(TableStyle([
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+            ]))
+            story.append(table)
 
-    if rewards:
-        story.append(PageBreak())
-        story.append(Paragraph("Награды", styles["Heading1"]))
-    for index, reward in enumerate(rewards, start=1):
-        story.append(Paragraph(f"{index}. {_p(reward.get('name') or 'Награда')}", styles["BookletHeading"]))
-        story.append(_key_value_table(
-            [
-                ("Государство", reward.get("gos")),
-                ("Категория", reward.get("category")),
-                ("Подкатегория", reward.get("subcategory")),
-                ("Наименование", reward.get("name")),
-                ("Номер", reward.get("number")),
-                ("Наличие", format_bool(reward.get("instock"), "В наличии", "Нет")),
-                ("Дата покупки", format_date(reward.get("date_purchase"))),
-                ("Цена покупки", format_money(reward.get("price_purchase"))),
-                ("Текущая цена", format_money(reward.get("price_now"))),
-            ],
-            Paragraph,
-            Table,
-            TableStyle,
-            colors,
-            styles,
-        ))
-        photo_group = reward_photo_groups[index - 1]
-        _add_photos(story, styles, Paragraph, Image, photo_group["photos"])
-        story.append(Spacer(1, 8))
+    story.append(Paragraph("БУКЛЕТ КАВАЛЕРА", styles["BookletCaption"]))
+    story.append(Paragraph(_p(person.get("fio")), styles["BookletTitle"]))
+    identity = [str(value) for value in (person.get("rank_name"), context["birth_line"]) if value]
+    if identity:
+        story.append(Paragraph(_p(" · ".join(identity)), styles["BookletBody"]))
+    story.append(Spacer(1, 10))
+    gallery(context["identity_photos"], columns=3, max_height=70 * mm)
 
-    if not rewards:
+    story.append(Paragraph("Все награды кавалера", styles["BookletHeading"]))
+    for group in context["reward_photo_groups"]:
+        reference = group["reference"]
+        photo = ""
+        if reference["available"]:
+            try:
+                photo = _summary_pdf_image(reference["resolved_path"], Image, 14 * mm, 16 * mm, image_cache)
+            except (OSError, ValueError):
+                pass
+        row = Table([[photo, Paragraph(_p(group["title"]), styles["BookletBody"])]], colWidths=[18 * mm, doc.width - 18 * mm])
+        row.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("LINEBELOW", (0, 0), (-1, -1), 0.3, rule), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
+        story.append(row)
+    if not context["rewards"]:
         story.append(Paragraph("Награды не найдены.", styles["BookletBody"]))
+    _add_text_block(story, styles, Paragraph, "Краткая биография", person.get("biography"))
+    if context["person_documents"]:
+        story.append(Paragraph("Документы кавалера", styles["BookletHeading"]))
+        gallery(context["person_documents"])
+    for group in context["reward_photo_groups"]:
+        story.append(Paragraph(_p(group["title"]), styles["BookletReward"]))
+        gallery(group["photos"])
+    _add_links(story, styles, Paragraph, context["links"])
+    _add_text_block(story, styles, Paragraph, "Комментарий / заметки", person.get("comment"))
 
-    doc.build(story)
+    def paper(canvas, document):
+        canvas.saveState()
+        canvas.setFillColor(colors.HexColor("#f7f3e9"))
+        canvas.rect(0, 0, *A4, fill=1, stroke=0)
+        canvas.setStrokeColor(rule)
+        canvas.setLineWidth(0.5)
+        canvas.rect(8 * mm, 8 * mm, A4[0] - 16 * mm, A4[1] - 16 * mm, fill=0)
+        canvas.setFont(font_name, 8)
+        canvas.setFillColor(ink)
+        canvas.drawCentredString(A4[0] / 2, 5 * mm, str(document.page))
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=paper, onLaterPages=paper)
     return BookletPDFResult(path=output_path, filename=filename)
 
 
@@ -295,16 +325,23 @@ def _photo_entries(settings: Settings, row: dict[str, object], fields) -> list[d
                 entry["missing"] = True
                 entry["reason"] = resolution.fallback_reason or "Файл изображения не найден"
             else:
-                entry["available"] = True
-                entry["resolved_path"] = resolution.serving_path
+                try:
+                    from PIL import Image
+                    with Image.open(resolution.serving_path) as image:
+                        image.verify()
+                    entry["available"] = True
+                    entry["resolved_path"] = resolution.serving_path
+                except (OSError, ValueError):
+                    entry["missing"] = True
+                    entry["reason"] = "Файл изображения повреждён или не поддерживается"
         entries.append(entry)
     return entries
 
 
 def _person_links(person: dict[str, object]) -> list[dict[str, str]]:
     links = [
-        {"label": 'Ссылка на сайт "Память народа"', "value": str(person.get("link1") or "")},
-        {"label": 'Ссылка на сайт "Форум коллекционеров"', "value": str(person.get("link2") or "")},
+        {"label": "Память народа", "value": str(person.get("link1") or "")},
+        {"label": "Форум коллекционеров", "value": str(person.get("link2") or "")},
     ]
     for link in links:
         link["url"] = safe_external_url(link["value"])
@@ -324,6 +361,23 @@ def _register_pdf_font(pdfmetrics, TTFont) -> str:
             except Exception:
                 continue
     return "Helvetica"
+
+
+def _register_booklet_serif(pdfmetrics, TTFont) -> tuple[str, str]:
+    for regular, bold in [
+        ("C:/Windows/Fonts/times.ttf", "C:/Windows/Fonts/timesbd.ttf"),
+        ("/System/Library/Fonts/Supplemental/Times New Roman.ttf", "/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf"),
+        ("/usr/share/fonts/truetype/liberation2/LiberationSerif-Regular.ttf", "/usr/share/fonts/truetype/liberation2/LiberationSerif-Bold.ttf"),
+    ]:
+        if Path(regular).is_file() and Path(bold).is_file():
+            try:
+                pdfmetrics.registerFont(TTFont("BookletSerif", regular))
+                pdfmetrics.registerFont(TTFont("BookletSerifBold", bold))
+                return "BookletSerif", "BookletSerifBold"
+            except (OSError, ValueError):
+                continue
+    font = _register_pdf_font(pdfmetrics, TTFont)
+    return font, font
 
 
 def _font_candidates() -> list[Path]:

@@ -42,11 +42,11 @@
 
 <section class="grid person-detail-grid compact-person-detail-grid cavalier-profile-grid">
   <div class="panel person-main-photo-panel compact-main-photo-panel">
-    <h2>Главное фото</h2>
+    <h2>Дополнительное фото</h2>
     <div class="photo-frame">
     {% if has_media_path(person.main_foto) %}
-    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Главное фото', '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="Главное фото" data-lightbox-src="{{ media_url(person.main_foto) }}">
-      <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Главное фото">
+    <a class="photo-link" href="{{ photo_view_url(person.main_foto, 'Дополнительное фото', '/persons/' ~ person.id) }}" data-lightbox-group="{{ person_lightbox_group }}" data-lightbox-caption="Дополнительное фото" data-lightbox-src="{{ media_url(person.main_foto) }}">
+      <img class="photo" src="{{ media_url(person.main_foto) }}" alt="Дополнительное фото">
     </a>
     {% else %}
     <div class="photo photo-placeholder">Нет фото</div>

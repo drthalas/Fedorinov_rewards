@@ -35,7 +35,7 @@ class PhotoMutationResult:
 
 PERSON_PHOTO_FIELDS = (
     PhotoField("person_foto", "Фото кавалера", "фото_кавалера"),
-    PhotoField("main_foto", "Главное фото", "главное_фото"),
+    PhotoField("main_foto", "Дополнительное фото", "главное_фото"),
     PhotoField("rewards_foto", "Общее фото наград", "фото_наград"),
     PhotoField("book1_foto", "Фото наградной книжки, сторона 1", "наградная_книжка_1"),
     PhotoField("book2_foto", "Фото наградной книжки, сторона 2", "наградная_книжка_2"),

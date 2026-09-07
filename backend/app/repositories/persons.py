@@ -85,8 +85,11 @@ def get_person(db_path: Path, person_id: int) -> dict[str, object] | None:
     )
 
 
-def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]]:
+def list_person_rewards(db_path: Path, person_id: int, *, ranked: bool = False) -> list[dict[str, object]]:
     reward_image_expr = "g3.image_path" if reward_guide_has_image(db_path) else "null"
+    columns = {row["name"] for row in fetch_all(db_path, "pragma table_info(guide_lev_3)")} if ranked else set()
+    rating_expr = "g3.rating_rank" if "rating_rank" in columns else "null"
+    order = f"case when {rating_expr} > 0 then 0 else 1 end, case when {rating_expr} > 0 then {rating_expr} end, r.id" if ranked else "r.id"
     return fetch_all(
         db_path,
         f"""
@@ -98,6 +101,7 @@ def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]
             g2.name as subcategory,
             g3.name as name,
             {reward_image_expr} as reward_image_path,
+            {rating_expr} as rating_rank,
             r.number,
             r.instock,
             r.date_purchase,
@@ -114,7 +118,7 @@ def list_person_rewards(db_path: Path, person_id: int) -> list[dict[str, object]
         left join guide_lev_2 g2 on g2.id = r.id_sub_catigory
         left join guide_lev_3 g3 on g3.id = r.id_name
         where r.person_id = ?
-        order by r.id
+        order by {order}
         """,
         (person_id,),
     )

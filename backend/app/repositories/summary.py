@@ -42,7 +42,7 @@ SUMMARY_CSV_HEADERS = [
 
 SUMMARY_MATRIX_PHOTO_COLUMNS = [
     ("person_foto", "Фото кавалера"),
-    ("main_foto", "Главное фото"),
+    ("main_foto", "Дополнительное фото"),
     ("rewards_foto", "Общее фото наград"),
     ("book1_foto", "Фото наградной книжки, сторона 1"),
     ("book2_foto", "Фото наградной книжки, сторона 2"),

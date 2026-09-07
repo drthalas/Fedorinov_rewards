@@ -216,7 +216,7 @@ class FormPolishTests(unittest.TestCase):
         context = response["context"]
         labels = [item["label"] for item in context["photo_controls"]]
         self.assertIn("Фото кавалера", labels)
-        self.assertIn("Главное фото", labels)
+        self.assertIn("Дополнительное фото", labels)
         self.assertIn("Общее фото наград", labels)
         self.assertIn("Фото учётной карточки, страница 1", labels)
         self.assertIn("Фото учётной карточки, страница 2", labels)
@@ -364,8 +364,8 @@ class FormPolishTests(unittest.TestCase):
         labels = [item["label"] for item in context["photo_controls"]]
         self.assertIn("Фото награды: аверс", labels)
         self.assertIn("Фото награды: реверс", labels)
-        self.assertIn("Фото книжки, сторона 1", labels)
-        self.assertIn("Фото книжки, сторона 2", labels)
+        self.assertIn("Дополнительный документ 1", labels)
+        self.assertIn("Дополнительный документ 2", labels)
         self.assertIn("Наградной лист", labels)
 
     def test_reward_edit_omits_next_actions(self) -> None:
