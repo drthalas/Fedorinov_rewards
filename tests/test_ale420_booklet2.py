@@ -9,7 +9,7 @@ from unittest.mock import patch
 from backend.app.routers import persons
 from backend.app.routers.templates import templates
 from backend.app.services.booklet2 import booklet2_context, generate_booklet2_pdf
-from backend.app.services.booklets import person_booklet_context
+from backend.app.services.booklets import generate_person_booklet_pdf, person_booklet_context
 from tests import test_ale419_booklet_dossier as fixture
 from tests.test_person_booklet import FakeRequest
 
@@ -74,6 +74,38 @@ class Booklet2Tests(unittest.TestCase):
             db.execute('alter table guide add column image_path text')
             db.execute("update guide set image_path='Source/1/portrait.png'")
         self.assertEqual(booklet2_context(self.settings, 1)['rank_insignia']['path'], 'Source/1/portrait.png')
+
+    def test_every_pdf_caption_is_centered_under_its_own_image(self):
+        from reportlab.platypus import Image, Paragraph
+        original_image, original_paragraph = Image.draw, Paragraph.draw
+        for generate in (generate_person_booklet_pdf, generate_booklet2_pdf):
+            images, captions = [], []
+
+            def point(canvas, x, y):
+                a, b, c, d, e, f = canvas._currentMatrix
+                return a*x+c*y+e, b*x+d*y+f
+
+            def image_draw(image):
+                images.append((point(image.canv, image.drawWidth/2, image.drawHeight/2)[0], point(image.canv, image.drawWidth/2, 0)[1], image.drawWidth))
+                return original_image(image)
+
+            def paragraph_draw(paragraph):
+                if paragraph.style.name in {'BookletPhotoCaption', 'EditorialPhotoCaption'}:
+                    center_x, bottom, width = images[-1]
+                    caption_top = point(paragraph.canv, paragraph.width/2, paragraph.height)
+                    self.assertEqual(paragraph.style.alignment, 1)
+                    self.assertAlmostEqual(center_x, caption_top[0], delta=.1)
+                    self.assertGreater(bottom, caption_top[1])
+                    self.assertLess(bottom-caption_top[1], 12)
+                    self.assertLessEqual(paragraph.width, width+6.01)
+                    captions.append(paragraph.getPlainText())
+                return original_paragraph(paragraph)
+
+            with self.subTest(flow=generate.__name__), patch.object(Image, 'draw', image_draw), patch.object(Paragraph, 'draw', paragraph_draw):
+                generate(self.settings, 1, self.root/'captions.pdf')
+            context = person_booklet_context(self.settings, 1)
+            expected = [p['label'] for p in [*context['identity_photos'], *context['person_documents'], *[p for group in context['reward_photo_groups'] for p in group['photos']]]]
+            self.assertCountEqual(captions, expected)
 
 
 if __name__ == '__main__':

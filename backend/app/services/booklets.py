@@ -204,6 +204,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink, keepWithNext=True))
     styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=13, textColor=ink))
     styles.add(ParagraphStyle(name="BookletCaption", parent=styles["BookletBody"], fontSize=8, leading=10, textColor=colors.HexColor("#655d4f")))
+    styles.add(ParagraphStyle(name="BookletPhotoCaption", parent=styles["BookletCaption"], alignment=1))
     styles.add(ParagraphStyle(name="BookletReward", parent=styles["BookletHeading"], spaceBefore=0, spaceAfter=0))
 
     doc = SimpleDocTemplate(
@@ -229,7 +230,14 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
                 photo = _summary_pdf_image(entry["resolved_path"], Image, width - 12, max_height, image_cache)
             except (OSError, ValueError):
                 continue
-            cells.append([photo, Spacer(1, 4), Paragraph(_p(entry["label"]), styles["BookletCaption"])])
+            caption = Table([[Paragraph(_p(entry["label"]), styles["BookletPhotoCaption"])]], colWidths=[photo.drawWidth], hAlign="CENTER")
+            caption.setStyle(TableStyle([
+                ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            cells.append([photo, Spacer(1, 4), caption])
         rows = []
         for offset in range(0, len(cells), columns):
             row = cells[offset:offset + columns]

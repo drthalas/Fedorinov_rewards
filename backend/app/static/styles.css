@@ -3106,6 +3106,7 @@ body.biography-editor-open {
 
 .booklet-photo-grid figcaption {
   margin-top: 5px;
+  text-align: center;
   font-size: 13px;
   color: #655d4f;
 }
