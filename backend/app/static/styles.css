@@ -3088,6 +3088,8 @@ body.biography-editor-open {
 }
 
 .booklet-photo-grid figure {
+  --photo-frame-height: 320px;
+  container-type: inline-size;
   margin: 0;
   min-width: 0;
   break-inside: avoid;
@@ -3104,9 +3106,15 @@ body.biography-editor-open {
   height: 300px;
 }
 
+.booklet-identity-photos figure {
+  --photo-frame-height: 300px;
+}
+
 .booklet-photo-grid figcaption {
   margin-top: 5px;
   text-align: center;
+  /* Move only the caption to the contained image edge; keep the fixed photo slot. */
+  transform: translateY(calc((min(var(--photo-frame-height), 100cqw / var(--photo-ratio)) - var(--photo-frame-height)) / 2));
   font-size: 13px;
   color: #655d4f;
 }

@@ -361,6 +361,7 @@ def _photo_entries(settings: Settings, row: dict[str, object], fields) -> list[d
                 try:
                     from PIL import Image
                     with Image.open(resolution.serving_path) as image:
+                        entry["aspect_ratio"] = image.width / image.height
                         image.verify()
                     entry["available"] = True
                     entry["resolved_path"] = resolution.serving_path
