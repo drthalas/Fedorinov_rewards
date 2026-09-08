@@ -176,6 +176,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import mm
+        from reportlab.lib.utils import ImageReader
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -198,7 +199,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     for style in styles.byName.values():
         style.fontName = font_name
     ink = colors.HexColor("#302d27")
-    rule = colors.HexColor("#b8ac95")
+    rule = colors.HexColor("#9d9584")
     styles.add(ParagraphStyle(name="BookletTitle", parent=styles["Title"], fontName=bold_font, fontSize=23, leading=26, alignment=0, textColor=ink))
     styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink, keepWithNext=True))
     styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=13, textColor=ink))
@@ -287,10 +288,20 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     _add_links(story, styles, Paragraph, context["links"])
     _add_text_block(story, styles, Paragraph, "Комментарий / заметки", person.get("comment"))
 
+    paper_tile = ImageReader(str(Path(__file__).resolve().parents[1] / "static" / "booklet-paper-v1.png"))
+
     def paper(canvas, document):
         canvas.saveState()
-        canvas.setFillColor(colors.HexColor("#f7f3e9"))
-        canvas.rect(0, 0, *A4, fill=1, stroke=0)
+        # Reuse one small tile and one page form, never a full-page raster.
+        if not canvas.hasForm("BookletPaper"):
+            canvas.beginForm("BookletPaper", 0, 0, *A4)
+            canvas.setFillColor(colors.HexColor("#e2dfd5"))
+            canvas.rect(0, 0, *A4, fill=1, stroke=0)
+            for y in range(0, int(A4[1]) + 1, 48):
+                for x in range(0, int(A4[0]) + 1, 48):
+                    canvas.drawImage(paper_tile, x, y, width=48, height=48)
+            canvas.endForm()
+        canvas.doForm("BookletPaper")
         canvas.setStrokeColor(rule)
         canvas.setLineWidth(0.5)
         canvas.rect(8 * mm, 8 * mm, A4[0] - 16 * mm, A4[1] - 16 * mm, fill=0)

@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from PIL import Image
+from PIL import ImageStat
 
 from backend.app.repositories.persons import list_person_rewards
 from backend.app.routers import persons as persons_router
@@ -48,6 +49,46 @@ class BookletDossierTests(unittest.TestCase):
         reference = context["reward_photo_groups"][3]["reference"]
         self.assertTrue(reference["available"])
         self.assertEqual(reference["path"], "Source/1/portrait.png")
+
+    def test_paper_tile_is_small_warm_nonwhite_and_print_safe(self):
+        asset = fixture.ROOT / "backend/app/static/booklet-paper-v1.png"
+        self.assertLess(asset.stat().st_size, 16_384)
+        with Image.open(asset) as image:
+            self.assertEqual(image.size, (128, 128))
+            stats = ImageStat.Stat(image.convert("RGB"))
+            for value, expected in zip(stats.mean, (226, 223, 213)):
+                self.assertAlmostEqual(value, expected, delta=0.2)
+            self.assertTrue(all(1 < value < 4 for value in stats.stddev))
+        css = (fixture.ROOT / "backend/app/static/styles.css").read_text()
+        screen = css.split(".booklet-document {", 1)[1].split("}", 1)[0]
+        print_body = css.split("body.booklet-page {", 1)[1].split("}", 1)[0]
+        for rules in (screen, print_body):
+            self.assertIn("var(--booklet-paper) var(--booklet-grain) repeat", rules)
+            self.assertIn("print-color-adjust: exact", rules)
+            self.assertNotIn("#fff", rules)
+
+    def test_pdf_reuses_one_small_paper_tile_on_every_page(self):
+        from reportlab.pdfgen.canvas import Canvas
+        from reportlab.lib.utils import ImageReader
+        original_image, original_form = Canvas.drawImage, Canvas.doForm
+        tiles, pages = [], []
+
+        def draw_image(canvas, image, x, y, width=None, height=None, *args, **kwargs):
+            if isinstance(image, ImageReader) and image.getSize() == (128, 128):
+                tiles.append((x, y, width, height))
+            return original_image(canvas, image, x, y, width, height, *args, **kwargs)
+
+        def do_form(canvas, name):
+            if name == "BookletPaper":
+                pages.append(canvas.getPageNumber())
+            return original_form(canvas, name)
+
+        with patch.object(Canvas, "drawImage", draw_image), patch.object(Canvas, "doForm", do_form):
+            generate_person_booklet_pdf(self.settings, 1, self.root / "paper.pdf")
+        self.assertGreater(len(pages), 1)
+        self.assertEqual(pages, list(range(1, len(pages) + 1)))
+        self.assertEqual(len(tiles), 13 * 18)
+        self.assertTrue(all(tile[2:] == (48, 48) for tile in tiles))
 
     def test_corrupt_and_missing_media_are_not_printable_placeholders(self):
         (self.root / "Source" / "1" / "broken.jpg").write_bytes(b"not an image")

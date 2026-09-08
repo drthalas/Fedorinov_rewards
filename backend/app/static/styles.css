@@ -2962,6 +2962,9 @@ body.biography-editor-open {
 }
 
 .booklet-page {
+  --booklet-paper: #e2dfd5;
+  --booklet-grain: url("booklet-paper-v1.png");
+  --booklet-rule: #9d9584;
   background: #d8d6d0;
   color: #302d27;
 }
@@ -2975,8 +2978,8 @@ body.biography-editor-open {
   gap: 8px;
   align-items: center;
   padding: 12px 18px;
-  border-bottom: 1px solid #b8ac95;
-  background: #f7f3e9;
+  border-bottom: 1px solid var(--booklet-rule);
+  background: var(--booklet-paper);
 }
 
 .booklet-toolbar form {
@@ -2988,9 +2991,12 @@ body.biography-editor-open {
   width: min(900px, calc(100% - 32px));
   margin: 20px auto 36px;
   padding: 32px;
-  background: #f7f3e9;
-  border: 1px solid #b8ac95;
-  outline: 1px solid #b8ac95;
+  background: var(--booklet-paper) var(--booklet-grain) repeat;
+  background-size: 64px 64px;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+  border: 1px solid var(--booklet-rule);
+  outline: 1px solid var(--booklet-rule);
   outline-offset: -9px;
   font: 17px/1.45 "Times New Roman", Georgia, serif;
   overflow-wrap: anywhere;
@@ -3026,7 +3032,7 @@ body.biography-editor-open {
 .booklet-reward h2 {
   margin: 0 0 10px;
   padding-bottom: 5px;
-  border-bottom: 1px solid #b8ac95;
+  border-bottom: 1px solid var(--booklet-rule);
   font: bold 21px/1.2 "Times New Roman", Georgia, serif;
   break-after: avoid;
 }
@@ -3045,7 +3051,7 @@ body.biography-editor-open {
   align-items: center;
   gap: 10px;
   padding: 7px 0;
-  border-bottom: 1px solid #d4cbb8;
+  border-bottom: 1px solid #bab3a3;
   break-inside: avoid;
 }
 
@@ -3059,7 +3065,7 @@ body.biography-editor-open {
 .booklet-reward {
   margin-top: 20px;
   padding: 14px;
-  border: 1px solid #b8ac95;
+  border: 1px solid var(--booklet-rule);
 }
 
 .booklet-text {
@@ -3140,7 +3146,10 @@ body.biography-editor-open {
 
 @media print {
   body.booklet-page {
-    background: #fff;
+    background: var(--booklet-paper) var(--booklet-grain) repeat;
+    background-size: 64px 64px;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
   .no-print {
