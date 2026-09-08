@@ -49,6 +49,7 @@ EXCLUDED_PATTERNS = [
     "*.dll",
 ]
 EMBEDDED_UI_ASSETS = {Path(*parts) for parts in SYSTEM_UI_ASSET_PATHS}
+BOOKLET_PAPER_PATH = Path("backend/app/static/booklet-paper-v1.png")
 MAX_EMBEDDED_ASSET_TOKEN_CHARS = 1_500_000
 TRANSITION_ASSET_PATHS = (
     Path("backend/app/static/document_transition.js"),
@@ -158,6 +159,34 @@ def _embed_ui_assets() -> None:
     styles_path.write_text(":root {\n" + "\n".join(declarations) + "\n}\n" + styles, encoding="utf-8")
 
 
+def _embed_booklet_paper() -> None:
+    # Public v2.0.18 rejects standalone PNGs; keep the exact texture in text assets.
+    encoded = base64.b64encode((PROJECT_ROOT / BOOKLET_PAPER_PATH).read_bytes()).decode("ascii")
+    for relative, marker in (
+        ("backend/app/static/styles.css", 'url("booklet-paper-v1.png")'),
+        ("backend/app/static/booklet2.css", "url('booklet-paper-v1.png')"),
+    ):
+        path = PACKAGE_ROOT / relative
+        source = path.read_text(encoding="utf-8")
+        if marker not in source:
+            raise RuntimeError(f"booklet paper CSS marker missing from {relative}")
+        path.write_text(source.replace(marker, f'url("data:image/png;base64,{encoded}")'), encoding="utf-8")
+
+    image_import = "        from reportlab.lib.utils import ImageReader"
+    memory_imports = image_import + "\n        from base64 import b64decode\n        from io import BytesIO"
+    for relative, marker in (
+        ("backend/app/services/booklets.py", 'ImageReader(str(Path(__file__).resolve().parents[1] / "static" / "booklet-paper-v1.png"))'),
+        ("backend/app/services/booklet2.py", 'ImageReader(str(Path(__file__).resolve().parents[1]/"static"/"booklet-paper-v1.png"))'),
+    ):
+        path = PACKAGE_ROOT / relative
+        source = path.read_text(encoding="utf-8")
+        if source.count(marker) != 1 or source.count(image_import) != 1:
+            raise RuntimeError(f"booklet paper PDF marker missing or ambiguous in {relative}")
+        source = source.replace(image_import, memory_imports, 1)
+        source = source.replace(marker, f'ImageReader(BytesIO(b64decode("{encoded}")))', 1)
+        path.write_text(source, encoding="utf-8")
+
+
 def _bundle_legacy_updater_compatible_transition_assets() -> None:
     static_root = PACKAGE_ROOT / "backend/app/static"
     templates_root = PACKAGE_ROOT / "backend/app/templates"
@@ -228,6 +257,7 @@ def main() -> int:
 
     _copy_required_files()
     _embed_ui_assets()
+    _embed_booklet_paper()
     _bundle_legacy_updater_compatible_transition_assets()
     file_count = _make_zip()
     size = ZIP_PATH.stat().st_size

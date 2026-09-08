@@ -2,7 +2,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from zipfile import ZipFile
+import ast
 import base64
+from io import BytesIO
 import json
 import re
 import unittest
@@ -22,6 +24,44 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ReleasePackageTests(unittest.TestCase):
+    def test_booklet_paper_is_identical_in_packaged_css_and_pdf_readers(self) -> None:
+        from reportlab.lib.utils import ImageReader
+        original = (ROOT / build_windows_preview_package.BOOKLET_PAPER_PATH).read_bytes()
+        expected = ImageReader(BytesIO(original))
+        with TemporaryDirectory() as tmp:
+            package_root = Path(tmp) / "package"
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                build_windows_preview_package._copy_required_files()
+                build_windows_preview_package._embed_booklet_paper()
+            self.assertFalse((package_root / build_windows_preview_package.BOOKLET_PAPER_PATH).exists())
+            for name in ("styles.css", "booklet2.css"):
+                css = (package_root / "backend/app/static" / name).read_text(encoding="utf-8")
+                textures = re.findall(r'data:image/png;base64,([^"\)]+)', css)
+                self.assertTrue(textures)
+                self.assertTrue(all(base64.b64decode(value) == original for value in textures))
+                self.assertNotIn("booklet-paper-v1.png", css)
+            for name in ("booklets.py", "booklet2.py"):
+                source = (package_root / "backend/app/services" / name).read_text(encoding="utf-8")
+                self.assertNotIn("booklet-paper-v1.png", source)
+                calls = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "b64decode"]
+                self.assertEqual(len(calls), 1)
+                decoded = base64.b64decode(ast.literal_eval(calls[0].args[0]))
+                self.assertEqual(decoded, original)
+                actual = ImageReader(BytesIO(decoded))
+                self.assertEqual(actual.getSize(), expected.getSize())
+                self.assertEqual(actual.getRGBData(), expected.getRGBData())
+            self.assertTrue(check_package_safety.check_package(package_root)[0])
+
+    def test_booklet_paper_packaging_fails_if_a_required_marker_disappears(self) -> None:
+        with TemporaryDirectory() as tmp:
+            package_root = Path(tmp) / "package"
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                build_windows_preview_package._copy_required_files()
+                path = package_root / "backend/app/services/booklet2.py"
+                path.write_text(path.read_text().replace("booklet-paper-v1.png", "missing.png"))
+                with self.assertRaisesRegex(RuntimeError, "booklet paper PDF marker"):
+                    build_windows_preview_package._embed_booklet_paper()
+
     def test_transition_assets_use_only_paths_present_in_public_v207_package(self) -> None:
         with TemporaryDirectory() as tmp:
             package_root = Path(tmp) / "package"
