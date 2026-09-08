@@ -36,6 +36,7 @@
   {{ open_person_catalog(person, person_card_return, "button secondary-button") }}
   {{ archive_person_catalog(person, person_archive_filename, "button secondary-button") }}
   {{ person_booklet_action(person, person_card_return, "button") }}
+  <a class="button" href="/persons/{{ person.id }}/booklet2?return_to={{ person_card_return|urlencode }}">Сформировать буклет 2</a>
 </div>
 <div id="person-archive-status" class="save-as-status archive-save-status" role="status" aria-live="polite" hidden></div>
 {% endif %}

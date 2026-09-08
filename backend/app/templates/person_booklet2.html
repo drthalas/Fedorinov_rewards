@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Буклет 2 · {{ person.fio|dash }}</title>
+  <link rel="stylesheet" href="{{ static_url('styles.css') }}">
+  <link rel="stylesheet" href="{{ static_url('booklet2.css') }}">
+</head>
+<body class="editorial-page">
+  {% include "_transient_notifications.html" %}
+  <header class="editorial-toolbar no-print">
+    <a class="button secondary-button" href="{{ return_to }}">← Назад</a>
+    <button class="button secondary-button" type="button" onclick="window.print()">Печать / сохранить в PDF</button>
+    <form method="post" action="/persons/{{ person.id }}/booklet2.pdf" data-save-as-form data-save-as-filename="{{ pdf_filename }}" data-save-as-mime="application/pdf">
+      <input type="hidden" name="return_to" value="{{ return_to }}">
+      <button type="submit">Сохранить PDF</button>
+    </form>
+  </header>
+  {% macro photo(item, role='') %}
+  {% if item %}<figure class="editorial-photo {{ role }}" style="--photo-ratio: {{ item.ratio|default(1) }}">
+    <img src="{{ media_url(item.path) }}" alt="{{ item.label }}">
+    <figcaption>{{ item.label }}</figcaption>
+  </figure>{% endif %}
+  {% endmacro %}
+  <main class="editorial-sheet">
+    <header class="editorial-masthead">
+      {% if rank_insignia %}<img class="editorial-insignia" src="{{ media_url(rank_insignia.path) }}" alt="{{ person.rank_name|dash }}">{% endif %}
+      <div class="editorial-identity"><p class="editorial-kicker">Буклет кавалера</p><h1>{{ person.fio|dash }}</h1>
+        <p>{{ person.rank_name|dash }}{% if birth_line %} · {{ birth_line }}{% endif %}</p>
+      </div>
+      {% if award_icons %}<div class="editorial-medals">{% for icon in award_icons %}<img src="{{ media_url(icon.path) }}" alt="{{ icon.label }}">{% endfor %}</div>{% endif %}
+    </header>
+    {% if portrait or lead_document %}<section class="editorial-lead {{ 'editorial-lead-single' if not (portrait and lead_document) else '' }}">
+      {{ photo(portrait, 'editorial-portrait') }}{{ photo(lead_document, 'editorial-record') }}
+    </section>{% endif %}
+    {% if biography_parts or inset_photo %}<section class="editorial-narrative {{ 'editorial-image-only' if not biography_parts else '' }}">
+      {% for part in biography_parts %}
+        <p class="editorial-prose">{{ part }}</p>
+        {% if loop.index == [1, (biography_parts|length + 1) // 2]|max %}{{ photo(inset_photo, 'editorial-inset') }}{% endif %}
+      {% else %}{{ photo(inset_photo, 'editorial-inset') }}{% endfor %}
+    </section>{% endif %}
+    {% if editorial_rows %}<section>
+      {% for row in editorial_rows %}<div class="editorial-montage {{ 'editorial-solo' if row.photos|length == 1 else '' }}" style="--editorial-left: {{ row.fractions[0] }}fr; --editorial-right: {{ row.fractions[1] }}fr">
+        {% for item in row.photos %}{{ photo(item, 'editorial-wide' if row.photos|length == 1 and item.wide else 'editorial-cutting') }}{% endfor %}
+      </div>{% endfor %}
+    </section>{% endif %}
+    {% if reward_photo_groups %}<section class="editorial-award-notes"><h2>Награды</h2>
+      <ol>{% for group in reward_photo_groups %}<li data-reward-id="{{ group.reward.id }}">{{ group.title }}</li>{% endfor %}</ol>
+    </section>{% endif %}
+    {% for group in reward_photo_groups if group.photos %}<section class="editorial-award" data-reward-id="{{ group.reward.id }}">
+      <h2>{{ group.title }}</h2><div class="editorial-montage">
+      {% for item in group.photos %}{{ photo(item, 'editorial-cutting') }}{% endfor %}
+      </div>
+    </section>{% endfor %}
+    <footer class="editorial-sources">
+      {% for link in links if link.value %}<p><strong>{{ link.label }}</strong>: {% if link.url %}<a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.value }}</a>{% else %}{{ link.value }}{% endif %}</p>{% endfor %}
+      {% if person.comment %}<div class="editorial-prose">{{ person.comment }}</div>{% endif %}
+    </footer>
+  </main>
+  <script src="{{ static_url('save_as.js') }}" defer></script>
+  <script src="{{ static_url('transient_notifications.js') }}" defer></script>
+</body>
+</html>

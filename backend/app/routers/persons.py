@@ -22,6 +22,7 @@ from ..services.delete_preflight import DeletePreflightValidationError, authoriz
 from ..services.dates import BIRTH_YEAR_MAXIMUM, BIRTH_YEAR_MINIMUM
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
+from ..services.booklet2 import booklet2_context, booklet2_filename, generate_booklet2_pdf
 from ..services.navigation import delete_preflight_retry_return_to, delete_return_to, safe_return_to, with_query_value, with_status
 from ..services.notifications import status_message
 from ..services.person_files import (
@@ -647,6 +648,42 @@ async def person_booklet_pdf(request: Request, person_id: int):
             status_code=400,
         )
     return RedirectResponse(_with_message(return_to, "Буклет сохранён."), status_code=303)
+
+
+@router.get("/persons/{person_id}/booklet2")
+def person_booklet2(request: Request, person_id: int, return_to: str = "", error: str = "", message: str = ""):
+    settings = get_settings()
+    safe_back = safe_return_to(return_to) or f"/persons/{person_id}"
+    try:
+        context = booklet2_context(settings, person_id, safe_back)
+    except BookletError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return templates.TemplateResponse(request, "person_booklet2.html", {
+        "settings": settings, **context, "pdf_filename": booklet2_filename(settings, person_id),
+        "error_message": error, "message": message,
+    })
+
+
+@router.post("/persons/{person_id}/booklet2.pdf")
+async def person_booklet2_pdf(request: Request, person_id: int):
+    settings = get_settings()
+    form_values = await _read_form(request)
+    return_to = safe_return_to(form_values.get("return_to")) or f"/persons/{person_id}/booklet2"
+    target_path = None
+    if form_values.get("save_dialog") == "1":
+        try:
+            target_path = choose_save_path(default_filename=booklet2_filename(settings, person_id), title="Сохранить Буклет 2", filetypes=(("PDF", "*.pdf"), ("Все файлы", "*.*")))
+        except SaveDialogCancelled:
+            return RedirectResponse(_with_message(return_to, "Сохранение буклета отменено."), status_code=303)
+        except SaveDialogError:
+            return RedirectResponse(_with_message(return_to, "Не удалось открыть окно сохранения."), status_code=303)
+    try:
+        result = generate_booklet2_pdf(settings, person_id, output_path=target_path)
+    except BookletError as exc:
+        return Response(str(exc), status_code=400, media_type="text/plain; charset=utf-8")
+    if target_path is not None:
+        return RedirectResponse(_with_message(return_to, "Буклет сохранён."), status_code=303)
+    return FileResponse(result.path, media_type="application/pdf", filename=result.filename)
 
 
 @router.get("/persons/{person_id}/edit")
