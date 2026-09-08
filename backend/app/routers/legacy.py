@@ -1133,6 +1133,7 @@ def summary_matrix_pdf(
     media_columns: str = "",
     include_reward_number: str | None = None,
     pdf_sort: str = "fio",
+    pdf_orientation: str = "portrait",
 ):
     settings = get_settings()
     filters = normalized_summary_filters(
@@ -1152,6 +1153,7 @@ def summary_matrix_pdf(
             media_columns,
             include_reward_number=include_reward_number,
             sort_by=pdf_sort,
+            orientation=pdf_orientation,
         )
     except SummaryPDFTooWide as exc:
         return Response(content=str(exc), status_code=400, media_type="text/plain; charset=utf-8")
@@ -1171,6 +1173,7 @@ def summary_matrix_pdf_head(
     media_columns: str = "",
     include_reward_number: str | None = None,
     pdf_sort: str = "fio",
+    pdf_orientation: str = "portrait",
 ):
     normalized_summary_filters(
         country_id=country_id,

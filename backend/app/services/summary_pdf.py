@@ -109,6 +109,10 @@ def normalize_summary_pdf_sort(value: object) -> str:
     return "reward_number" if str(value or "").strip() == "reward_number" else "fio"
 
 
+def normalize_summary_pdf_orientation(value: object) -> str:
+    return "landscape" if str(value or "").strip() == "landscape" else "portrait"
+
+
 def _fio_sort_key(value: object) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
     return normalized.replace("ё", "е")
@@ -145,6 +149,7 @@ def generate_summary_matrix_pdf(
     media_fields: Iterable[str] | str | None = None,
     include_reward_number: object = False,
     sort_by: object = "fio",
+    orientation: object = "portrait",
 ) -> SummaryPDFResult:
     matrix = summary_matrix(settings.rewards_db_path, filters)
     selected_fields = normalize_summary_pdf_media_fields(media_fields)
@@ -162,6 +167,7 @@ def generate_summary_matrix_pdf(
         columns,
         include_reward_number=show_reward_number,
         sort_by=normalize_summary_pdf_sort(sort_by),
+        orientation=normalize_summary_pdf_orientation(orientation),
     )
 
 
@@ -173,6 +179,7 @@ def _build_summary_cards_pdf(
     *,
     include_reward_number: bool,
     sort_by: str,
+    orientation: str = "portrait",
 ) -> SummaryPDFResult:
     try:
         from reportlab.lib import colors
@@ -186,7 +193,7 @@ def _build_summary_cards_pdf(
         raise SummaryPDFError("PDF-библиотека reportlab не установлена.") from exc
 
     buffer = BytesIO()
-    page_size = A4
+    page_size = landscape(A4) if normalize_summary_pdf_orientation(orientation) == "landscape" else A4
     margin = 10 * mm
     font_name, bold_font_name = _register_pdf_font_pair(pdfmetrics, TTFont)
     styles = getSampleStyleSheet()
@@ -207,6 +214,9 @@ def _build_summary_cards_pdf(
         title="Сводная таблица",
     )
     available_width = page_size[0] - margin * 2
+    available_height = page_size[1] - margin * 2
+    person_photo_height = min(36 * mm, available_height * 0.18)
+    media_photo_height = min(50 * mm, available_height * 0.25)
     widths = _summary_pdf_column_widths(
         available_width,
         len(columns),
@@ -222,7 +232,7 @@ def _build_summary_cards_pdf(
         matrix.get("selected_reward_image_path"),
         Image,
         38 * mm,
-        38 * mm,
+        min(38 * mm, available_height * 0.14),
         image_cache,
     )
     if guide_image is not None:
@@ -262,7 +272,7 @@ def _build_summary_cards_pdf(
                 Image,
                 Spacer,
                 card_width - SUMMARY_PDF_CELL_PADDING,
-                36 * mm,
+                person_photo_height,
                 image_cache,
             )
         ]
@@ -290,7 +300,7 @@ def _build_summary_cards_pdf(
                     Image,
                     Spacer,
                     photo_widths[column_index] - SUMMARY_PDF_CELL_PADDING,
-                    50 * mm,
+                    media_photo_height,
                     image_cache,
                 )
             )
