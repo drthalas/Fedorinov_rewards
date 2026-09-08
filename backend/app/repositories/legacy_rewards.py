@@ -5,7 +5,7 @@ import unicodedata
 
 from ..db import open_readonly_connection, row_to_dict
 from .common import fetch_all, fetch_one
-from .guides import guide_cascade_data, guide_cascade_options, list_rank_guide
+from .guides import guide_cascade_data, guide_cascade_options, guide_name_sort_key, list_rank_guide
 from .summary import parse_optional_int
 
 
@@ -110,12 +110,13 @@ def legacy_rewards_filter_options(
         "countries": cascade["gos"],
         "categories": cascade["categories"],
         "subcategories": cascade["subcategories"],
-        "names": cascade["names"],
+        "names": sorted(cascade["names"], key=guide_name_sort_key),
     }
 
 
 def legacy_rewards_filter_cascade(db_path: Path) -> dict[str, list[dict[str, object]]]:
-    return guide_cascade_data(db_path)
+    cascade = guide_cascade_data(db_path)
+    return {**cascade, "names": sorted(cascade["names"], key=guide_name_sort_key)}
 
 
 def _reward_filter_clauses(filters: LegacyRewardsFilters, alias: str = "r") -> tuple[list[str], list[object]]:

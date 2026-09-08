@@ -219,7 +219,7 @@ class LegacyRewardsFilterTests(unittest.TestCase):
             normalized_legacy_rewards_filters(country_id="1", category_id="1", subcategory_id="1"),
         )
         self.assertEqual([row["id"] for row in category_options["subcategories"]], [1])
-        self.assertEqual([row["id"] for row in category_options["names"]], [1, 2])
+        self.assertEqual([row["id"] for row in category_options["names"]], [2, 1])
 
 
 if __name__ == "__main__":

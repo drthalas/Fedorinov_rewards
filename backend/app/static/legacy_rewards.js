@@ -222,12 +222,12 @@
   };
 
   const loadPersonSearch = async (query, selectFirst, searchRevision) => {
-    const cleanQuery = String(query || "").trim();
-    const loaded = await navigateToUrl(personSearchUrl(cleanQuery), {
+    const inputValue = String(query || "");
+    const loaded = await navigateToUrl(personSearchUrl(inputValue), {
       replaceList: true,
       listScrollTop: 0,
       historyMode: "replace",
-      searchValue: cleanQuery,
+      searchValue: inputValue,
       shouldApply: () => searchRevision === activeSearchRevision,
     });
     if (!loaded || !selectFirst) {
