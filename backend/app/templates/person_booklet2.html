@@ -20,7 +20,6 @@
   {% macro photo(item, role='') %}
   {% if item %}<figure class="editorial-photo {{ role }}" style="--photo-ratio: {{ item.ratio|default(1) }}">
     <img src="{{ media_url(item.path) }}" alt="{{ item.label }}">
-    <figcaption>{{ item.label }}</figcaption>
   </figure>{% endif %}
   {% endmacro %}
   <main class="editorial-sheet">

@@ -71,7 +71,6 @@ def generate_booklet2_pdf(settings: Settings, person_id: int, output_path: Path 
     regular, bold = _register_booklet_serif(pdfmetrics, TTFont)
     ink = colors.HexColor("#292a25")
     caption = ParagraphStyle("EditorialCaption", fontName=regular, fontSize=8, leading=10, textColor=ink)
-    photo_caption = ParagraphStyle("EditorialPhotoCaption", parent=caption, alignment=1)
     body = ParagraphStyle("EditorialBody", fontName=regular, fontSize=10, leading=12, textColor=ink, alignment=4, spaceAfter=5)
     title = ParagraphStyle("EditorialTitle", fontName=bold, fontSize=21, leading=23, textColor=ink)
     heading = ParagraphStyle("EditorialHeading", fontName=bold, fontSize=12, leading=14, textColor=ink, spaceAfter=6, keepWithNext=True)
@@ -82,12 +81,9 @@ def generate_booklet2_pdf(settings: Settings, person_id: int, output_path: Path 
         def __init__(self, entry, width, height, angle=0):
             Flowable.__init__(self)
             self.photo = _summary_pdf_image(entry["resolved_path"], Image, width-12, height-12, cache)
-            self.caption = Paragraph(_p(entry["label"]), photo_caption)
-            self.caption_width = self.photo.drawWidth + 6
-            self.caption_height = self.caption.wrap(self.caption_width, 10_000)[1]
             self.width = width
             self.paper_height = self.photo.drawHeight + 12
-            self.height = self.paper_height + self.caption_height + 3
+            self.height = self.paper_height
             self.angle = angle
 
         def draw(self):
@@ -95,7 +91,6 @@ def generate_booklet2_pdf(settings: Settings, person_id: int, output_path: Path 
             w, h = self.photo.drawWidth+6, self.photo.drawHeight+6
             x = (self.width-w)/2
             canvas.saveState()
-            canvas.translate(0, self.caption_height+3)
             canvas.translate(self.width/2, self.paper_height/2)
             canvas.rotate(self.angle)
             canvas.translate(-self.width/2, -self.paper_height/2)
@@ -108,7 +103,6 @@ def generate_booklet2_pdf(settings: Settings, person_id: int, output_path: Path 
             canvas.rect(x, 3, w, h, fill=1, stroke=0)
             self.photo.drawOn(canvas, x+3, 6)
             canvas.restoreState()
-            self.caption.drawOn(canvas, (self.width-self.caption_width)/2, 0)
 
     def photo(entry, width, height, angle=0):
         return [PaperPhoto(entry, width, height, angle)]

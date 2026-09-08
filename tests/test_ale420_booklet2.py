@@ -5,6 +5,7 @@ import re
 import sqlite3
 import unittest
 from unittest.mock import patch
+from urllib.parse import quote
 
 from backend.app.routers import persons
 from backend.app.routers.templates import templates
@@ -75,10 +76,40 @@ class Booklet2Tests(unittest.TestCase):
             db.execute("update guide set image_path='Source/1/portrait.png'")
         self.assertEqual(booklet2_context(self.settings, 1)['rank_insignia']['path'], 'Source/1/portrait.png')
 
-    def test_every_pdf_caption_is_centered_under_its_own_image(self):
+    def test_booklet2_has_no_photo_captions_and_preserves_media(self):
+        from reportlab.platypus import Paragraph
+        context = booklet2_context(self.settings, 1)
+        photos = [p for p in [context['portrait'], context['lead_document'], context['inset_photo'], *context['editorial_media'], *[p for group in context['reward_photo_groups'] for p in group['photos']]] if p]
+        html = persons.person_booklet2(FakeRequest(path='/persons/1/booklet2'), 1).body.decode()
+        self.assertNotIn('<figcaption', html)
+        figures = re.findall(r'<figure\b[^>]*>(.*?)</figure>', html, re.S)
+        self.assertEqual(len(figures), len(photos))
+        for figure, entry in zip(figures, photos):
+            self.assertIn(quote(entry['path'], safe=''), figure)
+            self.assertIn(f'alt="{entry["label"]}"', figure)
+            self.assertEqual(re.sub(r'<[^>]+>', '', figure).strip(), '')
+        old = persons.person_booklet(FakeRequest(), 1).body.decode()
+        self.assertEqual(old.count('<figcaption'), len(photos))
+
+        paragraphs = []
+        original = Paragraph.__init__
+
+        def capture(paragraph, text, style=None, *args, **kwargs):
+            paragraphs.append(text)
+            return original(paragraph, text, style, *args, **kwargs)
+
+        with patch.object(Paragraph, '__init__', capture):
+            generate_booklet2_pdf(self.settings, 1, self.root/'no-captions.pdf')
+        for entry in photos:
+            self.assertNotIn(entry['label'], paragraphs)
+        self.assertIn('Награды', paragraphs)
+        for group in context['reward_photo_groups']:
+            self.assertIn(group['title'], paragraphs)
+
+    def test_ordinary_pdf_captions_remain_centered_under_their_images(self):
         from reportlab.platypus import Image, Paragraph
         original_image, original_paragraph = Image.draw, Paragraph.draw
-        for generate in (generate_person_booklet_pdf, generate_booklet2_pdf):
+        for generate in (generate_person_booklet_pdf,):
             images, captions = [], []
 
             def point(canvas, x, y):

@@ -14,7 +14,6 @@
 .editorial-lead-single { grid-template-columns: minmax(0, 1fr); }
 .editorial-photo { margin: 0; min-width: 0; break-inside: avoid; }
 .editorial-photo img { display: block; box-sizing: border-box; width: min(100%, calc(var(--photo-height, 510px) * var(--photo-ratio, 1))); height: auto; margin: 0 auto; object-fit: contain; padding: 3px; background: #f0eee4; box-shadow: 2px 3px 3px #302d2740, 0 0 1px #302d2770; }
-.editorial-photo figcaption { width: min(100%, calc(var(--photo-height, 510px) * var(--photo-ratio, 1))); font-size: 11px; font-style: italic; margin: 6px auto 0; text-align: center; }
 .editorial-portrait { transform: rotate(-.5deg); }
 .editorial-record { transform: rotate(.3deg); margin-top: 3px; }
 .editorial-lead .editorial-photo { --photo-height: 380px; }
