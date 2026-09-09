@@ -265,7 +265,9 @@ def process_snapshot(pid: int) -> ProcessSnapshot | None:
             f'try {{ $p = Get-WmiObject Win32_Process -Filter "ProcessId = {pid}" }} catch {{ exit 4 }}; '
             'if ($null -eq $p) { exit 3 }; '
             '$p | Select-Object ProcessId,'
-            '@{Name="CreationDate";Expression={[System.Management.ManagementDateTimeConverter]::ToDateTime($_.CreationDate)}},'
+            '@{Name="CreationDate";Expression={"/Date(" + '
+            '([DateTimeOffset]([System.Management.ManagementDateTimeConverter]::ToDateTime($_.CreationDate)))'
+            '.ToUnixTimeMilliseconds() + ")/"}},'
             'ExecutablePath,CommandLine | ConvertTo-Json -Compress'
         )
         queries = (
