@@ -302,7 +302,7 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
 
         def simulated_cold_query(*args, timeout: float, **kwargs):
             observed_timeouts.append(timeout)
-            if timeout < 1.623:
+            if timeout < 3.156:
                 raise subprocess.TimeoutExpired(args[0], timeout)
             return subprocess.CompletedProcess(args[0], 0, stdout=payload, stderr="")
 

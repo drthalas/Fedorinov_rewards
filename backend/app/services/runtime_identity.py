@@ -23,8 +23,8 @@ TOKEN_PATTERN = re.compile(r"^[a-f0-9]{32}$")
 BUILD_ID_PATTERN = re.compile(r"^[a-f0-9]{64}$")
 LOCAL_HOSTS = {"127.0.0.1", "localhost", "::1"}
 PROCESS_QUERY_TIMEOUT_SECONDS = 1.5
-# A cold PowerShell + CIM startup can exceed the generic process-query bound.
-WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS = 3.0
+# Native VM cold PowerShell + CIM measured 3.156s; keep a bounded query margin.
+WINDOWS_PROCESS_QUERY_TIMEOUT_SECONDS = 5.0
 WINDOWS_PROCESS_QUERY_ATTEMPTS = 3
 WINDOWS_PROCESS_FALLBACK_ATTEMPTS = 1
 WINDOWS_FILETIME_UNIX_EPOCH = 116_444_736_000_000_000
