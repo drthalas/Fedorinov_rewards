@@ -393,6 +393,10 @@ class WindowsStartupDiagnosticsTests(unittest.TestCase):
             + runtime_identity.WINDOWS_PROCESS_FALLBACK_ATTEMPTS,
         )
         self.assertIn("Get-WmiObject", query.call_args.args[0][-1])
+        self.assertIn(
+            '[System.Management.ManagementDateTimeConverter]::ToDateTime($_.CreationDate)',
+            query.call_args.args[0][-1],
+        )
 
     def test_windows_process_snapshot_preserves_cyrillic_command_line(self) -> None:
         command_line = (

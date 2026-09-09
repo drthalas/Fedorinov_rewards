@@ -591,6 +591,7 @@ class RuntimeSupervisor:
         last_heartbeat = 0.0
         while True:
             now = time.monotonic()
+            inspection_unavailable = False
             startup = read_runtime_startup(startup_path)
             if startup is not None:
                 startup_mismatch = []
@@ -676,9 +677,16 @@ class RuntimeSupervisor:
                 identity = fetch_runtime_identity(host, port, timeout=0.15)
                 if identity is not None:
                     inspection = inspect_runtime_record(record, health_timeout=0.2)
+                    now = time.monotonic()
                     if inspection.confirmed and inspection.healthy:
-                        return record, time.monotonic() - started
-                    if inspection.identity is not None:
+                        if now < hard_deadline:
+                            return record, now - started
+                    elif inspection.healthy and inspection.reason == "process-inspection-unavailable":
+                        # HTTP proves liveness, never ownership. Retry the OS query only
+                        # within the original hard limit; identity-ready stops heartbeats.
+                        inspection_unavailable = True
+                        progress_deadline = min(hard_deadline, now + self.ready_timeout)
+                    elif inspection.identity is not None:
                         raise self._startup_failure(
                             category="http-identity-mismatch",
                             process=process,
@@ -692,9 +700,10 @@ class RuntimeSupervisor:
                             detail=inspection.reason,
                         )
 
+            now = time.monotonic()
             if now >= hard_deadline:
                 raise self._startup_failure(
-                    category="slow-start-hard-limit",
+                    category="process-inspection-unavailable" if inspection_unavailable else "slow-start-hard-limit",
                     process=process,
                     token=token,
                     state_path=state_path,
@@ -703,7 +712,11 @@ class RuntimeSupervisor:
                     host=host,
                     port=port,
                     elapsed=now - started,
-                    detail=f"active startup exceeded {self.startup_timeout:.1f}s",
+                    detail=(
+                        f"OS process identity unconfirmed after {self.startup_timeout:.1f}s; HTTP identity matches"
+                        if inspection_unavailable
+                        else f"active startup exceeded {self.startup_timeout:.1f}s"
+                    ),
                 )
             if now >= progress_deadline:
                 raise self._startup_failure(
