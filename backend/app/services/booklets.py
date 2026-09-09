@@ -279,6 +279,8 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
         story.append(Paragraph("Документы кавалера", styles["BookletHeading"]))
         story.extend(gallery(context["person_documents"]))
     for group in context["reward_photo_groups"]:
+        if not group["photos"]:
+            continue
         title = Paragraph(_p(group["title"]), styles["BookletReward"])
         rows = [[title], *[[row] for row in gallery(group["photos"])]]
         article = Table(rows, colWidths=[doc.width], repeatRows=1)

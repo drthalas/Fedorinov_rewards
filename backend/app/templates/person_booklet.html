@@ -64,7 +64,7 @@
     </section>
     {% endif %}
 
-    {% for group in reward_photo_groups %}
+    {% for group in reward_photo_groups if group.photos %}
     <article class="booklet-reward" data-reward-id="{{ group.reward.id }}">
       <h2>{{ group.title }}</h2>
       {{ gallery(group.photos) }}
