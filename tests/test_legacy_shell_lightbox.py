@@ -146,7 +146,7 @@ class LegacyShellLightboxTests(unittest.TestCase):
         booklet = (ROOT / "backend" / "app" / "templates" / "person_booklet.html").read_text()
 
         self.assertIn('STATIC_ASSET_VERSION = "20260902-ale409-pdf-corrective"', templates_py)
-        self.assertIn("include_query_params(v=STATIC_ASSET_VERSION)", templates_py)
+        self.assertIn("sha=static_asset_digest(path)", templates_py)
         self.assertIn("static_url('styles.css')", base)
         self.assertIn("static_url('styles.css')", legacy_base)
         self.assertIn("static_url('confirm_submit.js')", base)

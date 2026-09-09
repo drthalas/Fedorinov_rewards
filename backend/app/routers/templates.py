@@ -1,3 +1,6 @@
+from functools import lru_cache
+from hashlib import sha256
+
 from fastapi.templating import Jinja2Templates
 from starlette.datastructures import URL
 
@@ -23,8 +26,21 @@ templates = Jinja2Templates(directory=PROJECT_ROOT / "backend" / "app" / "templa
 STATIC_ASSET_VERSION = "20260902-ale409-pdf-corrective"
 
 
+@lru_cache(maxsize=256)
+def static_asset_digest(path: str) -> str:
+    # Hash the installed bytes, including assets transformed by the packager.
+    # The normal updater restarts the process, so this cache is per build/run.
+    root = (PROJECT_ROOT / "backend" / "app" / "static").resolve()
+    asset = (root / path).resolve()
+    if not asset.is_relative_to(root):
+        raise ValueError("Static asset must be inside the application static directory")
+    return sha256(asset.read_bytes()).hexdigest()
+
+
 def static_url(path: str) -> str:
-    return str(URL(path=f"/static/{path}").include_query_params(v=STATIC_ASSET_VERSION))
+    return str(URL(path=f"/static/{path}").include_query_params(
+        v=STATIC_ASSET_VERSION, sha=static_asset_digest(path),
+    ))
 
 
 def media_url(path: object) -> str:
