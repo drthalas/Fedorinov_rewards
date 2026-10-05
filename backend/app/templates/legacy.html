@@ -684,6 +684,7 @@
             <button class="button secondary-button summary-export-action" type="submit" form="summary-save-form">XLSX свод</button>
             {% if summary_mode == "matrix" %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form" data-summary-pdf-options-open>Сформировать PDF</button>
+            <button class="button secondary-button summary-export-action" type="button" data-summary-booklets="{{ summary_booklets_snapshot }}" data-total="{{ summary_matrix.person_total }}" {% if not summary_matrix.person_total %}disabled{% endif %}>Сформировать буклет</button>
             {% else %}
             <button class="button secondary-button summary-export-action" type="submit" form="summary-pdf-save-form">PDF</button>
             {% endif %}
@@ -691,6 +692,16 @@
           </div>
         </form>
         {% if summary_has_result %}
+        {% if summary_mode == "matrix" %}
+        <div id="summary-booklets-progress" hidden>
+          <progress max="100" value="0" aria-label="Формирование буклетов"></progress>
+          <span role="status" aria-live="polite"></span>
+        </div>
+        <form id="summary-booklets-save-form" hidden method="get" data-save-as-form data-save-as-filename="summary_booklets.pdf" data-save-as-mime="application/pdf" data-save-as-status="#summary-booklets-save-status" data-save-as-open-copy-only="true" data-save-as-native-open-url="/summary/open-copy">
+          <button class="button secondary-button" type="submit">Сохранить PDF буклетов</button>
+        </form>
+        <div id="summary-booklets-save-status" hidden></div>
+        {% endif %}
         <form id="summary-matrix-save-form" method="get" action="/summary_matrix.xlsx" data-save-as-form data-save-as-filename="summary_matrix.xlsx" data-save-as-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-save-as-status="#summary-export-status" data-save-as-success-message="XLSX сохранён." data-save-as-open-copy="true">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">
           <input type="hidden" name="category_id" value="{{ summary_filters.category_id or '' }}">

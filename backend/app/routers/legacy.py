@@ -46,6 +46,7 @@ from ..services.generated_copy import (
 from ..services.update_checker import check_for_updates
 from ..services.person_files import person_archive_filename, person_folder_image_items
 from ..services.notifications import status_message
+from ..services.summary_booklets import SummaryBookletError, summary_booklet_jobs
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..services.summary_xlsx import XLSX_MEDIA_TYPE, summary_matrix_xlsx_bytes, summary_xlsx_bytes
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
@@ -799,6 +800,7 @@ def legacy_index(
                 matrix_sort=active_matrix_sort,
                 matrix_dir=active_matrix_dir,
             )
+            context["summary_booklets_snapshot"] = summary_booklet_jobs.snapshot(settings, matrix["rows"])
             visible_rows = []
             for row in matrix["rows"][row_slice]:
                 visible = dict(row)
@@ -1120,6 +1122,37 @@ def summary_matrix_xlsx(
         media_type=XLSX_MEDIA_TYPE,
         headers={"Content-Disposition": 'attachment; filename="summary_matrix.xlsx"'},
     )
+
+
+@router.post("/summary/booklets")
+def summary_booklets_start(snapshot: str = Form(...)):
+    try:
+        return summary_booklet_jobs.start(get_settings(), snapshot)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=400, media_type="text/plain")
+
+
+@router.get("/summary/booklets/active")
+def summary_booklets_active():
+    return summary_booklet_jobs.active(get_settings())
+
+
+@router.get("/summary/booklets/{job_id}")
+def summary_booklets_status(job_id: str):
+    try:
+        return summary_booklet_jobs.status(get_settings(), job_id)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=404, media_type="text/plain")
+
+
+@router.get("/summary/booklets/{job_id}/file")
+def summary_booklets_file(job_id: str):
+    try:
+        content = summary_booklet_jobs.content(get_settings(), job_id)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=409, media_type="text/plain")
+    from types import SimpleNamespace
+    return _pdf_download_response(SimpleNamespace(content=content, filename="summary_booklets.pdf"))
 
 
 @router.get("/summary_matrix.pdf")
