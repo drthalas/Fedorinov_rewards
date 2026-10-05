@@ -3,7 +3,6 @@ import gc
 import sqlite3
 import time
 import unittest
-from threading import Event
 from unittest.mock import patch
 
 from pypdf import PdfReader
@@ -89,27 +88,67 @@ class SummaryBookletsTests(unittest.TestCase):
         self.assertEqual(titles, ['Андреев', 'Егоров', 'Ёлкин', 'Иванов Иван', 'Яковлев'])
         self.assertTrue(all(p.extract_text().count('БУКЛЕТ КАВАЛЕРА') <= 1 for p in reader.pages))
 
-    def test_double_start_progress_failure_cleanup_and_retry(self):
-        entered, release = Event(), Event()
-        def fail(*args, **kwargs):
-            kwargs['output_path'].write_bytes(b'partial')
-            entered.set()
-            release.wait(5)
-            raise OSError('test failure')
+    def wait_state(self, job, expected):
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            state = self.jobs.status(self.settings, job['id'])
+            if state['state'] in expected:
+                return state
+            time.sleep(.01)
+        self.fail('Expected state ' + str(expected))
+
+    def test_pause_resume_stop_cleanup_and_fresh_start(self):
+        # Rich ordinary booklets give control requests real in-flight work.
+        with sqlite3.connect(self.db_path) as db:
+            columns = [r[1] for r in db.execute('pragma table_info(person)')]
+            for ident in range(10, 30):
+                values = ['?' if c in ('id', 'fio') else c for c in columns]
+                db.execute('insert into person select ' + ','.join(values) + ' from person where id=1',
+                           (ident, 'Тест ' + str(ident)))
         token = self.snapshot()
-        with patch('backend.app.services.summary_booklets.generate_person_booklet_pdf', side_effect=fail), self.assertLogs('backend.app.services.summary_booklets', level='ERROR'):
-            job = self.jobs.start(self.settings, token)
-            self.assertTrue(entered.wait(5))
-            second = self.jobs.start(self.settings, token)
-            self.assertEqual(second['id'], job['id'])
-            self.assertEqual(second['completed'], 0)
-            with self.assertRaises(SummaryBookletError):
-                self.jobs.content(self.settings, job['id'])
-            release.set()
-            self.assertEqual(self.wait(job)['state'], 'failed')
+        job = self.jobs.start(self.settings, token)
+        self.jobs.control(self.settings, job['id'], 'pause')
+        paused = self.wait_state(job, {'paused'})
+        time.sleep(.3)
+        self.assertEqual(self.jobs.status(self.settings, job['id'])['completed'], paused['completed'])
+        self.assertEqual(self.jobs.start(self.settings, token)['id'], job['id'])
+        self.assertEqual(self.jobs.active(self.settings)['id'], job['id'])
+        self.jobs.control(self.settings, job['id'], 'resume')
+        deadline = time.monotonic() + 10
+        while self.jobs.status(self.settings, job['id'])['completed'] <= paused['completed']:
+            self.assertLess(time.monotonic(), deadline)
+            time.sleep(.01)
+        self.jobs.control(self.settings, job['id'], 'pause')
+        advanced = self.wait_state(job, {'paused'})
+        self.assertGreater(advanced['completed'], paused['completed'])
+        directory = self.jobs.jobs[job['id']].directory.name
+        self.jobs.control(self.settings, job['id'], 'stop')
+        self.assertEqual(self.wait_state(job, {'stopped'})['state'], 'stopped')
+        from pathlib import Path
+        self.assertFalse(Path(directory).exists())
         self.assertIsNone(self.jobs.active(self.settings))
-        retry = self.jobs.start(self.settings, token)
+        with self.assertRaises(SummaryBookletError):
+            self.jobs.content(self.settings, job['id'])
+        retry = self.jobs.start(self.settings, self.snapshot(normalized_summary_filters(name_id='1')))
         self.assertNotEqual(retry['id'], job['id'])
+        self.assertEqual(self.wait(retry)['state'], 'ready')
+
+    def test_running_stop_and_failure_retry(self):
+        token = self.snapshot()
+        job = self.jobs.start(self.settings, token)
+        self.jobs.control(self.settings, job['id'], 'stop')
+        self.assertEqual(self.wait_state(job, {'stopped'})['state'], 'stopped')
+        with sqlite3.connect(self.db_path) as db:
+            db.execute('alter table person rename to person_unavailable')
+        try:
+            failed = self.jobs.start(self.settings, token)
+            self.assertEqual(self.wait(failed)['state'], 'failed')
+            self.assertIsNone(self.jobs.jobs[failed['id']].directory)
+            self.assertIsNone(self.jobs.active(self.settings))
+        finally:
+            with sqlite3.connect(self.db_path) as db:
+                db.execute('alter table person_unavailable rename to person')
+        retry = self.jobs.start(self.settings, token)
         self.assertEqual(self.wait(retry)['state'], 'ready')
 
     def test_http_job_and_download_native_copy(self):

@@ -108,7 +108,7 @@
     link.href = openUrl;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
-    link.className = "save-as-open-copy-link";
+    link.className = form.hasAttribute("data-save-as-compact") ? "button secondary-button" : "save-as-open-copy-link";
     link.textContent = "Открыть копию файла";
     if (filename) {
       link.setAttribute("aria-label", "Открыть копию файла " + filename);
@@ -131,7 +131,7 @@
     const target = saveStatusTarget(form);
     const action = document.createElement("button");
     action.type = "button";
-    action.className = "save-as-open-copy-link";
+    action.className = form.hasAttribute("data-save-as-compact") ? "button secondary-button" : "save-as-open-copy-link";
     action.textContent = "Открыть копию файла";
     if (filename) {
       action.setAttribute("aria-label", "Открыть копию файла " + filename);
@@ -169,7 +169,7 @@
       target.replaceChildren();
       target.hidden = false;
       target.classList.remove("notice-error");
-      target.classList.add("notice-success");
+      if (!form.hasAttribute("data-save-as-compact")) target.classList.add("notice-success");
       appendNativeOpenCopyAction(form, blob, filename, openCopyToken);
       return;
     }

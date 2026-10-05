@@ -1145,6 +1145,14 @@ def summary_booklets_status(job_id: str):
         return Response(str(exc), status_code=404, media_type="text/plain")
 
 
+@router.post("/summary/booklets/{job_id}/{action}")
+def summary_booklets_control(job_id: str, action: str):
+    try:
+        return summary_booklet_jobs.control(get_settings(), job_id, action)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=400, media_type="text/plain")
+
+
 @router.get("/summary/booklets/{job_id}/file")
 def summary_booklets_file(job_id: str):
     try:

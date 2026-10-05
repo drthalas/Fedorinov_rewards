@@ -1,10 +1,11 @@
 """Temporary, single-runtime jobs over an immutable matrix membership snapshot."""
 from dataclasses import dataclass, field
 import logging
+import multiprocessing
 from pathlib import Path
 import secrets
 from tempfile import TemporaryDirectory
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 import time
 
 from ..config import Settings
@@ -13,6 +14,7 @@ from .booklets import generate_person_booklet_pdf
 
 logger = logging.getLogger(__name__)
 TTL = 3600
+ACTIVE_STATES = {"running", "pausing", "paused", "stopping"}
 
 
 class SummaryBookletError(ValueError):
@@ -30,6 +32,8 @@ class Job:
     touched: float = field(default_factory=time.monotonic)
     directory: TemporaryDirectory | None = None
     path: Path | None = None
+    pause_requested: object = None
+    stop_requested: Event = field(default_factory=Event)
 
     def status(self):
         total = len(self.person_ids)
@@ -54,7 +58,7 @@ class SummaryBookletJobs:
             if created < threshold:
                 del self.snapshots[token]
         for token, job in list(self.jobs.items()):
-            if job.state != "running" and job.touched < threshold:
+            if job.state not in ACTIVE_STATES and job.touched < threshold:
                 if job.directory:
                     job.directory.cleanup()
                 del self.jobs[token]
@@ -74,14 +78,14 @@ class SummaryBookletJobs:
     def active(self, settings):
         with self.lock:
             return next((job.status() for job in self.jobs.values()
-                         if job.database == self.database(settings) and job.state == "running"), None)
+                         if job.database == self.database(settings) and job.state in ACTIVE_STATES), None)
 
     def start(self, settings: Settings, snapshot: str):
         with self.lock:
             self._cleanup()
             database = self.database(settings)
             for job in self.jobs.values():
-                if job.database == database and job.state == "running":
+                if job.database == database and job.state in ACTIVE_STATES:
                     return job.status()  # A second tab/reload joins the existing operation.
             saved = self.snapshots.get(snapshot)
             if not saved or saved[0] != database:
@@ -89,6 +93,7 @@ class SummaryBookletJobs:
             if not saved[1]:
                 raise SummaryBookletError("В текущем результате нет кавалеров.")
             job = Job(secrets.token_hex(16), database, saved[1])
+            job.pause_requested = multiprocessing.get_context("spawn").Event()
             self.jobs[job.id] = job
             try:
                 Thread(target=self._run, args=(settings, job), daemon=True).start()
@@ -97,38 +102,99 @@ class SummaryBookletJobs:
                 raise SummaryBookletError("Не удалось начать формирование. Повторите попытку.")
             return job.status()
 
+    def control(self, settings, token, action):
+        with self.lock:
+            job = self._get(settings, token)
+            if action == "stop" and job.state in ACTIVE_STATES:
+                job.state = "stopping"
+                job.stop_requested.set()
+            elif action == "pause" and job.state == "running":
+                job.state = "pausing"
+                job.pause_requested.set()
+            elif action == "resume" and job.state in {"paused", "pausing"}:
+                job.pause_requested.clear()
+                job.state = "running"
+            elif action not in {"pause", "resume", "stop"}:
+                raise SummaryBookletError("Неизвестное действие.")
+            return job.status()
+
     def _run(self, settings, job):
         directory = None
+        process = None
+        receive = send = None
+        ready = False
+        failure = False
         try:
-            from pypdf import PdfWriter
             directory = TemporaryDirectory(prefix="rewards-booklets-")
-            root = Path(directory.name)
-            with PdfWriter() as writer:
-                for person_id in job.person_ids:
-                    # Keep the accepted ordinary booklet renderer and all its media rules intact.
-                    part = root / f"{person_id}.pdf"
-                    generate_person_booklet_pdf(settings, person_id, output_path=part)
-                    writer.append(str(part), import_outline=False)
-                    part.unlink()
-                    with self.lock:
-                        job.completed += 1
-                output = root / "summary_booklets.pdf"
-                writer.add_metadata({"/Title": "Буклеты кавалеров"})
-                writer.write(str(output))
+            context = multiprocessing.get_context("spawn")
+            receive, send = context.Pipe(duplex=False)
+            process = context.Process(target=_generate_booklets,
+                args=(settings.model_dump(), job.person_ids, directory.name, send, job.pause_requested),
+                daemon=True)
+            process.start()
+            send.close()
             with self.lock:
-                job.directory, job.path = directory, output
-                job.state, job.touched = "ready", time.monotonic()
+                job.directory = directory
+            while not job.stop_requested.is_set():
+                if receive.poll(0.1):
+                    try:
+                        event, completed = receive.recv()
+                    except EOFError:
+                        break
+                    with self.lock:
+                        if job.state == "stopping":
+                            break
+                        job.completed = completed
+                        if event == "paused" and job.pause_requested.is_set():
+                            job.state = "paused"
+                        elif event == "ready":
+                            ready = True
+                            break
+                        elif event == "failed":
+                            failure = True
+                            break
+                elif not process.is_alive():
+                    break
+            if job.stop_requested.is_set() or not ready:
+                if process.is_alive():
+                    process.terminate()
+            process.join(5)
+            if process.is_alive():
+                process.kill()
+                process.join()
+            with self.lock:
+                # Stop wins even if it raced with the final ready notification.
+                if ready and process.exitcode == 0 and not job.stop_requested.is_set():
+                    job.path = Path(directory.name) / "summary_booklets.pdf"
+                    job.state, job.touched = "ready", time.monotonic()
+                    directory = None  # Retain only complete artifacts until TTL.
+                elif not job.stop_requested.is_set():
+                    failure = True
         except Exception:
-            logger.exception("Summary booklet generation failed: %s", job.id)
+            logger.exception("Summary booklet worker failed: %s", job.id)
+            failure = True
+        finally:
+            if process is not None and process.is_alive():
+                process.terminate()
+                process.join()
+            for connection in (receive, send):
+                if connection is not None:
+                    connection.close()
             if directory:
                 try:
                     directory.cleanup()
                 except OSError:
                     logger.exception("Could not remove temporary booklet files: %s", job.id)
+                    failure = True
+                with self.lock:
+                    job.directory = None
             with self.lock:
-                job.state = "failed"
-                job.error = "Не удалось сформировать буклеты. Повторите попытку. Если ошибка повторяется, обратитесь за помощью."
-                job.touched = time.monotonic()
+                if job.state != "ready":
+                    job.path = None
+                    job.state = "failed" if failure else "stopped"
+                    if failure:
+                        job.error = "Не удалось сформировать буклеты. Повторите попытку. Если ошибка повторяется, обратитесь за помощью."
+                    job.touched = time.monotonic()
 
     def _get(self, settings, token):
         self._cleanup()
@@ -148,6 +214,40 @@ class SummaryBookletJobs:
             if job.state != "ready" or job.path is None:
                 raise SummaryBookletError("PDF ещё не готов. Дождитесь завершения формирования.")
             return job.path.read_bytes()
+
+
+def _generate_booklets(settings_values, person_ids, directory, connection, pause_requested):
+    """One killable worker; pause acknowledges only at a safe booklet boundary."""
+    settings = Settings(**settings_values)
+    root = Path(directory)
+    completed = 0
+
+    def checkpoint():
+        if pause_requested.is_set():
+            connection.send(("paused", completed))
+            while pause_requested.is_set():
+                time.sleep(0.05)
+
+    try:
+        from pypdf import PdfWriter
+        with PdfWriter() as writer:
+            for person_id in person_ids:
+                checkpoint()
+                part = root / f"{person_id}.pdf"
+                generate_person_booklet_pdf(settings, person_id, output_path=part)
+                writer.append(str(part), import_outline=False)
+                part.unlink()
+                completed += 1
+                connection.send(("progress", completed))
+            checkpoint()
+            writer.add_metadata({"/Title": "Буклеты кавалеров"})
+            writer.write(str(root / "summary_booklets.pdf"))
+        connection.send(("ready", completed))
+    except Exception:
+        logger.exception("Summary booklet generation failed")
+        connection.send(("failed", completed))
+    finally:
+        connection.close()
 
 
 summary_booklet_jobs = SummaryBookletJobs()

@@ -693,14 +693,18 @@
         </form>
         {% if summary_has_result %}
         {% if summary_mode == "matrix" %}
-        <div id="summary-booklets-progress" hidden>
+        <div id="summary-booklets-progress" class="summary-booklets-progress" hidden>
+          <div class="summary-booklets-controls">
+            <button class="button secondary-button summary-booklets-control" type="button" data-booklets-stop aria-label="Остановить формирование" title="Остановить формирование">■</button>
+            <button class="button secondary-button summary-booklets-control" type="button" data-booklets-pause aria-label="Приостановить формирование" title="Приостановить формирование">Ⅱ</button>
+          </div>
           <progress max="100" value="0" aria-label="Формирование буклетов"></progress>
           <span role="status" aria-live="polite"></span>
         </div>
-        <form id="summary-booklets-save-form" hidden method="get" data-save-as-form data-save-as-filename="summary_booklets.pdf" data-save-as-mime="application/pdf" data-save-as-status="#summary-booklets-save-status" data-save-as-open-copy-only="true" data-save-as-native-open-url="/summary/open-copy">
-          <button class="button secondary-button" type="submit">Сохранить PDF буклетов</button>
+        <form id="summary-booklets-save-form" class="summary-booklets-actions" hidden method="get" data-save-as-form data-save-as-filename="summary_booklets.pdf" data-save-as-mime="application/pdf" data-save-as-status="#summary-booklets-save-status" data-save-as-open-copy-only="true" data-save-as-compact="true" data-save-as-native-open-url="/summary/open-copy">
+          <button class="button secondary-button" type="submit">Сохранить в PDF</button>
+          <span id="summary-booklets-save-status" hidden></span>
         </form>
-        <div id="summary-booklets-save-status" hidden></div>
         {% endif %}
         <form id="summary-matrix-save-form" method="get" action="/summary_matrix.xlsx" data-save-as-form data-save-as-filename="summary_matrix.xlsx" data-save-as-mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" data-save-as-status="#summary-export-status" data-save-as-success-message="XLSX сохранён." data-save-as-open-copy="true">
           <input type="hidden" name="country_id" value="{{ summary_filters.country_id or '' }}">

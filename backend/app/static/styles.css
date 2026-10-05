@@ -7923,3 +7923,36 @@ body.legacy-rewards-theme::after {
     opacity: 1;
   }
 }
+
+/* Bulk ordinary booklets: compact archive progress and completion actions. */
+.summary-booklets-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+  color: #d7d0c2;
+  font-size: 13px;
+}
+.summary-booklets-progress[hidden], .summary-booklets-actions[hidden],
+.summary-booklets-controls[hidden], #summary-booklets-save-status[hidden] { display: none; }
+.summary-booklets-controls { display: flex; gap: 6px; }
+.summary-booklets-control { min-width: 32px; width: 32px; height: 30px; padding: 0; line-height: 1; }
+.summary-booklets-progress progress {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 1;
+  max-width: 360px;
+  min-width: 80px;
+  height: 8px;
+  border: 1px solid #655741;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #25251f;
+  color: #c6a269;
+}
+.summary-booklets-progress progress::-webkit-progress-bar { background: #25251f; }
+.summary-booklets-progress progress::-webkit-progress-value { background: #c6a269; }
+.summary-booklets-progress progress::-moz-progress-bar { background: #c6a269; }
+.summary-booklets-actions { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
+#summary-booklets-save-status { display: inline-flex; align-items: center; gap: 8px; color: #d7d0c2; font-size: 13px; }
+#summary-booklets-save-status.notice-error { color: #e5a29b; }
