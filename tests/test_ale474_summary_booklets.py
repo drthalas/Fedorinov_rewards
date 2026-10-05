@@ -1,4 +1,5 @@
 from io import BytesIO
+import gc
 import sqlite3
 import time
 import unittest
@@ -28,6 +29,9 @@ class SummaryBookletsTests(unittest.TestCase):
         for job in self.jobs.jobs.values():
             if job.directory:
                 job.directory.cleanup()
+        # The shared legacy fixture leaves committed SQLite handles for GC.
+        # Windows cannot unlink its temp DB until these handles are closed.
+        gc.collect()
         dossier.BookletDossierTests.tearDown(self)
 
     def wait(self, job):
