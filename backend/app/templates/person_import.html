@@ -3,43 +3,76 @@
 {% block title %}Импорт кавалеров из Excel{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
-<section class="cavalier-standalone-page cavalier-form-page">
+<section class="cavalier-standalone-page cavalier-form-page person-import-page">
   <h1>Импорт кавалеров из Excel</h1>
   <p class="local-back-nav"><a class="button secondary-button" href="/legacy?tab=rewards">← К кавалерам</a></p>
   {% if error %}<section class="notice notice-error" role="alert">{{ error }}</section>{% endif %}
   {% if result is not none %}
-  <section class="cavalier-form-card" aria-label="Результат импорта">
-    <h2>Импорт завершён</h2>
-    <p>{{ reference.name }}</p>
-    <p><strong>Добавлено: {{ result.added }}</strong></p>
-    <p>Пропущено — номер уже есть: {{ result.skipped }}</p>
-    <p>Ошибки: {{ result.errors|length }}</p>
-    {% if result.errors %}
-    <p>Исправьте указанные строки в Excel и повторите импорт. Уже добавленные номера будут пропущены.</p>
-    <div style="max-height: 24rem; overflow: auto;">
-      <table><thead><tr><th>Строка Excel</th><th>Причина</th></tr></thead><tbody>
-      {% for item in result.errors %}<tr><td>{{ item.row }}</td><td>{{ item.reason }}</td></tr>{% endfor %}
-      </tbody></table>
+  <section class="cavalier-form-card person-import-card" aria-label="Результат импорта">
+    <header class="person-import-context">
+      <div><h2>Импорт завершён</h2><p class="person-import-muted">{{ reference.name }}</p></div>
+    </header>
+    <div class="person-import-counts" role="status" aria-live="polite">
+      <p>Добавлено: <strong>{{ result.added }}</strong></p>
+      <p>Пропущено — номер уже есть: <strong>{{ result.skipped }}</strong></p>
+      <p>Ошибки: <strong>{{ result.errors|length }}</strong></p>
     </div>
+    {% if result.errors %}
+    <section class="person-import-help" aria-labelledby="import-errors-title">
+      <h3 id="import-errors-title">Строки для исправления</h3>
+      <p class="person-import-muted">Исправьте эти строки и повторите импорт. Уже добавленные номера будут пропущены.</p>
+      <div class="person-import-errors">
+        <table><thead><tr><th>Строка Excel</th><th>Причина</th></tr></thead><tbody>
+        {% for item in result.errors %}<tr><td>{{ item.row }}</td><td>{{ item.reason }}</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </section>
     {% endif %}
-    <p><a class="button" href="/persons/import?id_name={{ reference.id_name }}">Выбрать следующий файл</a></p>
+    <div class="actions"><a class="button" href="/persons/import?id_name={{ reference.id_name }}">Выбрать следующий файл</a></div>
   </section>
   {% elif reference %}
-  <form class="edit-form cavalier-form-card" method="post" enctype="multipart/form-data" action="/persons/import" data-write-feedback data-write-pending-label="Импортируем…">
-    <h2>{{ reference.name }}</h2>
-    <p class="secondary">{{ reference.gos }} → {{ reference.category }} → {{ reference.subcategory }}</p>
-    <p><a href="/persons/import">Выбрать другую награду</a></p>
+  <form class="edit-form cavalier-form-card person-import-card" method="post" enctype="multipart/form-data" action="/persons/import" data-write-feedback data-write-pending-label="Импортируем…">
+    <header class="person-import-context">
+      <div>
+        <p class="person-import-caption">Выбранная награда</p>
+        <h2>{{ reference.name }}</h2>
+        <p class="person-import-muted">{{ reference.gos }} · {{ reference.category }} · {{ reference.subcategory }}</p>
+      </div>
+      <a class="button secondary-button" href="/persons/import">Изменить награду</a>
+    </header>
     <input type="hidden" name="id_name" value="{{ reference.id_name }}">
-    <p>В первой строке первого листа нужны заголовки: <strong>Фамилия, Имя, Отчество, Номер ордена</strong> (или Номер награды). Отчество может быть пустым.</p>
-    <p>Необязательные колонки: <strong>Дата рождения / Год рождения</strong> и <strong>Звание / специальность</strong>. Пустой год — 1945; из полной даты сохраняется год (1800–1999). Пустое звание — «Красноармеец» из справочника.</p>
-    <p>Каждый новый номер создаёт отдельного кавалера с выбранной наградой. Существующие номера этой награды пропускаются. Формулы замените значениями. До 50 000 строк, файл до 10 МБ.</p>
-    <label><span>Excel-файл (.xlsx)</span><input type="file" name="file" accept=".xlsx" required></label>
-    <label class="checkbox-label"><input type="checkbox" name="confirm" value="yes" required> Добавить кавалеров с наградой «{{ reference.name }}»</label>
-    <div class="form-actions"><button type="submit">Импортировать</button></div>
+    <input type="hidden" name="confirm" value="yes">
+    <section class="person-import-help" aria-labelledby="import-format-title">
+      <h3 id="import-format-title">Формат Excel</h3>
+      <ul class="person-import-instructions">
+        <li>Первая строка первого листа — заголовки колонок.</li>
+        <li><strong>Заполните:</strong> Фамилия, Имя, Номер ордена (или Номер награды).</li>
+        <li><strong>Отчество:</strong> оставьте колонку; значения могут быть пустыми.</li>
+        <li><strong>Необязательные колонки:</strong> Год рождения или Дата рождения, Звание.</li>
+      </ul>
+      <details class="person-import-details">
+        <summary>Год рождения, звание и ограничения файла</summary>
+        <div>
+          <p>Из полной даты сохраняется только год: 1800–1999. Пустой год — 1945.</p>
+          <p>Звание должно быть в справочнике. Пустое — «Красноармеец» из справочника.</p>
+          <p>Формулы замените значениями. До 50 000 строк, файл до 10 МБ.</p>
+        </div>
+      </details>
+    </section>
+    <label class="guide-upload-control person-import-file">
+      <span>Excel-файл</span>
+      <input type="file" name="file" accept=".xlsx" required aria-describedby="import-file-hint">
+      <small id="import-file-hint">Формат .xlsx · до 10 МБ</small>
+    </label>
+    <p class="person-import-note">Каждый новый номер создаёт отдельного кавалера. Номера, уже имеющиеся у выбранной награды, будут пропущены.</p>
+    <div class="actions"><button type="submit">Импортировать</button></div>
   </form>
   {% else %}
-  <form class="edit-form cavalier-form-card" method="get" action="/persons/import" data-reward-reference-derived>
-    <h2>Кавалеров какого ордена вы хотите добавить?</h2>
+  <form class="edit-form cavalier-form-card person-import-card" method="get" action="/persons/import" data-reward-reference-derived>
+    <header class="person-import-context"><div>
+      <h2>Кавалеров какого ордена вы хотите добавить?</h2>
+      <p class="person-import-muted">Выберите награду из справочника, затем загрузите Excel.</p>
+    </div></header>
     <script type="application/json" data-reward-reference-options>{{ reward_references|tojson }}</script>
     <div class="form-grid two-columns" data-reward-reference-cascade>
       <label><span>Государство</span><select data-reward-reference-filter="country" data-guide-role="country" data-styled-select><option value="">—</option></select></label>
@@ -47,7 +80,7 @@
       <label><span>Подкатегория</span><select data-reward-reference-filter="subcategory" data-guide-role="subcategory" data-styled-select><option value="">—</option></select></label>
       <label><span>Наименование</span><select name="id_name" data-guide-role="name" data-styled-select data-styled-select-typeahead="prefix" required><option value="">—</option></select></label>
     </div>
-    <div class="form-actions"><button type="submit">Далее — выбрать Excel</button></div>
+    <div class="actions"><button type="submit">Далее — выбрать Excel</button></div>
   </form>
   {% endif %}
 </section>
