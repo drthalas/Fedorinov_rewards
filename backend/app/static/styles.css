@@ -5042,7 +5042,7 @@ body.legacy-rewards-theme::after {
 }
 
 .legacy-rewards-theme .legacy-filter-actions .tool-button:first-child::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7' fill='none' stroke='white' stroke-width='2'/%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='m20 20-4-4'/%3E%3C/svg%3E"); }
-.legacy-rewards-theme .legacy-filter-actions .tool-button:last-child::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6'/%3E%3C/svg%3E"); }
+.legacy-rewards-theme .legacy-filter-actions .tool-button:nth-child(2)::before { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' d='M4 12a8 8 0 1 0 2.3-5.7L4 8.6M4 4v4.6h4.6'/%3E%3C/svg%3E"); }
 
 .legacy-rewards-theme .tool-button,
 .legacy-rewards-theme .button,
@@ -7956,3 +7956,7 @@ body.legacy-rewards-theme::after {
 .summary-booklets-actions { display: flex; align-items: center; gap: 8px; margin: 8px 0 12px; }
 #summary-booklets-save-status { display: inline-flex; align-items: center; gap: 8px; color: #d7d0c2; font-size: 13px; }
 #summary-booklets-save-status.notice-error { color: #e5a29b; }
+
+/* Excel import stays beside the existing filter actions on narrow sidebars. */
+.legacy-rewards-theme .legacy-filter-actions .tool-button[href="/persons/import"] { grid-column: 1 / -1; }
+.legacy-rewards-theme .legacy-filter-actions .tool-button[href="/persons/import"]::before { display: none; }

@@ -66,6 +66,7 @@
           <div class="legacy-filter-actions">
             <button class="tool-button" type="submit">Показать</button>
             <a class="tool-button" href="/legacy?tab=rewards">Сброс</a>
+            {% if settings.write_mode and not settings.read_only %}<a class="tool-button" href="/persons/import">Импорт</a>{% endif %}
           </div>
         </form>
         <div class="legacy-toolbar">

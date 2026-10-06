@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
+{% block title %}Импорт кавалеров из Excel{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
+{% block content %}
+<section class="cavalier-standalone-page cavalier-form-page">
+  <h1>Импорт кавалеров из Excel</h1>
+  <p class="local-back-nav"><a class="button secondary-button" href="/legacy?tab=rewards">← К кавалерам</a></p>
+  {% if error %}<section class="notice notice-error" role="alert">{{ error }}</section>{% endif %}
+  {% if result is not none %}
+  <section class="cavalier-form-card" aria-label="Результат импорта">
+    <h2>Импорт завершён</h2>
+    <p>{{ reference.name }}</p>
+    <p><strong>Добавлено: {{ result.added }}</strong></p>
+    <p>Пропущено — номер уже есть: {{ result.skipped }}</p>
+    <p>Ошибки: {{ result.errors|length }}</p>
+    {% if result.errors %}
+    <p>Исправьте указанные строки в Excel и повторите импорт. Уже добавленные номера будут пропущены.</p>
+    <div style="max-height: 24rem; overflow: auto;">
+      <table><thead><tr><th>Строка Excel</th><th>Причина</th></tr></thead><tbody>
+      {% for item in result.errors %}<tr><td>{{ item.row }}</td><td>{{ item.reason }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+    {% endif %}
+    <p><a class="button" href="/persons/import?id_name={{ reference.id_name }}">Выбрать следующий файл</a></p>
+  </section>
+  {% elif reference %}
+  <form class="edit-form cavalier-form-card" method="post" enctype="multipart/form-data" action="/persons/import" data-write-feedback data-write-pending-label="Импортируем…">
+    <h2>{{ reference.name }}</h2>
+    <p class="secondary">{{ reference.gos }} → {{ reference.category }} → {{ reference.subcategory }}</p>
+    <p><a href="/persons/import">Выбрать другую награду</a></p>
+    <input type="hidden" name="id_name" value="{{ reference.id_name }}">
+    <p>В первой строке первого листа нужны заголовки: <strong>Фамилия, Имя, Отчество, Номер ордена</strong> (или Номер награды). Отчество может быть пустым.</p>
+    <p>Необязательные колонки: <strong>Дата рождения / Год рождения</strong> и <strong>Звание / специальность</strong>. Пустой год — 1945; из полной даты сохраняется год (1800–1999). Пустое звание — «Красноармеец» из справочника.</p>
+    <p>Каждый новый номер создаёт отдельного кавалера с выбранной наградой. Существующие номера этой награды пропускаются. Формулы замените значениями. До 50 000 строк, файл до 10 МБ.</p>
+    <label><span>Excel-файл (.xlsx)</span><input type="file" name="file" accept=".xlsx" required></label>
+    <label class="checkbox-label"><input type="checkbox" name="confirm" value="yes" required> Добавить кавалеров с наградой «{{ reference.name }}»</label>
+    <div class="form-actions"><button type="submit">Импортировать</button></div>
+  </form>
+  {% else %}
+  <form class="edit-form cavalier-form-card" method="get" action="/persons/import" data-reward-reference-derived>
+    <h2>Кавалеров какого ордена вы хотите добавить?</h2>
+    <script type="application/json" data-reward-reference-options>{{ reward_references|tojson }}</script>
+    <div class="form-grid two-columns" data-reward-reference-cascade>
+      <label><span>Государство</span><select data-reward-reference-filter="country" data-guide-role="country" data-styled-select><option value="">—</option></select></label>
+      <label><span>Категория</span><select data-reward-reference-filter="category" data-guide-role="category" data-styled-select><option value="">—</option></select></label>
+      <label><span>Подкатегория</span><select data-reward-reference-filter="subcategory" data-guide-role="subcategory" data-styled-select><option value="">—</option></select></label>
+      <label><span>Наименование</span><select name="id_name" data-guide-role="name" data-styled-select data-styled-select-typeahead="prefix" required><option value="">—</option></select></label>
+    </div>
+    <div class="form-actions"><button type="submit">Далее — выбрать Excel</button></div>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}
