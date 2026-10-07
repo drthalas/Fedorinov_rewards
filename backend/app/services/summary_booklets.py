@@ -27,6 +27,7 @@ class Job:
     database: str
     person_ids: tuple[int, ...]
     contents_rows: tuple[dict, ...] = ()
+    payload: dict = field(default_factory=dict)
     state: str = "running"
     completed: int = 0
     error: str = ""
@@ -44,6 +45,9 @@ class Job:
 
 
 class SummaryBookletJobs:
+    filename = "summary_booklets.pdf"
+    failure_message = "Не удалось сформировать буклеты. Повторите попытку. Если ошибка повторяется, обратитесь за помощью."
+
     def __init__(self):
         self.lock = Lock()
         self.snapshots = {}
@@ -97,7 +101,7 @@ class SummaryBookletJobs:
                 raise SummaryBookletError("Результат устарел. Нажмите «Показать» и повторите формирование.")
             if not saved[1]:
                 raise SummaryBookletError("В текущем результате нет кавалеров.")
-            job = Job(secrets.token_hex(16), database, tuple(row["id"] for row in saved[1]), saved[1])
+            job = self._new_job(database, saved[1])
             job.pause_requested = multiprocessing.get_context("spawn").Event()
             self.jobs[job.id] = job
             try:
@@ -106,6 +110,15 @@ class SummaryBookletJobs:
                 del self.jobs[job.id]
                 raise SummaryBookletError("Не удалось начать формирование. Повторите попытку.")
             return job.status()
+
+    def _new_job(self, database, rows):
+        return Job(secrets.token_hex(16), database, tuple(row["id"] for row in rows), rows)
+
+    def _worker(self):
+        return _generate_booklets
+
+    def _worker_args(self, settings, job, directory, send):
+        return (settings.model_dump(), job.person_ids, directory, send, job.pause_requested, job.contents_rows)
 
     def control(self, settings, token, action):
         with self.lock:
@@ -133,8 +146,8 @@ class SummaryBookletJobs:
             directory = TemporaryDirectory(prefix="rewards-booklets-")
             context = multiprocessing.get_context("spawn")
             receive, send = context.Pipe(duplex=False)
-            process = context.Process(target=_generate_booklets,
-                args=(settings.model_dump(), job.person_ids, directory.name, send, job.pause_requested, job.contents_rows),
+            process = context.Process(target=self._worker(),
+                args=self._worker_args(settings, job, directory.name, send),
                 daemon=True)
             process.start()
             send.close()
@@ -170,7 +183,7 @@ class SummaryBookletJobs:
             with self.lock:
                 # Stop wins even if it raced with the final ready notification.
                 if ready and process.exitcode == 0 and not job.stop_requested.is_set():
-                    job.path = Path(directory.name) / "summary_booklets.pdf"
+                    job.path = Path(directory.name) / self.filename
                     job.state, job.touched = "ready", time.monotonic()
                     directory = None  # Retain only complete artifacts until TTL.
                 elif not job.stop_requested.is_set():
@@ -198,7 +211,7 @@ class SummaryBookletJobs:
                     job.path = None
                     job.state = "failed" if failure else "stopped"
                     if failure:
-                        job.error = "Не удалось сформировать буклеты. Повторите попытку. Если ошибка повторяется, обратитесь за помощью."
+                        job.error = self.failure_message
                     job.touched = time.monotonic()
 
     def _get(self, settings, token):

@@ -180,6 +180,8 @@ def _build_summary_cards_pdf(
     include_reward_number: bool,
     sort_by: str,
     orientation: str = "portrait",
+    checkpoint=None,
+    completed=None,
 ) -> SummaryPDFResult:
     try:
         from reportlab.lib import colors
@@ -252,6 +254,8 @@ def _build_summary_cards_pdf(
     header.extend(Paragraph(_p(label), styles["CardHeader"]) for _field, label in columns)
     table_data: list[list[object]] = [header]
     for row in sort_summary_pdf_rows(matrix.get("rows") or [], sort_by):
+        if checkpoint:
+            checkpoint()
         paths = row.get("photo_paths") or {}
         birth_year = format_birth_year(row.get("birthday"))
         identity_details = ", ".join(
@@ -305,6 +309,8 @@ def _build_summary_cards_pdf(
                 )
             )
         table_data.append(cells)
+        if completed:
+            completed(len(table_data) - 1)
 
     table = Table(table_data, colWidths=widths, repeatRows=1)
     table.setStyle(
@@ -322,7 +328,11 @@ def _build_summary_cards_pdf(
         )
     )
     story.append(table)
+    if checkpoint:
+        checkpoint()
     doc.build(story)
+    if checkpoint:
+        checkpoint()
     return SummaryPDFResult(content=buffer.getvalue(), filename="summary_matrix.pdf")
 
 

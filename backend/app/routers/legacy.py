@@ -47,6 +47,7 @@ from ..services.update_checker import check_for_updates
 from ..services.person_files import person_archive_filename, person_folder_image_items
 from ..services.notifications import status_message
 from ..services.summary_booklets import SummaryBookletError, summary_booklet_jobs
+from ..services.summary_pdf_jobs import summary_pdf_jobs
 from ..services.summary_pdf import SummaryPDFError, SummaryPDFTooWide, generate_summary_matrix_pdf, generate_summary_pdf
 from ..services.summary_xlsx import XLSX_MEDIA_TYPE, summary_matrix_xlsx_bytes, summary_xlsx_bytes
 from ..services.write_guard import WriteBlockedError, ensure_write_allowed
@@ -1161,6 +1162,54 @@ def summary_booklets_file(job_id: str):
         return Response(str(exc), status_code=409, media_type="text/plain")
     from types import SimpleNamespace
     return _pdf_download_response(SimpleNamespace(content=content, filename="summary_booklets.pdf"))
+
+
+@router.post("/summary/pdf-jobs")
+def summary_pdf_jobs_start(country_id: str = Form(""), category_id: str = Form(""),
+    subcategory_id: str = Form(""), name_id: str = Form(""), extra: str = Form(""),
+    include_marks: str = Form(""), media_columns: str = Form(""),
+    include_reward_number: str = Form(""), pdf_sort: str = Form("fio"), pdf_orientation: str = Form("portrait")):
+    settings = get_settings()
+    try:
+        active = summary_pdf_jobs.active(settings)
+        if active:
+            return active
+        filters = normalized_summary_filters(country_id=country_id, category_id=category_id,
+            subcategory_id=subcategory_id, name_id=name_id, extra=extra, include_marks=include_marks)
+        return summary_pdf_jobs.prepare(settings, filters, media_columns, include_reward_number, pdf_sort, pdf_orientation)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=400, media_type="text/plain")
+
+
+@router.get("/summary/pdf-jobs/active")
+def summary_pdf_jobs_active():
+    return summary_pdf_jobs.active(get_settings())
+
+
+@router.get("/summary/pdf-jobs/{job_id}")
+def summary_pdf_jobs_status(job_id: str):
+    try:
+        return summary_pdf_jobs.status(get_settings(), job_id)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=404, media_type="text/plain")
+
+
+@router.post("/summary/pdf-jobs/{job_id}/{action}")
+def summary_pdf_jobs_control(job_id: str, action: str):
+    try:
+        return summary_pdf_jobs.control(get_settings(), job_id, action)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=400, media_type="text/plain")
+
+
+@router.get("/summary/pdf-jobs/{job_id}/file")
+def summary_pdf_jobs_file(job_id: str):
+    try:
+        content = summary_pdf_jobs.content(get_settings(), job_id)
+    except SummaryBookletError as exc:
+        return Response(str(exc), status_code=409, media_type="text/plain")
+    from types import SimpleNamespace
+    return _pdf_download_response(SimpleNamespace(content=content, filename="summary_matrix.pdf"))
 
 
 @router.get("/summary_matrix.pdf")

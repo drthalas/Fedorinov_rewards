@@ -73,7 +73,8 @@ class SummaryPDFOptionsTests(unittest.TestCase):
         self.assertIn('value="front_foto,back_foto"', template)
         self.assertIn("event.preventDefault()", script)
         self.assertIn("form.requestSubmit(trigger)", script)
-        self.assertIn("closeDialog();\n    form.requestSubmit(trigger);", script)
+        self.assertIn("closeDialog();", script)
+        self.assertIn("form.dispatchEvent(new Event('summary-pdf-generate'))", script)
         self.assertIn("summary_pdf_options.js", legacy_base)
 
     def test_matrix_pdf_renderer_has_no_legacy_matrix_title_or_total_column(self) -> None:

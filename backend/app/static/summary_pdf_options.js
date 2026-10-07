@@ -31,7 +31,11 @@
       .map(function (input) { return input.value; })
       .join(",");
     closeDialog();
-    form.requestSubmit(trigger);
+    if (form.hasAttribute('data-summary-pdf-job')) {
+      form.dispatchEvent(new Event('summary-pdf-generate'));
+    } else {
+      form.requestSubmit(trigger);
+    }
   });
   dialog.addEventListener("cancel", function (event) {
     event.preventDefault();

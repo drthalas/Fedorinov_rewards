@@ -1,0 +1,14 @@
+{% macro summary_job(prefix, filename, label) %}
+        <div id="{{ prefix }}-progress" class="summary-booklets-progress" hidden>
+          <div class="summary-booklets-controls">
+            <button class="button secondary-button summary-booklets-control" type="button" data-booklets-stop aria-label="Остановить формирование" title="Остановить формирование">■</button>
+            <button class="button secondary-button summary-booklets-control" type="button" data-booklets-pause aria-label="Приостановить формирование" title="Приостановить формирование">Ⅱ</button>
+          </div>
+          <progress max="100" value="0" aria-label="{{ label }}"></progress>
+          <span role="status" aria-live="polite"></span>
+        </div>
+        <form id="{{ prefix }}-save-form" class="summary-booklets-actions" hidden method="get" data-save-as-form data-save-as-filename="{{ filename }}" data-save-as-mime="application/pdf" data-save-as-status="#{{ prefix }}-save-status" data-save-as-open-copy-only="true" data-save-as-compact="true" data-save-as-native-open-url="/summary/open-copy">
+          <button class="button secondary-button" type="submit">Сохранить в PDF</button>
+          <span id="{{ prefix }}-save-status" hidden></span>
+        </form>
+{% endmacro %}
