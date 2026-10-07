@@ -7986,8 +7986,8 @@ body.legacy-rewards-theme::after {
 .person-import-page .person-import-details > div { display: grid; gap: 6px; padding-top: 10px; }
 .person-import-page .person-import-file { display: grid; gap: 8px; min-width: 0; }
 .person-import-page .person-import-file > span { margin: 0; font-weight: 600; }
-.person-import-page .person-import-file input[type="file"] { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; color-scheme: dark; }
-.person-import-page .person-import-file input[type="file"]::file-selector-button { font: inherit; background: linear-gradient(180deg, #262722, #1f201d); }
+.person-import-page .person-import-file input[type="file"] { position: static; inset: auto; display: block; width: 100%; height: auto; min-width: 0; min-height: 52px; padding: 7px; box-sizing: border-box; border-style: dashed; opacity: 1; font: inherit; color-scheme: dark; }
+.person-import-page .person-import-file input[type="file"]::file-selector-button { margin-right: 12px; padding: 8px 12px; color: #ded5c5; border: 1px solid #625842; border-radius: 2px; font: inherit; background: linear-gradient(180deg, #262722, #1f201d); cursor: pointer; }
 .person-import-page .person-import-file input[type="file"]::file-selector-button:hover { border-color: #967447; background: #292a24; }
 .person-import-page .person-import-note { padding-left: 12px; border-left: 2px solid #6c5b3d; color: #aaa294; font-size: 13px; }
 .person-import-page .actions { display: flex; gap: 10px; margin: 0; }

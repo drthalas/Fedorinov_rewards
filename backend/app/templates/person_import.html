@@ -59,11 +59,11 @@
         </div>
       </details>
     </section>
-    <label class="guide-upload-control person-import-file">
-      <span>Excel-файл</span>
-      <input type="file" name="file" accept=".xlsx" required aria-describedby="import-file-hint">
+    <div class="person-import-file">
+      <span id="import-file-label">Excel-файл</span>
+      <input type="file" name="file" accept=".xlsx" required aria-labelledby="import-file-label" aria-describedby="import-file-hint">
       <small id="import-file-hint">Формат .xlsx · до 10 МБ</small>
-    </label>
+    </div>
     <p class="person-import-note">Каждый новый номер создаёт отдельного кавалера. Номера, уже имеющиеся у выбранной награды, будут пропущены.</p>
     <div class="actions"><button type="submit">Импортировать</button></div>
   </form>
