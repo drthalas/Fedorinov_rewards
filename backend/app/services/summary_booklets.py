@@ -26,6 +26,7 @@ class Job:
     id: str
     database: str
     person_ids: tuple[int, ...]
+    contents_rows: tuple[dict, ...] = ()
     state: str = "running"
     completed: int = 0
     error: str = ""
@@ -66,13 +67,17 @@ class SummaryBookletJobs:
     def snapshot(self, settings, rows):
         ordered = sorted(rows, key=lambda row: (person_name_sort_key(row.get("fio")), int(row["id"])))
         ids = tuple(dict.fromkeys(int(row["id"]) for row in ordered))
+        by_id = {int(row["id"]): row for row in ordered}
+        contents_rows = tuple(dict(id=ident, fio=by_id[ident].get("fio"),
+            birthday=by_id[ident].get("birthday"), rank_name=by_id[ident].get("rank_name"),
+            pdf_reward_numbers=tuple(by_id[ident].get("pdf_reward_numbers") or ())) for ident in ids)
         with self.lock:
             self._cleanup()
             # Bound abandoned page snapshots without discarding an active job.
             while len(self.snapshots) >= 256:
                 del self.snapshots[next(iter(self.snapshots))]
             token = secrets.token_hex(16)
-            self.snapshots[token] = (self.database(settings), ids, time.monotonic())
+            self.snapshots[token] = (self.database(settings), contents_rows, time.monotonic())
             return token
 
     def active(self, settings):
@@ -92,7 +97,7 @@ class SummaryBookletJobs:
                 raise SummaryBookletError("Результат устарел. Нажмите «Показать» и повторите формирование.")
             if not saved[1]:
                 raise SummaryBookletError("В текущем результате нет кавалеров.")
-            job = Job(secrets.token_hex(16), database, saved[1])
+            job = Job(secrets.token_hex(16), database, tuple(row["id"] for row in saved[1]), saved[1])
             job.pause_requested = multiprocessing.get_context("spawn").Event()
             self.jobs[job.id] = job
             try:
@@ -129,7 +134,7 @@ class SummaryBookletJobs:
             context = multiprocessing.get_context("spawn")
             receive, send = context.Pipe(duplex=False)
             process = context.Process(target=_generate_booklets,
-                args=(settings.model_dump(), job.person_ids, directory.name, send, job.pause_requested),
+                args=(settings.model_dump(), job.person_ids, directory.name, send, job.pause_requested, job.contents_rows),
                 daemon=True)
             process.start()
             send.close()
@@ -216,7 +221,7 @@ class SummaryBookletJobs:
             return job.path.read_bytes()
 
 
-def _generate_booklets(settings_values, person_ids, directory, connection, pause_requested):
+def _generate_booklets(settings_values, person_ids, directory, connection, pause_requested, contents_rows):
     """One killable worker; pause acknowledges only at a safe booklet boundary."""
     settings = Settings(**settings_values)
     root = Path(directory)
@@ -231,6 +236,12 @@ def _generate_booklets(settings_values, person_ids, directory, connection, pause
     try:
         from pypdf import PdfWriter
         with PdfWriter() as writer:
+            checkpoint()
+            from .summary_booklet_contents import generate_contents_pdf
+            contents = root / "contents.pdf"
+            generate_contents_pdf(contents_rows, contents)
+            writer.append(str(contents), import_outline=False)
+            contents.unlink()
             for person_id in person_ids:
                 checkpoint()
                 part = root / f"{person_id}.pdf"

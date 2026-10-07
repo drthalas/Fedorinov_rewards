@@ -70,8 +70,9 @@ class SummaryBookletsTests(unittest.TestCase):
         ordinary = generate_person_booklet_pdf(self.settings, 1, self.root / 'ordinary.pdf')
         expected = PdfReader(ordinary.path)
         actual = PdfReader(BytesIO(self.jobs.content(self.settings, job['id'])))
-        self.assertEqual(len(actual.pages), len(expected.pages))
-        for left, right in zip(actual.pages, expected.pages):
+        self.assertIn('Содержание буклета', actual.pages[0].extract_text())
+        self.assertEqual(len(actual.pages), len(expected.pages) + 1)
+        for left, right in zip(actual.pages[1:], expected.pages):
             self.assertEqual(left.extract_text(), right.extract_text())
             self.assertEqual(left.get_contents().get_data(), right.get_contents().get_data())
             self.assertEqual(len(left.images), len(right.images))
@@ -86,6 +87,10 @@ class SummaryBookletsTests(unittest.TestCase):
         titles = [p.extract_text().split('БУКЛЕТ КАВАЛЕРА\n')[1].split('\n')[0]
                   for p in reader.pages if 'БУКЛЕТ КАВАЛЕРА\n' in p.extract_text()]
         self.assertEqual(titles, ['Андреев', 'Егоров', 'Ёлкин', 'Иванов Иван', 'Яковлев'])
+        contents = reader.pages[0].extract_text()
+        self.assertEqual(sorted(titles, key=contents.index), titles)
+        self.assertIn('Всего кавалеров: 5', contents)
+        self.assertNotIn('Новый после Показать', contents)
         self.assertTrue(all(p.extract_text().count('БУКЛЕТ КАВАЛЕРА') <= 1 for p in reader.pages))
 
     def wait_state(self, job, expected):
