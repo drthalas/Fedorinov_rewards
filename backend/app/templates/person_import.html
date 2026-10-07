@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block title %}Импорт кавалеров из Excel{% endblock %}
+{% block extra_head %}<script src="{{ static_url('person_import_file.js') }}" defer></script>{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
 <section class="cavalier-standalone-page cavalier-form-page person-import-page">
@@ -61,7 +62,11 @@
     </section>
     <div class="person-import-file">
       <span id="import-file-label">Excel-файл</span>
-      <input type="file" name="file" accept=".xlsx" required aria-labelledby="import-file-label" aria-describedby="import-file-hint">
+      <div class="person-import-picker-row">
+        <input type="file" name="file" accept=".xlsx" required aria-labelledby="import-file-label" aria-describedby="import-file-hint" data-import-file-input>
+        <button type="button" class="secondary-button" data-import-file-button aria-describedby="import-file-name import-file-hint" hidden>Выбрать файл</button>
+        <span id="import-file-name" data-import-file-name aria-live="polite" hidden>Файл не выбран</span>
+      </div>
       <small id="import-file-hint">Формат .xlsx · до 10 МБ</small>
     </div>
     <p class="person-import-note">Каждый новый номер создаёт отдельного кавалера. Номера, уже имеющиеся у выбранной награды, будут пропущены.</p>

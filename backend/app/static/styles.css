@@ -8008,3 +8008,12 @@ body.legacy-rewards-theme::after {
   .person-import-page .person-import-counts { grid-template-columns: minmax(0, 1fr); }
   .person-import-page .person-import-counts p { flex-direction: row; align-items: center; }
 }
+
+/* A localized button replaces browser-language file chrome, never a page overlay. */
+.person-import-page .person-import-picker-row { position: relative; min-width: 0; }
+.person-import-page .person-import-file[data-file-picker-ready] .person-import-picker-row { display: flex; align-items: center; gap: 12px; padding: 7px; min-height: 52px; box-sizing: border-box; border: 1px dashed #514b40; background: #10120f; }
+.person-import-page .person-import-file[data-file-picker-ready] input[type="file"] { position: absolute; inset: auto; width: 1px; height: 1px; min-width: 0; min-height: 0; padding: 0; border: 0; overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none; }
+.person-import-page [data-import-file-button] { flex-shrink: 0; }
+.person-import-page [data-import-file-name] { min-width: 0; overflow-wrap: anywhere; color: #aaa294; font-size: 13px; }
+.person-import-page [data-import-file-name][data-error] { color: #e6b3a7; }
+.person-import-page .person-import-picker-row [hidden] { display: none; }
