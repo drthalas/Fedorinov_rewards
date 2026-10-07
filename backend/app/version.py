@@ -1,3 +1,3 @@
 APP_NAME = "Награды и награждённые"
-APP_VERSION = "2.0.21"
-APP_VERSION_DATE = "2026-10-05"
+APP_VERSION = "2.0.22"
+APP_VERSION_DATE = "2026-10-07"
