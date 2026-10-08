@@ -4,45 +4,72 @@ from .display import format_birth_year
 from html import escape
 
 
-def reward_heading(name):
-    """Inflect only unambiguous displayed names; preserve all remaining wording."""
+def _unquote_name(name):
+    """Remove only quotation marks enclosing the entire name."""
+    pairs = {'«': '»', '"': '"', '“': '”'}
+    while len(name) > 1 and pairs.get(name[0]) == name[-1]:
+        opening, closing = name[0], name[-1]
+        if opening == closing:
+            if name.count(opening) != 2:
+                break
+        else:
+            depth = 0
+            for index, char in enumerate(name):
+                depth += (char == opening) - (char == closing)
+                if depth == 0 and index < len(name) - 1:
+                    break
+            else:
+                name = name[1:-1].strip()
+                continue
+            break
+        name = name[1:-1].strip()
+    return name
+
+
+def _reward_kind(label):
     import re
-    name = str(name or '').strip()
-    order = re.fullmatch(r'Орден\s+(.+)', name, re.IGNORECASE)
-    medal = re.fullmatch(r'Медаль\s+(.+)', name, re.IGNORECASE)
-    if order:
-        rest = order[1]
-        if rest.startswith(('«', '"', 'Славы', 'Ленина', 'Отечественной войны', 'Красной Звезды', 'Трудового Красного Знамени')):
-            return f'Кавалеры ордена {rest}'
-    if medal:
-        rest = medal[1]
-        if rest.startswith(('«', '"', 'Жукова', 'Ушакова', 'Нахимова', 'Суворова')):
-            return f'Награждённые медалью {rest}'
-    return f'Кавалеры и награждённые — {name}'
+    for pattern, instrumental in ((r'Ордена?', 'орденом'),
+                                  (r'Медал[ьи]', 'медалью'),
+                                  (r'Знак[и]?', 'знаком')):
+        if re.match(r'^' + pattern + r'\b', label, re.IGNORECASE):
+            return instrumental
+    return None
+
+
+def reward_heading(name, kind=None):
+    """Quote the official name and inflect only a recognized award kind."""
+    import re
+    exact = str(name or '').strip()
+    display = _unquote_name(exact)
+    leading = re.fullmatch(r'(Орден|Медаль|Знак)\s+(.+)', display, re.IGNORECASE)
+    if leading:
+        named_kind = _reward_kind(leading[1])
+        # A different hierarchy kind may mean the word belongs to the title.
+        if kind and kind != named_kind:
+            return f'Награждённые — {exact}'
+        kind = named_kind
+        display = _unquote_name(leading[2])
+    if kind and display:
+        # Preserve meaningful inner quotations using Russian nested quote marks.
+        display = display.translate(str.maketrans({'«': '„', '»': '“', '“': '„', '”': '“'}))
+        display = re.sub(r'"([^"]+)"', r'„\1“', display)
+        return f'Награждённые {kind} «{display}»'
+    return f'Награждённые — {exact}'
 
 
 def contents_selection(db_path, matrix, filters):
-    """Use only the same filtered matrix and its filter labels, never person rewards."""
-    from ..repositories.guides import get_guide_level_item
+    """Use the actual filtered columns; never choose a person's other reward."""
+    from ..repositories.guides import guide_level_item_lineage
     columns = matrix.get('reward_columns') or []
-    title = 'Кавалеры и награждённые по выбранным наградам'
+    title = 'Награждённые'
     if matrix.get('rows') and len(columns) == 1:
-        name = str(columns[0].get('name') or '').strip()
+        column = columns[0]
+        name = str(column.get('name') or '').strip()
         if name and name != '—':
-            title = reward_heading(name)
-    labels = []
-    for level, attr, label in ((0, 'country_id', 'Страна'), (1, 'category_id', 'Категория'),
-                               (2, 'subcategory_id', 'Подкатегория'), (3, 'name_id', 'Наименование')):
-        ident = getattr(filters, attr)
-        if ident is not None:
-            item = get_guide_level_item(db_path, level, ident)
-            labels.append(f"{label}: {(item or {}).get('name') or '—'}")
-    if filters.extra:
-        item = get_guide_level_item(db_path, 4, int(filters.extra)) if filters.extra.isdigit() else None
-        labels.append(f"Дополнение: {(item or {}).get('name') or filters.extra}")
-    if filters.include_marks:
-        labels.append('Знаки: включены в фильтрах')
-    return dict(title=title, context=' · '.join(labels) or 'Все награды · без ограничений по фильтрам')
+            lineage = guide_level_item_lineage(db_path, 3, int(column.get('id') or 0))
+            kinds = {_reward_kind(item['name']) for item in lineage if item['level'] in (1, 2)} - {None}
+            title = reward_heading(name, kinds.pop() if len(kinds) == 1 else None)
+    return dict(title=title)
 
 
 def generate_contents_pdf(rows, output_path, selection=None):
@@ -60,7 +87,6 @@ def generate_contents_pdf(rows, output_path, selection=None):
     heading = ParagraphStyle('ContentsHeading', parent=body, fontName=bold)
     title = ParagraphStyle('ContentsTitle', parent=heading, fontSize=23, leading=26, spaceAfter=14)
     theme = ParagraphStyle('ContentsTheme', parent=title, fontSize=28, leading=32, alignment=1, keepWithNext=True)
-    context = ParagraphStyle('ContentsContext', parent=body, fontSize=9, leading=12, spaceAfter=14, alignment=1, keepWithNext=True)
     title.keepWithNext = True
     p = lambda value, style=body: Paragraph(escape(str(value or '—')), style)
     data = [[p(value, heading) for value in ('ФИО', 'Год рождения', 'Звание', 'Номер ордена')]]
@@ -89,9 +115,7 @@ def generate_contents_pdf(rows, output_path, selection=None):
         canvas.drawCentredString(A4[0]/2, 5*mm, str(document.page))
         canvas.restoreState()
 
-    selection = selection or dict(title='Кавалеры и награждённые по выбранным наградам', context='')
+    selection = selection or dict(title='Награждённые')
     intro = [p(selection['title'], theme)] if rows else []
-    if rows and selection.get('context'):
-        intro.append(p(selection['context'], context))
     doc.build([*intro, p('Содержание буклета', title), table, Spacer(1, 10),
                p(f'Всего кавалеров: {len(rows)}', heading)], onFirstPage=paper, onLaterPages=paper)
