@@ -801,7 +801,9 @@ def legacy_index(
                 matrix_sort=active_matrix_sort,
                 matrix_dir=active_matrix_dir,
             )
-            context["summary_booklets_snapshot"] = summary_booklet_jobs.snapshot(settings, matrix["rows"])
+            from ..services.summary_booklet_contents import contents_selection
+            selection = contents_selection(settings.rewards_db_path, matrix, context["summary_filters"])
+            context["summary_booklets_snapshot"] = summary_booklet_jobs.snapshot(settings, matrix["rows"], selection)
             visible_rows = []
             for row in matrix["rows"][row_slice]:
                 visible = dict(row)

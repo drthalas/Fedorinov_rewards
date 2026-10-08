@@ -68,7 +68,7 @@ class SummaryBookletJobs:
                     job.directory.cleanup()
                 del self.jobs[token]
 
-    def snapshot(self, settings, rows):
+    def snapshot(self, settings, rows, selection=None):
         ordered = sorted(rows, key=lambda row: (person_name_sort_key(row.get("fio")), int(row["id"])))
         ids = tuple(dict.fromkeys(int(row["id"]) for row in ordered))
         by_id = {int(row["id"]): row for row in ordered}
@@ -81,7 +81,7 @@ class SummaryBookletJobs:
             while len(self.snapshots) >= 256:
                 del self.snapshots[next(iter(self.snapshots))]
             token = secrets.token_hex(16)
-            self.snapshots[token] = (self.database(settings), contents_rows, time.monotonic())
+            self.snapshots[token] = (self.database(settings), dict(rows=contents_rows, selection=dict(selection or {})), time.monotonic())
             return token
 
     def active(self, settings):
@@ -99,7 +99,7 @@ class SummaryBookletJobs:
             saved = self.snapshots.get(snapshot)
             if not saved or saved[0] != database:
                 raise SummaryBookletError("Результат устарел. Нажмите «Показать» и повторите формирование.")
-            if not saved[1]:
+            if not saved[1] or ("rows" in saved[1] and not saved[1]["rows"]):
                 raise SummaryBookletError("В текущем результате нет кавалеров.")
             job = self._new_job(database, saved[1])
             job.pause_requested = multiprocessing.get_context("spawn").Event()
@@ -111,14 +111,15 @@ class SummaryBookletJobs:
                 raise SummaryBookletError("Не удалось начать формирование. Повторите попытку.")
             return job.status()
 
-    def _new_job(self, database, rows):
-        return Job(secrets.token_hex(16), database, tuple(row["id"] for row in rows), rows)
+    def _new_job(self, database, payload):
+        rows = payload["rows"]
+        return Job(secrets.token_hex(16), database, tuple(row["id"] for row in rows), rows, payload=payload["selection"])
 
     def _worker(self):
         return _generate_booklets
 
     def _worker_args(self, settings, job, directory, send):
-        return (settings.model_dump(), job.person_ids, directory, send, job.pause_requested, job.contents_rows)
+        return (settings.model_dump(), job.person_ids, directory, send, job.pause_requested, job.contents_rows, job.payload)
 
     def control(self, settings, token, action):
         with self.lock:
@@ -234,7 +235,7 @@ class SummaryBookletJobs:
             return job.path.read_bytes()
 
 
-def _generate_booklets(settings_values, person_ids, directory, connection, pause_requested, contents_rows):
+def _generate_booklets(settings_values, person_ids, directory, connection, pause_requested, contents_rows, selection=None):
     """One killable worker; pause acknowledges only at a safe booklet boundary."""
     settings = Settings(**settings_values)
     root = Path(directory)
@@ -252,7 +253,7 @@ def _generate_booklets(settings_values, person_ids, directory, connection, pause
             checkpoint()
             from .summary_booklet_contents import generate_contents_pdf
             contents = root / "contents.pdf"
-            generate_contents_pdf(contents_rows, contents)
+            generate_contents_pdf(contents_rows, contents, selection)
             writer.append(str(contents), import_outline=False)
             contents.unlink()
             for person_id in person_ids:

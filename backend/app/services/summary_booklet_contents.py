@@ -4,7 +4,48 @@ from .display import format_birth_year
 from html import escape
 
 
-def generate_contents_pdf(rows, output_path):
+def reward_heading(name):
+    """Inflect only unambiguous displayed names; preserve all remaining wording."""
+    import re
+    name = str(name or '').strip()
+    order = re.fullmatch(r'Орден\s+(.+)', name, re.IGNORECASE)
+    medal = re.fullmatch(r'Медаль\s+(.+)', name, re.IGNORECASE)
+    if order:
+        rest = order[1]
+        if rest.startswith(('«', '"', 'Славы', 'Ленина', 'Отечественной войны', 'Красной Звезды', 'Трудового Красного Знамени')):
+            return f'Кавалеры ордена {rest}'
+    if medal:
+        rest = medal[1]
+        if rest.startswith(('«', '"', 'Жукова', 'Ушакова', 'Нахимова', 'Суворова')):
+            return f'Награждённые медалью {rest}'
+    return f'Кавалеры и награждённые — {name}'
+
+
+def contents_selection(db_path, matrix, filters):
+    """Use only the same filtered matrix and its filter labels, never person rewards."""
+    from ..repositories.guides import get_guide_level_item
+    columns = matrix.get('reward_columns') or []
+    title = 'Кавалеры и награждённые по выбранным наградам'
+    if matrix.get('rows') and len(columns) == 1:
+        name = str(columns[0].get('name') or '').strip()
+        if name and name != '—':
+            title = reward_heading(name)
+    labels = []
+    for level, attr, label in ((0, 'country_id', 'Страна'), (1, 'category_id', 'Категория'),
+                               (2, 'subcategory_id', 'Подкатегория'), (3, 'name_id', 'Наименование')):
+        ident = getattr(filters, attr)
+        if ident is not None:
+            item = get_guide_level_item(db_path, level, ident)
+            labels.append(f"{label}: {(item or {}).get('name') or '—'}")
+    if filters.extra:
+        item = get_guide_level_item(db_path, 4, int(filters.extra)) if filters.extra.isdigit() else None
+        labels.append(f"Дополнение: {(item or {}).get('name') or filters.extra}")
+    if filters.include_marks:
+        labels.append('Знаки: включены в фильтрах')
+    return dict(title=title, context=' · '.join(labels) or 'Все награды · без ограничений по фильтрам')
+
+
+def generate_contents_pdf(rows, output_path, selection=None):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -18,6 +59,9 @@ def generate_contents_pdf(rows, output_path):
     body = ParagraphStyle('ContentsBody', fontName=font, fontSize=10, leading=13, textColor=ink)
     heading = ParagraphStyle('ContentsHeading', parent=body, fontName=bold)
     title = ParagraphStyle('ContentsTitle', parent=heading, fontSize=23, leading=26, spaceAfter=14)
+    theme = ParagraphStyle('ContentsTheme', parent=title, fontSize=28, leading=32, alignment=1, keepWithNext=True)
+    context = ParagraphStyle('ContentsContext', parent=body, fontSize=9, leading=12, spaceAfter=14, alignment=1, keepWithNext=True)
+    title.keepWithNext = True
     p = lambda value, style=body: Paragraph(escape(str(value or '—')), style)
     data = [[p(value, heading) for value in ('ФИО', 'Год рождения', 'Звание', 'Номер ордена')]]
     for row in rows:
@@ -45,5 +89,9 @@ def generate_contents_pdf(rows, output_path):
         canvas.drawCentredString(A4[0]/2, 5*mm, str(document.page))
         canvas.restoreState()
 
-    doc.build([p('Содержание буклета', title), table, Spacer(1, 10),
+    selection = selection or dict(title='Кавалеры и награждённые по выбранным наградам', context='')
+    intro = [p(selection['title'], theme)] if rows else []
+    if rows and selection.get('context'):
+        intro.append(p(selection['context'], context))
+    doc.build([*intro, p('Содержание буклета', title), table, Spacer(1, 10),
                p(f'Всего кавалеров: {len(rows)}', heading)], onFirstPage=paper, onLaterPages=paper)

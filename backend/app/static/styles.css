@@ -8017,3 +8017,90 @@ body.legacy-rewards-theme::after {
 .person-import-page [data-import-file-name] { min-width: 0; overflow-wrap: anywhere; color: #aaa294; font-size: 13px; }
 .person-import-page [data-import-file-name][data-error] { color: #e6b3a7; }
 .person-import-page .person-import-picker-row [hidden] { display: none; }
+
+/* About: lightweight project attribution beside the existing information. */
+.legacy-about-tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  column-gap: 28px;
+  align-items: start;
+}
+
+.legacy-about-tab > h1,
+.legacy-about-tab > .notice,
+.legacy-about-tab > .update-block {
+  grid-column: 1 / -1;
+}
+
+.legacy-about-tab > .details {
+  grid-column: 1;
+}
+
+.about-project-team {
+  grid-column: 2;
+  padding: 10px 0 16px 20px;
+  border-left: 1px solid #514737;
+  min-width: 0;
+}
+
+.about-project-team h2 {
+  margin: 0 0 20px;
+  color: #c9ad7d;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.about-team-group + .about-team-group {
+  margin-top: 22px;
+}
+
+.about-project-team p {
+  margin: 0 0 6px;
+}
+
+.about-team-role,
+.about-team-contact {
+  color: #a79d8d;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.about-team-name {
+  color: #d7cdbb;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.about-team-contact span,
+.about-team-contact a {
+  display: block;
+}
+
+.about-team-contact a {
+  color: #c9ad7d;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.about-team-contact a:focus-visible {
+  outline: 2px solid #c9ad7d;
+  outline-offset: 3px;
+}
+
+.legacy-about-tab .about-title-form input {
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .legacy-about-tab {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .about-project-team {
+    grid-column: 1;
+    padding: 12px 0 20px;
+    border-left: 0;
+  }
+}
