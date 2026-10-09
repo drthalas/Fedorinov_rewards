@@ -27,8 +27,10 @@ range.format.columnWidth=23;
 s.getRangeByIndexes(0,0,1,cols.length).format={fill:'#24364B',font:{name:'Arial',size:10,bold:true,color:'#FFFFFF'},rowHeight:56,wrapText:true};
 s.getRange('A:A').format.columnWidth=10;s.getRange('B:B').format.columnWidth=14;
 s.getRange('C:C').format.columnWidth=36;s.getRange('E:E').format.columnWidth=24;
+s.getRange('I:I').format.columnWidth=60;
 s.getRange('J:J').format.columnWidth=46;s.getRange('L:L').format.columnWidth=34;
 if(progressPath){s.getRange('M:M').format.columnWidth=68;s.getRange('N:N').format.columnWidth=52;s.getRange('P:R').format.columnWidth=64;}
+s.getRangeByIndexes(1,0,rows.length,cols.length).format.autofitRows();
 s.freezePanes.freezeRows(1);s.freezePanes.freezeColumns(3);
 wb.recalculate();
 const retained=s.getRangeByIndexes(1,0,rows.length,headers.length).values;
