@@ -52,8 +52,15 @@ Capability preflight
 пропускаются. `attempt_state=infrastructure_blocked` и legacy infrastructure
 `Ошибка источника` не считаются завершением и могут повторяться. Завершённый
 source-result, включая честный source error, сохраняется при resume.
-Изменение input hash блокирует resume. Источники текущего пилота ограничены
-warheroes.ru, podvignaroda.ru, pamyat-naroda.ru. Нет обхода CAPTCHA/login/robots.
+Изменение input hash блокирует resume. Базовые источники — warheroes.ru,
+podvignaroda.ru, pamyat-naroda.ru. Проверенный институциональный источник добавлен
+узко: `xn----7sbajiedzjdfe3ac7bmi.xn--p1ai`, только actual person cards в
+`/electronic-database/`. Он охватывает отдельные операции Восточной Пруссии/Литвы
+1944–45, а не всех кавалеров. `direct_source.py` читает реальные GET, хранит
+status/resolved URL/content hash локально, проверяет robots, соблюдает Crawl-delay
+10 секунд и общий request budget. Возобновление не обнуляет ledger; cached robots
+действует максимум 10 минут. Никаких придуманных URL/slugs или слепой пагинации.
+Кодирование query сохраняет семантику form-encoded пробелов. Нет обхода CAPTCHA/login/robots.
 Допустимы только реально открытые страницы, а не snippets. Готовая биография
 требует награды и второго идентифицирующего признака, evidence минимум для двух
 фактов, согласованных source URLs и длины до 600 символов. Год 1945 не является
