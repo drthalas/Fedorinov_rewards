@@ -1,0 +1,63 @@
+# Локальный пилот биографий ALE-491
+
+Прототип работает отдельно от приложения. Он не импортирует backend, не запускает
+runtime и не пишет в SQLite. Персональные XLSX, JSON и исследовательские события
+хранятся в приватном каталоге вне репозитория. Не отправлять их в Linear/GitHub.
+
+`select_sample.py` запускается на source host с подтверждённым DB path. Он
+разрешает только read-only SQLite, одну query-only транзакцию и rollback journal
+без sidecars. WAL/journal ambiguity означает STOP, без восстановления. Иерархия
+«СССР → Боевые → Ордена → Александра Невского» разрешается через исходные guide IDs.
+Pool упорядочен по DISTINCT person.id; seed обязателен. Единственная frozen
+selection.json сохраняется локально; повторно не извлекать выборку при resume.
+
+```sh
+python select_sample.py --db <verified-source-db> --seed 20261009491
+```
+
+Вывод этой команды содержит только выбранные 50 записей и предназначен для
+перенаправления в приватный файл через доверенный LAN, а не для терминального лога.
+
+`xlsx.mjs` создаёт новый input или enriched XLSX через bundled artifact-tool.
+Задать `ARTIFACT_TOOL_MODULE` из dependency loader; использовать bundled Node.
+Выходной файл не перезаписывается. Исходные колонки/значения проверяются перед
+экспортом; идентификаторы и номера сохраняются строками. Если исходный SQLite
+хранил номер INTEGER, утраченные ранее ведущие нули невозможно восстановить.
+
+```sh
+node xlsx.mjs <private>/selection.json <private>/input.xlsx
+python research.py <private>/input.xlsx --private-dir <private> --limit 5
+# Только после реального access/identity PASS первых пяти:
+# Private quality_gate.json: {"pass": true, "input_sha256": "<frozen-input-hash>"}
+python research.py <private>/input.xlsx --private-dir <private> --offset 5 --limit 45
+node xlsx.mjs <private>/selection.json <private>/enriched.xlsx <private>/progress.json
+```
+
+Research использует установленный Codex CLI с существующим ChatGPT login,
+read-only sandbox, ephemeral session и native live web search. Новые API keys,
+платные сервисы и автоматическая замена модели запрещены. Capability preflight
+должен пройти до передачи персональных запросов. Несовместимая модель или
+недоступный подписочный runner означает BLOCKED, а не поиск обходного платного API.
+
+На одну запись отведено до 240 секунд; уже завершённые IDs при resume пропускаются.
+Изменение input hash блокирует resume. Источники текущего пилота ограничены
+warheroes.ru, podvignaroda.ru, pamyat-naroda.ru. Нет обхода CAPTCHA/login/robots.
+Допустимы только реально открытые страницы, а не snippets. Готовая биография
+требует награды и второго идентифицирующего признака, evidence минимум для двух
+фактов, согласованных source URLs и длины до 600 символов. Год 1945 не является
+самодостаточным идентифицирующим признаком. Неподтверждённая биография пустая.
+
+JSON validation проверяет структуру, но не доказывает историческую истинность.
+Первые пять требуют содержательной проверки source/identity evidence перед
+45 оставшимися. Текущий запуск остановлен на capability preflight: CLI default
+`gpt-6.1-sol` отклонён ChatGPT authentication (HTTP 400 unsupported model).
+Ни один персональный запрос не был запущен; выборка не заменяется.
+
+Проверки:
+
+```sh
+python -m unittest discover -s tools/biography_research -p 'test_*.py' -v
+```
+
+Full suite, browser/runtime, VM, updater, продуктовые изменения и SQLite import
+не относятся к этому прототипу. Перед импортом требуется отдельное Owner решение.
