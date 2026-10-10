@@ -6,6 +6,16 @@ import subprocess
 import time
 import tomllib
 from pathlib import Path
+from urllib.parse import urlparse,unquote,parse_qsl
+
+
+def source_url_key(url):
+    p=urlparse(url)
+    return (p.scheme.casefold(),(p.hostname or '').casefold(),p.port,unquote(p.path),tuple(sorted(parse_qsl(p.query,keep_blank_values=True))))
+
+
+def source_was_opened(url,opened_urls):
+    return source_url_key(url) in {source_url_key(value) for value in opened_urls}
 
 
 def subscription_environment():
@@ -16,13 +26,14 @@ def subscription_environment():
     return env
 
 
-def command(model,directory,schema,last_message):
+def command(model,directory,schema,last_message,slim=False):
     if not model or not isinstance(model,str):raise ValueError('Explicit smoke-verified subprocess model required')
     # Research uses native web only; unrelated configured connectors must not start.
     config=Path.home()/'.codex/config.toml'
     servers=tomllib.loads(config.read_text()).get('mcp_servers',{}) if config.exists() else {}
     overrides=[arg for name in servers for arg in ('-c',f'mcp_servers.{name}.enabled=false')]
-    return ['codex','--no-daemon','--search',*overrides,'exec','--ephemeral','--sandbox','read-only',
+    if slim:overrides=[]  # Ignored user config has no MCP transports to override.
+    return ['codex','--no-daemon','--search',*overrides,'exec',*(['--ignore-user-config'] if slim else []),'--ephemeral','--sandbox','read-only',
       '--skip-git-repo-check','--json','-m',model,'-C',str(directory),'--output-schema',str(schema),'-o',str(last_message),'-']
 
 
@@ -46,7 +57,7 @@ def events_summary(path):
     return result
 
 
-def smoke(model,directory,timeout=90):
+def smoke(model,directory,timeout=90,slim=False):
     directory=Path(directory);directory.mkdir(parents=True,exist_ok=True,mode=0o700)
     schema=directory/'smoke_schema.json';schema.write_text(json.dumps({'type':'object','properties':{
       'synthetic_answer':{'type':'integer'},'source_accessible':{'type':'boolean'},'visited_url':{'type':'string'},'page_title':{'type':'string'}},
@@ -58,7 +69,7 @@ def smoke(model,directory,timeout=90):
     prompt='Synthetic non-personal smoke. Compute 7+8. Use web search and actually open https://warheroes.ru/ (or https://pamyat-naroda.ru/ if first is inaccessible). Return synthetic_answer=15 and source_accessible=true only if an actual webpage was opened. Include its real URL/title. Do not read files, run shell, access connectors, upload anything, or contact people.'
     try:
         with events.open('w') as output,err.open('w') as stderr:
-            p=subprocess.run(command(model,directory,schema,last),input=prompt,text=True,env=subscription_environment(),stdout=output,stderr=stderr,timeout=timeout)
+            p=subprocess.run(command(model,directory,schema,last,slim=slim),input=prompt,text=True,env=subscription_environment(),stdout=output,stderr=stderr,timeout=timeout)
         summary=events_summary(events)
         if p.returncode or not last.exists():error='; '.join(summary['errors']) or 'CLI failed'
         else:
@@ -76,6 +87,6 @@ def smoke(model,directory,timeout=90):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--private-dir',required=True);p.add_argument('--timeout',type=int,default=90)
-    a=p.parse_args();r=smoke(a.model,a.private_dir,a.timeout)
+    p=argparse.ArgumentParser();p.add_argument('--model',required=True);p.add_argument('--private-dir',required=True);p.add_argument('--timeout',type=int,default=90);p.add_argument('--slim',action='store_true')
+    a=p.parse_args();r=smoke(a.model,a.private_dir,a.timeout,a.slim)
     print(json.dumps(r,ensure_ascii=False));raise SystemExit(0 if r['status']=='PASS' else 1)

@@ -30,6 +30,9 @@ class ResearchContractTests(unittest.TestCase):
         from unittest.mock import patch
         c=runner.command('gpt-6-sol','private','schema','last')
         self.assertEqual(c[c.index('-m')+1],'gpt-6-sol')
+        slim=runner.command('gpt-6-sol','private','schema','last',slim=True)
+        self.assertIn('--ignore-user-config',slim)
+        self.assertFalse(any('mcp_servers.' in v for v in slim))
         with patch.dict('os.environ',{'OPENAI_API_KEY':'synthetic','CODEX_API_KEY':'synthetic'}):
             self.assertNotIn('OPENAI_API_KEY',runner.subscription_environment())
             self.assertNotIn('CODEX_API_KEY',runner.subscription_environment())
@@ -71,30 +74,73 @@ class ResearchContractTests(unittest.TestCase):
             with patch.object(research,'load_xlsx',return_value=[self.row()]*50):
                 with self.assertRaisesRegex(ValueError,'five-person'):
                     research.run(input_file,root,45,offset=5,model='test-model')
-    def row(self):return {'person_id':'001','Год рождения':'1910','Награда':'Александра Невского'}
+    def row(self):return {'person_id':'001','ФИО':'Тестов Иван Петрович','Год рождения':'1910','Награда':'Александра Невского'}
     def result(self):
         url='https://pamyat-naroda.ru/heroes/example'
         return {'person_id':'001','biography':'Краткая подтверждённая биография. Второй факт.',
           'status':'Готово к проверке','source_urls':[url],
-          'identity':[{'attribute':'award','source_value':'орден Александра Невского','url':url,'explanation':'synthetic test'},
-            {'attribute':'rank','source_value':'капитан','url':url,'explanation':'synthetic test'}],
-          'evidence':[{'claim':'Факт1','url':url,'support':'synthetic test'},{'claim':'Факт2','url':url,'support':'synthetic test'}],'notes':''}
+          'identity':[{'attribute':'fio','source_value':'Тестов Иван Петрович','url':url,'explanation':'synthetic test'},
+            {'attribute':'birth','source_value':'1910','url':url,'explanation':'synthetic test'},
+            {'attribute':'award','source_value':'орден Александра Невского','url':url,'explanation':'synthetic test'}],
+          'evidence':[{'claim':'Факт1 и факт2','url':url,'support':'synthetic test'}],'notes':''}
     def test_name_only_does_not_pass(self):
         r=self.result();r['identity']=[]
-        with self.assertRaisesRegex(ValueError,'FIO-only'):research.validate(r,self.row())
-    def test_ambiguous_biography_must_be_empty(self):
-        r=self.result();r['status']='Требует проверки'
+        with self.assertRaisesRegex(ValueError,'Exact full FIO'):research.validate(r,self.row())
+    def test_three_fields_are_sufficient_without_extra_identifiers(self):
+        r=self.result();research.validate(r,self.row())
+        self.assertEqual(r['confidence'],'high')
+        self.assertEqual(len(r['source_urls']),1)
+        self.assertEqual({i['attribute'] for i in r['identity']},{'fio','birth','award'})
+    def test_harmless_fio_display_order_and_formatting(self):
+        for value in ('  ТЕСТОВ,\u00a0 Иван   Петрович  ','Иван Петрович Тестов'):
+            r=self.result();r['identity'][0]['source_value']=value
+            research.validate(r,self.row());self.assertEqual(r['confidence'],'high')
+    def test_provisional_biography_allowed_and_visibly_marked(self):
+        r=self.result();r['identity']=[i for i in r['identity'] if i['attribute']!='birth']
+        r['status']='Требует проверки';r['notes']='Год рождения не подтверждён'
+        r['biography']='[Предварительно] '+r['biography']
+        research.validate(r,self.row());self.assertEqual(r['confidence'],'provisional')
+        r['biography']=r['biography'].replace('[Предварительно] ','')
+        with self.assertRaisesRegex(ValueError,'visibly marked'):research.validate(r,self.row())
+    def test_fio_initials_or_birth_contradiction_rejected(self):
+        r=self.result();r['identity'][0]['source_value']='Тестов И. П.'
         with self.assertRaises(ValueError):research.validate(r,self.row())
-        r['biography']='';research.validate(r,self.row())
+        r=self.result();r['identity'][1]['source_value']='1911'
+        with self.assertRaisesRegex(ValueError,'Contradictory birth'):research.validate(r,self.row())
+    def test_missing_birth_or_award_not_high_confidence(self):
+        for attribute in ('birth','award'):
+            r=self.result();r['identity']=[i for i in r['identity'] if i['attribute']!=attribute]
+            with self.assertRaisesRegex(ValueError,'three-field'):research.validate(r,self.row())
+    def test_public_biographical_profile_can_be_used(self):
+        r=self.result();url='https://ru.wikipedia.org/wiki/Synthetic_profile'
+        r['source_urls']=[url]
+        for item in r['identity']+r['evidence']:item['url']=url
+        research.validate(r,self.row())
+        r['source_urls']=['http://127.0.0.1/profile']
+        with self.assertRaises(ValueError):research.validate(r,self.row())
+    def test_verified_award_holder_collection_entry_is_sufficient(self):
+        from direct_source import BASE
+        r=self.result();url=BASE+'/elektronnaya-baza/'
+        r['source_urls']=[url]
+        for item in r['identity']+r['evidence']:item['url']=url
+        r['identity'][2]['source_value']='Кавалер ордена Александра Невского в проверенной коллекции'
+        research.validate(r,self.row());self.assertEqual(r['confidence'],'high')
+    def test_opened_iri_and_encoded_url_same_profile(self):
+        import runner
+        from urllib.parse import quote
+        iri='https://ru.wikipedia.org/wiki/Синтетический_профиль'
+        self.assertTrue(runner.source_was_opened(iri,[quote(iri,safe=':/_')]))
+        self.assertFalse(runner.source_was_opened(iri,['https://ru.wikipedia.org/wiki/Другой_профиль']))
     def test_unsupported_source_is_rejected(self):
         r=self.result();r['source_urls']=['https://pamyat-naroda.ru.bad.example/heroes/1']
         with self.assertRaises(ValueError):research.validate(r,self.row())
     def test_1945_not_sufficient(self):
         row=self.row();row['Год рождения']='1945'
-        r=self.result();r['identity'][1]['attribute']='birth'
+        r=self.result();r['identity'][1]['source_value']='1945'
         with self.assertRaises(ValueError):research.validate(r,row)
+        row['Год рождения подтверждён']=True;research.validate(r,row)
     def test_lookalike_award_rejected(self):
-        r=self.result();r['identity'][0]['source_value']='Александра Невского II'
+        r=self.result();r['identity'][2]['source_value']='Александра Невского II'
         with self.assertRaises(ValueError):research.validate(r,self.row())
     def test_fact_evidence_required(self):
         r=self.result();r['evidence']=[]

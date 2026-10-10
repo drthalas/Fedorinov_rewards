@@ -9,13 +9,14 @@ if(!selectionPath||!outputPath) throw new Error('Usage: xlsx.mjs selection.json 
 const selection=JSON.parse(await fs.readFile(selectionPath,'utf8'));
 const progress=progressPath?JSON.parse(await fs.readFile(progressPath,'utf8')):{};
 const headers=Object.keys(selection.rows[0]);
-const extra=['Биография (черновик)','Источники URL/документы','Статус исследования','Основание идентификации','Факты и evidence','Причина/примечание'];
+const extra=['Биография (черновик)','Источники URL/документы','Статус исследования','Основание идентификации','Факты и evidence','Причина/примечание','Уверенность'];
 const cols=progressPath?[...headers,...extra]:headers;
 const rows=selection.rows.map(row=>{
   const values=headers.map(k=>row[k]??'');
   if(!progressPath)return values;
   const r=progress[row.person_id]??{};
-  return [...values,r.biography??'',(r.source_urls??[]).join('\n'),r.status??'Не исследовано',JSON.stringify(r.identity??[]),JSON.stringify(r.evidence??[]),r.notes??''];
+  const confidence={high:'Высокая',provisional:'Предварительная',none:'Не подтверждена'}[r.confidence]??'Не оценивалась';
+  return [...values,r.biography??'',(r.source_urls??[]).join('\n'),r.status??'Не исследовано',JSON.stringify(r.identity??[]),JSON.stringify(r.evidence??[]),r.notes??'',confidence];
 });
 const wb=Workbook.create();const s=wb.worksheets.add('Кавалеры');
 const range=s.getRangeByIndexes(0,0,rows.length+1,cols.length);
