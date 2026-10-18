@@ -7204,17 +7204,19 @@ body.legacy-rewards-theme::after {
   }
 }
 
-/* ALE-499: fit the complete emblem inside the existing trailing menu space.
-   Intrinsic image proportions and the theme's asset/fade stay unchanged. */
+/* ALE-499: the approved full composition keeps its former medal scale.
+   Only the source's outer background is clipped; all leaves stay inside the
+   reserved menu space with a 16px gutter plus the image's native right margin. */
 .guide-theme .legacy-app-header::after,
 .legacy-rewards-theme .legacy-app-header::after,
 .cavalier-page-theme .legacy-app-header::after {
   top: 3px;
-  right: 8px;
-  width: min(178px, calc(100vw - 900px));
+  right: 16px;
+  width: clamp(146px, calc(100vw - 908px), 170px);
   height: 61px;
+  background-image: url("/static/assets/guides/top-right-emblem.png");
   background-position: right center;
-  background-size: contain;
+  background-size: auto 76px;
   background-repeat: no-repeat;
   pointer-events: none;
 }
