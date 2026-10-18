@@ -7204,6 +7204,21 @@ body.legacy-rewards-theme::after {
   }
 }
 
+/* ALE-499: fit the complete emblem inside the existing trailing menu space.
+   Intrinsic image proportions and the theme's asset/fade stay unchanged. */
+.guide-theme .legacy-app-header::after,
+.legacy-rewards-theme .legacy-app-header::after,
+.cavalier-page-theme .legacy-app-header::after {
+  top: 3px;
+  right: 8px;
+  width: min(178px, calc(100vw - 900px));
+  height: 61px;
+  background-position: right center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 /* Readable form values and one semantic button palette for archive tabs. */
 .legacy-search-tab,
 .legacy-summary-tab {
