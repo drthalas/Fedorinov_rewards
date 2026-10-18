@@ -117,10 +117,10 @@ Preview without sending:
 python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
 ```
 
-After separate confirmation, send a test only to Alexander:
+After separate confirmation, send one neutral identity test only to the single configured Owner copy, then STOP until Owner confirms receipt:
 
 ```sh
-python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send-test-to-copy-only
+python3 scripts/send_release_notification.py --version X.Y.Z --send-test-to-copy-only
 ```
 
 After separate confirmation for the real notification:
@@ -130,7 +130,13 @@ python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/lat
 ```
 
 Release notification logs are written to ignored
-`logs/release_notifications.jsonl`.
+`logs/release_notifications.jsonl`. Reuse the authoritative ledger across worktrees
+with `--log-path`; do not replace delivery history with a new empty log.
+Release preflight requires explicit, distinct Sergey primary and one Owner copy.
+PASS requires both role statuses and message IDs. A partial failure returns nonzero;
+a subsequent authorized run retries only a definite API rejection and skips prior
+success. Timeout, missing acknowledgement or interrupted intent means uncertain:
+STOP for an Owner decision. See `docs/context/RELEASES.md` for the checklist.
 
 ## Enable launchd
 

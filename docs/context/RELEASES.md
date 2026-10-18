@@ -61,19 +61,55 @@ gh release upload vX.Y.Z \
 самостоятельно. Не добавлять обязательный повторный запуск BAT в release notes,
 dry-run или финальное сообщение.
 
-Сначала dry-run:
+До отправки явно настроить `REPORT_PRIMARY_CHAT_ID` (один Сергей) и
+`REPORT_COPY_CHAT_IDS` (один отдельный Owner). Отсутствие, совпадение или
+неоднозначность ролей — preflight FAIL до любых отправок. Release sender не
+угадывает Owner через конфигурацию других приложений. Личность Owner сначала
+подтверждается им вручную; один настроенный copy ID сам по себе этого не доказывает.
+
+Использовать один авторитетный журнал `logs/release_notifications.jsonl` для всех
+запусков и worktrees. При другом рабочем каталоге передавать `--log-path` с путём
+к этому существующему журналу; пустой новый журнал не заменяет историю доставок.
+Не удалять журнал или его записи ради повторной отправки.
+
+Сначала dry-run (без отправки и изменения журнала):
 
 ```sh
 python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
 ```
 
-Если текст корректный:
+После отдельного release-разрешения, проверки текста, public release/latest.json
+и личности двух получателей (`REPORT_PRIMARY_SEND_CONFIRMED=true`):
 
 ```sh
 python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
 ```
 
-Не отправлять Telegram, если release/latest.json не проверены.
+Telegram PASS требует **двух независимых подтверждений API**: `Sergey: sent`
+и `Owner: sent`, с отдельным положительным `message_id` у каждого. В отчёте
+показывать роли, статусы и message IDs, маскировать chat IDs. Один primary
+message ID не является общим PASS; API acknowledgement не доказывает прочтение.
+
+Частичная отправка — FAIL (exit 1). Следующий разрешённый запуск той же версии
+с тем же журналом пропускает успешного адресата и повторяет только явный отказ
+Telegram API. Timeout, 5xx, ответ без ID, незавершённый `attempt_started` или старый
+`failed` без доказательства отказа — uncertain (exit 2): STOP и решение Owner,
+автоматического повтора нет. Повреждённый журнал/занятый `.lock` также блокируют
+отправку; stale lock разбирать только после проверки процесса и журнала.
+Ошибки document/recovery sender считаются uncertain консервативно.
+`--correction` не обходит защиту (version, recipient).
+
+Только при отдельном разрешении на проверку личности:
+
+```sh
+python3 scripts/send_release_notification.py --version X.Y.Z --send-test-to-copy-only
+```
+
+Это одно нейтральное сообщение единственному copy, без release content/архивов и
+без отправки Сергею. Оно учитывается отдельно от release delivery, не повторяется
+с тем же журналом даже при смене версии. После него STOP до Owner «пришло».
+Для ALE-502 отправка v2.0.27 запрещена до подтверждения identity; существующие
+`sent` для v2.0.27 нельзя обходить новым журналом.
 
 ## v2.0.15
 

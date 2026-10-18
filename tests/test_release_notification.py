@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
 import importlib.util
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 
@@ -25,6 +30,11 @@ class ReleaseNotificationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.generator = load_module("release_notification_generator_test", GENERATOR_PATH)
         self.sender = load_module("release_notification_sender_test", SENDER_PATH)
+        self.config = {"REPORT_PRIMARY_CHAT_ID": "1", "REPORT_COPY_CHAT_IDS": "2",
+                       "REPORT_PRIMARY_SEND_CONFIRMED": "true"}
+        config_patch = patch.object(self.sender.daily, "merged_config", return_value=self.config)
+        config_patch.start()
+        self.addCleanup(config_patch.stop)
 
     def _manifest(self, path: Path) -> Path:
         path.write_text(
@@ -155,9 +165,9 @@ class ReleaseNotificationTests(unittest.TestCase):
             manifest = self._manifest(Path(tmpdir) / "latest.json")
             with patch.object(self.sender.daily, "resolve_recipients", return_value=(1, [2])), \
                 patch.object(self.sender.daily, "resolve_token", return_value="TOKEN"), \
-                patch.object(self.sender.daily, "send_message") as send_message, \
+                patch.object(self.sender, "send_notification", return_value="77") as send_message, \
                 patch.object(self.sender, "LOG_PATH", Path(tmpdir) / "release_notifications.jsonl"), \
-                patch("sys.argv", ["send_release_notification.py", "--version", "0.1.1", "--manifest", str(manifest), "--send-test-to-copy-only"]):
+                patch("sys.argv", ["send_release_notification.py", "--version", "0.1.1", "--send-test-to-copy-only"]):
                 result = self.sender.main()
         self.assertEqual(result, 0)
         send_message.assert_called_once()
@@ -195,7 +205,7 @@ class ReleaseNotificationTests(unittest.TestCase):
             with patch.object(
                 self.sender.daily,
                 "merged_config",
-                return_value={"REPORT_PRIMARY_SEND_CONFIRMED": "true"},
+                return_value=self.config,
             ), patch.object(self.sender.daily, "resolve_recipients", return_value=(1, [2])), patch.object(
                 self.sender.daily, "resolve_token", return_value="TOKEN"
             ), patch.object(self.sender.daily, "send_message") as send_message, patch.object(
@@ -212,7 +222,7 @@ class ReleaseNotificationTests(unittest.TestCase):
                 ],
             ):
                 result = self.sender.main()
-            entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+            entries = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines() if json.loads(line)["status"] == "sent"]
             expected_sha = self.sender.hashlib.sha256(recovery.read_bytes()).hexdigest()
         self.assertEqual(result, 0)
         send_message.assert_not_called()
@@ -221,6 +231,237 @@ class ReleaseNotificationTests(unittest.TestCase):
         self.assertEqual([item["message_id"] for item in entries], ["101", "102"])
         self.assertTrue(all(item["artifact_name"] == recovery.name for item in entries))
         self.assertTrue(all(item["artifact_sha256"] == expected_sha for item in entries))
+
+
+    def _deliver(self, log, side_effect, purpose="release", version="2.0.27"):
+        output = io.StringIO()
+        with patch.object(self.sender, "LOG_PATH", log), patch.object(
+            self.sender, "send_notification", side_effect=side_effect
+        ) as send, redirect_stdout(output):
+            recipients = [("Sergey", 1), ("Owner", 2)] if purpose == "release" else [("Owner", 2)]
+            result = self.sender.deliver(version, recipients, "unchanged release text", "TOKEN", purpose=purpose)
+        return result, send, output.getvalue()
+
+    def test_preflight_rejects_missing_ambiguous_or_same_recipient_before_network(self):
+        invalid = [{}, {"REPORT_PRIMARY_CHAT_ID": "1"},
+                   {"REPORT_COPY_CHAT_IDS": "2"},
+                   {"REPORT_PRIMARY_CHAT_ID": "1,3", "REPORT_COPY_CHAT_IDS": "2"},
+                   {"REPORT_PRIMARY_CHAT_ID": "1", "REPORT_COPY_CHAT_IDS": "2,3"},
+                   {"REPORT_PRIMARY_CHAT_ID": "1", "REPORT_COPY_CHAT_IDS": "1"},
+                   {"REPORT_PRIMARY_CHAT_ID": "SECRET_ID", "REPORT_COPY_CHAT_IDS": "2"}]
+        for config in invalid:
+            with self.subTest(config=config), patch.object(self.sender.daily, "merged_config", return_value=config), \
+                    patch.object(self.sender, "send_notification") as send, \
+                    patch("sys.argv", ["sender", "--version", "2.0.27", "--send"]):
+                with self.assertRaises(RuntimeError) as error:
+                    self.sender.main()
+                self.assertNotIn("SECRET_ID", str(error.exception))
+                send.assert_not_called()
+
+    def test_copy_failure_is_partial_fail_and_retry_only_owner(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            code, send, output = self._deliver(log, ["612", self.sender.DeliveryRejected()])
+            self.assertEqual(code, 1)
+            self.assertIn("partial FAIL", output)
+            self.assertIn("Sergey: sent", output)
+            self.assertIn("Owner: failed", output)
+            code, send, output = self._deliver(log, ["614"])
+            self.assertEqual(code, 0)
+            send.assert_called_once_with("TOKEN", 2, "unchanged release text", None)
+            self.assertIn("message_id=612", output)
+            self.assertIn("message_id=614", output)
+            code, send, _ = self._deliver(log, AssertionError("duplicate"))
+            self.assertEqual(code, 0)
+            send.assert_not_called()
+
+    def test_primary_rejection_retry_only_sergey(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            self.assertEqual(self._deliver(log, [self.sender.DeliveryRejected(), "614"])[0], 1)
+            code, send, _ = self._deliver(log, ["612"])
+            self.assertEqual(code, 0)
+            send.assert_called_once_with("TOKEN", 1, "unchanged release text", None)
+
+    def test_uncertain_or_missing_ack_never_retries(self):
+        for outcome in [TimeoutError(), RuntimeError("token must never print"), "", "0", "None"]:
+            with self.subTest(outcome=type(outcome).__name__), tempfile.TemporaryDirectory() as tmpdir:
+                log = Path(tmpdir) / "ledger.jsonl"
+                code, _, output = self._deliver(log, ["612", outcome])
+                self.assertEqual(code, 2)
+                self.assertNotIn("token must never print", output)
+                code, send, output = self._deliver(log, AssertionError("unsafe retry"))
+                self.assertEqual(code, 2)
+                send.assert_not_called()
+                self.assertIn("STOP", output)
+
+    def test_interrupted_or_legacy_failed_attempt_stops_before_any_send(self):
+        for status in ["attempt_started", "failed", "uncertain", "sent", "unknown"]:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as tmpdir:
+                log = Path(tmpdir) / "ledger.jsonl"
+                log.write_text(json.dumps({"version": "v2.0.27", "recipient_id": 2, "status": status}) + "\n")
+                code, send, _ = self._deliver(log, AssertionError("unsafe send"))
+                self.assertEqual(code, 2)
+                send.assert_not_called()
+
+    def test_existing_legacy_success_deduplicates_by_version_and_recipient_not_role(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            log.write_text("\n".join(json.dumps({"version": "v2.0.27", "recipient_id": rid,
+                "recipient_role": "legacy", "status": "sent", "message_id": mid})
+                for rid, mid in [(1, "612"), (2, "614")]) + "\n")
+            code, send, _ = self._deliver(log, AssertionError("duplicate"))
+            self.assertEqual(code, 0)
+            send.assert_not_called()
+            code, send, _ = self._deliver(log, ["700", "701"], version="2.0.28")
+            self.assertEqual(code, 0)
+            self.assertEqual(send.call_count, 2)
+
+    def test_identity_test_is_separate_and_cannot_repeat_for_another_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            self.assertEqual(self._deliver(log, ["800"], purpose="owner_identity_test")[0], 0)
+            code, send, _ = self._deliver(log, AssertionError("second test"),
+                                        purpose="owner_identity_test", version="2.0.28")
+            self.assertEqual(code, 0)
+            send.assert_not_called()
+            code, send, _ = self._deliver(log, ["801", "802"])
+            self.assertEqual(code, 0)
+            self.assertEqual(send.call_count, 2)
+
+    def test_corrupt_ledger_or_lock_fails_closed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            log.write_text('{"truncated":')
+            with self.assertRaises(RuntimeError):
+                self._deliver(log, AssertionError("send"))
+            log.unlink()
+            log.with_name(log.name + ".lock").mkdir()
+            with self.assertRaises(RuntimeError):
+                self._deliver(log, AssertionError("send"))
+
+    def test_journal_intent_exists_before_network_and_log_failure_prevents_send(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger.jsonl"
+            def acknowledged(*args):
+                entries = [json.loads(line) for line in log.read_text().splitlines()]
+                self.assertEqual(entries[-1]["status"], "attempt_started")
+                return "900"
+            self.assertEqual(self._deliver(log, acknowledged)[0], 0)
+            with patch.object(self.sender, "append_log", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    self._deliver(log, AssertionError("send"), version="2.0.28")
+
+    def test_identity_test_content_is_neutral(self):
+        with tempfile.TemporaryDirectory() as tmpdir, patch.object(self.sender, "LOG_PATH", Path(tmpdir) / "log"), \
+                patch.object(self.sender.daily, "resolve_token", return_value="TOKEN"), \
+                patch.object(self.sender, "send_notification", return_value="901") as send, \
+                patch("sys.argv", ["sender", "--version", "2.0.27", "--send-test-to-copy-only"]):
+            self.assertEqual(self.sender.main(), 0)
+            send.assert_called_once()
+            self.assertEqual(send.call_args.args[1], 2)
+            self.assertIn("Нейтральная проверка связи", send.call_args.args[2])
+            self.assertNotIn("2.0.27", send.call_args.args[2])
+            self.assertIsNone(send.call_args.args[3])
+
+    def test_api_ack_requires_ok_positive_id_and_matching_chat(self):
+        cases = [({"ok": True, "result": {"message_id": 123, "chat": {"id": 2}}}, None),
+                 ({"ok": False, "error_code": 403}, self.sender.DeliveryRejected),
+                 ({"ok": False, "error_code": 500}, RuntimeError),
+                 ({"ok": True, "result": {"message_id": 123, "chat": {"id": 1}}}, RuntimeError),
+                 ({"ok": True, "result": {"chat": {"id": 2}}}, RuntimeError)]
+        for data, error in cases:
+            with self.subTest(data=data), patch.object(self.sender.urllib.request, "urlopen") as open_request:
+                open_request.return_value.__enter__.return_value.read.return_value = json.dumps(data).encode()
+                if error:
+                    with self.assertRaises(error):
+                        self.sender.send_notification("TOKEN", 2, "text", None)
+                else:
+                    self.assertEqual(self.sender.send_notification("TOKEN", 2, "text", None), "123")
+
+    def test_http_rejection_vs_proxy_server_and_timeout(self):
+        for status, body, expected in [(403, b'{"ok":false,"error_code":403}', self.sender.DeliveryRejected),
+                                       (502, b'{"ok":false,"error_code":502}', RuntimeError),
+                                       (403, b'proxy error', RuntimeError)]:
+            with self.subTest(status=status), patch.object(self.sender.urllib.request, "urlopen",
+                    side_effect=urllib.error.HTTPError("SECRET_URL", status, "error", {}, io.BytesIO(body))):
+                with self.assertRaises(expected) as error:
+                    self.sender.send_notification("TOKEN", 2, "text", None)
+                self.assertNotIn("SECRET", str(error.exception))
+
+
+    def test_http_integration_partial_failure_retry_and_repeat_on_temp_ledger(self):
+        requests = []
+        replies = [(200, {"ok": True, "result": {"message_id": 612, "chat": {"id": 1}}}),
+                   (403, {"ok": False, "error_code": 403}),
+                   (200, {"ok": True, "result": {"message_id": 614, "chat": {"id": 2}}})]
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_POST(self):
+                requests.append(self.rfile.read(int(self.headers["Content-Length"])).decode())
+                status, data = replies.pop(0)
+                body = json.dumps(data).encode()
+                self.send_response(status)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        real_open = self.sender.urllib.request.urlopen
+        def local_open(request, timeout):
+            local_request = self.sender.urllib.request.Request(
+                f"http://127.0.0.1:{server.server_port}/sendMessage", data=request.data, method="POST")
+            return real_open(local_request, timeout=timeout)
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir, patch.object(
+                    self.sender, "LOG_PATH", Path(tmpdir) / "ledger.jsonl"), patch.object(
+                    self.sender.urllib.request, "urlopen", side_effect=local_open), redirect_stdout(io.StringIO()):
+                self.assertEqual(self.sender.deliver("2.0.27", [("Sergey", 1), ("Owner", 2)], "release", "FAKE"), 1)
+                self.assertEqual(self.sender.deliver("2.0.27", [("Sergey", 1), ("Owner", 2)], "release", "FAKE"), 0)
+                self.assertEqual(self.sender.deliver("2.0.27", [("Sergey", 1), ("Owner", 2)], "release", "FAKE"), 0)
+            self.assertEqual(len(requests), 3)
+            self.assertEqual([self.sender.urllib.parse.parse_qs(body)["chat_id"] for body in requests],
+                             [["1"], ["2"], ["2"]])
+        finally:
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)
+
+    def test_uncertain_primary_reports_owner_pending_and_stops(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            code, send, output = self._deliver(Path(tmpdir) / "ledger", [TimeoutError()])
+            self.assertEqual(code, 2)
+            send.assert_called_once()
+            self.assertIn("Sergey: uncertain", output)
+            self.assertIn("Owner: pending", output)
+
+    def test_ack_log_failure_leaves_uncertain_intent_and_never_resends(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger"
+            append = self.sender.append_log
+            def broken_append(*args, **kwargs):
+                if args[3] == "sent":
+                    raise OSError("disk full after API success")
+                return append(*args, **kwargs)
+            with patch.object(self.sender, "append_log", side_effect=broken_append):
+                with self.assertRaises(OSError):
+                    self._deliver(log, ["612"])
+            code, send, _ = self._deliver(log, AssertionError("resend after journal failure"))
+            self.assertEqual(code, 2)
+            send.assert_not_called()
+
+    def test_legacy_test_copy_never_counts_as_release_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log = Path(tmpdir) / "ledger"
+            log.write_text(json.dumps({"version": "2.0.27", "recipient_id": 2,
+                                     "status": "sent_test_copy_only", "message_id": "600"}) + "\n")
+            code, send, _ = self._deliver(log, ["612", "614"])
+            self.assertEqual(code, 0)
+            self.assertEqual(send.call_count, 2)
 
 
 if __name__ == "__main__":
