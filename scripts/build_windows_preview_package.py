@@ -187,6 +187,22 @@ def _embed_booklet_paper() -> None:
         path.write_text(source, encoding="utf-8")
 
 
+def _embed_header_emblem_mask() -> None:
+    # Keep the accepted mask bytes; legacy updater policy forbids external SVGs.
+    mask = PACKAGE_ROOT / "backend/app/static/assets/guides/top-right-emblem-mask.svg"
+    styles_path = PACKAGE_ROOT / "backend/app/static/styles.css"
+    styles = styles_path.read_text(encoding="utf-8")
+    marker = 'url("/static/assets/guides/top-right-emblem-mask.svg")'
+    if styles.count(marker) != 1:
+        raise RuntimeError("header emblem mask CSS marker missing or ambiguous")
+    encoded = base64.b64encode(mask.read_bytes()).decode("ascii")
+    styles_path.write_text(
+        styles.replace(marker, f'url("data:image/svg+xml;base64,{encoded}")', 1),
+        encoding="utf-8",
+    )
+    mask.unlink()
+
+
 def _bundle_legacy_updater_compatible_transition_assets() -> None:
     static_root = PACKAGE_ROOT / "backend/app/static"
     templates_root = PACKAGE_ROOT / "backend/app/templates"
@@ -258,6 +274,7 @@ def main() -> int:
     _copy_required_files()
     _embed_ui_assets()
     _embed_booklet_paper()
+    _embed_header_emblem_mask()
     _bundle_legacy_updater_compatible_transition_assets()
     file_count = _make_zip()
     size = ZIP_PATH.stat().st_size

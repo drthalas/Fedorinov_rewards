@@ -33,6 +33,7 @@ class ReleasePackageTests(unittest.TestCase):
             with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
                 build_windows_preview_package._copy_required_files()
                 build_windows_preview_package._embed_booklet_paper()
+                build_windows_preview_package._embed_header_emblem_mask()
             self.assertFalse((package_root / build_windows_preview_package.BOOKLET_PAPER_PATH).exists())
             for name in ("styles.css", "booklet2.css"):
                 css = (package_root / "backend/app/static" / name).read_text(encoding="utf-8")
@@ -51,6 +52,43 @@ class ReleasePackageTests(unittest.TestCase):
                 self.assertEqual(actual.getSize(), expected.getSize())
                 self.assertEqual(actual.getRGBData(), expected.getRGBData())
             self.assertTrue(check_package_safety.check_package(package_root)[0])
+
+    def test_header_emblem_mask_embedding_preserves_bytes_and_other_css(self) -> None:
+        relative = Path("backend/app/static/assets/guides/top-right-emblem-mask.svg")
+        original = (ROOT / relative).read_bytes()
+        source_css = (ROOT / "backend/app/static/styles.css").read_text(encoding="utf-8")
+        marker = 'url("/static/assets/guides/top-right-emblem-mask.svg")'
+        with TemporaryDirectory() as tmp:
+            package_root = Path(tmp)
+            mask = package_root / relative
+            mask.parent.mkdir(parents=True)
+            mask.write_bytes(original)
+            styles = package_root / "backend/app/static/styles.css"
+            styles.write_text(source_css, encoding="utf-8")
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                build_windows_preview_package._embed_header_emblem_mask()
+            packaged = styles.read_text(encoding="utf-8")
+            uri = re.search(r'url\("data:image/svg\+xml;base64,([^\"]+)"\)', packaged)
+            self.assertIsNotNone(uri)
+            self.assertEqual(base64.b64decode(uri.group(1), validate=True), original)
+            self.assertEqual(packaged.replace(uri.group(0), marker), source_css)
+            self.assertFalse(mask.exists())
+            self.assertTrue(check_package_safety.check_package(package_root)[0])
+            self.assertIsNotNone(forbidden_relative_reason(relative))
+
+    def test_header_emblem_mask_embedding_fails_before_removing_unreferenced_mask(self) -> None:
+        with TemporaryDirectory() as tmp:
+            package_root = Path(tmp)
+            mask = package_root / "backend/app/static/assets/guides/top-right-emblem-mask.svg"
+            mask.parent.mkdir(parents=True)
+            mask.write_text("<svg/>", encoding="utf-8")
+            styles = package_root / "backend/app/static/styles.css"
+            styles.write_text("/* missing mask reference */", encoding="utf-8")
+            with patch.object(build_windows_preview_package, "PACKAGE_ROOT", package_root):
+                with self.assertRaisesRegex(RuntimeError, "header emblem mask CSS marker"):
+                    build_windows_preview_package._embed_header_emblem_mask()
+            self.assertTrue(mask.exists())
+            self.assertEqual(styles.read_text(encoding="utf-8"), "/* missing mask reference */")
 
     def test_booklet_paper_packaging_fails_if_a_required_marker_disappears(self) -> None:
         with TemporaryDirectory() as tmp:
