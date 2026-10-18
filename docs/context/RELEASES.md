@@ -1,46 +1,52 @@
 # Релизы
 
-## Общий процесс
+## Актуальный workflow
 
-1. Убедиться, что Hermes QA PASS.
-2. Поднять `APP_VERSION` в `backend/app/version.py`.
-3. Создать или обновить `release_notes/X.Y.Z.md`.
-4. Обновить docs/context при необходимости.
-5. Запустить локальные проверки.
-6. Собрать release package:
+Основание: [Owner workflow — physical Windows runtime и release candidate через Start.bat](https://linear.app/drthalas/document/owner-workflow-physical-windows-runtime-i-release-candidate-cherez-990849969b4b), утверждённый 18.10.2026. Краткий вход: [CODEX_START_HERE.md](CODEX_START_HERE.md#краткий-workflow); роли, статусы и handoff: [LINEAR_PROCESS.md](LINEAR_PROCESS.md#owner-workflow-по-фазам). Description задаёт разрешённую фазу и exact HEAD. Ни один предыдущий PASS не разрешает автоматически следующую фазу.
+
+1. **Feature preview → Owner feature PASS.** После implementation и focused TEMP checks отдельно разрешённый preview — физический Windows `COPEW-04C68047F`, отдельный runtime/install, согласованный прежний рабочий SQLite/media profile, открытый Edge. Передать `OWNER QA URL` и identity по LINEAR_PROCESS, оставить Edge/runtime запущенными. Mac/VM smoke не заменяет Owner acceptance. Автоматические write-тесты только TEMP; Public Current не затрагивать. Риск одновременных writers явно сообщать.
+2. **Exact candidate packaging на Mac → STOP.** После Owner feature PASS и отдельного разрешения собрать exact Owner-only patch ZIP + manifest из принятого HEAD в feature/release branch, без merge в main. Version bump и release notes — только в явно разрешённом packaging scope. Docs-only commit после принятого product HEAD включать в candidate только по явному Owner разрешению. Проверить package/version/SHA/byte parity; размещать только в Owner candidate channel и только при разрешении. В этой фазе не подключаться к Windows, не запускать runtime/Edge/updater, не менять `.env`. Завершить отчётом и STOP.
+3. **Отдельный Windows updater handoff.** По отдельному разрешению подтвердить постоянный Public Current, его существующий `Start.bat` и путь «О программе → Проверить обновления → Обновить» к нужному Owner candidate. Не пересоздавать Public Current и не заменять BAT. При необходимости отдельно разрешённое изменение — только `UPDATE_MANIFEST_URL`, без изменения остальных настроек, ACL и реальных DB/media. Если visibility не проверена: **«ZIP опубликован, Windows updater visibility НЕ подтверждена»**. Установку через updater и product review выполняет Owner.
+4. **Owner updater/product PASS → controlled merge.** Дождаться явного Owner сообщения: новая версия установлена, приложение работает, product review пройден. Только затем по отдельному разрешению мержить exact accepted HEAD в main, сверив ancestry/parity. При FAIL/паузе candidate не попадает в main/production; исторические ZIP/manifest bytes сохраняются, исправленный candidate получает новую patch version.
+5. **Отдельно разрешённая production publication.** Опубликовать GitHub Release и public `latest.json`; сверить version и SHA/byte parity принятого ZIP, доступность artifacts и корректность production manifest/ZIP URL. Не добавлять непринятый код и не заменять принятый пакет молчаливой пересборкой. Внутренний Hermes/Codex QA PASS не заменяет Owner feature PASS или Owner updater/product PASS.
+6. **Production verification → Telegram Сергей + Owner.** Только после проверки public release/manifest и отдельного разрешения отправить релизное уведомление двум обязательным получателям; отдельные подтверждения описаны [ниже](#telegram-notification). Обновить Linear release issue фактическими результатами. Owner updater/product acceptance нельзя переносить на post-release QA.
+
+После Owner feature PASS не повторять full suite/VM/physical feature acceptance без конкретного blocker или риска updater/recovery/packaging/migration. Переход между фазами сам по себе не создаёт дополнительный gate.
+
+### Packaging и production-команды
+
+Команды выполняются только в соответствующей явно разрешённой фазе. Сам docs-only review не разрешает их запуск.
+
+Packaging на Mac:
 
 ```sh
 python3 scripts/build_release_package.py
-```
-
-7. Проверить safety:
-
-```sh
 python3 scripts/check_package_safety.py dist/FedorinovRewards_WebPreview_vX.Y.Z.zip
 ```
 
-8. Выполнить publish dry-run:
+В отдельно разрешённой production-фазе после Owner updater/product PASS и controlled merge:
 
 ```sh
 python3 scripts/publish_github_release.py --dry-run
 ```
 
-9. Опубликовать через Manual Release workflow или обновить существующие assets, если это явно разрешено.
-10. Проверить public `latest.json`:
+Публикация — через явно разрешённый Manual Release workflow. После неё проверить public `latest.json` и связанный ZIP:
 
 ```sh
 curl -fsS -L https://github.com/drthalas/Fedorinov_rewards/releases/latest/download/latest.json
 ```
 
-11. Только после успешного public `latest.json` отправить Telegram notification.
-12. Обновить Linear release issue.
-13. Перевести owner testing issue в проверку владельцем.
+### Постоянный BAT и post-update restart
+
+Первый пользовательский запуск постоянной Owner-установки — существующий `Start.bat`. Это вход в штатный updater flow, а не fallback. После успешного обновления штатен автоматический restart; `start_windows.bat` указывать только как технический fallback, если приложение не открылось самостоятельно. Не добавлять обязательный повторный запуск BAT после каждого обновления в release notes, dry-run или Telegram. Постоянный пользовательский BAT и конфигурацию установки не пересоздавать.
+
+Если Owner видит «установлена актуальная версия», хотя candidate новее production, сначала проверить manifest URL Public Current, возвращаемую версию `latest.json`, embedded ZIP URL/доступность и сравнение версий. Причину не утверждать без диагностики; ZIP не пересобирать и updater не менять без evidence и разрешения.
 
 ## Если release уже существует
 
-По умолчанию не перезаписывать.
+По умолчанию не перезаписывать. Отдельное разрешение на изменение конкретных existing assets не отменяет Owner PASS/phase boundaries и проверки exact artifact identity.
 
-Если дано отдельное решение обновить assets существующего release:
+Только при таком разрешении:
 
 ```sh
 gh release upload vX.Y.Z \
@@ -50,30 +56,20 @@ gh release upload vX.Y.Z \
   --clobber
 ```
 
-После `--clobber` обязательно проверить public `latest.json`.
+После `--clobber` проверить public `latest.json`, ZIP URL и SHA/byte parity. Не использовать clobber для замены historical failed candidate: исправленный candidate — новая patch version.
 
 ## Telegram notification
 
-Каноническая пользовательская инструкция генерируется
-`scripts/generate_release_telegram_message.py`. После обновления основной
-сценарий — автоматический перезапуск приложения. Ручной запуск
-`start_windows.bat` допустим только как fallback, если приложение не открылось
-самостоятельно. Не добавлять обязательный повторный запуск BAT в release notes,
-dry-run или финальное сообщение.
+Обязательны **Сергей (primary) и Owner (copy)**. Текст формирует `scripts/generate_release_telegram_message.py`; отправку выполняет существующий `scripts/send_release_notification.py`. Ниже workflow-контракт [ALE-502](https://linear.app/drthalas/issue/ALE-502/release-telegram-obyazatelnoe-uvedomlenie-owner-i-sergeya-s-razdelnym), а не утверждение о реализации всех проверок в текущем sender. Сам Telegram fix выполняется отдельной задачей.
 
-Сначала dry-run:
+1. До отправки проверить production release/public `latest.json`, разрешение на Telegram, текст dry-run и конфигурацию обоих обязательных получателей. Если Сергей/primary или Owner/copy отсутствует — preflight FAIL до первой отправки; если текущие инструменты не позволяют подтвердить обоих, STOP.
+2. Получить два независимых подтверждения Telegram API. В release report отдельно показать роли Сергей и Owner, sent/failed и `message_id`; приватные chat IDs/token не выводить. Один primary `message_id` не означает общий Telegram PASS.
+3. Если один send не прошёл — partial FAIL; исправлять/повторять только неуспешному адресату с защитой от дублей по version/recipient. Успешному адресату повторно не отправлять; при неопределённом результате STOP и решение Owner до retry.
+4. Общий Telegram PASS — только после подтверждения обеих ролей. В тексте различать первый запуск через постоянный `Start.bat` и автоматический restart после обновления; ручной `start_windows.bat` — только fallback.
 
-```sh
-python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --dry-run
-```
+## История релизов
 
-Если текст корректный:
-
-```sh
-python3 scripts/send_release_notification.py --version X.Y.Z --manifest dist/latest.json --send
-```
-
-Не отправлять Telegram, если release/latest.json не проверены.
+Разделы версий ниже — исторические сведения о конкретных релизах и применявшихся тогда gates/исключениях; статусы относятся к моменту ведения этих записей. Они не задают текущий порядок merge/Owner QA и не вводят обязательный VM gate для следующих релизов; использовать [актуальный workflow](#актуальный-workflow) выше.
 
 ## v2.0.15
 
