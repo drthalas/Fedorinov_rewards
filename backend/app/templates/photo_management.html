@@ -81,6 +81,9 @@
             {% endif %}
           >
         </form>
+        {% if photo_entity_type == 'reward' and editable_media_exists(photo.path) %}
+        <button class="mini-button" type="button" data-photo-edit data-reward-id="{{ photo_entity_id }}" data-photo-field="{{ photo.field }}" data-photo-path="{{ photo.path }}" data-photo-label="{{ photo.label }}">Редактировать</button>
+        {% endif %}
         {% if has_media_path(photo.path) %}
         <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота?');"{% if photo_entity_type == 'person' %} data-person-photo-mutation data-person-id="{{ photo_entity_id }}"{% endif %} data-write-feedback data-write-pending-label="Удаляем…">
           <input type="hidden" name="entity_type" value="{{ photo_entity_type }}">

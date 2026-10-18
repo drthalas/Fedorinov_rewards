@@ -144,4 +144,8 @@
 </aside>
 </div>
 </section>
+{% if mode == 'edit' and settings.write_mode %}
+{% include "_photo_editor.html" %}
+<script src="{{ static_url('photo_editor.js') }}" defer></script>
+{% endif %}
 {% endblock %}

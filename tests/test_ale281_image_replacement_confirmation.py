@@ -35,6 +35,7 @@ class Ale281ImageReplacementConfirmationTests(unittest.TestCase):
             photo_entity_type=entity_type,
             photo_entity_id=42,
             has_media_path=bool,
+            editable_media_exists=bool,
             photo_view_url=lambda path, label, return_to: "/photo/view",
             media_url=lambda path: "/media",
         )

@@ -58,6 +58,12 @@ def photo_view_url(path: object, label: object = "", return_to: object = "") -> 
     return str(URL(path="/photo/view").include_query_params(**query))
 
 
+def editable_media_exists(path: object) -> bool:
+    from ..services.media import resolve_media
+    resolution = resolve_media(get_settings(), path)
+    return bool(resolution.serving_path and not resolution.fallback)
+
+
 def media_exists(path: object) -> bool:
     settings = get_settings()
     value = path if isinstance(path, str) else ""
@@ -80,3 +86,5 @@ templates.env.filters["format_date"] = format_date
 templates.env.filters["format_birth_year_input"] = format_birth_year_input
 templates.env.filters["format_date_input"] = format_date_input
 templates.env.filters["format_money"] = format_money
+
+templates.env.globals["editable_media_exists"] = editable_media_exists

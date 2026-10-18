@@ -8104,3 +8104,28 @@ body.legacy-rewards-theme::after {
     border-left: 0;
   }
 }
+
+/* ALE-495: only the shared person identity fields. */
+.person-edit-form .person-identity-grid { grid-template-columns: minmax(0, 3fr) minmax(155px, 1fr); }
+.person-identity-grid > label { min-width: 0; }
+@media (max-width: 640px) {
+  .person-edit-form .person-identity-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.photo-editor { width: min(1100px, 94vw); max-height: 92vh; overflow: auto; border: 1px solid #657387; border-radius: 12px; padding: 20px; background: #202a38; color: #eef2f6; }
+.photo-editor::backdrop { background: rgb(0 0 0 / 70%); }
+.photo-editor-canvases { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.photo-editor-canvases > div { min-width: 0; }
+.photo-editor canvas { display: block; max-width: 100%; height: auto; background: #111; }
+.photo-editor [data-photo-crop] { touch-action: none; cursor: crosshair; }
+.photo-editor-coordinates { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.photo-editor label { display: flex; flex-direction: column; gap: 6px; }
+.photo-editor input { min-width: 0; width: 100%; box-sizing: border-box; }
+.photo-editor .actions { margin-top: 16px; }
+@media (max-width: 640px) {
+  .photo-editor-canvases { grid-template-columns: 1fr; }
+  .photo-editor-coordinates { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.photo-editor .secondary { color: #c0ccd8; }
+.photo-editor input[type="number"] { padding: 6px 8px; border: 1px solid #657387; border-radius: 4px; background: #111b29; color: #eef2f6; }

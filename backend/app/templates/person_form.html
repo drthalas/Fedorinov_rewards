@@ -29,7 +29,7 @@
   {% if post_create %}<input type="hidden" name="post_create" value="1">{% endif %}
   <fieldset class="form-section">
     <legend>Основные данные</legend>
-    <div class="form-grid two-columns">
+    <div class="form-grid two-columns person-identity-grid">
       <label>
         <span>ФИО <span class="required-marker" aria-hidden="true">*</span></span>
         <input name="fio" value="{{ person.fio or '' }}" required autocomplete="off" spellcheck="false">

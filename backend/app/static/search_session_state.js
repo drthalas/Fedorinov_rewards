@@ -16,6 +16,7 @@
       const url = new URL(value, window.location.origin);
       if (url.origin !== window.location.origin || url.pathname !== "/legacy") return null;
       if (url.searchParams.get("tab") !== "search") return null;
+      if (url.hash.startsWith("#search-return-")) url.hash = "";
       return url;
     } catch (error) {
       return null;

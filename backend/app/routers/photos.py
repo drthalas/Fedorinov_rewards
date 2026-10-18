@@ -1,14 +1,18 @@
-from urllib.parse import parse_qs
+import sqlite3
+from urllib.parse import parse_qs, urlencode
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field, StrictInt
 from starlette.datastructures import UploadFile
 
 from ..config import get_settings
 from ..services.navigation import safe_return_to, with_query_value
+from ..services.photo_editor import edit_reward_photo
 from ..services.photos import (
     MAX_PHOTO_BYTES,
     PhotoValidationError,
+    PhotoConflictError,
     clear_photo_with_result,
     save_photo_with_result,
 )
@@ -102,3 +106,27 @@ async def photo_clear(request: Request):
     else:
         return_url = with_query_value(return_url, "status", "photo_cleared")
     return RedirectResponse(return_url, status_code=303)
+
+
+class PhotoEditRequest(BaseModel):
+    photo_field: str
+    expected_path: str
+    crop: list[StrictInt] = Field(min_length=4, max_length=4)
+    brightness: float = Field(ge=0.25, le=2, allow_inf_nan=False)
+
+
+@router.post("/rewards/{reward_id}/photos/edit")
+def photo_edit(reward_id: int, values: PhotoEditRequest):
+    try:
+        result = edit_reward_photo(get_settings(), reward_id, values.photo_field, values.expected_path,
+                                   values.crop, values.brightness)
+    except WriteBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PhotoConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PhotoValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(status_code=500, detail="Не удалось сохранить фото. Исходное фото сохранено.") from exc
+    return {"ok": True, "path": result.path, "url": "/media?" + urlencode({"path": result.path}),
+            "cleanup_warning": result.cleanup.warning_required}

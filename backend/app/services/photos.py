@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
@@ -17,6 +18,10 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 
 class PhotoValidationError(ValueError):
+    pass
+
+
+class PhotoConflictError(PhotoValidationError):
     pass
 
 
@@ -157,6 +162,8 @@ def save_photo_with_result(
     photo_field: str,
     filename: str,
     content: bytes,
+    *,
+    expected_path: str | None = None,
 ) -> PhotoMutationResult:
     ensure_write_allowed(settings)
     field = _field_config(entity_type, photo_field)
@@ -171,6 +178,8 @@ def save_photo_with_result(
     relative_path: str | None = None
     old_path: object = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        if expected_path is not None:
+            connection.execute("BEGIN IMMEDIATE")
         row = _entity_row(connection, entity_type, entity_id)
         if row is None:
             raise PhotoValidationError("Объект не найден")
@@ -180,10 +189,13 @@ def save_photo_with_result(
             (entity_id,),
         ).fetchone()
         old_path = current["photo_path"] if current is not None else None
+        if expected_path is not None and old_path != expected_path:
+            raise PhotoConflictError("Фото уже изменено. Закройте редактор и обновите форму.")
         relative_dir = _relative_dir(entity_type, entity_id, row)
         target_dir = settings.rewards_data_dir / relative_dir
         try:
-            target_path = write_collision_safe_media(target_dir, field.stem, extension, content)
+            stem = f"{field.stem}_{uuid4().hex}" if expected_path is not None else field.stem
+            target_path = write_collision_safe_media(target_dir, stem, extension, content)
             relative_path = (relative_dir / target_path.name).as_posix()
             connection.execute(f"update {table} set {field.field} = ? where id = ?", (relative_path, entity_id))
             connection.commit()

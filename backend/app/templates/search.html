@@ -78,7 +78,7 @@
   </fieldset>
   <div class="search-buttons">
     <button type="submit">Искать</button>
-    <a class="button secondary-button" href="/search">Сброс</a>
+    <a class="button secondary-button" href="/search" data-search-reset>Сброс</a>
   </div>
 </form>
 
@@ -130,7 +130,7 @@
         </thead>
         <tbody>
           {% for person in results.persons %}
-          <tr>
+          <tr data-search-row="person-{{ person.id }}">
             <td>{{ results.offset + loop.index }}</td>
             <td><a href="/persons/{{ person.id }}?return_to={{ search_return_to|urlencode }}">{{ person.fio|dash }}</a></td>
             <td>{{ person.rank_name|dash }}</td>
@@ -181,7 +181,7 @@
         </thead>
         <tbody>
           {% for reward in results.rewards %}
-          <tr>
+          <tr data-search-row="reward-{{ reward.id }}">
             <td><a href="/persons/{{ reward.person_id }}?return_to={{ search_return_to|urlencode }}">{{ reward.fio|dash }}</a></td>
             <td>{{ reward.rank_name|dash }}</td>
             <td>{{ reward.birthday|format_birth_year }}</td>
