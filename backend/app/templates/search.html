@@ -2,7 +2,7 @@
 {% block title %}Поиск{% endblock %}
 {% block content %}
 {% macro search_sort_th(key, label) -%}
-<th><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+<th data-column-key="{{ key }}"><a class="matrix-sort-link" href="{{ search_sort.urls.get(key, '#') }}">{{ label }}{% if search_sort.sort == key %} {{ '↓' if search_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
 {%- endmacro %}
 {% macro search_pagination_controls(pagination) -%}
 {% if pagination and pagination.total > pagination.page_size %}
@@ -112,10 +112,10 @@
     <h2>Награжденные</h2>
     <p class="muted">Найдено: {{ results.counts.persons }} · показано на странице: {{ results.persons|length }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-table-size-key="search-persons">
         <thead>
           <tr>
-            <th>№</th>
+            <th data-column-key="row-number">№</th>
             {{ search_sort_th("fio", "ФИО") }}
             {{ search_sort_th("rank_name", "Звание / специальность") }}
             {{ search_sort_th("birthday", "Год рождения") }}
@@ -156,7 +156,7 @@
     <h2>{{ "Номер награды" if scope == "reward_numbers" else "Наименование награды" }}</h2>
     <p class="muted">Найдено: {{ results.counts.rewards }} · показано на странице: {{ results.rewards|length }}</p>
     <div class="table-wrap">
-      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-row-height-storage-key="search-results-row-height">
+      <table class="search-results-table resizable-search-table {% if photo_mode == 'photos' %}search-results-table--photo-mode{% endif %}" data-resizable-table data-sync-row-height data-table-size-key="search-rewards">
         <thead>
           <tr>
             {{ search_sort_th("fio", "ФИО") }}

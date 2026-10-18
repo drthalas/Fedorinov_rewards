@@ -8203,3 +8203,15 @@ body.legacy-rewards-theme::after {
   .photo-editor-heading h2 { font-size: 16px; }
   .photo-editor .actions button { padding: 5px 10px; }
 }
+/* Keep resized search tables scrollable inside their panel at narrow widths. */
+.legacy-search-tab,
+.legacy-search-tab .legacy-block,
+.legacy-search-tab .legacy-table-wrap,
+.panel:has(.search-results-table),
+.table-wrap:has(> .search-results-table) {
+  min-width: 0;
+  max-width: 100%;
+}
+.search-results-table th,
+.search-results-table td { overflow-wrap: anywhere; }
+.search-table-size-reset { margin: 6px 10px; }

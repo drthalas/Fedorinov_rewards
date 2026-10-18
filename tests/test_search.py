@@ -352,8 +352,8 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("Предыдущая", search_template)
         self.assertIn("Следующая", search_template)
         self.assertIn("Последняя", search_template)
-        self.assertIn('data-sync-row-height data-row-height-storage-key="search-results-row-height"', search_template)
-        self.assertIn('data-sync-row-height data-row-height-storage-key="search-results-row-height"', legacy_template)
+        self.assertIn('data-sync-row-height data-table-size-key="search-persons"', search_template)
+        self.assertIn('data-sync-row-height data-table-size-key="search-persons"', legacy_template)
 
     def test_person_search_results_render_user_columns_without_id_header(self) -> None:
         results = search_all(self.db_path, "Андрос", scope="persons")
@@ -373,7 +373,7 @@ class SearchRepositoryTests(unittest.TestCase):
             search_sort={"sort": "", "dir": "asc", "urls": {"fio": "#", "rank_name": "#", "birthday": "#", "person_foto_flag": "#", "main_foto_flag": "#", "rewards_foto_flag": "#", "book1_foto_flag": "#", "book2_foto_flag": "#", "card1_foto_flag": "#", "card2_foto_flag": "#"}},
         )
         self.assertNotIn("<th>ID</th>", rendered)
-        self.assertIn("<th>№</th>", rendered)
+        self.assertIn('<th data-column-key="row-number">№</th>', rendered)
         self.assertIn("Фото кавалера", rendered)
         self.assertIn("Фото наградной книжки, сторона 1", rendered)
         self.assertIn("search-photo-flag\">1</span>", rendered)
@@ -529,8 +529,8 @@ class SearchRepositoryTests(unittest.TestCase):
         self.assertIn("DEFAULT_ROW_HEIGHT_STORAGE_KEY", search_js)
         self.assertIn("data-sync-row-height", search_js)
         self.assertIn("applyTableRowHeight", search_js)
-        self.assertIn("localStorage.setItem(rowHeightStorageKey(table)", search_js)
-        self.assertIn("localStorage.getItem(rowHeightStorageKey(table))", search_js)
+        self.assertIn("localStorage.setItem(key, JSON.stringify(sizes.get(table))", search_js)
+        self.assertIn("localStorage.getItem(key)", search_js)
         self.assertIn("Array.from(table.querySelectorAll(\"tbody tr\"))", search_js)
 
     def test_search_csv_includes_reward_photo_document_columns(self) -> None:
