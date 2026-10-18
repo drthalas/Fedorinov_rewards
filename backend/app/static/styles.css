@@ -7204,9 +7204,8 @@ body.legacy-rewards-theme::after {
   }
 }
 
-/* ALE-499: the approved full composition keeps its former medal scale.
-   Only the source's outer background is clipped; all leaves stay inside the
-   reserved menu space with a 16px gutter plus the image's native right margin. */
+/* ALE-499: mask the approved raster's baked-in plaque/frame, retaining its
+   medal pixels, scale and native margin. Intersect with the existing fade. */
 .guide-theme .legacy-app-header::after,
 .legacy-rewards-theme .legacy-app-header::after,
 .cavalier-page-theme .legacy-app-header::after {
@@ -7218,6 +7217,11 @@ body.legacy-rewards-theme::after {
   background-position: right center;
   background-size: auto 76px;
   background-repeat: no-repeat;
+  mask-image: url("/static/assets/guides/top-right-emblem-mask.svg"), linear-gradient(90deg, transparent 0, rgb(0 0 0 / 35%) 11%, #000 28%, #000 100%);
+  mask-size: auto 76px, 100% 100%;
+  mask-position: right center, center;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
   pointer-events: none;
 }
 
