@@ -6,11 +6,11 @@
   <div class="photo-manage-grid">
     {% for photo in photo_controls %}
     {% set file_input_id = 'photo-file-' ~ photo_entity_type ~ '-' ~ photo_entity_id ~ '-' ~ photo.field %}
-    <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}" data-photo-field="{{ photo.field }}">
+    <div class="photo-manage-card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}" data-photo-field="{{ photo.field }}" data-photo-editor-slot data-photo-edit-url="/photos/{{ photo_entity_type }}/{{ photo_entity_id }}/edit" data-photo-edit-path="{{ photo.path or '' }}">
       <div class="photo-frame">
       {% if has_media_path(photo.path) %}
       <a class="photo-link" href="{{ photo_view_url(photo.path, photo.label, photo_return_url) }}">
-        <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+        <img class="photo" data-photo-editor-image src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
       </a>
       {% else %}
       <div class="photo photo-placeholder">Нет фото</div>
@@ -81,8 +81,8 @@
             {% endif %}
           >
         </form>
-        {% if photo_entity_type == 'reward' and editable_media_exists(photo.path) %}
-        <button class="mini-button" type="button" data-photo-edit data-reward-id="{{ photo_entity_id }}" data-photo-field="{{ photo.field }}" data-photo-path="{{ photo.path }}" data-photo-label="{{ photo.label }}">Редактировать</button>
+        {% if editable_media_exists(photo.path) %}
+        <button class="mini-button" type="button" data-photo-edit data-photo-field="{{ photo.field }}" data-photo-label="{{ photo.label }}">Редактировать</button>
         {% endif %}
         {% if has_media_path(photo.path) %}
         <form method="post" action="/photos/clear" onsubmit="return confirm('Удалить фотографию из этого слота?');"{% if photo_entity_type == 'person' %} data-person-photo-mutation data-person-id="{{ photo_entity_id }}"{% endif %} data-write-feedback data-write-pending-label="Удаляем…">

@@ -129,9 +129,9 @@
       <div class="photo-manage-grid">
       {% for photo in photo_controls %}
         {% set draft_photo = draft_photos.get(photo.field) %}
-        <div class="photo-manage-card {{ '' if draft_photo else 'placeholder-card' }}" data-draft-photo-card="{{ photo.field }}">
+        <div class="photo-manage-card {{ '' if draft_photo else 'placeholder-card' }}" data-draft-photo-card="{{ photo.field }}" data-photo-editor-slot data-photo-edit-kind="draft" data-photo-edit-url="/draft-photos/{{ draft_token }}/{{ photo.field }}/edit">
           <div class="photo-frame">
-            <img class="photo" data-draft-photo-image src="{% if draft_photo %}/persons/new/draft/{{ draft_token }}/photos/{{ photo.field }}{% endif %}" alt="{{ photo.label }}" {% if not draft_photo %}hidden{% endif %}>
+            <img class="photo" data-draft-photo-image data-photo-editor-image src="{% if draft_photo %}/persons/new/draft/{{ draft_token }}/photos/{{ photo.field }}{% endif %}" alt="{{ photo.label }}" {% if not draft_photo %}hidden{% endif %}>
             <div class="photo photo-placeholder" data-draft-photo-placeholder {% if draft_photo %}hidden{% endif %}>Нет фото</div>
           </div>
           <p class="photo-manage-label">{{ photo.label }}</p>
@@ -139,6 +139,7 @@
             <button class="mini-button photo-icon-button" type="button" data-draft-photo-trigger data-photo-field="{{ photo.field }}" aria-label="Добавить фотографию: {{ photo.label }}" title="Добавить фотографию">+</button>
             <input class="sr-only-file" type="file" data-draft-photo-input data-photo-field="{{ photo.field }}" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
             <button class="mini-button danger photo-icon-button" type="button" data-draft-photo-clear data-photo-field="{{ photo.field }}" aria-label="Удалить фотографию: {{ photo.label }}" title="Удалить фотографию" {% if not draft_photo %}hidden{% endif %}>×</button>
+            <button class="mini-button" type="button" data-photo-edit data-photo-field="{{ photo.field }}" data-photo-label="{{ photo.label }}" {% if not draft_photo %}hidden{% endif %}>Редактировать</button>
             <p class="notice notice-error photo-source-error" data-draft-photo-error hidden></p>
           </div>
         </div>

@@ -32,3 +32,32 @@ Acceptance: реальный browser flow crop/brightness/reset/cancel/save, с�
 несохранённых полей, новые пиксели после reload в форме/карточке/поиске/lightbox;
 focused temp tests shared references, conflict, filesystem/SQLite failure,
 валидации и write guard. Никаких real DB/media, full suite или Windows gate.
+
+## Corrective ALE-496/497 — 18.10.2026
+
+Инвентарь controls: сохранённые слоты person/reward/mark в общем
+`photo_management.html`; погон в `rank_form.html`; изображение награды уровня 3
+в `guide_level_form.html`; staged person/reward slots с upload/delete в формах
+черновиков. Галереи, дополнительные файлы каталога и остальные уровни справочника
+без image controls не расширены.
+
+Один адаптер/модальное окно использует существующее место сохранения:
+- сохранённые person/reward/mark — guarded media pipeline с optimistic path check;
+- rank/guide image — уникальный GuideImages файл и транзакционная смена только
+  image_path, без миграций и изменения названия/рейтинга;
+- draft — новый staged PNG и атомарная смена manifest, без записи SQLite;
+- выбранный файл справочника/погона — обработанный File остаётся в форме до
+  обычного Save. Погон не проходит повторное авто-кадрирование после ручной обрезки.
+
+Модальное окно ограничено viewport; оба Canvas вписываются целиком без clipping.
+Числовые поля и служебные подсказки удалены. Стрелки перемещают crop на один
+исходный пиксель, Shift+стрелки меняют его размер для точной настройки.
+Кнопки появляются динамически после staged upload и скрываются после clear.
+Reset/Cancel не пишут данные. Остальные несохранённые поля сохраняются.
+Ограничения размера прежние: 40 млн пикселей, 25 MB; для справочников 5 MB.
+
+Поиск использует исходный person/reward ID и return token; после возврата
+выделяет ровно одну строку, не соседние награды того же кавалера. Новый контекст
+поиска/сортировки/фильтра сбрасывает выделение, отсутствующая строка не заменяется
+другим человеком. Доступный marker не влияет на высоту строки.
+ALE-495 identity grid и его стили остаются frozen.

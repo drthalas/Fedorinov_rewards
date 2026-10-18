@@ -373,3 +373,44 @@ def commit_draft(settings: Settings, token: object, person_data: PersonWriteData
     discard_draft(settings, token)
     log_action("create", "person", person_id, {"draft": True, "rewards": len(draft["rewards"]), "photos": len(written_paths)})
     return person_id
+
+
+def edit_staged_photo(settings: Settings, token: str, photo_field: str, expected_revision: str,
+                      crop: list[int], brightness: float, reward_token: str | None = None) -> str:
+    """Publish a new staged file through the atomic draft manifest; keep the source on failure."""
+    from hashlib import sha256
+    from uuid import uuid4
+    from .photo_editor import edited_image
+    from .photos import PhotoConflictError, _field_config
+    from .media_filenames import write_collision_safe_media
+
+    ensure_write_allowed(settings)
+    _field_config("reward" if reward_token else "person", photo_field)
+    def current_path():
+        return (staged_reward_photo_path(settings, token, reward_token, photo_field) if reward_token
+                else staged_photo_path(settings, token, photo_field))
+    source = current_path()
+    if source is None or source.stat().st_size > MAX_PHOTO_BYTES:
+        raise PhotoValidationError("Фото черновика недоступно.")
+    content = source.read_bytes()
+    if sha256(content).hexdigest() != expected_revision:
+        raise PhotoConflictError("Фото черновика уже изменено. Откройте редактор заново.")
+    result = edited_image(content, crop, brightness)
+    current = current_path()
+    if current is None or sha256(current.read_bytes()).hexdigest() != expected_revision:
+        raise PhotoConflictError("Фото черновика уже изменено. Откройте редактор заново.")
+    draft = load_draft(settings, token)
+    target = write_collision_safe_media(source.parent, f"{photo_field}_{uuid4().hex}", ".png", result)
+    try:
+        item = {"filename": target.name, "original_name": "edited.png"}
+        if reward_token:
+            index, entry = _reward_entry(draft, reward_token)
+            updated = {**entry, "photos": {**entry.get("photos", {}), photo_field: item}}
+            draft["rewards"][index] = updated
+        else:
+            draft["photos"][photo_field] = item
+        _save(settings, draft)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    return sha256(result).hexdigest()

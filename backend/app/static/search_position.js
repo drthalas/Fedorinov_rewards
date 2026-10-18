@@ -17,6 +17,12 @@
     return null;
   }
   function restore() {
+    document.querySelectorAll("[data-search-return-selected]").forEach((row) => {
+      row.classList.remove("selected-row", "search-return-selected");
+      row.removeAttribute("data-search-return-selected");
+      row.removeAttribute("aria-current");
+      row.querySelector("[data-search-return-marker]")?.remove();
+    });
     try {
       const saved = JSON.parse(sessionStorage.getItem(key) || "null");
       const token = location.hash.startsWith("#search-return-") ? location.hash.slice(1) : history.state?.searchReturn;
@@ -30,6 +36,14 @@
       window.scrollTo(saved.x, saved.y);
       // Keep the stable row at its old viewport position; missing rows use saved scroll.
       if (row) {
+        row.classList.add("selected-row", "search-return-selected");
+        row.setAttribute("data-search-return-selected", "");
+        row.setAttribute("aria-current", "true");
+        const marker = document.createElement("span");
+        marker.className = "visually-hidden";
+        marker.setAttribute("data-search-return-marker", "");
+        marker.textContent = "Последняя открытая строка. ";
+        row.querySelector("td")?.prepend(marker);
         const delta = row.getBoundingClientRect().top - saved.top;
         const wrap = rowScroller(row);
         if (wrap && wrap.scrollHeight > wrap.clientHeight) wrap.scrollTop += delta;

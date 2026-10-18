@@ -15,6 +15,10 @@
       {% block content %}{% endblock %}
     </main>
     {% include "_lightbox.html" %}
+    {% if settings.write_mode %}
+    {% include "_photo_editor.html" %}
+    <script src="{{ static_url('photo_editor.js') }}" defer></script>
+    {% endif %}
     <script src="{{ static_url('cascading_guides.js') }}" defer></script>
     <script src="{{ static_url('search_suggestions.js') }}" defer></script>
     <script src="{{ static_url('search_results.js') }}" defer></script>

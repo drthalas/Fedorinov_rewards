@@ -32,10 +32,10 @@
     <span>Рейтинг</span>
     <input type="number" name="rating_rank" value="{{ item.rating_rank or '' }}" min="1" step="1" inputmode="numeric" placeholder="Положительное целое число" autocomplete="off">
   </label>
-  <section class="guide-image-editor" aria-label="Изображение элемента справочника">
+  <section class="guide-image-editor" data-photo-editor-slot data-photo-edit-kind="guide" data-photo-edit-stored="{{ 'true' if editable_media_exists(item.image_path) else 'false' }}" data-photo-edit-url="/photos/guide/{{ item.id }}/edit" data-photo-edit-path="{{ item.image_path or '' }}" aria-label="Изображение элемента справочника">
     <h2>Изображение</h2>
     <div class="guide-image-preview-frame" data-guide-image-preview data-current-src="{% if item.image_path %}{{ media_url(item.image_path) }}{% endif %}">
-      <img class="guide-image-preview" data-guide-image-preview-image {% if item.image_path %}src="{{ media_url(item.image_path) }}"{% else %}hidden{% endif %} alt="{{ item.name or 'Изображение элемента справочника' }}">
+      <img class="guide-image-preview" data-guide-image-preview-image data-photo-editor-image {% if item.image_path %}src="{{ media_url(item.image_path) }}"{% else %}hidden{% endif %} alt="{{ item.name or 'Изображение элемента справочника' }}">
       <span class="guide-image-preview-placeholder" data-guide-image-preview-placeholder {% if item.image_path %}hidden{% endif %}>Изображение не загружено</span>
     </div>
     <p class="notice notice-error guide-image-preview-error" data-guide-image-preview-error hidden></p>
@@ -48,6 +48,7 @@
         <input type="file" name="image_file" data-guide-image-input data-image-slot-occupied="{{ 'true' if item.image_path else 'false' }}" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp">
       </span>
     </label>
+    <button class="mini-button" type="button" data-photo-edit data-photo-field="image_path" data-photo-label="Изображение" {% if not item.image_path %}hidden{% endif %}>Редактировать</button>
     <small class="secondary">JPG, JPEG, PNG или WebP, не более 5 MB.</small>
   </section>
   {% endif %}

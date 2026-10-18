@@ -8,7 +8,8 @@ from starlette.datastructures import UploadFile
 
 from ..config import get_settings
 from ..services.navigation import safe_return_to, with_query_value
-from ..services.photo_editor import edit_reward_photo
+from ..services.photo_editor import edit_photo
+from ..services.guide_images import GuideImageValidationError
 from ..services.photos import (
     MAX_PHOTO_BYTES,
     PhotoValidationError,
@@ -117,16 +118,42 @@ class PhotoEditRequest(BaseModel):
 
 @router.post("/rewards/{reward_id}/photos/edit")
 def photo_edit(reward_id: int, values: PhotoEditRequest):
+    return entity_photo_edit("reward", reward_id, values)
+
+
+@router.post("/photos/{entity_type}/{entity_id}/edit")
+def entity_photo_edit(entity_type: str, entity_id: int, values: PhotoEditRequest):
     try:
-        result = edit_reward_photo(get_settings(), reward_id, values.photo_field, values.expected_path,
+        result = edit_photo(get_settings(), entity_type, entity_id, values.photo_field, values.expected_path,
                                    values.crop, values.brightness)
     except WriteBlockedError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except PhotoConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except PhotoValidationError as exc:
+    except (PhotoValidationError, GuideImageValidationError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except (OSError, sqlite3.Error) as exc:
         raise HTTPException(status_code=500, detail="Не удалось сохранить фото. Исходное фото сохранено.") from exc
     return {"ok": True, "path": result.path, "url": "/media?" + urlencode({"path": result.path}),
             "cleanup_warning": result.cleanup.warning_required}
+
+
+@router.post("/draft-photos/{draft_token}/{photo_field}/edit")
+@router.post("/draft-photos/{draft_token}/rewards/{reward_token}/{photo_field}/edit")
+def draft_photo_edit(draft_token: str, photo_field: str, values: PhotoEditRequest, reward_token: str | None = None):
+    from ..services.person_create_drafts import edit_staged_photo
+    if values.photo_field != photo_field:
+        raise HTTPException(status_code=400, detail="Некорректное поле фото")
+    try:
+        revision = edit_staged_photo(get_settings(), draft_token, photo_field, values.expected_path,
+                                     values.crop, values.brightness, reward_token)
+    except WriteBlockedError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except PhotoConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="Не удалось сохранить фото черновика.") from exc
+    base = f"/persons/new/draft/{draft_token}" + (f"/rewards/{reward_token}" if reward_token else "")
+    return {"ok": True, "url": f"{base}/photos/{photo_field}?v={revision}", "revision": revision}

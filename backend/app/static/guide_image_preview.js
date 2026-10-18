@@ -146,7 +146,7 @@
     const uploadName = form.querySelector("[data-guide-upload-name]");
     if (!input || !preview || !image || !placeholder || !error) return;
 
-    const currentSrc = preview.dataset.currentSrc || "";
+    let currentSrc = preview.dataset.currentSrc || "";
     let objectUrl = "";
     let allowConfirmedPicker = false;
 
@@ -249,6 +249,12 @@
       image.src = objectUrl;
     });
 
+    form.addEventListener("photo-editor:saved", (event) => {
+      currentSrc = event.detail.url;
+      preview.dataset.currentSrc = currentSrc;
+      resetPreview();
+    });
+    form.addEventListener("photo-editor:staged", () => input.dispatchEvent(new Event("change", { bubbles: true })));
     form.addEventListener("reset", () => window.requestAnimationFrame(resetPreview));
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });
   }
@@ -425,6 +431,13 @@
       if (helper && typeof helper.clearPending === "function") helper.clearPending();
     });
 
+    editor.addEventListener("photo-editor:saved", (event) => {
+      revokeObjectUrl(); clearError(); clearValue.value = "";
+      preview.dataset.currentSrc = event.detail.url;
+      image.src = event.detail.url; image.hidden = false; placeholder.hidden = true; clear.hidden = false;
+      setTriggerOccupied(true);
+    });
+    editor.addEventListener("photo-editor:staged", (event) => showFile(event.detail.file));
     window.addEventListener("beforeunload", revokeObjectUrl, { once: true });
   }
 

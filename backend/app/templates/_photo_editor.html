@@ -1,18 +1,14 @@
 <dialog class="photo-editor" data-photo-editor aria-labelledby="photo-editor-title">
-  <h2 id="photo-editor-title">Редактировать фото</h2>
-  <p data-photo-editor-label></p>
-  <p class="secondary" id="photo-crop-help">Выделите область мышью или касанием. Для точной обрезки можно задать координаты в пикселях.</p>
+  <header class="photo-editor-heading">
+    <h2 id="photo-editor-title">Редактировать фото</h2>
+    <span data-photo-editor-label></span>
+  </header>
   <div class="photo-editor-canvases">
-    <div><p>Область обрезки</p><canvas data-photo-crop aria-describedby="photo-crop-help" aria-label="Изображение для выбора области"></canvas></div>
-    <div><p>Предпросмотр</p><canvas data-photo-preview aria-label="Предпросмотр результата"></canvas></div>
-  </div>
-  <div class="photo-editor-coordinates">
-    {% for name, label in [('x', 'Слева'), ('y', 'Сверху'), ('width', 'Ширина'), ('height', 'Высота')] %}
-    <label>{{ label }}<input type="number" data-crop-value="{{ name }}" min="{{ 1 if name in ('width', 'height') else 0 }}" step="1"></label>
-    {% endfor %}
+    <section><span>Обрезка</span><div class="photo-editor-canvas-frame"><canvas data-photo-crop tabindex="0" aria-label="Область обрезки" title="Выделите область мышью или касанием. Стрелки — сдвиг, Shift со стрелками — размер."></canvas></div></section>
+    <section><span>Предпросмотр</span><div class="photo-editor-canvas-frame"><canvas data-photo-preview aria-label="Предпросмотр результата"></canvas></div></section>
   </div>
   <label class="photo-editor-brightness">Яркость <output data-photo-brightness-value>100%</output>
-    <input type="range" data-photo-brightness min="25" max="200" value="100" step="1">
+    <input type="range" data-photo-brightness aria-label="Яркость" min="25" max="200" value="100" step="1">
   </label>
   <p class="notice notice-error" data-photo-editor-error role="alert" hidden></p>
   <div class="actions">
@@ -20,5 +16,4 @@
     <button type="button" class="secondary-button" data-photo-editor-cancel>Отмена</button>
     <button type="button" data-photo-editor-save>Сохранить</button>
   </div>
-  <p class="secondary">Сохраняется только фото. Остальные поля формы останутся без изменений.</p>
 </dialog>
