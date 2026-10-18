@@ -221,6 +221,24 @@
     });
   }
 
+  // Refresh every visible occurrence of the same entity/slot, including a
+  // person's photo repeated across multiple reward rows. Other shared paths stay intact.
+  document.addEventListener("photo-editor:saved", (event) => {
+    const source = event.target.closest("[data-search-photo-slot]");
+    if (!source || !event.detail.path) return;
+    const field = source.querySelector("[data-photo-edit]").dataset.photoField;
+    document.querySelectorAll("[data-search-photo-slot]").forEach((host) => {
+      if (host.dataset.photoEditUrl !== source.dataset.photoEditUrl || host.querySelector("[data-photo-edit]").dataset.photoField !== field) return;
+      host.dataset.photoEditPath = event.detail.path;
+      host.querySelector("[data-photo-editor-image]").src = event.detail.url;
+      const link = host.querySelector("a.photo-link");
+      const url = new URL(link.href);
+      url.searchParams.set("path", event.detail.path);
+      link.href = url.href;
+      link.dataset.lightboxSrc = event.detail.url;
+    });
+  });
+
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-resizable-table]").forEach((table) => {
       loadSizes(table);

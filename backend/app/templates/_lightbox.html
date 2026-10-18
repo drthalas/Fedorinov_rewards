@@ -11,6 +11,9 @@
       <button type="button" data-lightbox-zoom-out title="Отдалить">−</button>
       <button type="button" data-lightbox-zoom-in title="Приблизить">+</button>
       <button type="button" data-lightbox-reset>Сброс</button>
+      {% if settings is defined and settings.write_mode and not settings.read_only|default(false) %}
+      <button type="button" data-lightbox-edit hidden>Редактировать</button>
+      {% endif %}
     </div>
     <div class="photo-lightbox-caption" id="photo-lightbox-caption"></div>
   </div>

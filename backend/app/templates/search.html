@@ -27,12 +27,28 @@
 {% endif %}
 {%- endmacro %}
 {% macro search_photo_cell(row, flag_field, path_field, label) -%}
-<td class="search-photo-cell {% if photo_mode == 'photos' %}search-photo-cell--preview{% endif %}" data-search-photo-field="{{ flag_field }}">
+{% set path = row.get(path_field) or '' %}
+{% set kind = 'reward' if row.get('person_id') else 'person' %}
+{% set entity_id = row.get('id') %}
+{% set slot = path_field %}
+{% if kind == 'reward' and path_field.startswith('person_') %}
+  {% set kind = 'person' %}
+  {% set entity_id = row.get('person_id') %}
+  {% set slot = path_field if path_field == 'person_foto' else path_field[7:] %}
+{% elif path_field.startswith('reward_book') %}
+  {% set slot = path_field[7:] %}
+{% endif %}
+{% set editable = settings.write_mode and not settings.read_only|default(false) and photo_mode == 'photos' and row.get(flag_field) and media_exists(path) and path.lower().endswith(('.jpg', '.jpeg', '.png', '.webp', '.bmp')) %}
+<td class="search-photo-cell {% if photo_mode == 'photos' %}search-photo-cell--preview{% endif %}" data-search-photo-field="{{ flag_field }}"{% if editable %} data-search-photo-slot data-photo-editor-slot data-photo-edit-kind="{{ kind }}" data-photo-edit-url="/photos/{{ kind }}/{{ entity_id }}/edit" data-photo-edit-path="{{ path }}"{% endif %}>
   {% if photo_mode == "photos" %}
-    {% if row.get(flag_field) and media_exists(row.get(path_field)) %}
-  <a class="photo-link search-photo-preview-link search-photo-frame" href="{{ photo_view_url(row.get(path_field), label, search_return_to) }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(row.get(path_field)) }}">
-    <img class="search-photo-preview" src="{{ media_url(row.get(path_field)) }}" alt="{{ label }}">
+    {% if row.get(flag_field) and media_exists(path) %}
+  <a class="photo-link search-photo-preview-link search-photo-frame" href="{{ photo_view_url(path, label, search_return_to) }}" data-lightbox-caption="{{ label }}" data-lightbox-src="{{ media_url(path) }}"{% if editable %} data-photo-edit-target="{{ kind }}:{{ entity_id }}:{{ slot }}"{% endif %}>
+    <img class="search-photo-preview" data-photo-editor-image src="{{ media_url(path) }}" alt="{{ label }}">
   </a>
+      {% if editable %}
+  <button type="button" class="search-photo-edit-trigger" data-search-photo-edit data-photo-edit data-photo-field="{{ slot }}" data-photo-label="{{ label }}" tabindex="-1" aria-hidden="true">Редактировать</button>
+  <span data-photo-source-error class="notice notice-error" hidden></span>
+      {% endif %}
     {% else %}
   <span class="search-photo-frame search-photo-placeholder" aria-label="{{ label }} отсутствует">0</span>
     {% endif %}

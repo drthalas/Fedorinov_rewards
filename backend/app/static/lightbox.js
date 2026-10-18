@@ -60,7 +60,8 @@
     if (!src) {
       return;
     }
-    var key = (group || "__all__") + "|" + src;
+    var target = element && element.getAttribute("data-photo-edit-target");
+    var key = (group || "__all__") + "|" + src + (target ? "|" + target : "");
     if (seen[key]) {
       return;
     }
@@ -135,6 +136,8 @@
     var zoomInButton = lightbox.querySelector("[data-lightbox-zoom-in]");
     var zoomOutButton = lightbox.querySelector("[data-lightbox-zoom-out]");
     var resetButton = lightbox.querySelector("[data-lightbox-reset]");
+    var editButton = lightbox.querySelector("[data-lightbox-edit]");
+    var currentLink = null;
     var currentGroup = "";
     var links = collectLinks(currentGroup);
     var currentIndex = -1;
@@ -168,8 +171,9 @@
       event.preventDefault();
       currentGroup = lightboxGroup(link);
       links = collectLinks(currentGroup);
-      var index = indexBySource(links, src);
-      open(index >= 0 ? index : 0);
+      var targetKey = link.getAttribute("data-photo-edit-target");
+      var index = targetKey ? links.findIndex(function (item) { return item.getAttribute && item.getAttribute("data-photo-edit-target") === targetKey; }) : indexBySource(links, src);
+      open(index >= 0 ? index : 0, targetKey ? link : null);
     });
 
     function updateNavigation() {
@@ -182,10 +186,11 @@
       }
     }
 
-    function open(index) {
+    function open(index, selectedLink) {
       links = collectLinks(currentGroup);
       currentIndex = index;
-      var link = links[currentIndex];
+      var link = selectedLink || links[currentIndex];
+      currentLink = link && link.closest ? link : null;
       if (!link) {
         return;
       }
@@ -201,10 +206,31 @@
       lightbox.setAttribute("aria-hidden", "false");
       document.body.classList.add("photo-lightbox-open");
       updateNavigation();
+      if (editButton) editButton.hidden = !currentLink || !currentLink.closest("[data-search-photo-slot]");
       var closeButton = lightbox.querySelector("[data-lightbox-close]");
       if (closeButton) {
         closeButton.focus();
       }
+    }
+
+    if (editButton) {
+      editButton.addEventListener("click", function () {
+        var host = currentLink && currentLink.closest("[data-search-photo-slot]");
+        var trigger = host && host.querySelector("[data-search-photo-edit]");
+        if (!trigger) return;
+        trigger.click();
+        var editor = document.querySelector("[data-photo-editor]");
+        if (editor && editor.open) editor.addEventListener("close", function () { editButton.focus({ preventScroll: true }); }, { once: true });
+      });
+      document.addEventListener("photo-editor:saved", function (event) {
+        var host = currentLink && currentLink.closest("[data-search-photo-slot]");
+        if (!host || !event.target.matches("[data-search-photo-slot]")) return;
+        if (host.dataset.photoEditUrl === event.target.dataset.photoEditUrl &&
+            host.querySelector("[data-photo-edit]").dataset.photoField === event.target.querySelector("[data-photo-edit]").dataset.photoField) {
+          image.src = event.detail.url;
+          resetTransform();
+        }
+      });
     }
 
     function close() {
@@ -320,6 +346,7 @@
     }
 
     document.addEventListener("keydown", function (event) {
+      if (document.querySelector("[data-photo-editor][open]")) return;
       if (!lightbox.classList.contains("is-open")) {
         return;
       }
