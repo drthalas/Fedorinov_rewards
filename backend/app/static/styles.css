@@ -7204,11 +7204,17 @@ body.legacy-rewards-theme::after {
   }
 }
 
-/* ALE-499: mask the approved raster's baked-in plaque/frame, retaining its
-   medal pixels, scale and native margin. Intersect with the existing fade. */
+/* ALE-503: retain the original central award and right foliage. Reflect only
+   the right foliage around the award axis (x=434.5 in the 600x210 source).
+   Both layers retain the accepted silhouette, scale, position and background. */
+.guide-theme .legacy-app-header::before,
+.legacy-rewards-theme .legacy-app-header::before,
+.cavalier-page-theme .legacy-app-header::before,
 .guide-theme .legacy-app-header::after,
 .legacy-rewards-theme .legacy-app-header::after,
 .cavalier-page-theme .legacy-app-header::after {
+  content: "";
+  position: absolute;
   top: 3px;
   right: 16px;
   width: clamp(146px, calc(100vw - 908px), 170px);
@@ -7223,6 +7229,29 @@ body.legacy-rewards-theme::after {
   mask-repeat: no-repeat;
   mask-composite: intersect;
   pointer-events: none;
+}
+
+.guide-theme .legacy-app-header::after,
+.legacy-rewards-theme .legacy-app-header::after,
+.cavalier-page-theme .legacy-app-header::after {
+  clip-path: inset(0 0 0 calc(100% - 81.8px));
+}
+.guide-theme .legacy-app-header::before,
+.legacy-rewards-theme .legacy-app-header::before,
+.cavalier-page-theme .legacy-app-header::before {
+  width: 119.8px;
+  clip-path: inset(0 0 0 calc(100% - 38.4px));
+  transform: scaleX(-1);
+  transform-origin: calc(100% - 59.9px) center;
+  filter: brightness(.92) contrast(1.08) saturate(.92) drop-shadow(0 3px 6px #000);
+  mix-blend-mode: screen;
+  opacity: .9;
+}
+@media (max-width: 1180px) {
+  .guide-theme .legacy-app-header::before { display: none; }
+}
+@media (max-width: 980px) {
+  .legacy-rewards-theme .legacy-app-header::before { display: none; }
 }
 
 /* Readable form values and one semantic button palette for archive tabs. */
