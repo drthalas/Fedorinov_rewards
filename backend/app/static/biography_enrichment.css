@@ -1,0 +1,34 @@
+.bio-page { max-width: 1280px; margin: 0 auto; }
+.biography-page-theme .page { overflow:auto; }
+.biography-page-theme .bio-card form.edit-form { background:transparent; color:inherit; border:0; padding:0; box-shadow:none; }
+.biography-page-theme .bio-card label { color:inherit; }
+.biography-page-theme .bio-card select { background:#171a16; color:#e2d9c9; border:1px solid #75654b; }
+.bio-breadcrumbs { display:flex; flex-wrap:wrap; gap:10px; margin: 4px 0 20px; }
+.bio-module { display:block; max-width:640px; padding:24px; text-decoration:none; color:inherit; }
+.bio-module h2 { margin-top:0; }
+.bio-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:24px 0; }
+.bio-counts>div { padding:18px 22px; border:1px solid #75654b; border-radius:10px; }
+.bio-counts span { display:block; font-size:14px; }
+.bio-counts strong { display:block; margin-top:8px; font-size:30px; }
+.bio-workflow { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.bio-card { padding:22px; margin-bottom:20px; min-width:0; }
+.bio-card h2 { margin-top:0; font-size:21px; }
+.bio-card label { display:grid; gap:8px; }
+.bio-card select,.bio-card input:not([type=checkbox]) { width:100%; box-sizing:border-box; min-width:0; }
+.bio-card summary { cursor:pointer; font-weight:600; }
+.bio-results { overflow:auto; max-height:640px; margin:18px 0; }
+.bio-results table { width:100%; border-collapse:collapse; }
+.bio-results td,.bio-results th { text-align:left; vertical-align:top; padding:12px; border-bottom:1px solid var(--border-color,#d2d8df); }
+.bio-results th { position:sticky; top:0; background:var(--surface-color,#f0f3f7); color:#1b2b3b; }
+.bio-results td p { margin-top:0; }
+.bio-results td:last-child { min-width:260px; overflow-wrap:anywhere; }
+.bio-text { white-space:pre-wrap; overflow-wrap:anywhere; max-width:740px; }
+.bio-results dd { margin:4px 0 12px; }
+.bio-summary { display:flex; flex-wrap:wrap; gap:20px; padding:12px 0; }
+.bio-status { font-weight:700; }
+.bio-status[data-kind="Конфликт"],.bio-status[data-kind="Ошибка"] { color:#a43828; }
+.bio-confirm { display:grid; gap:18px; border-top:1px solid var(--border-color,#d2d8df); padding-top:20px; }
+.bio-confirm label { display:flex; align-items:flex-start; }
+.bio-confirm input { margin-top:4px; }
+.bio-confirm button { justify-self:start; }
+@media(max-width:800px) { .bio-workflow { grid-template-columns:1fr; } .bio-counts { gap:8px; } .bio-counts>div { padding:12px; } }

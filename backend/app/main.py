@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .config import PROJECT_ROOT
-from .routers import dashboard, delete_preflight, guides, health, legacy, marks, media, person_import, persons, photos, rewards, search, updates
+from .routers import biography_enrichment, dashboard, delete_preflight, guides, health, legacy, marks, media, person_import, persons, photos, rewards, search, updates
 from .version import APP_VERSION
 
 
@@ -10,6 +10,7 @@ app = FastAPI(title="Fedorinov Rewards", version=APP_VERSION)
 app.mount("/static", StaticFiles(directory=PROJECT_ROOT / "backend" / "app" / "static"), name="static")
 
 app.include_router(dashboard.router)
+app.include_router(biography_enrichment.router)
 app.include_router(legacy.router)
 app.include_router(delete_preflight.router)
 app.include_router(person_import.router)

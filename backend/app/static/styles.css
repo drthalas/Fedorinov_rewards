@@ -8222,3 +8222,10 @@ body.legacy-rewards-theme::after {
 
 .search-photo-edit-trigger { display: none !important; }
 .photo-lightbox-tools [hidden] { display: none !important; }
+
+/* ALE-510: keep existing six tab identities; add one independent section. */
+.legacy-tabs a[data-maintenance-nav] { width:224px; min-width:0; }
+.legacy-tabs a[data-maintenance-nav]::before {
+  content:"⚙"; mask-image:none; background:transparent;
+  width:18px; height:18px; flex:0 0 18px; line-height:18px;
+}
