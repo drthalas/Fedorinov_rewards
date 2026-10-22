@@ -437,6 +437,21 @@ class BiographyEnrichmentTests(unittest.TestCase):
         self.assertEqual(result['ready'],0)
         self.assertIn('исходный файл данных с теми же кавалерами',result['rows'][0]['reason'])
 
+    def test_biography_screen_starts_with_statistics_without_visible_chrome(self):
+        with TestClient(app) as client:
+            response=client.get('/data-maintenance/enrichment/biographies')
+        self.assertEqual(response.status_code,200)
+        page=response.text.split('<section class="cavalier-standalone-page bio-page"',1)[1]
+        before_counts=page.split('<section class="bio-counts"',1)[0]
+        self.assertRegex(before_counts,r'^ aria-label="Биографии">\s*$')
+        self.assertNotIn('bio-breadcrumbs',page)
+        self.assertNotIn('<h1',page)
+        counters=page.split('aria-label="Заполненность биографий">',1)[1].split('</section>',1)[0]
+        self.assertEqual(re.findall(r'<span>([^<]*)</span>',counters),
+            ['Всего кавалеров','Пустые биографии','Заполненные биографии'])
+        for label in ['1. Скачать данные','2. Заполнить биографии','3. Загрузить данные','4. Проверить и сохранить']:
+            self.assertIn(label,page)
+
     def test_shared_navigation_orders_maintenance_before_about(self):
         expected=['Кавалеры','Поиск','Знаки','Свод.таблица','Справочник','Обслуживание данных','О программе']
         with TestClient(app) as client:

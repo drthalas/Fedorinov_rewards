@@ -20,8 +20,8 @@
 </tbody></table></div>
 {% endmacro %}
 {% block content %}
-<section class="cavalier-standalone-page bio-page">
-  {% if level != 'maintenance' %}
+<section class="cavalier-standalone-page bio-page"{% if level == 'biographies' %} aria-label="Биографии"{% endif %}>
+  {% if level == 'enrichment' %}
   <nav class="bio-breadcrumbs" aria-label="Хлебные крошки">
     <a href="/data-maintenance">Обслуживание данных</a>
     {% if level != 'maintenance' %}<span>›</span><a href="/data-maintenance/enrichment">Наполнение данных</a>{% endif %}
@@ -47,8 +47,6 @@
       <a class="button" href="{{ base }}">Открыть биографии →</a>
     </section>
   {% else %}
-    <h1>Биографии</h1>
-    <p>Скачайте данные о кавалерах с пустыми биографиями, дополните их по источникам и проверьте результат перед сохранением.</p>
     {% if stats %}
     <section class="bio-counts" aria-label="Заполненность биографий">
       <div><span>Всего кавалеров</span><strong>{{ stats.total }}</strong></div>
