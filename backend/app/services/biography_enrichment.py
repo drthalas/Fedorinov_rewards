@@ -318,7 +318,7 @@ def _sheet_rows(sheet, required, *, human=False):
             headers = names
             break
     if headers is None or not required.issubset(headers):
-        raise ValidationError('Не найдены обязательные колонки. Скачайте данные в разделе «Биографии» и сохраните его структуру.')
+        raise ValidationError('Не найдены обязательные колонки. Скачайте данные в разделе «Биографии» и сохраните структуру файла.')
     if human and set(headers) != required:
         raise ValidationError('На основном листе должно быть семь колонок исходной выгрузки. Скачайте новые данные.')
     rows = []
