@@ -77,3 +77,7 @@
 }
 .bio-result-group { scroll-margin-top:16px; }
 @media(max-width:800px) { .bio-landing { grid-template-columns:1fr; } .bio-result-count { width:100%; } }
+
+.bio-landing .bio-module h2 a { color:var(--guide-gold,#d5b57b); text-decoration:none; }
+.bio-landing .bio-module h2 a:hover { color:var(--guide-gold-bright,#ffe1a4); text-decoration:underline; }
+.bio-landing .bio-module h2 a:focus-visible { outline:2px solid #d6b77b; outline-offset:5px; }

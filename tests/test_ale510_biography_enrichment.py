@@ -7,6 +7,7 @@ from unittest.mock import patch
 import hashlib
 import os
 import sqlite3
+import re
 import unittest
 
 from fastapi.testclient import TestClient
@@ -436,6 +437,39 @@ class BiographyEnrichmentTests(unittest.TestCase):
         self.assertEqual(result['ready'],0)
         self.assertIn('исходный файл данных с теми же кавалерами',result['rows'][0]['reason'])
 
+    def test_shared_navigation_orders_maintenance_before_about(self):
+        expected=['Кавалеры','Поиск','Знаки','Свод.таблица','Справочник','Обслуживание данных','О программе']
+        with TestClient(app) as client:
+            for path in ['/data-maintenance','/data-maintenance/enrichment/biographies','/data-maintenance/enrichment']:
+                response=client.get(path)
+                self.assertEqual(response.status_code,200)
+                nav=response.text.split('<nav class="legacy-tabs"',1)[1].split('</nav>',1)[0]
+                self.assertEqual(re.findall(r'<a [^>]*>([^<]*)</a>',nav),expected)
+                self.assertIn('data-about-nav',nav)
+        from starlette.requests import Request
+        from backend.app.routers.templates import templates
+        request=Request({'type':'http','method':'GET','scheme':'http','server':('testserver',80),
+            'path':'/legacy','query_string':b'tab=about','headers':[]})
+        header=templates.env.get_template('_user_nav.html').render(request=request,settings=self.settings)
+        self.assertEqual(re.findall(r'<a [^>]*>([^<]*)</a>',header),expected)
+        self.assertIn('class="active" href="/legacy?tab=about" data-about-nav',header)
+
+    def test_landing_has_two_cards_one_direct_link_and_no_duplicate_title(self):
+        with TestClient(app) as client:
+            response=client.get('/data-maintenance')
+        main=response.text.split('<main',1)[1].split('</main>',1)[0]
+        self.assertNotIn('<h1',main)
+        self.assertNotIn('bio-breadcrumbs',main)
+        self.assertNotIn('Сведения о кавалерах',main)
+        self.assertEqual(main.count('cavalier-form-card bio-module'),2)
+        self.assertEqual(main.count('<a href="/data-maintenance/enrichment/biographies">'),1)
+        self.assertNotIn('href="/data-maintenance/enrichment"',main)
+        self.assertNotIn('class="button"',main)
+        disabled=main.split('aria-labelledby="optimization-title"',1)[1]
+        self.assertIn('aria-disabled="true"',disabled)
+        self.assertIn('В разработке',disabled)
+        self.assertNotIn('<a ',disabled)
+
     def test_landing_disabled_placeholder_and_user_facing_copy(self):
         with TestClient(app) as client:
             landing=client.get('/data-maintenance').text
@@ -443,7 +477,7 @@ class BiographyEnrichmentTests(unittest.TestCase):
             self.assertIn('В разработке',landing)
             self.assertIn('aria-disabled="true"',landing)
             response=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('new.xlsx',self.human_filled())})
-            for label in ['1. Скачать данные','2. Загрузить данные','3. Проверить и сохранить',bio.READY_LABEL,bio.REVIEW_LABEL,bio.SKIP_LABEL]:
+            for label in ['1. Скачать данные','2. Заполнить биографии','3. Загрузить данные','4. Проверить и сохранить',bio.READY_LABEL,bio.REVIEW_LABEL,bio.SKIP_LABEL]:
                 self.assertIn(label,response.text)
             for internal in ['пилот','ALE-491','snapshot','source_url','notes','research']:
                 self.assertNotIn(internal,response.text)

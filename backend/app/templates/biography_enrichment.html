@@ -21,23 +21,20 @@
 {% endmacro %}
 {% block content %}
 <section class="cavalier-standalone-page bio-page">
+  {% if level != 'maintenance' %}
   <nav class="bio-breadcrumbs" aria-label="Хлебные крошки">
     <a href="/data-maintenance">Обслуживание данных</a>
     {% if level != 'maintenance' %}<span>›</span><a href="/data-maintenance/enrichment">Наполнение данных</a>{% endif %}
     {% if level == 'biographies' %}<span>›</span><span aria-current="page">Биографии</span>{% endif %}
   </nav>
+  {% endif %}
   {% if level == 'maintenance' %}
-    <h1>Обслуживание данных</h1>
-    <p>Выберите раздел для работы с данными и материалами кавалеров.</p>
     <div class="bio-landing">
       <section class="cavalier-form-card bio-module" aria-labelledby="enrichment-title">
-        <span class="bio-module-caption">Сведения о кавалерах</span>
-        <h2 id="enrichment-title"><a href="/data-maintenance/enrichment">Наполнение данных</a></h2>
+        <h2 id="enrichment-title"><a href="{{ base }}">Наполнение данных</a></h2>
         <p>Дополняйте пустые биографии через файл данных. Перед сохранением программа проверит каждую запись.</p>
-        <a class="button" href="{{ base }}">Биографии →</a>
       </section>
       <section class="cavalier-form-card bio-module bio-module-disabled" aria-labelledby="optimization-title" aria-disabled="true">
-        <span class="bio-module-caption">Фотографии и изображения</span>
         <h2 id="optimization-title">Оптимизация изображений</h2>
         <p>Подготовка изображений для хранения и просмотра.</p>
         <span class="bio-development">В разработке</span>
