@@ -3,6 +3,20 @@
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}">{% endblock %}
+{% macro row_table(rows) %}
+<div class="bio-results"><table><thead><tr><th>ID кавалера</th><th>ФИО</th><th>Причина и сведения</th></tr></thead><tbody>
+{% for row in rows %}
+  <tr><td>{{ row.person_id }}<small class="bio-row-number">Строка Excel: {{ row.row }}</small></td><td>{{ row.fio }}</td><td>
+    <p>{{ row.reason }}</p>
+    <details><summary>Биография, источник и проверка личности</summary>
+      <p class="bio-text">{{ row.biography or 'Биография в файле не заполнена' }}</p>
+      {% for url in row.source_url.splitlines() %}<p>{% if safe_external_url(url) %}<a href="{{ safe_external_url(url) }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>{% else %}{{ url }}{% endif %}</p>{% endfor %}
+      <dl>{% for name, value in row.evidence.items() if value %}<dt>{{ name }}</dt><dd class="bio-text">{{ value }}</dd>{% endfor %}</dl>
+    </details>
+  </td></tr>
+{% endfor %}
+</tbody></table></div>
+{% endmacro %}
 {% block content %}
 <section class="cavalier-standalone-page bio-page">
   <nav class="bio-breadcrumbs" aria-label="Хлебные крошки">
@@ -12,84 +26,104 @@
   </nav>
   {% if level == 'maintenance' %}
     <h1>Обслуживание данных</h1>
-    <a class="cavalier-form-card bio-module" href="/data-maintenance/enrichment"><h2>Наполнение данных</h2><p>Подготовка выгрузок и проверка дополнений к существующим кавалерам.</p><span>Открыть →</span></a>
+    <p>Выберите раздел для работы с данными и материалами кавалеров.</p>
+    <div class="bio-landing">
+      <section class="cavalier-form-card bio-module" aria-labelledby="enrichment-title">
+        <span class="bio-module-caption">Сведения о кавалерах</span>
+        <h2 id="enrichment-title"><a href="/data-maintenance/enrichment">Наполнение данных</a></h2>
+        <p>Дополняйте пустые биографии с помощью Excel. Перед сохранением программа проверит каждую запись.</p>
+        <a class="button" href="{{ base }}">Биографии →</a>
+      </section>
+      <section class="cavalier-form-card bio-module bio-module-disabled" aria-labelledby="optimization-title" aria-disabled="true">
+        <span class="bio-module-caption">Фотографии и изображения</span>
+        <h2 id="optimization-title">Оптимизация изображений</h2>
+        <p>Подготовка изображений для хранения и просмотра.</p>
+        <span class="bio-development">В разработке</span>
+      </section>
+    </div>
   {% elif level == 'enrichment' %}
     <h1>Наполнение данных</h1>
-    <a class="cavalier-form-card bio-module" href="{{ base }}"><h2>Биографии</h2><p>Статистика заполненности, выгрузка Excel и сохранение проверенных биографий.</p><span>Открыть →</span></a>
+    <section class="cavalier-form-card bio-module">
+      <h2>Биографии</h2><p>Проверьте заполненность, выгрузите пустые биографии и загрузите дополнения для проверки.</p>
+      <a class="button" href="{{ base }}">Открыть биографии →</a>
+    </section>
   {% else %}
     <h1>Биографии</h1>
-    <p>Выгрузите пустые биографии для исследования по источникам, затем проверьте заполненный файл перед сохранением.</p>
-    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <p>Скачайте Excel с пустыми биографиями, дополните его по источникам и проверьте результат перед сохранением.</p>
     {% if stats %}
     <section class="bio-counts" aria-label="Заполненность биографий">
       <div><span>Всего кавалеров</span><strong>{{ stats.total }}</strong></div>
       <div><span>Пустые биографии</span><strong>{{ stats.empty }}</strong></div>
       <div><span>Заполненные биографии</span><strong>{{ stats.filled }}</strong></div>
     </section>
-    {% endif %}
-    {% if result %}
-    <section class="cavalier-form-card bio-card" aria-label="Проверка импорта">
-      <h2>{{ 'Результат сохранения' if result.state == 'committed' else 'Предпросмотр импорта' }}</h2>
-      <div class="bio-summary" role="status">
-        {% if result.state == 'committed' %}<strong>Сохранено: {{ result.saved }}</strong>{% endif %}
-        {% for kind in ['Готово', 'Пропуск', 'Конфликт', 'Ошибка'] %}<span>{{ kind }}: {{ result.rows|selectattr('kind', 'equalto', kind)|list|length }}</span>{% endfor %}
-      </div>
-      {% if result.report_warning %}<p role="alert">{{ result.report_warning }}</p>{% endif %}
-      <p>Будут сохранены только строки «Готово». Конфликты, ошибки и пропуски остаются без изменений. Перед записью приложение повторно проверит текущую базу.</p>
-      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}">Сохранить отчёт с источниками</a><a href="{{ base }}">К следующему файлу</a></div>
-      <div class="bio-results"><table><thead><tr><th>Строка / ID</th><th>Кавалер</th><th>Результат</th><th>Причина и сведения</th></tr></thead><tbody>
-      {% for row in result.rows %}
-        <tr><td>{{ row.row }} / {{ row.person_id }}</td><td>{{ row.fio }}</td><td><span class="bio-status" data-kind="{{ row.kind }}">{{ row.kind }}</span></td><td>
-          <p>{{ row.reason }}</p>
-          <details><summary>Биография и источник</summary>
-            <p class="bio-text">{{ row.biography or 'Биография не заполнена' }}</p>
-            {% for url in row.source_url.splitlines() %}<p>{% if safe_external_url(url) %}<a href="{{ safe_external_url(url) }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>{% else %}{{ url }}{% endif %}</p>{% endfor %}
-            <dl>{% for name, value in row.evidence.items() if value %}<dt>{{ name }}</dt><dd class="bio-text">{{ value }}</dd>{% endfor %}</dl>
-          </details>
-        </td></tr>
-      {% endfor %}
-      </tbody></table></div>
-      {% if result.state == 'preview' and result.ready %}
-      {% if settings.write_mode and not settings.read_only %}
-      <form action="{{ base }}/commit" method="post" class="bio-confirm" data-write-feedback data-write-pending-label="Сохраняем биографии…">
-        <input type="hidden" name="token" value="{{ token }}">
-        <label><input type="checkbox" name="confirm" value="yes" required> Подтверждаю сохранение только допустимых строк ({{ result.ready }}). Остальные строки будут пропущены.</label>
-        <button type="submit">Сохранить допустимые биографии</button>
-      </form>
-      {% else %}<p role="alert">Редактирование выключено. Предпросмотр и отчёт доступны, сохранение запрещено.</p>{% endif %}
-      {% endif %}
-    </section>
-    {% endif %}
-    {% if stats %}
+    <ol class="bio-steps" aria-label="Этапы работы">
+      <li><a href="#bio-download">Скачать Excel</a></li>
+      <li><a href="#bio-upload">Загрузить заполненный Excel</a></li>
+      <li><a href="#bio-review">Проверить и сохранить</a></li>
+    </ol>
     <div class="bio-workflow">
-      <section class="cavalier-form-card bio-card">
-        <h2>1. Выгрузить пустые биографии</h2>
+      <section class="cavalier-form-card bio-card" id="bio-download">
+        <h2>1. Скачать Excel</h2>
         <form action="{{ base }}/export" method="get" class="edit-form">
           <label><span>Награда или категория</span><select name="selection">
             <option value="">Все кавалеры</option>
             {% for group in stats.groups %}<option value="{{ group.selection }}" {% if selection == group.selection %}selected{% endif %}>{{ group.label }} — пустых {{ group.empty }} из {{ group.total }}</option>{% endfor %}
           </select></label>
           <label><span>Количество записей</span><input name="limit" type="number" min="1" max="5000" value="20" required></label>
-          <p>Только существующие кавалеры с пустой биографией. Порядок — по стабильному ID. Один кавалер включается один раз.</p>
-          <button type="submit">Скачать XLSX</button>
+          <p>В файл попадут только кавалеры с пустой биографией, по одному на строку. Порядок — по ID.</p>
+          <button type="submit">Скачать Excel</button>
         </form>
       </section>
-      <section class="cavalier-form-card bio-card">
-        <h2>2. Проверить заполненный файл</h2>
-        <form action="{{ base }}/preview" method="post" enctype="multipart/form-data" class="edit-form" data-write-feedback data-write-pending-label="Проверяем файл…">
-          <label><span>Заполненный XLSX</span><input type="file" name="file" accept=".xlsx" required></label>
-          <details><summary>Файл пилота ALE-491</summary><p>Для старого формата приложите исходную выгрузку этого раздела, содержащую те же ID. Пилот: «Биография» → biography, «WarHeroes URL» → source_url, «Статус» → status, «Подтверждённые факты» → notes.</p>
-            <label><span>Исходная выгрузка для ALE-491</span><input type="file" name="original" accept=".xlsx"></label>
+      <section class="cavalier-form-card bio-card" id="bio-upload">
+        <h2>2. Загрузить заполненный Excel</h2>
+        <form action="{{ base }}/preview#bio-review" method="post" enctype="multipart/form-data" class="edit-form" data-write-feedback data-write-pending-label="Проверяем файл…">
+          <label><span>Заполненный Excel</span><input type="file" name="file" accept=".xlsx" required></label>
+          <p>Файл .xlsx, до 10 МБ и 5 000 записей.</p>
+          <details class="bio-old-file"><summary>Файл создан из прежней выгрузки</summary>
+            <p>Приложите исходный Excel, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
+            <label><span>Исходный Excel</span><input type="file" name="original" accept=".xlsx"></label>
           </details>
-          <button type="submit">Показать предпросмотр</button>
+          <button type="submit">Проверить файл</button>
         </form>
       </section>
     </div>
-    <details class="cavalier-form-card bio-card"><summary>Как заполнить XLSX</summary>
-      <p>Сохраните исходные ID, ФИО, год, звание, награду, иерархию, номера и snapshot без изменений. Заполните biography (до 2 500 символов), source_url, status («Биография подтверждена»), notes с подтверждёнными фактами, ФИО и год в карточке, награду в карточке и идентификацию. Звание в карточке указывайте при наличии.</p>
-      <p>«Требует проверки», неизвестный год и возможный default 1945 блокируют автоматический импорт. Формулы замените значениями. Один файл — до 10 МБ и 5 000 записей. Приложение не выполняет ИИ-исследование самостоятельно.</p>
-      <p>Предпросмотр и отчёт хранятся локально во временной папке до 7 дней. Скачайте отчёт для постоянного хранения. После очистки временной папки потребуется новая выгрузка.</p>
+    {% endif %}
+    <section class="cavalier-form-card bio-card bio-review" id="bio-review" aria-label="Проверка импорта">
+      <h2>3. Проверить и сохранить</h2>
+      {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+      {% if result %}
+      {% if result.state == 'committed' %}<p class="bio-saved" role="status"><strong>Сохранено: {{ result.saved }}</strong>. Остальные записи остались без изменений.</p>{% endif %}
+      <div class="bio-summary" role="status">
+        {% for name, rows in groups.items() %}<a class="bio-result-count" href="#bio-group-{{ loop.index }}"><strong>{{ rows|length }}</strong><span>{{ name }}</span></a>{% endfor %}
+      </div>
+      <p>Сохраняются только строки «Готово к сохранению». Перед записью программа повторно проверит данные и пустоту биографии в базе.</p>
+      {% if result.report_warning %}<p role="alert">{{ result.report_warning }}</p>{% endif %}
+      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel">Скачать отчёт Excel</a><a href="{{ base }}">Загрузить другой файл</a></div>
+      {% if saved_rows %}<details class="bio-result-group" open><summary>Сохранённые биографии · {{ saved_rows|length }}</summary>{{ row_table(saved_rows) }}</details>{% endif %}
+      {% for name, rows in groups.items() %}
+      <details class="bio-result-group" id="bio-group-{{ loop.index }}" {% if rows and name != 'Пропущено' %}open{% endif %}>
+        <summary>{{ name }} · {{ rows|length }}</summary>
+        {% if rows %}{{ row_table(rows) }}{% else %}<p>Таких записей нет.</p>{% endif %}
+      </details>
+      {% endfor %}
+      {% if result.state == 'preview' and result.ready %}
+      {% if settings.write_mode and not settings.read_only %}
+      <form action="{{ base }}/commit#bio-review" method="post" class="bio-confirm" data-write-feedback data-write-pending-label="Сохраняем биографии…">
+        <input type="hidden" name="token" value="{{ token }}">
+        <label><input type="checkbox" name="confirm" value="yes" required> Подтверждаю, что источники относятся к этим кавалерам, и разрешаю сохранить только готовые биографии ({{ result.ready }}). Записи, требующие проверки, и пропущенные строки останутся без изменений.</label>
+        <button type="submit">Сохранить готовые биографии</button>
+      </form>
+      {% else %}<p class="notice" role="alert">Режим просмотра: проверка и отчёт доступны, сохранение выключено.</p>{% endif %}
+      {% endif %}
+      {% else %}<p>После загрузки Excel здесь появятся результаты проверки каждой строки. До вашего подтверждения ничего не сохраняется.</p>{% endif %}
+    </section>
+    <details class="cavalier-form-card bio-card"><summary>Как заполнить Excel</summary>
+      <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>
+      <dl class="bio-status-help"><dt>Найдено</dt><dd>Источник подтверждает именно этого кавалера по ФИО, достоверному году рождения и награде. Можно передать биографию на проверку и сохранение.</dd><dt>Требует проверки</dt><dd>Личность или сведения вызывают сомнения. Такая строка автоматически не сохраняется.</dd></dl>
+      <p>Неизвестные статусы и расхождения исходных полей требуют проверки. Год 1945 мог быть подставлен при старом импорте и не считается подтверждённым автоматически. Формулы замените значениями. Сохраните книгу целиком, не копируйте только видимый лист.</p>
+      <p>Отчёт доступен 7 дней. Скачайте его для постоянного хранения. После очистки временных файлов компьютера может потребоваться новая выгрузка.</p>
     </details>
+    {% if stats %}
     <details class="cavalier-form-card bio-card"><summary>Статистика по иерархии наград</summary>
       <p>Уникальные кавалеры внутри каждой группы. Один человек может входить в разные группы; итоги групп не суммируются.</p>
       <div class="bio-results"><table><thead><tr><th>Группа</th><th>Всего</th><th>Пустые</th><th>Заполненные</th></tr></thead><tbody>

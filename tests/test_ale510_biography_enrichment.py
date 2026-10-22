@@ -52,7 +52,24 @@ class BiographyEnrichmentTests(unittest.TestCase):
                          f"insert into rewards(person_id,id_gos,id_catigory,id_sub_catigory,id_name,number) values({person_id},1,2,3,4,{person_id});")
 
     def exported(self, limit=20):
+        # Retain the original backend safety cases against the supported legacy
+        # format. New contract cases below exercise the actual visible/hidden file.
+        entries=bio.read_rows(self.human_exported(limit))
+        return bio._workbook(bio.HEADERS, [[entry['values'].get(h,'') for h in bio.HEADERS] for entry in entries])
+
+    def human_exported(self, limit=20):
         return bio.export_workbook(self.settings, '1/2/3/4', limit)
+
+    def human_filled(self, edits=None, content=None):
+        workbook=load_workbook(BytesIO(content or self.human_exported()))
+        sheet=workbook.active
+        headers={cell.value:cell.column for cell in sheet[1]}
+        for number in range(2,sheet.max_row+1):
+            for field,value in {'Биография':'Проверенная биография.','Источник':'https://warheroes.ru/hero/hero.asp?Hero_id=1','Статус':'Найдено'}.items():
+                sheet.cell(number,headers[field],value)
+        if edits: edits(sheet,headers,workbook)
+        output=BytesIO();workbook.save(output);workbook.close()
+        return output.getvalue()
 
     def filled(self, edits=None, content=None):
         workbook = load_workbook(BytesIO(content or self.exported()))
@@ -315,9 +332,133 @@ class BiographyEnrichmentTests(unittest.TestCase):
             content=self.filled()
             response=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('filled.xlsx',content)})
             self.assertEqual(response.status_code,200)
-            self.assertIn('Готово: 1',response.text)
-            self.assertIn('Подтверждаю сохранение',response.text)
+            self.assertIn('Готово к сохранению',response.text)
+            self.assertIn('Подтверждаю, что источники относятся к этим кавалерам',response.text)
             self.assertEqual(client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('bad.xls',content)}).status_code,400)
+
+    def test_human_visible_columns_hidden_metadata_and_roundtrip(self):
+        self.add()
+        self.execute('insert into rewards(person_id,id_gos,id_catigory,id_sub_catigory,id_name,number) values(1,1,2,3,4,222)')
+        content=self.human_exported()
+        workbook=load_workbook(BytesIO(content))
+        self.assertEqual([c.value for c in workbook.active[1]],bio.VISIBLE_HEADERS)
+        self.assertEqual([s.title for s in workbook if s.sheet_state=='visible'],['Биографии'])
+        self.assertEqual(workbook[bio.METADATA_SHEET].sheet_state,'hidden')
+        self.assertEqual(len(workbook.active.data_validations.dataValidation),1)
+        workbook.close()
+        entries=bio.read_rows(content)
+        self.assertEqual(entries[0]['values']['Номер(а) награды'],'99 | 222')
+        self.assertEqual(entries[0]['values']['Иерархия ID'],'1 / 2 / 3 / 4')
+        filled=self.human_filled(content=content)
+        token,result=bio.preview(self.settings,filled)
+        self.assertEqual(result['ready'],2)
+        self.assertEqual(bio.commit(self.settings,token)['saved'],2)
+        self.assertEqual(bio.preview(self.settings,filled)[1]['ready'],0)
+
+    def test_human_identity_fields_and_hidden_snapshot_cannot_be_changed(self):
+        for field,value in [('ID кавалера','999'),('ФИО','Другой'),('Год рождения','1900'),('Награда','Другая')]:
+            content=self.human_filled(edits=lambda s,h,w:s.cell(2,h[field],value))
+            _,result=bio.preview(self.settings,content)
+            self.assertEqual(result['ready'],0)
+        for field,value in [('snapshot','{}'),('snapshot_signature','0'*64),('Звание','Капитан'),('Иерархия ID','1 / 2 / 3 / 5')]:
+            def edit(s,h,w):
+                hidden=w[bio.METADATA_SHEET];cols={c.value:c.column for c in hidden[1]}
+                hidden.cell(2,cols[field],value)
+            _,result=bio.preview(self.settings,self.human_filled(edits=edit))
+            self.assertEqual(result['ready'],0)
+
+    def test_human_metadata_missing_duplicate_formula_and_legacy_signature_fail_closed(self):
+        for mode in ['missing','duplicate','formula']:
+            def edit(s,h,w):
+                hidden=w[bio.METADATA_SHEET]
+                if mode=='missing': del w[bio.METADATA_SHEET]
+                elif mode=='duplicate': hidden.append([c.value for c in hidden[2]])
+                else: hidden.cell(2,2,'=1+1')
+            with self.assertRaises(bio.ValidationError):bio.preview(self.settings,self.human_filled(edits=edit))
+        self.assertEqual(self.query('select biography from person'),[(None,)])
+        def legacy_signature(s,h,w):
+            import json
+            hidden=w[bio.METADATA_SHEET];cols={cell.value:cell.column for cell in hidden[1]}
+            old=json.loads(hidden.cell(2,cols['snapshot']).value)
+            old['version']=1;old.pop('contract')
+            serialized=bio.canonical(old)
+            hidden.cell(2,cols['snapshot'],serialized)
+            hidden.cell(2,cols['snapshot_signature'],bio._sign(self.settings,serialized))
+        _,result=bio.preview(self.settings,self.human_filled(edits=legacy_signature))
+        self.assertEqual(result['ready'],0)
+        self.assertIn('другому формату',result['rows'][0]['reason'])
+
+    def test_human_status_semantics_and_three_categories(self):
+        self.add(3)
+        def edit(s,h,w):
+            s.cell(3,h['Статус'],'Требует проверки')
+            s.cell(4,h['Статус'],'Неизвестное значение')
+            s.cell(5,h['Биография'],'')
+            s.cell(5,h['Статус'],'')
+        token,result=bio.preview(self.settings,self.human_filled(edits=edit))
+        groups=bio.review_groups(result)
+        self.assertEqual([len(rows) for rows in groups.values()],[1,2,1])
+        self.assertIn('Неизвестный статус',groups[bio.REVIEW_LABEL][1]['reason'])
+        self.assertEqual(bio.commit(self.settings,token)['saved'],1)
+        self.assertEqual(self.query('select count(*) from person where biography is not null'),[(1,)])
+
+    def test_human_default_year_filled_missing_and_duplicate_id(self):
+        self.add(3)
+        self.execute("update person set birthday='1945' where id=2")
+        content=self.human_filled(edits=lambda s,h,w:s.cell(5,h['ID кавалера'],'999'))
+        self.execute("update person set biography='Существующая' where id=3")
+        _,result=bio.preview(self.settings,content)
+        self.assertEqual([r['kind'] for r in result['rows']],[bio.READY,bio.CONFLICT,bio.SKIP,bio.SKIP])
+        content=self.human_filled(edits=lambda s,h,w:s.append([c.value for c in s[2]]))
+        _,result=bio.preview(self.settings,content)
+        self.assertIn('повторяется',result['rows'][0]['reason'])
+
+    def test_human_concurrency_rollback_and_only_biography_updates(self):
+        self.add()
+        content=self.human_filled()
+        before=self.query('select id,fio,birthday,id_rank,comment,person_foto from person'),self.query('select * from rewards')
+        token,_=bio.preview(self.settings,content)
+        self.execute("create trigger fail_second before update of biography on person when new.id=2 begin select raise(ABORT,'test'); end;")
+        with self.assertRaises(sqlite3.IntegrityError):bio.commit(self.settings,token)
+        self.assertEqual(self.query('select biography from person'),[(None,),(None,)])
+        self.execute("drop trigger fail_second; update person set biography='Ручная запись' where id=2")
+        self.assertEqual(bio.commit(self.settings,token)['saved'],1)
+        self.assertEqual(before,(self.query('select id,fio,birthday,id_rank,comment,person_foto from person'),self.query('select * from rewards')))
+        self.assertEqual(self.query('select biography from person where id=2'),[('Ручная запись',)])
+
+    def test_human_legacy_selection_mismatch_has_instructions(self):
+        self.add()
+        old=bio.read_rows(self.filled())[1]['values']
+        old.pop('snapshot');old.pop('snapshot_signature')
+        content=xlsx([[old.get(h,'') for h in bio.HEADERS]],bio.HEADERS)
+        original=self.human_exported(limit=1)
+        _,result=bio.preview(self.settings,content,original)
+        self.assertEqual(result['ready'],0)
+        self.assertIn('исходный Excel с теми же кавалерами',result['rows'][0]['reason'])
+
+    def test_landing_disabled_placeholder_and_user_facing_copy(self):
+        with TestClient(app) as client:
+            landing=client.get('/data-maintenance').text
+            self.assertIn('Оптимизация изображений',landing)
+            self.assertIn('В разработке',landing)
+            self.assertIn('aria-disabled="true"',landing)
+            response=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('new.xlsx',self.human_filled())})
+            for label in ['1. Скачать Excel','2. Загрузить заполненный Excel','3. Проверить и сохранить',bio.READY_LABEL,bio.REVIEW_LABEL,bio.SKIP_LABEL]:
+                self.assertIn(label,response.text)
+            for internal in ['пилот','ALE-491','snapshot','source_url','notes','research']:
+                self.assertNotIn(internal,response.text)
+
+    def test_human_excel_report_contains_categories_reasons_and_source(self):
+        token,result=bio.preview(self.settings,self.human_filled())
+        with TestClient(app) as client:
+            response=client.get('/data-maintenance/enrichment/biographies/report/'+token+'/excel')
+            self.assertEqual(response.status_code,200)
+        workbook=load_workbook(BytesIO(response.content))
+        row=[cell.value for cell in workbook.active[2]]
+        self.assertEqual(row[3],bio.READY_LABEL)
+        self.assertIn('warheroes.ru',row[6])
+        self.assertTrue(row[4])
+        workbook.close()
 
 
 if __name__ == '__main__':

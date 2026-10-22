@@ -22,6 +22,9 @@ def _render(request, *, level='biographies', status_code=200, **context):
         except sqlite3.Error:
             context.update(stats=None, error='Не удалось прочитать биографии из базы. Проверьте доступность базы и наличие поля biography.')
             status_code = 503
+    if context.get('result'):
+        context['groups'] = service.review_groups(context['result'])
+        context['saved_rows'] = [row for row in context['result']['rows'] if row['kind'] == 'Сохранено']
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, **context}, status_code=status_code)
 
@@ -105,3 +108,16 @@ def report(token: str):
         payload['warning'] = result['warning']
     return Response(service.canonical(payload), media_type='application/json',
                     headers={'Content-Disposition': 'attachment; filename="biographies-report.json"', 'Cache-Control': 'no-store'})
+
+
+@router.get(BASE + '/report/{token}/excel')
+def excel_report(token: str):
+    try:
+        result = service.load_preview(get_settings(), token)
+    except service.ValidationError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    if result['state'] == 'commit_pending':
+        raise HTTPException(409, 'Результат сохранения не подтверждён. Загрузите файл для новой проверки текущей базы.')
+    return Response(service.report_workbook(result),
+                    media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': 'attachment; filename="biographies-report.xlsx"', 'Cache-Control': 'no-store'})

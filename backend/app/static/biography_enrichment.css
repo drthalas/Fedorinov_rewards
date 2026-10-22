@@ -32,3 +32,23 @@
 .bio-confirm input { margin-top:4px; }
 .bio-confirm button { justify-self:start; }
 @media(max-width:800px) { .bio-workflow { grid-template-columns:1fr; } .bio-counts { gap:8px; } .bio-counts>div { padding:12px; } }
+.bio-landing { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:28px 0; }
+.biography-page-theme .bio-module { box-sizing:border-box; width:auto; max-width:none; padding:28px; margin:0; }
+.bio-module-caption { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#b5a183; }
+.bio-module h2 { margin:14px 0; }
+.bio-module p { line-height:1.5; margin-bottom:26px; }
+.bio-module-disabled { opacity:.65; }
+.bio-development { display:inline-block; padding:8px 14px; border:1px solid #75654b; border-radius:4px; }
+.bio-steps { display:flex; flex-wrap:wrap; gap:14px 32px; padding:18px 18px 18px 40px; margin:0 0 22px; border-block:1px solid #75654b; }
+.bio-steps a { color:inherit; }
+.bio-workflow .bio-card { height:100%; box-sizing:border-box; }
+.bio-workflow { margin-bottom:20px; }
+.bio-old-file { margin:12px 0 20px; }
+.bio-review { scroll-margin-top:12px; }
+.bio-result-count { display:grid; grid-template-columns:auto 1fr; align-items:center; gap:12px; padding:14px 18px; border:1px solid #75654b; text-decoration:none; color:inherit; }
+.bio-result-count strong { font-size:26px; }
+.bio-result-group { border-top:1px solid #75654b; margin-top:20px; padding-top:18px; }
+.bio-row-number { display:block; white-space:nowrap; font-size:12px; margin-top:8px; opacity:.75; }
+.bio-result-group .bio-results { max-height:420px; }
+.bio-status-help dd { margin:6px 0 18px; }
+@media(max-width:800px) { .bio-landing { grid-template-columns:1fr; } .bio-result-count { width:100%; } }
