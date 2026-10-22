@@ -225,7 +225,7 @@
       void submitOpenFolder(form, event.submitter || null);
       return;
     }
-    if (event.defaultPrevented || form.matches("[data-save-as-form], [data-update-form]")) return;
+    if (event.defaultPrevented || form.matches("[data-save-as-form], [data-update-form], [data-no-transition]")) return;
     saveLegacyState();
     if ((form.method || "get").toLowerCase() === "get") {
       beginNavigation(form.dataset.transitionLabel || "Загружаем…");

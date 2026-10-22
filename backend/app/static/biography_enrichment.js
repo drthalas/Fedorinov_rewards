@@ -4,34 +4,26 @@
   function initialize() {
     document.querySelectorAll("[data-bio-file-picker]").forEach((area) => {
       const input = area.querySelector("input[type=file]");
-      const button = area.querySelector("[data-bio-choose]");
       const filename = area.querySelector("[data-bio-file-name]");
       const error = area.querySelector("[data-bio-file-error]");
-      if (!input || !button || !filename || !error) return;
+      if (!input || !filename || !error) return;
       const update = () => {
         filename.textContent = input.files.length ? input.files[0].name : "";
         filename.hidden = !filename.textContent;
         error.textContent = "";
         error.hidden = true;
-        button.removeAttribute("aria-invalid");
+        input.removeAttribute("aria-invalid");
       };
-      button.addEventListener("click", () => input.click());
       input.addEventListener("change", update);
       input.addEventListener("cancel", update);
       input.addEventListener("invalid", (event) => {
         event.preventDefault();
         error.textContent = "Выберите файл данных в формате .xlsx.";
         error.hidden = false;
-        button.setAttribute("aria-invalid", "true");
-        button.focus();
+        input.setAttribute("aria-invalid", "true");
+        input.focus();
       });
       if (input.form) input.form.addEventListener("reset", () => queueMicrotask(update));
-      // The visible native button is replaced by an equivalently labelled,
-      // keyboard-operable button; the input stays enabled for multipart/validity.
-      input.tabIndex = -1;
-      input.setAttribute("aria-hidden", "true");
-      area.dataset.bioPickerReady = "true";
-      button.hidden = false;
       update();
     });
 

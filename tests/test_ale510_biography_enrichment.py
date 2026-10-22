@@ -502,7 +502,7 @@ class BiographyEnrichmentTests(unittest.TestCase):
         with TestClient(app) as client:
             content=client.get('/data-maintenance/enrichment/biographies').text
         self.assertEqual(content.count('data-bio-file-picker>'),2)
-        self.assertEqual(content.count('data-bio-choose hidden'),2)
+        self.assertEqual(content.count('class="button bio-file-button"'),2)
         self.assertEqual(content.count('data-bio-file-name aria-live="polite" hidden'),2)
         self.assertIn('name="file" accept=".xlsx" required',content)
         self.assertIn('name="original" accept=".xlsx"',content)
@@ -510,6 +510,20 @@ class BiographyEnrichmentTests(unittest.TestCase):
             self.assertIn(f'for="{prefix}-input"',content)
             self.assertIn(f'aria-describedby="{prefix}-name {prefix}-error"',content)
         self.assertIn('biography_enrichment.js',content)
+
+    def test_sequential_flow_hides_results_until_file_is_checked(self):
+        with TestClient(app) as client:
+            content=client.get('/data-maintenance/enrichment/biographies').text
+            invalid=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('bad.xlsx',b'bad')}).text
+        headings=['1. Скачать данные','2. Заполнить биографии','3. Загрузить данные']
+        self.assertEqual([content.index(h) for h in headings],sorted(content.index(h) for h in headings))
+        self.assertIn('самостоятельно или с помощью ИИ',content)
+        self.assertIn('<summary>Дополнительные параметры</summary>',content)
+        self.assertNotIn('bio-card bio-review',content)
+        self.assertNotIn('data-bio-result-link',content)
+        self.assertNotIn('bio-card bio-review',invalid)
+        self.assertIn('role="alert"',invalid)
+        self.assertIn('class="edit-form bio-download-form" data-no-transition',content)
 
     def test_result_counters_target_each_group_without_changing_reasons(self):
         self.add(2)

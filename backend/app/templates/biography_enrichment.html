@@ -60,13 +60,14 @@
     </section>
     <ol class="bio-steps" aria-label="Этапы работы">
       <li><a href="#bio-download">Скачать данные</a></li>
+      <li><a href="#bio-fill">Заполнить биографии</a></li>
       <li><a href="#bio-upload">Загрузить данные</a></li>
       <li><a href="#bio-review">Проверить и сохранить</a></li>
     </ol>
     <div class="bio-workflow">
       <section class="cavalier-form-card bio-card" id="bio-download">
         <h2>1. Скачать данные</h2>
-        <form action="{{ base }}/export" method="get" class="edit-form">
+        <form action="{{ base }}/export" method="get" class="edit-form bio-download-form" data-no-transition>
           <label><span>Награда или категория</span><select name="selection">
             <option value="">Все кавалеры</option>
             {% for group in stats.groups %}<option value="{{ group.selection }}" {% if selection == group.selection %}selected{% endif %}>{{ group.label }} — пустых {{ group.empty }} из {{ group.total }}</option>{% endfor %}
@@ -76,27 +77,36 @@
           <button type="submit">Скачать данные</button>
         </form>
       </section>
+      <section class="cavalier-form-card bio-card bio-fill" id="bio-fill">
+        <h2>2. Заполнить биографии</h2>
+        <p>Заполните биографии в скачанном файле самостоятельно или с помощью ИИ, затем загрузите его обратно.</p>
+        <p>Для каждой биографии укажите ссылку на источник и статус «Найдено», только если совпадают ФИО, достоверный год рождения и награда. Если есть сомнения, выберите «Требует проверки».</p>
+        <p>Проверьте сведения, предложенные ИИ. Не меняйте ID и исходные сведения о кавалерах; сохраните книгу целиком в формате .xlsx, включая скрытый лист.</p>
+      </section>
       <section class="cavalier-form-card bio-card" id="bio-upload">
-        <h2>2. Загрузить данные</h2>
+        <h2>3. Загрузить данные</h2>
         <form action="{{ base }}/preview#bio-review" method="post" enctype="multipart/form-data" class="edit-form" data-write-feedback data-write-pending-label="Проверяем файл…">
           <div class="bio-file-picker" data-bio-file-picker>
             <label id="bio-file-label" for="bio-file-input">Файл данных</label>
             <div class="bio-file-choice">
-              <input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-label">
-              <button type="button" data-bio-choose hidden aria-labelledby="bio-file-choose-label bio-file-label" aria-describedby="bio-file-name bio-file-error"><span id="bio-file-choose-label">Выбрать файл</span></button>
+              <label class="button bio-file-button" for="bio-file-input">
+                <span id="bio-file-choose-label">Выбрать файл</span>
+                <input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label" aria-describedby="bio-file-name bio-file-error">
+              </label>
               <span id="bio-file-name" class="bio-file-name" data-bio-file-name aria-live="polite" hidden></span>
             </div>
             <p id="bio-file-error" class="bio-file-error" data-bio-file-error role="alert" hidden></p>
           </div>
-          <p class="bio-required-hint"><strong>Одной биографии недостаточно.</strong> Заполните также «Источник» — полную ссылку на карточку кавалера — и «Статус». «Найдено» означает, что личность подтверждена по ФИО, достоверному году и награде; при сомнениях выберите «Требует проверки».</p>
           <p>Файл .xlsx, до 10 МБ и 5 000 записей.</p>
-          <details class="bio-old-file"><summary>Файл создан из прежней выгрузки</summary>
-            <p>Приложите исходный файл данных, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
+          <details class="bio-old-file"><summary>Дополнительные параметры</summary>
+            <p>Исходная выгрузка нужна только для файла прежнего формата. Приложите исходный файл данных, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
             <div class="bio-file-picker" data-bio-file-picker>
-              <label id="bio-original-label" for="bio-original-input">Исходные данные</label>
+              <label id="bio-original-label" for="bio-original-input">Исходная выгрузка</label>
               <div class="bio-file-choice">
-                <input id="bio-original-input" type="file" name="original" accept=".xlsx" aria-labelledby="bio-original-label">
-                <button type="button" data-bio-choose hidden aria-labelledby="bio-original-choose-label bio-original-label" aria-describedby="bio-original-name bio-original-error"><span id="bio-original-choose-label">Выбрать файл</span></button>
+                <label class="button bio-file-button" for="bio-original-input">
+                  <span id="bio-original-choose-label">Выбрать файл</span>
+                  <input id="bio-original-input" type="file" name="original" accept=".xlsx" aria-labelledby="bio-original-choose-label bio-original-label" aria-describedby="bio-original-name bio-original-error">
+                </label>
                 <span id="bio-original-name" class="bio-file-name" data-bio-file-name aria-live="polite" hidden></span>
               </div>
               <p id="bio-original-error" class="bio-file-error" data-bio-file-error role="alert" hidden></p>
@@ -107,10 +117,10 @@
       </section>
     </div>
     {% endif %}
+    {% if result %}
     <section class="cavalier-form-card bio-card bio-review" id="bio-review" aria-label="Проверка импорта">
-      <h2>3. Проверить и сохранить</h2>
+      <h2>4. Проверить и сохранить</h2>
       {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
-      {% if result %}
       {% if result.state == 'committed' %}<p class="bio-saved" role="status"><strong>Сохранено: {{ result.saved }}</strong>. Остальные записи остались без изменений.</p>{% endif %}
       <div class="bio-summary" role="status">
         {% for name, rows in groups.items() %}<a class="bio-result-count" href="#bio-group-{{ loop.index }}" data-bio-result-link aria-controls="bio-group-{{ loop.index }}" aria-expanded="{{ 'true' if rows else 'false' }}"><strong>{{ rows|length }}</strong><span>{{ name }}</span></a>{% endfor %}
@@ -118,7 +128,7 @@
       <p>Сохраняются только строки «Готово к сохранению». Перед записью программа повторно проверит данные и пустоту биографии в базе.</p>
       {% if result.state == 'preview' and not result.ready %}<p class="bio-required-hint"><strong>Нет строк, готовых к сохранению.</strong> Ниже открыты все категории с причинами. Для непустой биографии обязательны подтверждённый статус «Найдено» и полная ссылка в «Источник».</p>{% endif %}
       {% if result.report_warning %}<p role="alert">{{ result.report_warning }}</p>{% endif %}
-      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel">Скачать отчёт</a><a href="{{ base }}">Загрузить другой файл</a></div>
+      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel" download>Скачать отчёт</a><a href="{{ base }}">Загрузить другой файл</a></div>
       {% if saved_rows %}<details class="bio-result-group" open><summary>Сохранённые биографии · {{ saved_rows|length }}</summary>{{ row_table(saved_rows) }}</details>{% endif %}
       {% for name, rows in groups.items() %}
       <details class="bio-result-group" id="bio-group-{{ loop.index }}" {% if rows %}open{% endif %}>
@@ -135,8 +145,13 @@
       </form>
       {% else %}<p class="notice" role="alert">Режим просмотра: проверка и отчёт доступны, сохранение выключено.</p>{% endif %}
       {% endif %}
-      {% else %}<p>После загрузки данных здесь появятся результаты проверки каждой строки. До вашего подтверждения ничего не сохраняется.</p>{% endif %}
     </section>
+    {% else %}
+    <div class="bio-review-hint" id="bio-review">
+      {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+      <p><strong>4. Проверить и сохранить.</strong> Загрузите заполненный файл и нажмите «Проверить файл». Результаты появятся здесь; до подтверждения ничего не сохраняется.</p>
+    </div>
+    {% endif %}
     <details class="cavalier-form-card bio-card"><summary>Как подготовить данные</summary>
       <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>
       <dl class="bio-status-help"><dt>Найдено</dt><dd>Источник подтверждает именно этого кавалера по ФИО, достоверному году рождения и награде. Можно передать биографию на проверку и сохранение.</dd><dt>Требует проверки</dt><dd>Личность или сведения вызывают сомнения. Такая строка автоматически не сохраняется.</dd></dl>
