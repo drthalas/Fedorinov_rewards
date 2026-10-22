@@ -1,5 +1,12 @@
 # QA notes
 
+## ALE-510: настоящий Windows file picker при Owner handoff
+
+- Playwright `filechooser` interception подавляет нативный OS dialog. Перехваченное событие и `setFiles` не подтверждают, что Owner увидит окно «Открытие»; нельзя оставлять такой browser client подключённым к Owner Edge.
+- Проверять тот же Owner profile: trusted Windows mouse/keyboard input, отдельное OS-окно `#32770`, затем выбранное имя и trusted `change`. Перед handoff отключить клиентов автоматизации; при необходимости перезапустить тот же profile. Финальный Edge запускать без remote debugging, сохраняя профиль.
+- Feature scheduled task должен работать без `ExecutionTimeLimit` (PT0S), чтобы дочерние runtime/Edge оставались доступны для Owner review.
+- Геометрия export: сравнивать нижние границы select/input/button; у `.edit-form label` есть общий `margin-bottom:12px`, его необходимо обнулить в export grid.
+
 ## Роль Hermes
 
 Hermes — основной тестировщик проекта. Hermes QA подтверждает качество перед релизом и фиксирует PASS/FAIL по пользовательским сценариям.

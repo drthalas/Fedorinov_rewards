@@ -64,6 +64,7 @@
 }
 .bio-file-button:focus-within { outline:2px solid #d6b77b; outline-offset:4px; }
 .bio-download-form { display:grid; grid-template-columns:minmax(0,2fr) minmax(140px,1fr) auto; gap:16px; align-items:end; }
+.bio-download-form > label { margin-bottom:0; }
 .bio-download-form p { grid-column:1 / -1; grid-row:2; margin:0; }
 .bio-download-form button { margin:0; }
 .bio-fill p { line-height:1.5; }
