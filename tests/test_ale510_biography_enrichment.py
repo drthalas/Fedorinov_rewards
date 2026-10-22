@@ -434,7 +434,7 @@ class BiographyEnrichmentTests(unittest.TestCase):
         original=self.human_exported(limit=1)
         _,result=bio.preview(self.settings,content,original)
         self.assertEqual(result['ready'],0)
-        self.assertIn('исходный Excel с теми же кавалерами',result['rows'][0]['reason'])
+        self.assertIn('исходный файл данных с теми же кавалерами',result['rows'][0]['reason'])
 
     def test_landing_disabled_placeholder_and_user_facing_copy(self):
         with TestClient(app) as client:
@@ -443,7 +443,7 @@ class BiographyEnrichmentTests(unittest.TestCase):
             self.assertIn('В разработке',landing)
             self.assertIn('aria-disabled="true"',landing)
             response=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('new.xlsx',self.human_filled())})
-            for label in ['1. Скачать Excel','2. Загрузить заполненный Excel','3. Проверить и сохранить',bio.READY_LABEL,bio.REVIEW_LABEL,bio.SKIP_LABEL]:
+            for label in ['1. Скачать данные','2. Загрузить данные','3. Проверить и сохранить',bio.READY_LABEL,bio.REVIEW_LABEL,bio.SKIP_LABEL]:
                 self.assertIn(label,response.text)
             for internal in ['пилот','ALE-491','snapshot','source_url','notes','research']:
                 self.assertNotIn(internal,response.text)
@@ -458,6 +458,58 @@ class BiographyEnrichmentTests(unittest.TestCase):
         self.assertEqual(row[3],bio.READY_LABEL)
         self.assertIn('warheroes.ru',row[6])
         self.assertTrue(row[4])
+        workbook.close()
+
+    def test_four_biographies_alone_require_status_and_source_without_reclassification(self):
+        self.add(14)
+        def edit(sheet,headers,workbook):
+            for row in range(2,17):
+                sheet.cell(row,headers['Биография'],'[ТЕСТ] абвгд' if row<=5 else '')
+                sheet.cell(row,headers['Источник'],'')
+                sheet.cell(row,headers['Статус'],'')
+        content=self.human_filled(edits=edit)
+        token,result=bio.preview(self.settings,content)
+        self.assertEqual([len(rows) for rows in bio.review_groups(result).values()],[0,4,11])
+        for row in result['rows'][:4]:
+            hints=' '.join(bio.row_guidance(row))
+            self.assertIn('«Статус»',hints)
+            self.assertIn('«Источник»',hints)
+            self.assertEqual(row['kind'],bio.CONFLICT)
+        with TestClient(app) as client:
+            response=client.post('/data-maintenance/enrichment/biographies/preview',files={'file':('test.xlsx',content)})
+        self.assertIn('Нет строк, готовых к сохранению',response.text)
+        self.assertIn('Одной биографии недостаточно',response.text)
+        self.assertRegex(response.text,r'id="bio-group-3"\s+open')
+        self.assertNotIn('Excel',response.text)
+        self.assertEqual(bio.commit(self.settings,token)['saved'],0)
+
+    def test_source_and_length_guidance_is_visible_and_exported_in_report(self):
+        self.add()
+        def edit(sheet,headers,workbook):
+            sheet.cell(2,headers['Источник'],'не ссылка')
+            sheet.cell(3,headers['Биография'],'я'*2501)
+        token,result=bio.preview(self.settings,self.human_filled(edits=edit))
+        self.assertEqual(result['ready'],0)
+        self.assertIn('Исправьте «Источник»',' '.join(bio.row_guidance(result['rows'][0])))
+        self.assertIn('2501 символов',' '.join(bio.row_guidance(result['rows'][1])))
+        workbook=load_workbook(BytesIO(bio.report_workbook(result)))
+        self.assertEqual(workbook.active.cell(1,9).value,'Что исправить')
+        self.assertIn('Источник',workbook.active.cell(2,9).value)
+        self.assertIn('2501',workbook.active.cell(3,9).value)
+        workbook.close()
+
+    def test_all_visible_data_labels_keep_xlsx_contract(self):
+        with TestClient(app) as client:
+            for path in ['/data-maintenance','/data-maintenance/enrichment','/data-maintenance/enrichment/biographies']:
+                response=client.get(path)
+                self.assertNotIn('Excel',response.text)
+            content=client.get('/data-maintenance/enrichment/biographies').text
+        for label in ['Скачать данные','Загрузить данные','Как подготовить данные']:
+            self.assertIn(label,content)
+        self.assertIn('accept=".xlsx"',content)
+        workbook=load_workbook(BytesIO(self.human_exported()))
+        self.assertEqual([cell.value for cell in workbook.active[1]],bio.VISIBLE_HEADERS)
+        self.assertEqual(workbook[bio.METADATA_SHEET].sheet_state,'hidden')
         workbook.close()
 
 

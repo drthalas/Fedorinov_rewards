@@ -26,7 +26,7 @@ def _render(request, *, level='biographies', status_code=200, **context):
         context['groups'] = service.review_groups(context['result'])
         context['saved_rows'] = [row for row in context['result']['rows'] if row['kind'] == 'Сохранено']
     return templates.TemplateResponse(request, 'biography_enrichment.html',
-        {'settings': settings, 'level': level, 'base': BASE, **context}, status_code=status_code)
+        {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, **context}, status_code=status_code)
 
 
 @router.get('/data-maintenance')

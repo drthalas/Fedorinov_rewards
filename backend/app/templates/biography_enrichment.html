@@ -6,8 +6,10 @@
 {% macro row_table(rows) %}
 <div class="bio-results"><table><thead><tr><th>ID кавалера</th><th>ФИО</th><th>Причина и сведения</th></tr></thead><tbody>
 {% for row in rows %}
-  <tr><td>{{ row.person_id }}<small class="bio-row-number">Строка Excel: {{ row.row }}</small></td><td>{{ row.fio }}</td><td>
+  <tr><td>{{ row.person_id }}<small class="bio-row-number">Строка файла: {{ row.row }}</small></td><td>{{ row.fio }}</td><td>
     <p>{{ row.reason }}</p>
+    {% set hints = row_guidance(row) %}
+    {% if hints %}<ul class="bio-row-guidance" aria-label="Что исправить">{% for hint in hints %}<li>{{ hint }}</li>{% endfor %}</ul>{% endif %}
     <details><summary>Биография, источник и проверка личности</summary>
       <p class="bio-text">{{ row.biography or 'Биография в файле не заполнена' }}</p>
       {% for url in row.source_url.splitlines() %}<p>{% if safe_external_url(url) %}<a href="{{ safe_external_url(url) }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>{% else %}{{ url }}{% endif %}</p>{% endfor %}
@@ -31,7 +33,7 @@
       <section class="cavalier-form-card bio-module" aria-labelledby="enrichment-title">
         <span class="bio-module-caption">Сведения о кавалерах</span>
         <h2 id="enrichment-title"><a href="/data-maintenance/enrichment">Наполнение данных</a></h2>
-        <p>Дополняйте пустые биографии с помощью Excel. Перед сохранением программа проверит каждую запись.</p>
+        <p>Дополняйте пустые биографии через файл данных. Перед сохранением программа проверит каждую запись.</p>
         <a class="button" href="{{ base }}">Биографии →</a>
       </section>
       <section class="cavalier-form-card bio-module bio-module-disabled" aria-labelledby="optimization-title" aria-disabled="true">
@@ -49,7 +51,7 @@
     </section>
   {% else %}
     <h1>Биографии</h1>
-    <p>Скачайте Excel с пустыми биографиями, дополните его по источникам и проверьте результат перед сохранением.</p>
+    <p>Скачайте данные о кавалерах с пустыми биографиями, дополните его по источникам и проверьте результат перед сохранением.</p>
     {% if stats %}
     <section class="bio-counts" aria-label="Заполненность биографий">
       <div><span>Всего кавалеров</span><strong>{{ stats.total }}</strong></div>
@@ -57,13 +59,13 @@
       <div><span>Заполненные биографии</span><strong>{{ stats.filled }}</strong></div>
     </section>
     <ol class="bio-steps" aria-label="Этапы работы">
-      <li><a href="#bio-download">Скачать Excel</a></li>
-      <li><a href="#bio-upload">Загрузить заполненный Excel</a></li>
+      <li><a href="#bio-download">Скачать данные</a></li>
+      <li><a href="#bio-upload">Загрузить данные</a></li>
       <li><a href="#bio-review">Проверить и сохранить</a></li>
     </ol>
     <div class="bio-workflow">
       <section class="cavalier-form-card bio-card" id="bio-download">
-        <h2>1. Скачать Excel</h2>
+        <h2>1. Скачать данные</h2>
         <form action="{{ base }}/export" method="get" class="edit-form">
           <label><span>Награда или категория</span><select name="selection">
             <option value="">Все кавалеры</option>
@@ -71,17 +73,18 @@
           </select></label>
           <label><span>Количество записей</span><input name="limit" type="number" min="1" max="5000" value="20" required></label>
           <p>В файл попадут только кавалеры с пустой биографией, по одному на строку. Порядок — по ID.</p>
-          <button type="submit">Скачать Excel</button>
+          <button type="submit">Скачать данные</button>
         </form>
       </section>
       <section class="cavalier-form-card bio-card" id="bio-upload">
-        <h2>2. Загрузить заполненный Excel</h2>
+        <h2>2. Загрузить данные</h2>
         <form action="{{ base }}/preview#bio-review" method="post" enctype="multipart/form-data" class="edit-form" data-write-feedback data-write-pending-label="Проверяем файл…">
-          <label><span>Заполненный Excel</span><input type="file" name="file" accept=".xlsx" required></label>
+          <label><span>Файл данных</span><input type="file" name="file" accept=".xlsx" required></label>
+          <p class="bio-required-hint"><strong>Одной биографии недостаточно.</strong> Заполните также «Источник» — полную ссылку на карточку кавалера — и «Статус». «Найдено» означает, что личность подтверждена по ФИО, достоверному году и награде; при сомнениях выберите «Требует проверки».</p>
           <p>Файл .xlsx, до 10 МБ и 5 000 записей.</p>
           <details class="bio-old-file"><summary>Файл создан из прежней выгрузки</summary>
-            <p>Приложите исходный Excel, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
-            <label><span>Исходный Excel</span><input type="file" name="original" accept=".xlsx"></label>
+            <p>Приложите исходный файл данных, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
+            <label><span>Исходные данные</span><input type="file" name="original" accept=".xlsx"></label>
           </details>
           <button type="submit">Проверить файл</button>
         </form>
@@ -97,11 +100,12 @@
         {% for name, rows in groups.items() %}<a class="bio-result-count" href="#bio-group-{{ loop.index }}"><strong>{{ rows|length }}</strong><span>{{ name }}</span></a>{% endfor %}
       </div>
       <p>Сохраняются только строки «Готово к сохранению». Перед записью программа повторно проверит данные и пустоту биографии в базе.</p>
+      {% if result.state == 'preview' and not result.ready %}<p class="bio-required-hint"><strong>Нет строк, готовых к сохранению.</strong> Ниже открыты все категории с причинами. Для непустой биографии обязательны подтверждённый статус «Найдено» и полная ссылка в «Источник».</p>{% endif %}
       {% if result.report_warning %}<p role="alert">{{ result.report_warning }}</p>{% endif %}
-      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel">Скачать отчёт Excel</a><a href="{{ base }}">Загрузить другой файл</a></div>
+      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel">Скачать отчёт</a><a href="{{ base }}">Загрузить другой файл</a></div>
       {% if saved_rows %}<details class="bio-result-group" open><summary>Сохранённые биографии · {{ saved_rows|length }}</summary>{{ row_table(saved_rows) }}</details>{% endif %}
       {% for name, rows in groups.items() %}
-      <details class="bio-result-group" id="bio-group-{{ loop.index }}" {% if rows and name != 'Пропущено' %}open{% endif %}>
+      <details class="bio-result-group" id="bio-group-{{ loop.index }}" {% if rows %}open{% endif %}>
         <summary>{{ name }} · {{ rows|length }}</summary>
         {% if rows %}{{ row_table(rows) }}{% else %}<p>Таких записей нет.</p>{% endif %}
       </details>
@@ -115,9 +119,9 @@
       </form>
       {% else %}<p class="notice" role="alert">Режим просмотра: проверка и отчёт доступны, сохранение выключено.</p>{% endif %}
       {% endif %}
-      {% else %}<p>После загрузки Excel здесь появятся результаты проверки каждой строки. До вашего подтверждения ничего не сохраняется.</p>{% endif %}
+      {% else %}<p>После загрузки данных здесь появятся результаты проверки каждой строки. До вашего подтверждения ничего не сохраняется.</p>{% endif %}
     </section>
-    <details class="cavalier-form-card bio-card"><summary>Как заполнить Excel</summary>
+    <details class="cavalier-form-card bio-card"><summary>Как подготовить данные</summary>
       <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>
       <dl class="bio-status-help"><dt>Найдено</dt><dd>Источник подтверждает именно этого кавалера по ФИО, достоверному году рождения и награде. Можно передать биографию на проверку и сохранение.</dd><dt>Требует проверки</dt><dd>Личность или сведения вызывают сомнения. Такая строка автоматически не сохраняется.</dd></dl>
       <p>Неизвестные статусы и расхождения исходных полей требуют проверки. Год 1945 мог быть подставлен при старом импорте и не считается подтверждённым автоматически. Формулы замените значениями. Сохраните книгу целиком, не копируйте только видимый лист.</p>

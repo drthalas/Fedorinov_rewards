@@ -65,10 +65,28 @@ def category(row):
     return READY_LABEL if row['kind'] == READY else SKIP_LABEL if row['kind'] == SKIP else REVIEW_LABEL
 
 
+def row_guidance(row):
+    """Presentation only: explain required inputs without changing eligibility."""
+    if row['kind'] not in {CONFLICT, ERROR} or blank(row['biography']):
+        return []
+    hints = []
+    status = text(row['evidence'].get('Статус в файле', row['evidence'].get('status', '')))
+    if not status:
+        hints.append('Заполните «Статус». «Найдено» выбирайте только после подтверждения личности по ФИО, году рождения и награде. При сомнениях укажите «Требует проверки».')
+    if not text(row['source_url']):
+        hints.append('Заполните «Источник»: нужна полная ссылка на карточку этого кавалера, начинающаяся с https:// или http://. Одного текста биографии недостаточно.')
+    elif row['reason'].startswith('Укажите полный http/https'):
+        hints.append('Исправьте «Источник»: вставьте полную ссылку на карточку кавалера, а не название сайта или произвольный текст.')
+    if len(row['biography']) > 2500:
+        hints.append(f'В биографии {len(row["biography"])} символов при лимите 2 500. Сократите текст самостоятельно; программа его не обрезает.')
+    return hints
+
+
 def report_workbook(record):
-    headers = ['Строка Excel', 'ID кавалера', 'ФИО', 'Результат', 'Причина', 'Биография', 'Источник', 'Проверка личности']
+    headers = ['Строка файла', 'ID кавалера', 'ФИО', 'Результат', 'Причина', 'Биография', 'Источник', 'Проверка личности', 'Что исправить']
     rows = [[r['row'], r['person_id'], r['fio'], category(r), r['reason'], r['biography'], r['source_url'],
-             '\n'.join(f'{name}: {value}' for name, value in r['evidence'].items() if value)] for r in record['rows']]
+             '\n'.join(f'{name}: {value}' for name, value in r['evidence'].items() if value),
+             '\n'.join(row_guidance(r))] for r in record['rows']]
     return _workbook(headers, rows)
 
 
@@ -294,21 +312,21 @@ def _sheet_rows(sheet, required, *, human=False):
         names = [ALIASES.get(text(c.value), text(c.value)) for c in cells]
         if 'person_id' in names and 'ФИО' in names:
             if any(c.data_type in {'f', 'e'} for c in cells):
-                raise ValidationError('Заголовки Excel содержат формулы или ошибки.')
+                raise ValidationError('Заголовки файла данных содержат формулы или ошибки.')
             if len(names) > MAX_COLUMNS or len([n for n in names if n]) != len(set(n for n in names if n)):
                 raise ValidationError('Повторяющиеся заголовки или слишком много колонок.')
             headers = names
             break
     if headers is None or not required.issubset(headers):
-        raise ValidationError('Не найдены обязательные колонки. Скачайте Excel в разделе «Биографии» и сохраните его структуру.')
+        raise ValidationError('Не найдены обязательные колонки. Скачайте данные в разделе «Биографии» и сохраните его структуру.')
     if human and set(headers) != required:
-        raise ValidationError('На основном листе должно быть семь колонок исходной выгрузки. Скачайте новый Excel.')
+        raise ValidationError('На основном листе должно быть семь колонок исходной выгрузки. Скачайте новые данные.')
     rows = []
     for number, cells in enumerate(iterator, header_row + 1):
         if number - header_row > MAX_ROWS or len(cells) > MAX_COLUMNS:
             raise ValidationError('Допустимо не более 5 000 строк и 40 колонок.')
         if human and len(cells) > len(headers):
-            raise ValidationError('В строке Excel есть лишние колонки без заголовков. Сохраните семь колонок исходной выгрузки.')
+            raise ValidationError('В строке файла данных есть лишние колонки без заголовков. Сохраните семь колонок исходной выгрузки.')
         if not any(text(c.value) for c in cells):
             continue
         values = {name: text(cells[i].value) if i < len(cells) else '' for i, name in enumerate(headers) if name}
@@ -317,7 +335,7 @@ def _sheet_rows(sheet, required, *, human=False):
             if bio_index < len(cells) and isinstance(cells[bio_index].value, str):
                 values['biography'] = cells[bio_index].value
         if any(len(text(c.value)) > 32000 for c in cells):
-            raise ValidationError('Слишком длинная ячейка Excel.')
+            raise ValidationError('Слишком длинная ячейка файла данных.')
         rows.append({'row': number, 'values': values, 'invalid': any(c.data_type in {'f', 'e'} for c in cells)})
     if not rows:
         raise ValidationError('В файле нет записей.')
@@ -343,7 +361,7 @@ def read_rows(content):
             required = {ALIASES.get(name, name) for name in VISIBLE_HEADERS}
             rows = _sheet_rows(sheet, required, human=True)
             if METADATA_SHEET not in workbook.sheetnames:
-                raise ValidationError('В файле нет служебного листа исходной выгрузки. Скачайте Excel заново; не переносите только видимый лист.')
+                raise ValidationError('В файле нет служебного листа исходной выгрузки. Скачайте данные заново; не переносите только видимый лист.')
             meta_rows = _sheet_rows(workbook[METADATA_SHEET], {'person_id', 'ФИО', 'Звание', 'Иерархия ID',
                                                               'Номер(а) награды', 'snapshot', 'snapshot_signature'})
             metadata = {}
@@ -375,14 +393,14 @@ def _snapshot(settings, values):
     serialized = values.get('snapshot', '')
     signature = values.get('snapshot_signature', '')
     if not serialized or not hmac.compare_digest(signature, _sign(settings, serialized)):
-        raise ValidationError('Исходные служебные данные отсутствуют или изменены. Приложите исходный Excel с теми же кавалерами либо скачайте новую выгрузку и перенесите только найденные биографии, источники и статусы.')
+        raise ValidationError('Исходные служебные данные отсутствуют или изменены. Приложите исходный файл данных с теми же кавалерами либо скачайте новую выгрузку и перенесите только найденные биографии, источники и статусы.')
     try:
         snapshot = json.loads(serialized)
         if snapshot['version'] not in {1, 2} or not isinstance(snapshot['person']['person_id'], int):
             raise ValueError()
         return snapshot
     except (ValueError, KeyError, TypeError) as exc:
-        raise ValidationError('Повреждены служебные данные исходной выгрузки. Скачайте Excel заново.') from exc
+        raise ValidationError('Повреждены служебные данные исходной выгрузки. Скачайте данные заново.') from exc
 
 
 def _assess(connection, settings, entry, originals, duplicates):
@@ -402,10 +420,10 @@ def _assess(connection, settings, entry, originals, duplicates):
         result.update(kind=kind, reason=reason)
         return result
     if entry['invalid']:
-        return fail(ERROR, 'Формулы и ошибки Excel: замените значениями.')
+        return fail(ERROR, 'В файле обнаружены формулы или ошибки: замените их обычными значениями.')
     raw_id = values['person_id']
     if not re.fullmatch(r'[1-9][0-9]{0,18}', raw_id) or int(raw_id) > 2**63 - 1:
-        return fail(ERROR, 'Некорректный ID кавалера. Сохраните ID из исходного Excel без изменений.')
+        return fail(ERROR, 'Некорректный ID кавалера. Сохраните ID из исходных данных без изменений.')
     person_id = int(raw_id)
     if person_id in duplicates:
         return fail(CONFLICT, 'ID кавалера повторяется: все его строки требуют проверки. Оставьте одну согласованную запись.')
@@ -414,11 +432,11 @@ def _assess(connection, settings, entry, originals, duplicates):
         return fail(SKIP, 'Кавалер с таким ID отсутствует в текущей базе. Новые записи не создаются.')
     try:
         if human and not values.get('snapshot'):
-            raise ValidationError('Кавалер не входит в исходную выгрузку этого файла. Скачайте Excel для нужной группы; не заменяйте ID вручную.')
+            raise ValidationError('Кавалер не входит в исходную выгрузку этого файла. Скачайте данные для нужной группы; не заменяйте ID вручную.')
         source = values if values.get('snapshot') else originals.get(str(person_id), {})
         snapshot = _snapshot(settings, source)
         if human and (snapshot['version'] != 2 or snapshot.get('contract') != 'visible-7-v2'):
-            raise ValidationError('Служебные данные относятся к другому формату выгрузки. Скачайте новый Excel в этом разделе.')
+            raise ValidationError('Служебные данные относятся к другому формату выгрузки. Скачайте новые данные в этом разделе.')
     except ValidationError as exc:
         return fail(CONFLICT, str(exc))
     if snapshot['person'] != current:
@@ -539,7 +557,7 @@ def commit(settings, token):
             if record['state'] == 'committed':
                 return record
             if record['state'] != 'preview':
-                raise ValidationError('Результат предыдущей попытки не подтверждён. Загрузите Excel для новой проверки.')
+                raise ValidationError('Результат предыдущей попытки не подтверждён. Загрузите данные для новой проверки.')
             # Only rows explicitly shown as ready may be applied. New eligibility
             # after preview never expands the owner's confirmed subset.
             eligible_rows = {r['row'] for r in record['rows'] if r['kind'] == READY}

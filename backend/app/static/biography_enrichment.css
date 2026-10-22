@@ -51,4 +51,7 @@
 .bio-row-number { display:block; white-space:nowrap; font-size:12px; margin-top:8px; opacity:.75; }
 .bio-result-group .bio-results { max-height:420px; }
 .bio-status-help dd { margin:6px 0 18px; }
+.bio-required-hint { padding:14px 16px; border-left:3px solid #b09a6c; background:rgb(176 154 108 / 8%); line-height:1.5; }
+.bio-row-guidance { padding-left:20px; margin:10px 0 14px; line-height:1.5; }
+.bio-row-guidance li+li { margin-top:8px; }
 @media(max-width:800px) { .bio-landing { grid-template-columns:1fr; } .bio-result-count { width:100%; } }
