@@ -498,6 +498,34 @@ class BiographyEnrichmentTests(unittest.TestCase):
         self.assertIn('2501',workbook.active.cell(3,9).value)
         workbook.close()
 
+    def test_compact_file_controls_preserve_accessible_native_inputs(self):
+        with TestClient(app) as client:
+            content=client.get('/data-maintenance/enrichment/biographies').text
+        self.assertEqual(content.count('data-bio-file-picker>'),2)
+        self.assertEqual(content.count('data-bio-choose hidden'),2)
+        self.assertEqual(content.count('data-bio-file-name aria-live="polite" hidden'),2)
+        self.assertIn('name="file" accept=".xlsx" required',content)
+        self.assertIn('name="original" accept=".xlsx"',content)
+        for prefix in ['bio-file','bio-original']:
+            self.assertIn(f'for="{prefix}-input"',content)
+            self.assertIn(f'aria-describedby="{prefix}-name {prefix}-error"',content)
+        self.assertIn('biography_enrichment.js',content)
+
+    def test_result_counters_target_each_group_without_changing_reasons(self):
+        self.add(2)
+        def edit(sheet,headers,workbook):
+            sheet.cell(3,headers['Статус'],'')
+            sheet.cell(4,headers['Биография'],'')
+        with TestClient(app) as client:
+            response=client.post('/data-maintenance/enrichment/biographies/preview',
+                files={'file':('test.xlsx',self.human_filled(edits=edit))})
+        self.assertEqual(response.status_code,200)
+        for index in range(1,4):
+            self.assertIn(f'href="#bio-group-{index}" data-bio-result-link aria-controls="bio-group-{index}"',response.text)
+            self.assertIn(f'id="bio-group-{index}"',response.text)
+        self.assertIn('Что исправить',response.text)
+        self.assertIn('Требует проверки',response.text)
+
     def test_all_visible_data_labels_keep_xlsx_contract(self):
         with TestClient(app) as client:
             for path in ['/data-maintenance','/data-maintenance/enrichment','/data-maintenance/enrichment/biographies']:
