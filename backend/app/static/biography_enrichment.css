@@ -81,3 +81,11 @@
 .bio-landing .bio-module h2 a { color:var(--guide-gold,#d5b57b); text-decoration:none; }
 .bio-landing .bio-module h2 a:hover { color:var(--guide-gold-bright,#ffe1a4); text-decoration:underline; }
 .bio-landing .bio-module h2 a:focus-visible { outline:2px solid #d6b77b; outline-offset:5px; }
+/* Field review stays on the import page; the list retains its scroll and state. */
+#bio-manual-dialog { box-sizing: border-box; width: min(850px, 94vw); max-height: 90vh; overflow: auto; color: var(--guide-text, #d7d0c2); background: var(--guide-surface, #171916); border: 1px solid #75654b; border-radius: 12px; padding: 24px; }
+#bio-manual-dialog::backdrop { background: rgb(0 0 0 / 45%); }
+#bio-manual-dialog label { display: block; margin: 12px 0 6px; }
+#bio-manual-dialog input:not([type=checkbox]), #bio-manual-dialog textarea, #bio-manual-dialog select { width: 100%; box-sizing: border-box; font: inherit; padding: 8px; color: inherit; background: #121411; border: 1px solid #75654b; }
+#bio-manual-dialog .bio-manual-field { margin: 18px 0; padding: 16px; border: 1px solid #abb5bf; }
+#bio-manual-dialog .bio-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+#bio-manual-dialog small { display: block; }
