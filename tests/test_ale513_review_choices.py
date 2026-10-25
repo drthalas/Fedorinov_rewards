@@ -111,16 +111,18 @@ class ImportWorkflowTests(unittest.TestCase):
         self.assertEqual(self.query('select birthday from person'),[('1945-05-09',)])
         self.assertTrue(choices.detail(self.settings,token,2)['confirmed'])
 
-    def test_ermakova_unresolved_identity_has_explanation_and_no_inactive_options(self):
+    def test_ermakova_alias_has_safe_manual_identity_and_fio_choices(self):
         token,_=self.preview(current='1954-05-09',year='1954',fio='Ермакова Мария Владимировна',identity='Личность не подтверждена')
         detail=choices.detail(self.settings,token,2)
-        self.assertEqual(detail['state'],'blocked')
-        self.assertFalse(detail['automatic']);self.assertFalse(detail['fields'])
+        self.assertEqual(detail['state'],'manual')
+        self.assertTrue(detail['identity_required'])
+        self.assertFalse(detail['automatic'])
+        self.assertEqual(set(detail['fields']),{'fio'})
         with TestClient(app) as client:
             response=client.get(f'/data-maintenance/enrichment/biographies/review/{token}/2')
-            self.assertIn('В базе:',response.text);self.assertIn('В источнике:',response.text)
-            self.assertNotIn('type="radio"',response.text)
-            self.assertNotIn('data-review-save',response.text)
+            self.assertIn('Это тот же кавалер',response.text)
+            self.assertIn('Не подтверждаю',response.text)
+            self.assertIn('data-identity-fields hidden',response.text)
         with self.assertRaises(bio.ValidationError):self.import_plan(token)
 
     def test_full_fio_award_degree_serial_and_source_required_for_auto(self):
@@ -223,7 +225,7 @@ class ImportWorkflowTests(unittest.TestCase):
             self.assertEqual(client.post(base+'/import/commit',data={'operation':op,'confirm':'yes'},headers={'origin':'https://foreign.example'}).status_code,403)
             self.assertEqual(client.post(base+'/import/commit',data={'operation':op,'confirm':'yes'}).status_code,200)
             html=client.get(f'{base}/state/{token}').text
-            self.assertIn('disabled aria-disabled="true" class="confirmed-button">Подтверждено',html)
+            self.assertIn('Подтверждено: 1',html)
             self.assertNotIn('data-manual-person=',html)
             history=client.get(f'{base}/review/{token}/2/history').text
             self.assertIn('Пользователь приложения',history);self.assertIn('Импорт',history)
@@ -293,7 +295,7 @@ class ImportWorkflowTests(unittest.TestCase):
         with TestClient(app) as client:
             response=client.post('/data-maintenance/enrichment/biographies/commit',data={'token':token,'confirm':'yes'})
             self.assertEqual(response.status_code,200)
-            self.assertIn('class="confirmed-button">Подтверждено',response.text)
+            self.assertIn('Подтверждено: 1',response.text)
         self.assertEqual(self.query('select birthday,biography from person'),[('1918','Обычная проверенная биография.')])
 
 

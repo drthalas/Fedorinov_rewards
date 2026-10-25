@@ -21,14 +21,14 @@ BASE = '/data-maintenance/enrichment/biographies'
 
 def _render(request, *, level='biographies', status_code=200, **context):
     settings = get_settings()
-    if level == 'biographies' and 'stats' not in context:
+    if level == 'biographies' and not context.get('result') and 'stats' not in context:
         try:
             context['stats'] = service.statistics(settings)
         except sqlite3.Error:
             context.update(stats=None, error='Не удалось прочитать биографии из базы. Проверьте доступность базы и наличие поля biography.')
             status_code = 503
     if context.get('result'):
-        context['view'] = workflow.present(settings,context['token'])
+        context['view'] = workflow.workspace(settings,context['token'])
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, 'year_label':format_birth_year_input, **context}, status_code=status_code)
 
@@ -59,11 +59,50 @@ def restored_preview(request: Request, token: str):
 @router.get(BASE + '/state/{token}')
 def workspace_state(request: Request, token: str):
     try:
-        view = workflow.present(get_settings(),token)
+        view = workflow.workspace(get_settings(),token)
         return templates.TemplateResponse(request,'enrichment_workspace.html',
             {'view':view,'base':BASE,'fields':manual.FIELDS,'year_label':format_birth_year_input},headers={'Cache-Control':'no-store'})
     except service.ValidationError as exc:
         raise HTTPException(409,choices.friendly_error(exc)) from exc
+
+
+def _operations(raw):
+    try:
+        values=json.loads(raw)
+        if not isinstance(values,list) or any(not isinstance(n,str) for n in values):raise ValueError()
+        return values
+    except (ValueError,TypeError):
+        raise service.ValidationError('Неверный набор принятых решений.')
+
+
+@router.post(BASE + '/workspace/{token}')
+def staged_workspace(request: Request, token: str, operations: str=Form('[]')):
+    _same_origin(request)
+    try:
+        view=workflow.workspace(get_settings(),token,_operations(operations))
+        return templates.TemplateResponse(request,'enrichment_workspace.html',{'view':view,'base':BASE,'fields':manual.FIELDS,'year_label':format_birth_year_input},headers={'Cache-Control':'no-store'})
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+
+
+@router.post(BASE + '/workspace/{token}/plan')
+def workspace_plan(request: Request, token: str, revision: str=Form(...), operations: str=Form('[]')):
+    _same_origin(request)
+    try:
+        operation,plan=workflow.prepare_workspace(get_settings(),token,revision,_operations(operations))
+        return _review_fragment(request,batch_plan=plan,operation=operation)
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+
+
+@router.post(BASE + '/review/{token}/{row_number}/stage')
+async def stage_review(request: Request, token: str, row_number: int):
+    _same_origin(request)
+    try:
+        operation,plan=await run_in_threadpool(workflow.stage,get_settings(),token,row_number,dict(await request.form()))
+        return _review_fragment(request,staged_operation=operation,staged_plan=plan)
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
 
 
 @router.get(BASE + '/confirm/{operation}')

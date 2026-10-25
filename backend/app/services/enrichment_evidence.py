@@ -70,9 +70,19 @@ def analyze(snapshot, values, current):
     # generic civilian rank and placeholder 1945 cannot corroborate identity.
     corroborated = not numbered and bool(matched) and valid_year and year==current_year and year!='1945' and rank not in {'','гражданский','неизвестно'} and rank==bio.key(snapshot['person']['rank'])
     verified = bool(valid_source and not problems and same_fio and matched and len(notes)>=10 and (serial_match or corroborated))
+    # An omitted parenthesized surname can be reviewed, never auto-approved.
+    # Exact signed award/serial and matching birth year independently corroborate
+    # the alias. Unrelated names, different awards/serials and contrary evidence
+    # cannot be overridden by an Owner checkbox.
+    plain = lambda name: bio.key(re.sub(r'\([^)]*\)', '', name))
+    alias = full_name(fio) and full_name(current['fio']) and plain(fio)==plain(current['fio'])
+    contradiction = bool(re.search(r'другой (?:человек|кавалер)|не тот (?:человек|кавалер)|номер не совпад|награда не совпад', bio.key(notes)))
+    manual_identity = bool(warheroes and matched and serial_match and alias and valid_year and bool(current_year)
+                           and len(notes)>=10 and not contradiction
+                           and not (supplied_serial and not any(supplied_serial==str(a['number']) for a in numbered)))
     return {'fio':fio,'year':year,'valid_year':valid_year,'source':source,'notes':notes,
             'sources':sources(source),'same_fio':same_fio,'verified':verified,'auto_verified':verified and warheroes,
-            'problems':problems,'selected':selected,'serial_match':bool(serial_match),
+            'problems':problems,'selected':selected,'serial_match':bool(serial_match),'manual_identity':manual_identity,
             'award_context':' · '.join(dict.fromkeys(f'{a["award"]} №{a["number"]}' for a in selected))}
 
 

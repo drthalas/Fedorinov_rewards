@@ -7,11 +7,22 @@ from . import enrichment_evidence as evidence
 from .dates import format_birth_year_input
 
 
-def detail(settings, token, row_number, *, connection=None, record=None):
+def detail(settings, token, row_number, *, connection=None, record=None, identity_choice=None):
     with (closing(bio._connection(settings.rewards_db_path)) if connection is None else nullcontext(connection)) as connection:
         record, values, snapshot, original, row, current = manual._validated(connection,settings,token,row_number,record=record)
     proof = evidence.analyze(snapshot,values,current)
     resolved = record['_progress']['decisions']
+    identity_case = proof['manual_identity'] and not proof['verified']
+    identity_saved = next((e['identity_decision'] for e in reversed(record['_progress']['events']) if e.get('identity_decision')),None)
+    identity = identity_saved or identity_choice
+    identity_required = proof['manual_identity'] and not proof['verified'] and not identity
+    if identity and identity not in {'same','different'}:
+        raise bio.ValidationError('Неизвестное решение о личности.')
+    if identity_choice and not proof['manual_identity']:
+        raise bio.ValidationError('Эту личность нельзя подтвердить без дополнительных доказательств.')
+    if proof['manual_identity'] and (identity=='same' or identity_required):
+        proof['problems'] = []
+        if identity=='same':proof.update(verified=True,auto_verified=True)
     proposals = {'biography':values.get('biography',''),'birthday':proof['year'],'fio':proof['fio']}
     automatic = {}
     fields = {}
@@ -25,7 +36,7 @@ def detail(settings, token, row_number, *, connection=None, record=None):
     if proof['year'] and not proof['valid_year']:
         blockers.append('Год в источнике указан неверно. Исправьте предложение в файле.')
         trusted = False
-    if not proof['problems']:
+    if not proof['problems'] and not identity_required and identity!='different':
         if year_conflict and 'birthday' not in resolved:
             if trusted and year=='1945' and proof['valid_year']:
                 automatic['birthday'] = proof['year']
@@ -47,38 +58,50 @@ def detail(settings, token, row_number, *, connection=None, record=None):
                 automatic['biography'] = text
             elif 'biography' not in resolved:
                 blockers.append('Для добавления биографии не хватает подтверждения личности или источника.')
-    if proof['problems']:
+    if identity_case and identity!='different' and 'fio' not in resolved and bio.key(proof['fio'])!=bio.key(current['fio']):
+        fields['fio'] = {'label':'ФИО','current':current['fio'],'proposed':proof['fio'],
+            'reason':'Подтверждение личности не требует изменения фамилии. Выберите ФИО независимо.',
+            'sources':proof['sources']}
+    if identity_required and year_conflict and year!='1945' and proof['valid_year'] and 'birthday' not in resolved:
+        fields['birthday']={'label':'Год рождения','current':year,'proposed':proof['year'],
+            'reason':'После подтверждения личности выберите год независимо от ФИО.','sources':proof['sources']}
+    if identity_required:
+        information.append('Полное имя без дополнительной фамилии, точная награда и номер совпадают. Подтвердите, что это тот же кавалер.')
+    if identity=='different':
+        automatic.clear();fields.clear();blockers.clear()
+        information.append('Источник отклонён: сведения из него не будут импортированы.')
+    if proof['problems'] and identity!='different':
         blockers.append('ФИО, год и биография из этого источника не будут перенесены. Уточните личность и загрузите проверенные сведения заново.')
     active = set(automatic)|set(fields)
     events = record['_progress']['events']
     confirmed = bool(events) and not active and not blockers
-    state = 'confirmed' if confirmed else 'manual' if fields else 'blocked' if blockers and not automatic else 'ready' if automatic else 'unchanged'
+    state = 'confirmed' if confirmed else 'manual' if fields or identity_required else 'blocked' if blockers and not automatic else 'ready' if automatic else 'unchanged'
     if events and fields:
         status = 'Частично подтверждено'
     else:
-        status = {'confirmed':'Подтверждено','manual':'Нужен выбор года','blocked':'Нужны подтверждения','ready':'Готово к импорту','unchanged':'Без изменений'}[state]
+        status = {'confirmed':'Подтверждено','manual':'Требует решения','blocked':'Нужны подтверждения','ready':'Готово к импорту','unchanged':'Без изменений'}[state]
     reason = 'Все решения сохранены. Повторная проверка не требуется.' if confirmed else (
         'Будут добавлены: '+', '.join(manual.FIELDS[n].lower() for n in automatic)+'.' if automatic else '')
     if fields:
-        reason += ' Год рождения нужно выбрать вручную.'
+        reason += ' Подтвердите личность и выберите ФИО.' if identity_required else ' Выберите значения спорных полей.'
     if blockers:
         reason += ' '+blockers[0]
     if state=='unchanged':
-        reason = information[0] if information else 'Подходящих изменений в файле нет.'
+        reason = information[0] if information else 'Нет подтверждённого текста или другого подходящего дополнения. Нужны сведения источника.'
     return {'token':token,'row_number':row_number,'person_id':snapshot['person']['person_id'],
             'fio':evidence.display_fio(current['fio']),'raw_fio':current['fio'],'award_context':proof['award_context'],
             'fields':fields,'automatic':automatic,'blockers':blockers,'information':information,
             'proposals':proposals,'current':current,'source':proof['source'],'sources':proof['sources'],'notes':proof['notes'],
-            'source_fio':proof['fio'],'identity_supported':proof['verified'],'ambiguous':bool(proof['problems']),
+            'identity_required':identity_required,'identity_decision':identity,'source_fio':proof['fio'],'identity_supported':proof['verified'],'ambiguous':bool(proof['problems']),
             'confirmed':confirmed,'state':state,'status':status,'reason':reason.strip(),
             'events':events,'ordinary':ordinary,
             'receipt':events[-1]['operation'] if events else None,
             'revision':bio._sign(settings,bio.canonical({'kind':'enrichment-review-v3','token':token,'row':row_number,
-                                                       'current':current,'resolved':resolved,'receipt':events[-1]['operation'] if events else None}))}
+                                                       'current':current,'resolved':resolved,'identity':identity_saved,'receipt':events[-1]['operation'] if events else None}))}
 
 
-def row_plan(settings, token, row_number, decisions, *, expected=None, mode='review'):
-    review = detail(settings,token,row_number)
+def row_plan(settings, token, row_number, decisions, *, expected=None, mode='review', identity_choice=None):
+    review = detail(settings,token,row_number,identity_choice=identity_choice)
     if review['confirmed'] or set(decisions)-set(review['automatic'])-set(review['fields']):
         raise bio.ValidationError('Эти поля уже подтверждены или недоступны. Обновите список.')
     if expected is not None and review['current']!=expected:
@@ -94,6 +117,7 @@ def row_plan(settings, token, row_number, decisions, *, expected=None, mode='rev
         identity_pending=bool(review['blockers']),expected_fields=review['current'],expected_receipt=review['receipt'])
     plan.pop('signature')
     plan.update(workflow_version=3,mode=mode)
+    if identity_choice:plan['identity_decision']=identity_choice
     plan['signature'] = bio._sign(settings,bio.canonical(plan))
     bio._save(settings,plan_token,plan)
     return plan_token,plan

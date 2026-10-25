@@ -183,3 +183,23 @@
 .import-confirm-person { border-top: 1px solid #5d5745; margin-top: 24px; padding-top: 10px; }
 .review-change-source { grid-column: 1 / -1; font-size: 13px; overflow-wrap: anywhere; }
 @media(max-width:700px) { .import-toolbar { align-items: flex-start; flex-direction: column; } .review-large-id { font-size: 31px; } }
+
+/* Single-screen import workspace. */
+.import-page-header { display:flex; align-items:center; gap:24px; margin:16px 0 24px; }
+.import-page-header h1 { margin:0; font-size:28px; color:#f4dfb7; }
+.bio-page .import-tabs { display:flex; gap:12px; padding:0 0 18px; flex-wrap:wrap; border-bottom:1px solid #75654b; }
+.bio-page .import-tabs button { flex:1; min-height:58px; font-size:17px; color:#e9dfc9; background:#20251e; border:1px solid #746849; padding:12px 18px; }
+.bio-page .import-tabs button[aria-selected=true] { background:#493c24; border-color:#c6a568; color:#ffe4ad; }
+.import-tabs strong { margin-left:12px; font-size:23px; }
+.import-bottom { display:flex; align-items:center; justify-content:space-between; gap:24px; border-top:1px solid #75654b; padding-top:20px; margin-top:20px; }
+.import-bottom p { margin:0; max-width:850px; line-height:1.6; }
+.bio-page button, .bio-page a.button { min-height:38px; box-sizing:border-box; }
+.bio-page .search-pagination { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin:18px 0; }
+.bio-detail-open #bio-upload { display:none; }
+#bio-manual-dialog [data-identity-question] label { display:flex; gap:10px; padding:14px; align-items:center; }
+#bio-manual-dialog input[type=radio] { width:auto; }
+.import-exact-changes { margin:20px 0; }
+.import-exact-changes>summary { cursor:pointer; color:#efd6a0; }
+@media(max-width:760px){.import-bottom{align-items:stretch;flex-direction:column}.import-tabs button{min-width:190px}.import-page-header{gap:14px}}
+.import-page-header { position:sticky; top:0; z-index:4; background:#171b15; padding:12px 0; }
+#bio-manual-dialog { scroll-margin-top:100px; }

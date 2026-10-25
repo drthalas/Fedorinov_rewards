@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Обслуживание данных' if level == 'maintenance' else 'Наполнение данных' if level == 'enrichment' else 'Биографии — Обслуживание данных' }}{% endblock %}
+{% block title %}{{ 'Обслуживание данных' if level == 'maintenance' else 'Наполнение данных' if level == 'enrichment' else 'Проверка и импорт' }}{% endblock %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('biography_enrichment.js') }}" defer></script><script src="{{ static_url('enrichment_state.js') }}" defer></script>{% endblock %}
@@ -31,90 +31,18 @@
       <a class="button" href="{{ base }}">Открыть биографии →</a>
     </section>
   {% else %}
-    {% if stats %}
-    <section class="bio-counts" aria-label="Заполненность биографий">
-      <div><span>Всего кавалеров</span><strong>{{ stats.total }}</strong></div>
-      <div><span>Пустые биографии</span><strong>{{ stats.empty }}</strong></div>
-      <div><span>Заполненные биографии</span><strong>{{ stats.filled }}</strong></div>
+    <header class="import-page-header"><a href="/data-maintenance?menu=1" data-maintenance-back class="button secondary-button">← Назад</a><h1>Проверка и импорт</h1></header>
+    <section class="cavalier-form-card bio-card" id="bio-upload">
+      <form action="{{ base }}/preview" method="post" enctype="multipart/form-data" data-auto-preview>
+        <div class="bio-file-picker" data-bio-file-picker><label id="bio-file-label" for="bio-file-input">Файл XLSX</label><div class="bio-file-choice"><label class="button bio-file-button" for="bio-file-input"><span id="bio-file-choose-label">Выбрать файл</span><input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label"></label><span data-bio-file-name>{{ view.filename if view else '' }}</span></div><p data-bio-file-error role="alert" hidden></p></div>
+        <p data-upload-status role="status">{{ 'Файл проверен. Решения будут записаны только после общего импорта.' if result else 'Выберите XLSX. Проверка начнётся автоматически; данные пока не записываются.' }}</p>
+        {% if not result %}<details class="bio-old-file"><summary>Исходная выгрузка для прежнего формата</summary><input type="file" name="original" accept=".xlsx"></details>{% endif %}
+      </form>
     </section>
-    <nav class="bio-local-nav"><a href="/data-maintenance" class="button secondary-button">← Назад</a>{% if result %}<button type="button" data-review-reset-file>Закрыть файл</button>{% endif %}</nav>
-    <ol class="bio-steps" aria-label="Этапы работы">
-      <li><a href="#bio-download">Скачать данные</a></li>
-      <li><a href="#bio-fill">Заполнить биографии</a></li>
-      <li><a href="#bio-upload">Загрузить данные</a></li>
-      <li><a href="#bio-review">Проверить и сохранить</a></li>
-    </ol>
-    <div class="bio-workflow">
-      <section class="cavalier-form-card bio-card" id="bio-download">
-        <h2>1. Скачать данные</h2>
-        <form action="{{ base }}/export" method="get" class="edit-form bio-download-form" data-no-transition>
-          <label><span>Награда или категория</span><select name="selection">
-            <option value="">Все кавалеры</option>
-            {% for group in stats.groups %}<option value="{{ group.selection }}" {% if selection == group.selection %}selected{% endif %}>{{ group.label }} — пустых {{ group.empty }} из {{ group.total }}</option>{% endfor %}
-          </select></label>
-          <label><span>Количество записей</span><input name="limit" type="number" min="1" max="5000" value="20" required></label>
-          <p>В файл попадут только кавалеры с пустой биографией, по одному на строку. Порядок — по ID.</p>
-          <button type="submit">Скачать данные</button>
-        </form>
-      </section>
-      <section class="cavalier-form-card bio-card bio-fill" id="bio-fill">
-        <h2>2. Заполнить биографии</h2>
-        <p>Заполните биографии в скачанном файле самостоятельно или с помощью ИИ, затем загрузите его обратно.</p>
-        <p>Для каждой биографии укажите ссылку на источник и статус «Найдено», только если совпадают ФИО, достоверный год рождения и награда. Если есть сомнения, выберите «Требует проверки».</p>
-        <p>Проверьте сведения, предложенные ИИ. Не меняйте ID и исходные сведения о кавалерах; сохраните книгу целиком в формате .xlsx, включая скрытый лист.</p>
-      </section>
-      <section class="cavalier-form-card bio-card" id="bio-upload">
-        <h2>3. Загрузить данные</h2>
-        <form action="{{ base }}/preview#bio-review" method="post" enctype="multipart/form-data" class="edit-form" data-write-feedback data-write-pending-label="Проверяем файл…">
-          <div class="bio-file-picker" data-bio-file-picker>
-            <label id="bio-file-label" for="bio-file-input">Файл данных</label>
-            <div class="bio-file-choice">
-              <label class="button bio-file-button" for="bio-file-input">
-                <span id="bio-file-choose-label">Выбрать файл</span>
-                <input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label" aria-describedby="bio-file-name bio-file-error">
-              </label>
-              <span id="bio-file-name" class="bio-file-name" data-bio-file-name aria-live="polite" hidden></span>
-            </div>
-            <p id="bio-file-error" class="bio-file-error" data-bio-file-error role="alert" hidden></p>
-          </div>
-          <p>Файл .xlsx, до 10 МБ и 5 000 записей.</p>
-          <details class="bio-old-file"><summary>Дополнительные параметры</summary>
-            <p>Исходная выгрузка нужна только для файла прежнего формата. Приложите исходный файл данных, содержащий тех же кавалеров. Если выборки не совпадают, скачайте файл для нужной группы. Не заменяйте ID вручную.</p>
-            <div class="bio-file-picker" data-bio-file-picker>
-              <label id="bio-original-label" for="bio-original-input">Исходная выгрузка</label>
-              <div class="bio-file-choice">
-                <label class="button bio-file-button" for="bio-original-input">
-                  <span id="bio-original-choose-label">Выбрать файл</span>
-                  <input id="bio-original-input" type="file" name="original" accept=".xlsx" aria-labelledby="bio-original-choose-label bio-original-label" aria-describedby="bio-original-name bio-original-error">
-                </label>
-                <span id="bio-original-name" class="bio-file-name" data-bio-file-name aria-live="polite" hidden></span>
-              </div>
-              <p id="bio-original-error" class="bio-file-error" data-bio-file-error role="alert" hidden></p>
-            </div>
-          </details>
-          <button type="submit">Проверить файл</button>
-        </form>
-      </section>
-    </div>
-    {% endif %}
+    {% if stats and not result %}<details class="cavalier-form-card bio-card"><summary>Скачать данные для заполнения</summary><form action="{{ base }}/export" method="get" class="edit-form bio-download-form" data-no-transition><label>Награда или категория<select name="selection"><option value="">Все кавалеры</option>{% for group in stats.groups %}<option value="{{ group.selection }}">{{ group.label }}</option>{% endfor %}</select></label><label>Количество записей<input name="limit" type="number" min="1" max="5000" value="20" required></label><button type="submit">Скачать данные</button></form></details>{% endif %}
     {% if result %}{% include 'enrichment_workspace.html' %}
     {% else %}<div class="bio-review-hint" id="bio-review">{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}<p>Загрузите файл, чтобы увидеть готовые изменения и спорные строки. До подтверждения данные не записываются.</p></div>{% endif %}
     <section id="bio-manual-dialog" class="cavalier-form-card" role="region" aria-labelledby="bio-manual-title" hidden><button type="button" class="review-back" data-manual-close>← К списку</button><div data-manual-content></div></section>
-    <p><button type="button" data-manual-open="{{ base }}/review-history">История действий</button></p>
-    <details class="cavalier-form-card bio-card"><summary>Как подготовить данные</summary>
-      <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>
-      <dl class="bio-status-help"><dt>Найдено</dt><dd>Источник подтверждает именно этого кавалера по ФИО, достоверному году рождения и награде. Можно передать биографию на проверку и сохранение.</dd><dt>Требует проверки</dt><dd>Личность или сведения вызывают сомнения. Такая строка автоматически не сохраняется.</dd></dl>
-      <p>Неизвестные статусы и расхождения исходных полей требуют проверки. Год 1945 мог быть подставлен при старом импорте и не считается подтверждённым автоматически. Формулы замените значениями. Сохраните книгу целиком, не копируйте только видимый лист.</p>
-      <p>Отчёт доступен 7 дней. Скачайте его для постоянного хранения. После очистки временных файлов компьютера может потребоваться новая выгрузка.</p>
-    </details>
-    {% if stats %}
-    <details class="cavalier-form-card bio-card"><summary>Статистика по иерархии наград</summary>
-      <p>Уникальные кавалеры внутри каждой группы. Один человек может входить в разные группы; итоги групп не суммируются.</p>
-      <div class="bio-results"><table><thead><tr><th>Группа</th><th>Всего</th><th>Пустые</th><th>Заполненные</th></tr></thead><tbody>
-        {% for group in stats.groups %}<tr><td><a href="{{ base }}?selection={{ group.selection }}">{{ group.label }}</a></td><td>{{ group.total }}</td><td>{{ group.empty }}</td><td>{{ group.filled }}</td></tr>{% endfor %}
-      </tbody></table></div>
-    </details>
-    {% endif %}
   {% endif %}
 </section>
 {% endblock %}

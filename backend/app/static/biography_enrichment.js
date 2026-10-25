@@ -8,7 +8,7 @@
       const error = area.querySelector("[data-bio-file-error]");
       if (!input || !filename || !error) return;
       const update = () => {
-        filename.textContent = input.files.length ? input.files[0].name : "";
+        filename.textContent = input.files.length ? input.files[0].name : (document.querySelector("[data-bio-workspace]")?.dataset.filename || "");
         filename.hidden = !filename.textContent;
         error.textContent = "";
         error.hidden = true;
