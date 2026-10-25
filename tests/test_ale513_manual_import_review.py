@@ -114,28 +114,18 @@ class ManualReviewTests(unittest.TestCase):
         event=manual.commit(self.settings,p)
         self.assertEqual(set(event['writes']),set(manual.FIELDS))
         self.assertEqual(len(manual.reviewed_history(self.settings,token,2)),1)
-        with self.assertRaisesRegex(bio.ValidationError,'исходные данные устарели'): manual.review(self.settings,token,2)
+        self.assertEqual(manual.review(self.settings,token,2)['current']['birthday'],'1938')
         self.assertEqual(event,manual.commit(self.settings,p))
         self.assertEqual(frozen,(self.query('select id,id_rank,comment,person_foto from person'),self.query('select * from rewards')))
 
-    def test_existing_biography_requires_separate_acceptance_and_detects_race(self):
+    def test_external_biography_change_is_not_silently_rebased(self):
         token,_=self.preview()
+        p,_=self.plan(token,birthday_decision='accept',birthday_proposal='1938')
         self.execute("update person set biography='Существующий текст'")
-        context=manual.review(self.settings,token,2)
-        self.assertEqual(context['current']['biography'],'Существующий текст')
-        self.assertEqual(context['original']['biography'],'')
-        p,_=self.plan(token, birthday_decision='accept',birthday_proposal='1938')
-        manual.commit(self.settings,p)
-        self.assertEqual(self.query('select biography from person'),[('Существующий текст',)])
-        token,_=self.preview_after_empty_export()
-        p,_=self.plan(token,biography_decision='accept',biography_proposal='Явная замена')
-        self.execute("update person set biography='Конкурентный текст'")
-        with self.assertRaisesRegex(bio.ValidationError,'поля изменены'): manual.commit(self.settings,p)
-        self.assertEqual(self.query('select biography from person'),[('Конкурентный текст',)])
-        # An intentional replacement is possible only after a fresh exact plan.
-        p,_=self.plan(token,biography_decision='accept',biography_proposal='Отдельно принятая замена')
-        manual.commit(self.settings,p)
-        self.assertEqual(self.query('select biography from person'),[('Отдельно принятая замена',)])
+        with self.assertRaisesRegex(bio.ValidationError,'вне этого импорта'):
+            manual.review(self.settings,token,2)
+        with self.assertRaises(bio.ValidationError):manual.commit(self.settings,p)
+        self.assertEqual(self.query('select biography,birthday from person'),[('Существующий текст','1918')])
 
     def preview_after_empty_export(self):
         self.execute('update person set biography=null')
@@ -216,24 +206,18 @@ class ManualReviewTests(unittest.TestCase):
         self.execute('drop table logs')
         with self.assertRaisesRegex(bio.ValidationError,'миграции'): manual.review(self.settings,token,2)
 
-    def test_http_confirmation_origin_and_rendered_context(self):
+    def test_http_blocker_has_no_pseudo_choices_and_origin_is_checked(self):
         token,_=self.preview()
         base='/data-maintenance/enrichment/biographies'
         with TestClient(app) as client:
             response=client.get(f'{base}/review/{token}/2')
             self.assertEqual(response.status_code,200)
-            self.assertIn('Ермакова (Зайцева)',response.text)
-            self.assertIn('Оставить на проверке',response.text)
-            response=client.post(f'{base}/review/{token}/2/plan',data={'biography_choice':'current','review_revision':choices.detail(self.settings,token,2)['revision']})
-            self.assertEqual(response.status_code,200)
-            self.assertIn('Проверьте изменения',response.text)
+            self.assertIn('Что мешает импорту',response.text)
+            self.assertNotIn('type="radio"',response.text)
+            self.assertEqual(client.post(f'{base}/review/{token}/2/plan',data={}).status_code,400)
             p,_=self.plan(token)
             self.assertEqual(client.post(base+'/review/commit',data={'plan_token':p}).status_code,409)
             self.assertEqual(client.post(base+'/review/commit',data={'plan_token':p,'confirm':'yes'},headers={'origin':'https://elsewhere.example'}).status_code,403)
-            self.assertEqual(client.post(base+'/review/commit',data={'plan_token':p,'confirm':'yes'}).status_code,200)
-            response=client.get(f'{base}/review/{token}/2/history')
-            self.assertEqual(response.status_code,200)
-            self.assertIn('Owner',response.text)
             self.assertEqual(client.get(f'{base}/preview/{token}').status_code,200)
             self.assertEqual(client.get(base+'/review-history?person_id=11095').status_code,200)
 

@@ -37,6 +37,7 @@ HEADERS = ['person_id', 'ФИО', 'Год рождения', 'Звание', 'Н
            'Идентификация', 'snapshot', 'snapshot_signature']
 VISIBLE_HEADERS = ['ID кавалера', 'ФИО', 'Год рождения', 'Награда', 'Биография', 'Источник', 'Статус']
 METADATA_SHEET = 'Служебные данные'
+PROPOSALS_SHEET = 'Предложения'
 ALIASES = {'ID кавалера': 'person_id', 'Источник': 'source_url',
            'Биография': 'biography', 'WarHeroes URL': 'source_url', 'Статус': 'status',
            'Подтверждённые факты': 'notes'}
@@ -342,6 +343,45 @@ def _sheet_rows(sheet, required, *, human=False):
     return rows
 
 
+def _merge_proposals(workbook, rows):
+    """Optional unprotected source assertions, bound to immutable signed IDs.
+
+    This does not alter the ordinary seven columns or hidden original snapshot.
+    Source assertions never establish authenticity on their own.
+    """
+    if PROPOSALS_SHEET not in workbook.sheetnames:
+        return rows
+    mapping = {'ID кавалера':'person_id', 'ФИО в источнике':'ФИО в карточке',
+               'Год в источнике':'Год в карточке', 'Награда в источнике':'Награда в карточке',
+               'Номер в источнике':'Номер в карточке', 'Источник':'source_url',
+               'Подтверждённые факты':'notes', 'Проверка личности':'Идентификация'}
+    iterator = workbook[PROPOSALS_SHEET].iter_rows()
+    header = next(iterator, ())
+    names = [text(c.value) for c in header]
+    required = set(mapping)-{'Проверка личности'}
+    if not required <= set(names) or len(names)!=len(set(names)) or set(names)-set(mapping) or any(c.data_type in {'f','e'} for c in header):
+        raise ValidationError('Неверные колонки листа «Предложения». Исходные сведения изменять нельзя.')
+    by_id = {e['values']['person_id']:e for e in rows}
+    seen = set()
+    for number, cells in enumerate(iterator, 2):
+        if number>MAX_ROWS+1:
+            raise ValidationError('Слишком много строк предложений.')
+        if not any(text(c.value) for c in cells):
+            continue
+        if len(cells)>len(names) or any(c.data_type in {'f','e'} or len(text(c.value))>32000 for c in cells):
+            raise ValidationError('На листе «Предложения» есть формула, ошибка или слишком длинный текст.')
+        values = {mapping[n]:text(cells[i].value) if i<len(cells) else '' for i,n in enumerate(names)}
+        pid = values.pop('person_id')
+        if pid in seen or pid not in by_id:
+            raise ValidationError('ID в предложениях повторяется или отсутствует в подписанной выгрузке.')
+        seen.add(pid)
+        target = by_id[pid]['values']
+        if text(target.get('source_url')) and set(target['source_url'].splitlines()) != set(values['source_url'].splitlines()):
+            raise ValidationError('Источник предложения отличается от источника биографии. Уточните файл.')
+        target.update(values)
+    return rows
+
+
 def read_rows(content):
     if not content or len(content) > MAX_BYTES:
         raise ValidationError('Выберите XLSX размером не более 10 МБ.')
@@ -376,10 +416,10 @@ def read_rows(content):
                 values.update(visible)
                 values['_format'] = 'visible-7-v2'
                 entry['values'] = values
-            return rows
+            return _merge_proposals(workbook, rows)
         required = {'person_id', 'ФИО', 'Год рождения', 'Звание', 'Награда', 'Иерархия ID',
                     'Номер(а) награды', 'biography', 'source_url', 'status'}
-        return _sheet_rows(sheet, required)
+        return _merge_proposals(workbook, _sheet_rows(sheet, required))
     except ValidationError:
         raise
     except Exception as exc:
@@ -540,9 +580,17 @@ def preview(settings, content, original_content=None):
     duplicates = {value for value, count in counts.items() if count > 1}
     with closing(_connection(settings.rewards_db_path)) as connection:
         rows = [_assess(connection, settings, entry, originals, duplicates) for entry in entries]
+        initial_fields = {}
+        for row in rows:
+            pid = row['person_id']
+            if re.fullmatch(r'[1-9][0-9]{0,18}',pid) and int(pid)<=2**63-1:
+                current = connection.execute('select biography,birthday,fio from person where id=?',(int(pid),)).fetchone()
+                if current is not None:
+                    initial_fields[str(row['row'])] = dict(current)
     token = secrets.token_hex(32)
     record = {'created': time.time(), 'state': 'preview', 'file_sha256': hashlib.sha256(content).hexdigest(),
               'entries': entries, 'originals': originals, 'duplicates': list(duplicates), 'rows': rows,
+              'initial_fields':initial_fields,
               'ready': sum(r['kind'] == READY for r in rows), 'saved': 0}
     _save(settings, token, record)
     return token, record

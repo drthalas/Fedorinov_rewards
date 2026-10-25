@@ -2,27 +2,9 @@
 {% block title %}{{ 'Обслуживание данных' if level == 'maintenance' else 'Наполнение данных' if level == 'enrichment' else 'Биографии — Обслуживание данных' }}{% endblock %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('biography_enrichment.js') }}" defer></script>{% endblock %}
-{% macro row_table(rows) %}
-<div class="bio-results"><table><thead><tr><th>ID кавалера</th><th>ФИО</th><th>Причина и сведения</th></tr></thead><tbody>
-{% for row in rows %}
-  <tr><td>{{ row.person_id }}<small class="bio-row-number">Строка файла: {{ row.row }}</small></td><td>{{ row.fio }}</td><td>
-    <p>{{ row.reason }}</p>
-    <p data-manual-row-status {% if not manual_summaries.get(row.row) %}hidden{% endif %}>{{ manual_summaries.get(row.row, '') }}</p>
-    {% if row.kind in ['Конфликт', 'Ошибка'] %}<button type="button" data-manual-person="{{ row.row }}" data-review-resolved="{{ 'true' if row.row in manual_finished else 'false' }}" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}">Проверить</button><details class="review-row-history"><summary>История</summary><button type="button" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}/history">История проверки</button></details>{% endif %}
-    {% set hints = row_guidance(row) %}
-    {% if hints %}<ul class="bio-row-guidance" aria-label="Что исправить">{% for hint in hints %}<li>{{ hint }}</li>{% endfor %}</ul>{% endif %}
-    <details><summary>Биография, источник и проверка личности</summary>
-      <p class="bio-text">{{ row.biography or 'Биография в файле не заполнена' }}</p>
-      {% for url in row.source_url.splitlines() %}<p>{% if safe_external_url(url) %}<a href="{{ safe_external_url(url) }}" target="_blank" rel="noopener noreferrer">{{ url }}</a>{% else %}{{ url }}{% endif %}</p>{% endfor %}
-      <dl>{% for name, value in row.evidence.items() if value %}<dt>{{ name }}</dt><dd class="bio-text">{{ value }}</dd>{% endfor %}</dl>
-    </details>
-  </td></tr>
-{% endfor %}
-</tbody></table></div>
-{% endmacro %}
+{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('biography_enrichment.js') }}" defer></script><script src="{{ static_url('enrichment_state.js') }}" defer></script>{% endblock %}
 {% block content %}
-<section class="cavalier-standalone-page bio-page"{% if level == 'biographies' %} aria-label="Биографии"{% endif %}>
+<section data-bio-level="{{ level }}" class="cavalier-standalone-page bio-page"{% if level == 'biographies' %} aria-label="Биографии"{% endif %}>
   {% if level == 'enrichment' %}
   <nav class="bio-breadcrumbs" aria-label="Хлебные крошки">
     <a href="/data-maintenance">Обслуживание данных</a>
@@ -55,6 +37,7 @@
       <div><span>Пустые биографии</span><strong>{{ stats.empty }}</strong></div>
       <div><span>Заполненные биографии</span><strong>{{ stats.filled }}</strong></div>
     </section>
+    <nav class="bio-local-nav"><a href="/data-maintenance" class="button secondary-button">← Назад</a>{% if result %}<button type="button" data-review-reset-file>Закрыть файл</button>{% endif %}</nav>
     <ol class="bio-steps" aria-label="Этапы работы">
       <li><a href="#bio-download">Скачать данные</a></li>
       <li><a href="#bio-fill">Заполнить биографии</a></li>
@@ -114,44 +97,10 @@
       </section>
     </div>
     {% endif %}
-    {% if result %}
-    <section class="cavalier-form-card bio-card bio-review" id="bio-review" aria-label="Проверка импорта">
-      <h2>4. Проверить и сохранить</h2>
-      {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
-      {% if result.state == 'committed' %}<p class="bio-saved" role="status"><strong>Сохранено: {{ result.saved }}</strong>. Остальные записи остались без изменений.</p>{% endif %}
-      <div class="bio-summary" role="status">
-        {% for name, rows in groups.items() %}<a class="bio-result-count" href="#bio-group-{{ loop.index }}" data-bio-result-link aria-controls="bio-group-{{ loop.index }}" aria-expanded="{{ 'true' if rows else 'false' }}"><strong>{{ rows|length }}</strong><span>{{ name }}</span></a>{% endfor %}
-      </div>
-      <p>Сохраняются только строки «Готово к сохранению». Перед записью программа повторно проверит данные и пустоту биографии в базе.</p>
-      {% if result.state == 'preview' and not result.ready %}<p class="bio-required-hint"><strong>Нет строк, готовых к сохранению.</strong> Ниже открыты все категории с причинами. Для непустой биографии обязательны подтверждённый статус «Найдено» и полная ссылка в «Источник».</p>{% endif %}
-      {% if result.report_warning %}<p role="alert">{{ result.report_warning }}</p>{% endif %}
-      <div class="actions"><a class="button secondary-button" href="{{ base }}/report/{{ token }}/excel" download>Скачать отчёт</a><a href="{{ base }}">Загрузить другой файл</a></div>
-      {% if saved_rows %}<details class="bio-result-group" open><summary>Сохранённые биографии · {{ saved_rows|length }}</summary>{{ row_table(saved_rows) }}</details>{% endif %}
-      {% for name, rows in groups.items() %}
-      <details class="bio-result-group" id="bio-group-{{ loop.index }}" {% if rows %}open{% endif %}>
-        <summary>{{ name }} · {{ rows|length }}</summary>
-        {% if rows %}{{ row_table(rows) }}{% else %}<p>Таких записей нет.</p>{% endif %}
-      </details>
-      {% endfor %}
-      {% if result.state == 'preview' and result.ready %}
-      {% if settings.write_mode and not settings.read_only %}
-      <form action="{{ base }}/commit#bio-review" method="post" class="bio-confirm" data-write-feedback data-write-pending-label="Сохраняем биографии…">
-        <input type="hidden" name="token" value="{{ token }}">
-        <label><input type="checkbox" name="confirm" value="yes" required> Подтверждаю, что источники относятся к этим кавалерам, и разрешаю сохранить только готовые биографии ({{ result.ready }}). Записи, требующие проверки, и пропущенные строки останутся без изменений.</label>
-        <button type="submit">Сохранить готовые биографии</button>
-      </form>
-      {% else %}<p class="notice" role="alert">Режим просмотра: проверка и отчёт доступны, сохранение выключено.</p>{% endif %}
-      {% endif %}
-    </section>
-    {% else %}
-    <div class="bio-review-hint" id="bio-review">
-      {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
-      <p><strong>4. Проверить и сохранить.</strong> Загрузите заполненный файл и нажмите «Проверить файл». Результаты появятся здесь; до подтверждения ничего не сохраняется.</p>
-    </div>
-    {% endif %}
-    <div class="review-list-result" role="status" data-review-list-result hidden></div>
-    <dialog id="bio-manual-dialog" aria-labelledby="bio-manual-title"><button type="button" class="review-back" data-manual-close>← К списку</button><div data-manual-content></div></dialog>
-    <p><button type="button" data-manual-open="{{ base }}/review-history">История ручной проверки</button></p>
+    {% if result %}{% include 'enrichment_workspace.html' %}
+    {% else %}<div class="bio-review-hint" id="bio-review">{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}<p>Загрузите файл, чтобы увидеть готовые изменения и спорные строки. До подтверждения данные не записываются.</p></div>{% endif %}
+    <section id="bio-manual-dialog" class="cavalier-form-card" role="region" aria-labelledby="bio-manual-title" hidden><button type="button" class="review-back" data-manual-close>← К списку</button><div data-manual-content></div></section>
+    <p><button type="button" data-manual-open="{{ base }}/review-history">История действий</button></p>
     <details class="cavalier-form-card bio-card"><summary>Как подготовить данные</summary>
       <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>
       <dl class="bio-status-help"><dt>Найдено</dt><dd>Источник подтверждает именно этого кавалера по ФИО, достоверному году рождения и награде. Можно передать биографию на проверку и сохранение.</dd><dt>Требует проверки</dt><dd>Личность или сведения вызывают сомнения. Такая строка автоматически не сохраняется.</dd></dl>

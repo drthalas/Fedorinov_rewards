@@ -1,0 +1,28 @@
+<section class="cavalier-form-card bio-card bio-review" id="bio-review" data-bio-workspace data-token="{{ view.token }}" data-filename="{{ view.filename }}" aria-label="Импорт данных">
+  <nav class="bio-local-nav"><a href="/data-maintenance" class="button secondary-button">← Назад</a><button type="button" data-review-reset-file>Закрыть файл</button></nav>
+  <div class="import-file-heading"><h2>Проверка и импорт</h2><span>Загружен: <strong>{{ view.filename }}</strong></span></div>
+  <div class="import-counts" role="status"><span>Готово к импорту <strong data-import-ready-count>{{ view.ready }}</strong></span><span>Нужна проверка <strong>{{ view.pending }}</strong></span><span>Подтверждено <strong>{{ view.confirmed }}</strong></span><span data-postponed-count hidden></span></div>
+  <div class="import-toolbar"><label>Показать <select data-review-filter><option value="all">Всех кавалеров</option><option value="pending">Нужна проверка</option><option value="ready">Готово к импорту</option><option value="confirmed">Подтверждено</option></select></label><a href="#bio-upload" data-review-change-file>Загрузить другой файл</a><a href="{{ base }}/report/{{ view.token }}/excel" download>Скачать отчёт</a></div>
+  {% if view.ready %}<form action="{{ base }}/import/{{ view.token }}/plan" method="post" data-import-plan>
+    <input type="hidden" name="revision" value="{{ view.revision }}">
+    <input type="hidden" name="exclude" value="[]">
+    <p>Проверенные биографии будут добавлены в пустые поля. Подтверждённые годы источника заменят только заглушку 1945. Остальные расхождения останутся на проверке.</p>
+    <button type="submit">Импортировать готовые данные</button>
+  </form>{% endif %}
+  <div class="review-list-result" role="status" data-review-list-result hidden></div>
+  <div class="bio-results" data-review-list><table><thead><tr><th>Кавалер</th><th>Результат проверки</th><th>Действие</th></tr></thead><tbody>
+  {% for row in view.rows %}
+    <tr data-review-row="{{ row.row }}" data-state="{{ row.state }}" data-auto="{{ 'true' if row.automatic else 'false' }}">
+      <td><strong class="import-person-id">№ {{ row.person_id }}</strong><span class="import-person-name">{{ row.fio }}</span></td>
+      <td><span class="import-status import-status-{{ row.state }}">{{ row.status }}</span><p data-manual-row-status>{{ row.reason }}</p>
+        {% for change in row.changes %}<p class="import-row-change"><strong>{{ change.label }}:</strong> {% if change.name=='biography' %}добавить проверенный текст{% else %}{{ year_label(change.before) }} → {{ change.after }}{% endif %}</p>{% endfor %}
+      </td>
+      <td>{% if row.state=='confirmed' %}<button type="button" disabled aria-disabled="true" class="confirmed-button">Подтверждено</button>
+        {% elif row.state=='unchanged' %}<span>Изменений нет</span>
+        {% else %}<button type="button" data-manual-person="{{ row.row }}" data-manual-open="{{ base }}/review/{{ view.token }}/{{ row.row }}">{{ row.action }}</button>{% endif %}
+        <button type="button" class="review-history-link" data-manual-open="{{ base }}/review/{{ view.token }}/{{ row.row }}/history">История действий</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody></table></div>
+</section>

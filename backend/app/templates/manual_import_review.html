@@ -1,70 +1,48 @@
-{% macro value(text) %}<span class="bio-text">{{ text if text is not none and text != '' else 'Не заполнено' }}</span>{% endmacro %}
-{% macro text_option(text, biography=false) %}
-  {% if biography and text %}<p class="review-bio-excerpt">{{ text }}</p><details class="review-full-text"><summary>Полный текст</summary><p class="bio-text">{{ text }}</p></details>
-  {% else %}<p class="review-option-value">{{ value(text) }}</p>{% endif %}
+{% macro value(text) %}<span class="bio-text">{{ text if text is not none and text|string|trim else 'Не заполнено' }}</span>{% endmacro %}
+{% macro biography(text, title='Прочитать биографию') %}<details class="review-full-text"><summary>{{ title }}</summary><p class="bio-text">{{ text }}</p></details>{% endmacro %}
+{% macro changes(plan) %}
+  {% if plan.writes %}<dl class="review-changes">{% for name in plan.writes %}{% set field=plan.fields[name] %}<dt>{{ fields[name] }}</dt><dd><div><span class="review-change-caption">Было</span><p>{{ value(year_label(field.before) if name=='birthday' else field.before) }}</p></div><span aria-hidden="true">→</span><div><span class="review-change-caption">Станет</span>{% if name=='biography' %}{{ biography(field.after,'Проверить полный текст') }}{% else %}<p class="review-option-value">{{ value(field.after) }}</p>{% endif %}</div><p class="review-change-source">Источник: {% if safe_external_url(field.source) %}<a href="{{ safe_external_url(field.source) }}" target="_blank" rel="noopener noreferrer">{{ field.source }}</a>{% else %}{{ field.source }}{% endif %}</p></dd>{% endfor %}</dl>{% else %}<p>Данные не изменятся. Будет сохранено ваше решение.</p>{% endif %}
 {% endmacro %}
 {% if error %}<div role="alert" class="notice notice-error">{{ error }}</div>{% endif %}
 {% if history is defined %}
-<h2 id="bio-manual-title" tabindex="-1">История проверки</h2>
-{% if durable %}<p>Последние 20 подтверждений.</p><form action="{{ base }}/review-history" method="get" data-manual-history><label>ID кавалера (пусто — все)<input type="number" name="person_id" min="1"></label><button type="submit">Найти историю</button></form>{% endif %}
-{% for event in history %}<p>{{ event.time }} · {{ event.actor }} · ID {{ event.person_id }} · {{ event.identity.fio }}</p><dl>{% for name, field in event.fields.items() %}<dt>{{ fields[name] }} · {{ decisions[field.decision] }}</dt><dd>{{ value(field.before) }} → {{ value(field.after) }}<p>Предлагалось: {{ value(field.proposed) }}</p><p>Источник: {{ field.source }} · {{ field.evidence }}</p></dd>{% endfor %}</dl>{% else %}<p>Подтверждённых решений пока нет.</p>{% endfor %}
+<h2 id="bio-manual-title" tabindex="-1">История действий</h2>
+{% if durable %}<form action="{{ base }}/review-history" method="get" data-manual-history><label>Номер кавалера (пусто — все)<input type="number" name="person_id" min="1"></label><button type="submit">Найти</button></form>{% endif %}
+{% for event in history %}<article class="history-event"><header><strong>{{ event.fio }} · № {{ event.person_id }}</strong><span>{{ event.when }} · {{ event.actor }} · {{ event.action }}</span></header>
+{% for field in event.fields %}<section><h3>{{ field.label }} · {{ field.decision }}</h3>
+{% if field.name=='biography' %}{% if field.before %}{{ biography(field.before,'Прежний текст') }}{% else %}<p>Ранее биография не была заполнена.</p>{% endif %}{{ biography(field.proposed,'Предложенный текст') }}
+{% else %}<p>Было: {{ value(field.before) }}. Предлагалось: {{ value(field.proposed) }}.</p>{% endif %}
+{% if field.name!='biography' %}<p><strong>Оставлено в базе: {{ value(field.after) }}</strong></p>{% elif field.decision=='Отклонено предложение' %}<p>Предложенный текст не записан.</p>{% else %}<p>Биография добавлена.</p>{% endif %}
+<p class="review-sources">Источник: {% if safe_external_url(field.source) %}<a href="{{ safe_external_url(field.source) }}" target="_blank" rel="noopener noreferrer">{{ field.source }}</a>{% else %}{{ field.source }}{% endif %}</p></section>{% endfor %}</article>
+{% else %}<p>Сохранённых действий пока нет.</p>{% endfor %}
 {% elif review %}
-<header class="review-person-header">
-  <p class="review-eyebrow">Проверка кавалера</p>
-  <h2 id="bio-manual-title" tabindex="-1">{{ review.fio }}</h2>
-  <p class="review-person-meta">ID {{ review.person_id }} <span>·</span> Нужен ваш выбор</p>
-  {% if review.award_context %}<p class="review-award">{{ review.award_context }}</p>{% endif %}
-</header>
-{% if review.ambiguous %}<p class="review-caution" role="note">Личность в источнике не подтверждена. Предлагаемые сведения пока нельзя перенести в карточку.</p>{% endif %}
-{% if review.fields %}
-<form action="{{ base }}/review/{{ review.token }}/{{ review.row_number }}/plan" method="post" data-manual-plan>
-<input type="hidden" name="review_revision" value="{{ review.revision }}">
-{% for name, field in review.fields.items() %}
-<fieldset class="review-field" data-review-field="{{ name }}">
-  <legend>{{ field.label }}</legend>
-  <p class="review-reason">{{ field.reason }}</p>
-  <div class="review-options">
-    <div class="review-option">
-      <input id="choice-{{ name }}-current" type="radio" name="{{ name }}_choice" value="current" aria-label="Оставить текущее · {{ field.label }}">
-      <label for="choice-{{ name }}-current"><span class="review-option-title">Сейчас в базе</span>{% if field.recommended == 'current' %}<span class="review-recommended">Рекомендуем оставить</span>{% endif %}</label>
-      {{ text_option(field.current, name == 'biography') }}
-    </div>
-    <div class="review-option {% if not field.allowed %}review-option-unavailable{% endif %}">
-      <input id="choice-{{ name }}-proposed" type="radio" name="{{ name }}_choice" value="proposed" aria-label="Выбрать источник · {{ field.label }}" {% if not field.allowed %}disabled{% endif %}>
-      <label for="choice-{{ name }}-proposed"><span class="review-option-title">Из источника</span>{% if field.recommended == 'proposed' %}<span class="review-recommended">Рекомендуем</span>{% endif %}</label>
-      {{ text_option(field.proposed, name == 'biography') }}
-    </div>
-  </div>
-  <p class="review-recommendation">{{ field.recommendation }}</p>
-  <div class="review-sources">{% for source in field.sources %}<span>{{ source.name }}: {% if safe_external_url(source.url) %}<a href="{{ safe_external_url(source.url) }}" target="_blank" rel="noopener noreferrer">{{ source.url }}</a>{% else %}{{ source.url }}{% endif %}</span>{% else %}<span>Источник не указан.</span>{% endfor %}</div>
-  <button class="review-reset" type="button" data-review-reset hidden>Оставить на проверке</button>
-</fieldset>
-{% endfor %}
-<p class="review-unselected">Не выбрали вариант — поле останется на проверке.</p>
-<div class="review-footer"><button type="button" class="secondary-button" data-manual-skip>Пропустить</button><button type="submit" data-review-save disabled>Сохранить изменения</button></div>
-</form>
-{% else %}<p>В этой строке нет отличающихся вариантов для выбора. Уточните сведения в источнике и загрузите файл заново.</p><button type="button" data-manual-skip>Пропустить</button>{% endif %}
+<header class="review-person-header"><span class="review-large-id">№ {{ review.person_id }}</span><h2 id="bio-manual-title" tabindex="-1">{{ review.fio }}</h2><p class="import-status import-status-{{ review.state }}">{{ review.status }}</p><p class="review-award">{{ review.award_context }}</p><a class="review-person-link" data-review-leave href="/legacy?tab=rewards&amp;person_id={{ review.person_id }}">Открыть в «Кавалерах»</a></header>
+{% if review.confirmed %}<p class="review-success">Все решения по этой строке сохранены. Повторная проверка и запись не нужны.</p>
+{% else %}
+  {% if review.blockers %}<section class="review-caution" role="note"><h3>Что мешает импорту</h3>{% for reason in review.blockers %}<p>{{ reason }}</p>{% endfor %}
+  {% if review.ambiguous and review.source_fio %}<p><strong>В базе:</strong> {{ review.fio }}<br><strong>В источнике:</strong> {{ review.source_fio }}</p>{% endif %}</section>{% endif %}
+  {% for message in review.information %}<p class="review-information">{{ message }}</p>{% endfor %}
+  {% if review.automatic %}<section class="review-auto-fields"><h3>Будет импортировано при подтверждении</h3>{% for name,proposed in review.automatic.items() %}<div><strong>{{ fields[name] }}</strong>{% if name=='biography' %}<p>Проверенный текст будет добавлен в пустую биографию.</p>{{ biography(proposed) }}{% else %}<p class="review-option-value">{{ year_label(review.current[name]) }} → {{ proposed }}</p><p>Подтверждённый год источника заменяет заглушку 1945.</p>{% endif %}</div>{% endfor %}</section>{% endif %}
+  {% if review.fields or review.automatic %}<form action="{{ base }}/review/{{ review.token }}/{{ review.row_number }}/plan" method="post" data-manual-plan data-auto-count="{{ review.automatic|length }}"><input type="hidden" name="review_revision" value="{{ review.revision }}">
+  {% for name,field in review.fields.items() %}<fieldset class="review-field" data-review-field="{{ name }}" data-current="{{ field.current }}" data-proposed="{{ field.proposed }}"><legend>{{ field.label }}</legend><p>{{ field.reason }}</p><div class="review-options">
+    <div class="review-option"><input id="choice-{{ name }}-current" type="radio" name="{{ name }}_choice" value="current" aria-label="Оставить текущее · {{ field.label }}"><label for="choice-{{ name }}-current">Оставить в базе</label><p class="review-option-value">{{ field.current }}</p></div>
+    <div class="review-option"><input id="choice-{{ name }}-proposed" type="radio" name="{{ name }}_choice" value="proposed" aria-label="Выбрать источник · {{ field.label }}"><label for="choice-{{ name }}-proposed">Использовать источник</label><p class="review-option-value">{{ field.proposed }}</p></div>
+  </div><button type="button" class="review-reset" data-review-reset hidden>Оставить на проверке</button></fieldset>{% endfor %}
+  <p class="review-unselected">Невыбранный спорный год останется на проверке. Проверенные дополнения можно сохранить отдельно.</p>
+  <div class="review-footer"><button type="button" class="secondary-button" data-manual-skip>Пропустить</button><button type="submit" data-review-save {% if not review.automatic %}disabled{% endif %}>{{ 'Импортировать' if not review.fields else 'Сохранить решение' }}</button></div></form>
+  {% else %}<button type="button" data-manual-skip>Пропустить</button>{% endif %}
+  <div class="review-sources">{% for source in review.sources %}<span>{{ source.name }}: {% if safe_external_url(source.url) %}<a href="{{ safe_external_url(source.url) }}" target="_blank" rel="noopener noreferrer">{{ source.url }}</a>{% else %}{{ source.url }}{% endif %}</span>{% endfor %}</div>
+{% endif %}
+<button type="button" class="review-history-link" data-review-history="{{ base }}/review/{{ review.token }}/{{ review.row_number }}/history">История действий</button>
+{% elif batch_plan %}
+<h2 id="bio-manual-title" tabindex="-1">Подтвердите импорт</h2><p>Будут записаны только показанные изменения из файла {{ batch_plan.filename }}.</p>
+{% for plan in batch_plan.rows %}<section class="import-confirm-person"><h3>№ {{ plan.person_id }} · {{ plan.identity.fio }}</h3>{{ changes(plan) }}</section>{% endfor %}
+<form action="{{ base }}/import/commit" method="post" data-manual-commit><input type="hidden" name="operation" value="{{ operation }}"><label class="review-confirm"><input type="checkbox" name="confirm" value="yes" required> Я проверил(а) источники и разрешаю записать эти изменения.</label><div class="review-footer"><button type="button" data-manual-undo>Назад к списку</button><button type="submit">Подтвердить импорт</button></div></form>
 {% elif plan %}
-<p class="review-eyebrow">Подтверждение</p>
-<h2 id="bio-manual-title" tabindex="-1">Проверьте изменения</h2>
-<p class="review-person-meta">{{ plan.identity.fio }} · ID {{ plan.person_id }}</p>
-{% if plan.writes %}
-<dl class="review-changes">{% for name in plan.writes %}{% set field = plan.fields[name] %}<dt>{{ fields[name] }}</dt><dd><div><span class="review-change-caption">Было</span>{{ text_option(field.before, name == 'biography') }}</div><span aria-hidden="true">→</span><div><span class="review-change-caption">Станет</span>{{ text_option(field.after, name == 'biography') }}</div></dd>{% endfor %}</dl>
-{% else %}<p class="review-no-changes">Значения в базе не изменятся. Будет сохранён ваш выбор.</p>{% endif %}
-{% set pending = namespace(names=[]) %}{% for name in plan.get('review_fields', fields.keys()) %}{% if plan.fields[name].decision == 'pending' %}{% set pending.names = pending.names + [fields[name]] %}{% endif %}{% endfor %}
-{% if pending.names %}<p class="review-unselected">Останется на проверке: {{ pending.names|join(', ') }}.</p>{% endif %}
-{% if plan.identity_pending %}<p class="review-caution">Личность или год рождения ещё требуют проверки. Этот кавалер останется в списке проверки.</p>{% endif %}
-<form action="{{ base }}/review/commit" method="post" data-manual-commit>
-  <input type="hidden" name="plan_token" value="{{ plan_token }}">
-  <label class="review-confirm"><input type="checkbox" name="confirm" value="yes" required> {% if plan.fields.values()|selectattr('decision', 'equalto', 'accept')|list %}Я проверил(а) источники: сведения относятся к этому кавалеру, награда и номер совпадают. Подтверждаю показанные изменения.{% else %}Подтверждаю выбор: оставить текущие значения. Предлагаемые сведения не будут перенесены.{% endif %}</label>
-  <div class="review-footer"><button type="button" class="secondary-button" data-manual-undo>Вернуться к выбору</button><button type="submit">Подтвердить</button></div>
-</form>
+<h2 id="bio-manual-title" tabindex="-1">Проверьте изменения</h2><p class="review-person-meta">№ {{ plan.person_id }} · {{ plan.identity.fio }}</p>{{ changes(plan) }}
+{% set pending=namespace(names=[]) %}{% for name in plan.review_fields %}{% if plan.fields[name].decision=='pending' %}{% set pending.names=pending.names+[fields[name]] %}{% endif %}{% endfor %}{% if pending.names %}<p>Останется на проверке: {{ pending.names|join(', ') }}.</p>{% endif %}
+<form action="{{ base }}/review/commit" method="post" data-manual-commit><input type="hidden" name="plan_token" value="{{ plan_token }}"><label class="review-confirm"><input type="checkbox" name="confirm" value="yes" required> Подтверждаю показанные изменения и выбранный год.</label><div class="review-footer"><button type="button" data-manual-undo>Вернуться к выбору</button><button type="submit">Подтвердить</button></div></form>
 {% elif event %}
-<h2 id="bio-manual-title" tabindex="-1">{{ 'Изменения сохранены' if event.writes else 'Выбор сохранён' }}</h2>
-<p class="review-person-meta">{{ event.identity.fio }} · ID {{ event.person_id }}</p>
-<div role="status" data-manual-result data-review-complete="{{ 'true' if review_complete(event) else 'false' }}">
-  <ul class="review-outcomes">{% for name in event.get('review_fields', fields.keys()) %}{% set field = event.fields[name] %}<li>{{ fields[name] }}: {% if field.decision == 'pending' %}осталось на проверке{% elif field.decision == 'reject' %}оставлено текущее значение{% elif name in event.writes %}сохранено{% else %}подтверждено без изменения{% endif %}.</li>{% endfor %}</ul>
-  {% if event.identity_pending %}<p class="review-caution">Личность или год рождения ещё требуют проверки.</p>{% elif not review_complete(event) %}<p>Не выбранные поля остались на проверке.</p>{% endif %}
-</div>
-<div class="review-footer"><button type="button" class="secondary-button" data-manual-close>К списку</button><button type="button" data-manual-next>Следующий кавалер</button></div>
+<h2 id="bio-manual-title" tabindex="-1">{{ 'Подтверждено' if updated.confirmed else 'Решение сохранено' }}</h2><p class="review-large-id">№ {{ event.person_id }}</p><p>{{ updated.fio }}</p><div role="status" data-manual-result><p>{{ updated.reason }}</p></div><div class="review-footer"><button type="button" data-manual-close>К списку</button><button type="button" data-manual-next>Следующий кавалер</button></div>
+{% elif batch_result %}
+<h2 id="bio-manual-title" tabindex="-1">Импорт завершён</h2><p role="status" data-manual-result>Обновлено кавалеров: {{ batch_result.saved }}. Сохранено полей: {{ batch_result.fields_saved }}. Спорные данные остались на проверке.</p><button type="button" data-manual-close>К списку</button>
 {% endif %}

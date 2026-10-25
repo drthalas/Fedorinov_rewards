@@ -6,6 +6,8 @@ from contextlib import closing
 from datetime import datetime, timezone
 import json
 import hmac
+import hashlib
+import copy
 import re
 import secrets
 import time
@@ -21,6 +23,93 @@ from .write_guard import ensure_write_allowed
 FIELDS = {'biography': 'Биография', 'birthday': 'Год рождения', 'fio': 'ФИО'}
 DECISIONS = {'accept': 'Принять', 'reject': 'Отклонить', 'pending': 'Оставить на проверке'}
 AUDIT_PREFIX = 'manual_import_review:'
+_UNSET = object()
+
+
+def _stored_year_equal(left, right):
+    # SQLite DATE/NUMERIC columns store a submitted four-digit year as INTEGER.
+    # This is deliberately narrower than date normalization: no full-date or
+    # floating-point substitutions can pass this comparison.
+    if type(left)==int and isinstance(right,str) and re.fullmatch(r'[0-9]{4}',right):
+        return left==int(right)
+    if type(right)==int and isinstance(left,str) and re.fullmatch(r'[0-9]{4}',left):
+        return right==int(left)
+    return type(left)==type(right) and left==right
+
+
+def _same_state(left, right, allow_year_affinity=False):
+    if not isinstance(left,dict) or not isinstance(right,dict) or left.keys()!=right.keys():
+        return left==right
+    return all(_stored_year_equal(left[n],right[n]) if n=='birthday' and allow_year_affinity else left[n]==right[n] for n in left)
+
+
+def _receipt_signature(settings, event):
+    return bio._sign(settings, 'enrichment-receipt-v1:' + bio.canonical(event))
+
+
+def _source_digest(record, values):
+    source = values if values.get('snapshot') else record['originals'].get(values.get('person_id'), {})
+    return hashlib.sha256(source.get('snapshot', '').encode()).hexdigest()
+
+
+def progress(connection, settings, record, values, snapshot, row_number):
+    """Only our authenticated, contiguous receipts can advance a signed export.
+
+    The original snapshot is never rewritten or re-signed. Every frozen identity
+    attribute and all three expected live fields remain checked against SQLite.
+    """
+    pid = snapshot['person']['person_id']
+    expected_identity = copy.deepcopy(snapshot['person'])
+    baseline = record.get('initial_fields', {}).get(str(row_number))
+    expected = dict(baseline) if baseline else None
+    decisions = {}
+    events = []
+    if '_receipt_events' not in record:
+        record['_receipt_events'] = []
+        if connection.execute("select 1 from sqlite_master where type='table' and name='logs'").fetchone():
+            for row in connection.execute('select comment from logs where action like ? and instr(comment,?)>0 order by rowid',
+                                          (AUDIT_PREFIX+'%', record['file_sha256'])):
+                try:
+                    record['_receipt_events'].append(json.loads(row['comment']))
+                except (ValueError, TypeError):
+                    continue
+    if record['_receipt_events']:
+        for event in record['_receipt_events']:
+            if not isinstance(event, dict) or event.get('person_id') != pid or event.get('file_sha256') != record['file_sha256']:
+                continue
+            signature = event.get('receipt_signature', '')
+            unsigned = {k:v for k,v in event.items() if k != 'receipt_signature'}
+            valid = isinstance(signature, str) and hmac.compare_digest(signature, _receipt_signature(settings, unsigned))
+            # Existing feature receipts can be authenticated against their saved
+            # immutable plan. An unverifiable old log never relaxes a guard.
+            if not valid and not signature:
+                try:
+                    plan = bio.load_preview(settings, event['operation'])
+                    signed = plan.pop('signature', '')
+                    valid = hmac.compare_digest(signed, bio._sign(settings, bio.canonical(plan))) and all(
+                        event.get(k) == plan.get(k) for k in ('identity','expected','fields','file_sha256','person_id','row_number'))
+                except (bio.ValidationError, KeyError, TypeError):
+                    valid = False
+            if not valid:
+                raise bio.ValidationError('Историю этой строки не удалось подтвердить. Нужна новая выгрузка.')
+            if event.get('source_snapshot_digest', _source_digest(record, values)) != _source_digest(record, values):
+                raise bio.ValidationError('История относится к другой выгрузке. Нужна новая проверка.')
+            if not _same_state(event['identity'],expected_identity, bool(events)):
+                raise bio.ValidationError('Последовательность изменений карточки нарушена. Нужна новая выгрузка.')
+            if not events:
+                # Re-uploading the identical workbook starts at the same receipt
+                # chain, not at today's already-updated values.
+                expected = dict(event['expected'])
+            elif not _same_state(event['expected'],expected, True):
+                raise bio.ValidationError('Поля изменялись вне этого импорта. Нужна новая выгрузка.')
+            expected = {n:event['fields'][n]['after'] for n in FIELDS}
+            expected_identity['fio'] = expected['fio']
+            expected_identity['birthday'] = expected['birthday']
+            for n in event.get('review_fields', FIELDS):
+                if event['fields'][n]['decision'] != 'pending':
+                    decisions[n] = event['fields'][n]['decision']
+            events.append(event)
+    return {'identity':expected_identity, 'expected':expected, 'decisions':decisions, 'events':events}
 
 
 def _audit_available(connection):
@@ -36,8 +125,8 @@ def _fields(connection, person_id):
     return dict(row)
 
 
-def _validated(connection, settings, token, row_number):
-    record = bio.load_preview(settings, token)
+def _validated(connection, settings, token, row_number, *, record=None):
+    record = bio.load_preview(settings, token) if record is None else record
     if record.get('state') == 'commit_pending':
         raise bio.ValidationError('Исход предыдущей записи не подтверждён. Загрузите файл для новой проверки текущей базы.')
     entries = [e for e in record['entries'] if e['row'] == row_number]
@@ -54,10 +143,11 @@ def _validated(connection, settings, token, row_number):
     snapshot = bio._snapshot(settings, values if values.get('snapshot') else record['originals'].get(raw_id, {}))
     if values.get('_format') == 'visible-7-v2' and (snapshot['version'] != 2 or snapshot.get('contract') != 'visible-7-v2'):
         raise bio.ValidationError('Подпись относится к другому формату. Нужна новая выгрузка.')
+    own = progress(connection, settings, record, values, snapshot, row_number)
     live = bio._identity(connection, person_id)
-    if snapshot['person'] != live:
+    if not _same_state(own['identity'],live,bool(own['events'])):
         labels = {'person_id':'ID кавалера', 'fio':'ФИО', 'birthday':'Год рождения', 'id_rank':'Звание', 'rank':'Звание', 'awards':'Награды и номера'}
-        changed = ', '.join(dict.fromkeys(labels[n] for n in snapshot['person'] if live is None or snapshot['person'][n] != live.get(n)))
+        changed = ', '.join(dict.fromkeys(labels[n] for n in own['identity'] if live is None or own['identity'][n] != live.get(n)))
         raise bio.ValidationError(f'ID {person_id}: исходные данные устарели; изменены поля: {changed}. Скачайте свежие данные и повторите проверку.')
     original = bio._original(snapshot)
     for name, expected in original.items():
@@ -65,7 +155,14 @@ def _validated(connection, settings, token, row_number):
             raise bio.ValidationError(f'Изменено исходное поле «{name}». Принять такую строку нельзя. Восстановите исходную выгрузку; предложения вводите в панели проверки.')
     _audit_available(connection)
     row = next(r for r in record['rows'] if r['row'] == row_number)
-    return record, values, snapshot, original, row, _fields(connection, person_id)
+    current = _fields(connection, person_id)
+    if own['expected'] is not None and not _same_state(current,own['expected'],bool(own['events'])):
+        raise bio.ValidationError('Поля изменены после проверки вне этого импорта. Нужна новая выгрузка.')
+    if own['events']:
+        own['identity'] = live
+        own['expected'] = current
+    record['_progress'] = own
+    return record, values, snapshot, original, row, current
 
 
 def history(connection, person_id=None):
@@ -152,12 +249,15 @@ def _valid_source(value):
         return False
 
 
-def prepare(settings, token, row_number, submitted, *, review_fields=None, identity_pending=False, expected_fields=None):
+def prepare(settings, token, row_number, submitted, *, review_fields=None, identity_pending=False, expected_fields=None, expected_receipt=_UNSET):
     # Preparing decisions is read-only for SQLite, including rejected/pending fields.
     with closing(bio._connection(settings.rewards_db_path)) as connection:
         record, values, snapshot, original, row, current = _validated(connection, settings, token, row_number)
     if expected_fields is not None and current != expected_fields:
         raise bio.ValidationError('Карточка изменилась после проверки. Откройте кавалера заново; ничего не записано.')
+    last = record['_progress']['events'][-1]['operation'] if record['_progress']['events'] else None
+    if expected_receipt is not _UNSET and expected_receipt != last:
+        raise bio.ValidationError('Решение уже изменилось. Обновите список перед сохранением.')
     actor = bio.text(submitted.get('actor'))
     if actor not in {'Owner', 'Сергей', 'Пользователь приложения'}:
         raise bio.ValidationError('Укажите, кто проверил сведения: Owner или Сергей.')
@@ -198,8 +298,10 @@ def prepare(settings, token, row_number, submitted, *, review_fields=None, ident
                         'after': after, 'source': source, 'evidence': evidence}
     plan_token = secrets.token_hex(32)
     plan = {'created': time.time(), 'state': 'manual_plan', 'token': token, 'row_number': row_number,
-            'person_id': snapshot['person']['person_id'], 'identity': snapshot['person'], 'expected': current,
+            'person_id': snapshot['person']['person_id'], 'identity': record['_progress']['identity'], 'expected': current,
+            'expected_receipt':record['_progress']['events'][-1]['operation'] if record['_progress']['events'] else None,
             'actor': actor, 'fields': fields, 'file_sha256': record['file_sha256'],
+            'source_snapshot_digest':_source_digest(record, values),
             'writes': [n for n, f in fields.items() if f['decision'] == 'accept' and f['before'] != f['after']]}
     if review_fields is not None:
         if any(n not in FIELDS for n in review_fields):
@@ -210,6 +312,44 @@ def prepare(settings, token, row_number, submitted, *, review_fields=None, ident
     plan['signature'] = bio._sign(settings, bio.canonical(plan))
     bio._save(settings, plan_token, plan)
     return plan_token, plan
+
+
+def check_plan(connection, settings, plan, *, record=None):
+    record, _, _, _, _, current = _validated(connection, settings, plan['token'], plan['row_number'], record=record)
+    if record['file_sha256'] != plan['file_sha256']:
+        raise bio.ValidationError('План относится к другому файлу.')
+    if current != plan['expected'] or record['_progress']['identity'] != plan['identity']:
+        raise bio.ValidationError('Карточка изменилась после проверки. Ничего не записано; обновите данные.')
+    last = record['_progress']['events'][-1]['operation'] if record['_progress']['events'] else None
+    if last != plan.get('expected_receipt'):
+        raise bio.ValidationError('Решение по кавалеру уже изменилось. Обновите список; ничего не записано.')
+    return record
+
+
+def apply_plan(connection, settings, plan, operation, *, record=None):
+    """Apply one already-confirmed plan inside the caller's transaction."""
+    record = check_plan(connection, settings, plan, record=record)
+    changed = {n:f['after'] for n,f in plan['fields'].items() if f['decision'] == 'accept' and f['before'] != f['after']}
+    if changed:
+        names = [n for n in FIELDS if n in changed]
+        cursor = connection.execute('update person set '+','.join(n+'=?' for n in names)+' where id=?',
+                                    [changed[n] for n in names]+[plan['person_id']])
+        if cursor.rowcount != 1:
+            raise bio.ValidationError('База отклонила запись. Все изменения отменены.')
+    after = {n:f['after'] for n,f in plan['fields'].items()}
+    stored = _fields(connection, plan['person_id'])
+    if not _same_state(stored,after,True):
+        raise bio.ValidationError('База не сохранила выбранные значения. Все изменения отменены.')
+    accepted_fields = copy.deepcopy(plan['fields'])
+    for name in FIELDS:
+        accepted_fields[name]['after'] = stored[name]
+    event = {**plan, 'state':'manual_committed', 'time':datetime.now(timezone.utc).isoformat(),
+             'operation':operation, 'writes':list(changed),'fields':accepted_fields}
+    event['receipt_signature'] = _receipt_signature(settings, event)
+    connection.execute('insert into logs(datetime,action,comment) values(?,?,?)',
+                       (event['time'], AUDIT_PREFIX+operation, bio.canonical(event)))
+    record.setdefault('_receipt_events',[]).append(event)
+    return event
 
 
 def commit(settings, plan_token):
@@ -226,21 +366,7 @@ def commit(settings, plan_token):
             previous = connection.execute('select comment from logs where action=?', (action,)).fetchone()
             if previous:
                 return json.loads(previous['comment'])
-            _, _, snapshot, _, _, current = _validated(connection, settings, plan['token'], plan['row_number'])
-            if current != plan['expected'] or snapshot['person'] != plan['identity']:
-                changed_fields = ', '.join(FIELDS[n] for n in FIELDS if current[n] != plan['expected'][n])
-                raise bio.ValidationError(f'ID {plan["person_id"]}: поля изменены после проверки: {changed_fields}. Ничего не сохранено; обновите данные и проверьте строку заново.')
-            changed = {n: f['after'] for n, f in plan['fields'].items() if f['decision'] == 'accept' and f['before'] != f['after']}
-            if changed:
-                # Column names are a fixed server allowlist, never request keys.
-                names = [n for n in FIELDS if n in changed]
-                cursor = connection.execute('update person set '+','.join(n+'=?' for n in names)+' where id=?',
-                                            [changed[n] for n in names]+[plan['person_id']])
-                if cursor.rowcount != 1:
-                    raise bio.ValidationError('Запись отклонена. Все изменения отменены.')
-            event = {**plan, 'state': 'manual_committed', 'time': datetime.now(timezone.utc).isoformat(),
-                     'operation': plan_token, 'writes': list(changed)}
-            connection.execute('insert into logs(datetime,action,comment) values(?,?,?)', (event['time'], action, bio.canonical(event)))
+            event = apply_plan(connection, settings, plan, plan_token)
             connection.commit()
         except BaseException:
             connection.rollback()

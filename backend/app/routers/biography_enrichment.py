@@ -1,5 +1,6 @@
 import logging
 import sqlite3
+import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -9,6 +10,8 @@ from ..config import get_settings
 from ..services import biography_enrichment as service
 from ..services import manual_import_review as manual
 from ..services import manual_review_choices as choices
+from ..services import enrichment_workflow as workflow
+from ..services.dates import format_birth_year_input
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -25,16 +28,9 @@ def _render(request, *, level='biographies', status_code=200, **context):
             context.update(stats=None, error='Не удалось прочитать биографии из базы. Проверьте доступность базы и наличие поля biography.')
             status_code = 503
     if context.get('result'):
-        context['groups'] = service.review_groups(context['result'])
-        context['saved_rows'] = [row for row in context['result']['rows'] if row['kind'] == 'Сохранено']
-        try:
-            context['manual_summaries'] = manual.summaries(settings, context['result']['file_sha256'])
-            context['manual_finished'] = choices.finished_rows(settings, context['result']['file_sha256'])
-        except (sqlite3.Error, OSError, ValueError, KeyError):
-            context['manual_summaries'] = {}
-            context['manual_finished'] = []
+        context['view'] = workflow.present(settings,context['token'])
     return templates.TemplateResponse(request, 'biography_enrichment.html',
-        {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, **context}, status_code=status_code)
+        {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, 'year_label':format_birth_year_input, **context}, status_code=status_code)
 
 
 @router.get('/data-maintenance')
@@ -60,9 +56,60 @@ def restored_preview(request: Request, token: str):
         return _render(request, error=str(exc), status_code=400)
 
 
+@router.get(BASE + '/state/{token}')
+def workspace_state(request: Request, token: str):
+    try:
+        view = workflow.present(get_settings(),token)
+        return templates.TemplateResponse(request,'enrichment_workspace.html',
+            {'view':view,'base':BASE,'fields':manual.FIELDS,'year_label':format_birth_year_input},headers={'Cache-Control':'no-store'})
+    except service.ValidationError as exc:
+        raise HTTPException(409,choices.friendly_error(exc)) from exc
+
+
+@router.get(BASE + '/confirm/{operation}')
+def restored_confirmation(request: Request, operation: str):
+    try:
+        return _review_fragment(request,**workflow.confirmation(get_settings(),operation))
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+
+
+@router.post(BASE + '/import/{token}/plan')
+def import_plan(request: Request, token: str, revision: str = Form(...), exclude: str = Form('[]')):
+    _same_origin(request)
+    try:
+        try:
+            excluded = json.loads(exclude)
+            if not isinstance(excluded,list) or any(not isinstance(n,(str,int)) for n in excluded):
+                raise ValueError()
+        except (ValueError,TypeError):
+            raise service.ValidationError('Неверный список отложенных строк. Обновите страницу.')
+        operation,plan = workflow.prepare_import(get_settings(),token,revision,excluded)
+        return _review_fragment(request,batch_plan=plan,operation=operation)
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+
+
+@router.post(BASE + '/import/commit')
+def import_commit(request: Request, operation: str = Form(...), confirm: str = Form('')):
+    _same_origin(request)
+    try:
+        if confirm!='yes':
+            raise service.ValidationError('Подтвердите показанные изменения перед импортом.')
+        result = workflow.commit_import(get_settings(),operation)
+        return _review_fragment(request,batch_result=result)
+    except WriteBlockedError as exc:
+        return _review_fragment(request,error=str(exc),status_code=403)
+    except service.ValidationError as exc:
+        return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+    except (sqlite3.Error,OSError):
+        logging.getLogger(__name__).exception('Enrichment batch transaction failure')
+        return _review_fragment(request,error='Импорт не подтверждён. Повторите это же подтверждение: повторная запись исключена. При ошибке транзакции все изменения отменены.',status_code=503)
+
+
 def _review_fragment(request, **context):
     return templates.TemplateResponse(request, 'manual_import_review.html',
-        {'base': BASE, 'fields': manual.FIELDS, 'decisions': manual.DECISIONS, 'review_complete': choices.complete, **context},
+        {'base': BASE, 'fields': manual.FIELDS, 'decisions': manual.DECISIONS, 'review_complete': choices.complete,'year_label':format_birth_year_input, **context},
         status_code=context.get('status_code', 200), headers={'Cache-Control': 'no-store'})
 
 
@@ -97,7 +144,7 @@ async def review_plan(request: Request, token: str, row_number: int):
 @router.get(BASE + '/review/{token}/{row_number}/history')
 def review_history(request: Request, token: str, row_number: int):
     try:
-        return _review_fragment(request, history=manual.reviewed_history(get_settings(), token, row_number))
+        return _review_fragment(request, history=workflow.history_view(manual.reviewed_history(get_settings(), token, row_number)))
     except service.ValidationError as exc:
         return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
@@ -107,7 +154,7 @@ def review_history(request: Request, token: str, row_number: int):
 @router.get(BASE + '/review-history')
 def durable_review_history(request: Request, person_id: int | None = None):
     try:
-        return _review_fragment(request, history=manual.durable_history(get_settings(), person_id), durable=True)
+        return _review_fragment(request, history=workflow.history_view(manual.durable_history(get_settings(), person_id)), durable=True)
     except service.ValidationError as exc:
         return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
@@ -120,8 +167,9 @@ def review_commit(request: Request, plan_token: str = Form(...), confirm: str = 
     try:
         if confirm != 'yes':
             raise service.ValidationError('Подтвердите точный набор изменений перед записью.')
-        event = manual.commit(get_settings(), plan_token)
-        return _review_fragment(request, event=event)
+        event = workflow.commit_review(get_settings(), plan_token)
+        review = workflow.result_state(get_settings(),event)
+        return _review_fragment(request, event=event, updated=review)
     except WriteBlockedError as exc:
         return _review_fragment(request, error=str(exc), status_code=403)
     except service.ValidationError as exc:
@@ -153,6 +201,8 @@ async def preview(request: Request, file: UploadFile = File(...), original: Uplo
                 raise service.ValidationError('Исходная выгрузка должна быть в формате .xlsx.')
             source = await original.read(service.MAX_BYTES + 1)
         token, result = await run_in_threadpool(service.preview, get_settings(), content, source)
+        result['filename'] = file.filename
+        service._save(get_settings(),token,result)
         return _render(request, token=token, result=result)
     except service.ValidationError as exc:
         return _render(request, error=str(exc), status_code=400)
@@ -169,7 +219,7 @@ def commit(request: Request, token: str = Form(...), confirm: str = Form('')):
     try:
         if confirm != 'yes':
             raise service.ValidationError('Подтвердите сохранение только допустимых строк.')
-        result = service.commit(get_settings(), token)
+        result = workflow.commit_ordinary(get_settings(), token)
         return _render(request, token=token, result=result)
     except WriteBlockedError as exc:
         return _render(request, error=str(exc), status_code=403)
@@ -190,7 +240,10 @@ def report(token: str):
     # uncertain outcome. It must never be reported as a confirmed write.
     if result['state'] == 'commit_pending':
         result['warning'] = 'Результат транзакции не подтверждён. Нужен новый preview текущей базы.'
-    payload = {name: result[name] for name in ('created', 'state', 'file_sha256', 'ready', 'saved', 'rows')}
+    view = workflow.present(get_settings(),token)
+    payload = {name: result[name] for name in ('created', 'state', 'file_sha256')}
+    payload.update(ready=view['ready'],confirmed=view['confirmed'],pending=view['pending'],
+                   rows=[{'person_id':r['person_id'],'fio':r['fio'],'status':r['status'],'reason':r['reason']} for r in view['rows']])
     if result.get('warning'):
         payload['warning'] = result['warning']
     return Response(service.canonical(payload), media_type='application/json',
@@ -205,6 +258,6 @@ def excel_report(token: str):
         raise HTTPException(404, str(exc)) from exc
     if result['state'] == 'commit_pending':
         raise HTTPException(409, 'Результат сохранения не подтверждён. Загрузите файл для новой проверки текущей базы.')
-    return Response(service.report_workbook(result),
+    return Response(workflow.report(get_settings(),token),
                     media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                     headers={'Content-Disposition': 'attachment; filename="biographies-report.xlsx"', 'Cache-Control': 'no-store'})
