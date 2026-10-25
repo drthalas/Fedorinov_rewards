@@ -1,52 +1,70 @@
-{% macro value(text) %}<span class="bio-text">{{ text if text is not none and text != '' else 'Пусто' }}</span>{% endmacro %}
+{% macro value(text) %}<span class="bio-text">{{ text if text is not none and text != '' else 'Не заполнено' }}</span>{% endmacro %}
+{% macro text_option(text, biography=false) %}
+  {% if biography and text %}<p class="review-bio-excerpt">{{ text }}</p><details class="review-full-text"><summary>Полный текст</summary><p class="bio-text">{{ text }}</p></details>
+  {% else %}<p class="review-option-value">{{ value(text) }}</p>{% endif %}
+{% endmacro %}
 {% if error %}<div role="alert" class="notice notice-error">{{ error }}</div>{% endif %}
 {% if history is defined %}
 <h2 id="bio-manual-title" tabindex="-1">История проверки</h2>
-{% if durable %}<p>Последние 20 подтверждений. История хранится в базе и доступна после удаления временной выгрузки.</p><form action="{{ base }}/review-history" method="get" data-manual-history><label>ID кавалера (пусто — все)<input type="number" name="person_id" min="1"></label><button type="submit">Найти историю</button></form>{% endif %}
-{% for event in history %}<p>{{ event.time }} · {{ event.actor }} · ID {{ event.person_id }} · {{ event.identity.fio }} · Записано полей: {{ event.writes|length }}</p><dl>{% for name, field in event.fields.items() %}<dt>{{ fields[name] }} · {{ decisions[field.decision] }}</dt><dd>{{ value(field.before) }} → {{ value(field.after) }}<p>Предлагалось: {{ value(field.proposed) }}</p><p>Источник: {{ field.source }} · {{ field.evidence }}</p></dd>{% endfor %}</dl>{% else %}<p>Подтверждённых решений пока нет.</p>{% endfor %}
+{% if durable %}<p>Последние 20 подтверждений.</p><form action="{{ base }}/review-history" method="get" data-manual-history><label>ID кавалера (пусто — все)<input type="number" name="person_id" min="1"></label><button type="submit">Найти историю</button></form>{% endif %}
+{% for event in history %}<p>{{ event.time }} · {{ event.actor }} · ID {{ event.person_id }} · {{ event.identity.fio }}</p><dl>{% for name, field in event.fields.items() %}<dt>{{ fields[name] }} · {{ decisions[field.decision] }}</dt><dd>{{ value(field.before) }} → {{ value(field.after) }}<p>Предлагалось: {{ value(field.proposed) }}</p><p>Источник: {{ field.source }} · {{ field.evidence }}</p></dd>{% endfor %}</dl>{% else %}<p>Подтверждённых решений пока нет.</p>{% endfor %}
 {% elif review %}
-<h2 id="bio-manual-title" tabindex="-1">Проверить строку · ID {{ review.person_id }}</h2>
-<p><strong>{{ review.identity.fio }}</strong> · Статус импорта: {{ review.status or 'не указан' }}</p>
-<ul>{% for award in review.identity.awards %}<li>{{ award.country }} / {{ award.category }} / {{ award.subcategory }} / {{ award.award }} · №{{ award.number }}</li>{% endfor %}</ul>
-<p>Исходные ID, награды, степени и номера доступны только для чтения. Предложения не меняют исходный файл.</p>
+<header class="review-person-header">
+  <p class="review-eyebrow">Проверка кавалера</p>
+  <h2 id="bio-manual-title" tabindex="-1">{{ review.fio }}</h2>
+  <p class="review-person-meta">ID {{ review.person_id }} <span>·</span> Нужен ваш выбор</p>
+  {% if review.award_context %}<p class="review-award">{{ review.award_context }}</p>{% endif %}
+</header>
+{% if review.ambiguous %}<p class="review-caution" role="note">Личность в источнике не подтверждена. Предлагаемые сведения пока нельзя перенести в карточку.</p>{% endif %}
+{% if review.fields %}
 <form action="{{ base }}/review/{{ review.token }}/{{ review.row_number }}/plan" method="post" data-manual-plan>
-{% for name, label in fields.items() %}
-<fieldset class="bio-manual-field"><legend>{{ label }}</legend>
-<p><strong>Сейчас в базе:</strong> {{ value(review.current[name]) }}</p>
-{% if review.original[name] != (review.current[name] or '') %}<p>В исходной выгрузке: {{ value(review.original[name]) }}</p>{% endif %}
-<p><strong>Причина:</strong> {{ review.reasons[name] }}</p>
-<label for="manual-{{ name }}-proposal">Предлагается · {{ label }}</label>
-{% if name == 'biography' %}<textarea id="manual-{{ name }}-proposal" name="{{ name }}_proposal" rows="6" data-unicode-limit="2500">{{ review.proposals[name] }}</textarea><small>До 2 500 Unicode символов. Текст не обрезается.</small>
-{% else %}<input id="manual-{{ name }}-proposal" name="{{ name }}_proposal" value="{{ review.proposals[name] }}" {% if name == 'birthday' %}inputmode="numeric"{% endif %}><small>{% if name == 'birthday' %}Год от 1800 до 1999. Подтверждённый 1945 можно оставить 1945.{% else %}Переименование требует доказательств личности; вариант фамилии сам по себе недостаточен.{% endif %}</small>{% endif %}
-<label for="manual-{{ name }}-source">Источник · {{ label }}</label><textarea id="manual-{{ name }}-source" name="{{ name }}_source" rows="2">{{ review.source }}</textarea>
-<label for="manual-{{ name }}-evidence">Подтверждение из источника · {{ label }}</label><textarea id="manual-{{ name }}-evidence" name="{{ name }}_evidence" rows="2" placeholder="Какие факты, награда и номер подтверждают принадлежность сведений этому кавалеру?"></textarea>
-<label for="manual-{{ name }}-decision">Решение · {{ label }}</label><select id="manual-{{ name }}-decision" name="{{ name }}_decision">{% for decision, title in decisions.items() %}<option value="{{ decision }}" {% if decision == 'pending' %}selected{% endif %}>{{ title }}</option>{% endfor %}</select>
+<input type="hidden" name="review_revision" value="{{ review.revision }}">
+{% for name, field in review.fields.items() %}
+<fieldset class="review-field" data-review-field="{{ name }}">
+  <legend>{{ field.label }}</legend>
+  <p class="review-reason">{{ field.reason }}</p>
+  <div class="review-options">
+    <div class="review-option">
+      <input id="choice-{{ name }}-current" type="radio" name="{{ name }}_choice" value="current" aria-label="Оставить текущее · {{ field.label }}">
+      <label for="choice-{{ name }}-current"><span class="review-option-title">Сейчас в базе</span>{% if field.recommended == 'current' %}<span class="review-recommended">Рекомендуем оставить</span>{% endif %}</label>
+      {{ text_option(field.current, name == 'biography') }}
+    </div>
+    <div class="review-option {% if not field.allowed %}review-option-unavailable{% endif %}">
+      <input id="choice-{{ name }}-proposed" type="radio" name="{{ name }}_choice" value="proposed" aria-label="Выбрать источник · {{ field.label }}" {% if not field.allowed %}disabled{% endif %}>
+      <label for="choice-{{ name }}-proposed"><span class="review-option-title">Из источника</span>{% if field.recommended == 'proposed' %}<span class="review-recommended">Рекомендуем</span>{% endif %}</label>
+      {{ text_option(field.proposed, name == 'biography') }}
+    </div>
+  </div>
+  <p class="review-recommendation">{{ field.recommendation }}</p>
+  <div class="review-sources">{% for source in field.sources %}<span>{{ source.name }}: {% if safe_external_url(source.url) %}<a href="{{ safe_external_url(source.url) }}" target="_blank" rel="noopener noreferrer">{{ source.url }}</a>{% else %}{{ source.url }}{% endif %}</span>{% else %}<span>Источник не указан.</span>{% endfor %}</div>
+  <button class="review-reset" type="button" data-review-reset hidden>Оставить на проверке</button>
 </fieldset>
 {% endfor %}
-<label>Проверил <select name="actor" required><option value="">Выберите</option><option>Owner</option><option>Сергей</option></select></label>
-<label><input type="checkbox" name="identity_confirm" value="yes"> Для принятия года/ФИО: я лично сверил источник, личность и точную награду с номером. Неподтверждённое совпадение фамилии не является доказательством.</label>
-<p>Решения пока не записывают SQLite. На следующем шаге проверьте точный набор изменений.</p>
-<button type="submit">Показать изменения перед записью</button>
+<p class="review-unselected">Не выбрали вариант — поле останется на проверке.</p>
+<div class="review-footer"><button type="button" class="secondary-button" data-manual-skip>Пропустить</button><button type="submit" data-review-save disabled>Сохранить изменения</button></div>
 </form>
-{% if review.history %}<details><summary>История подтверждённых решений · {{ review.history|length }}</summary>{% for event in review.history %}<p>{{ event.time }} · {{ event.actor }}</p><dl>{% for name, field in event.fields.items() %}<dt>{{ fields[name] }} · {{ decisions[field.decision] }}</dt><dd>{{ value(field.before) }} → {{ value(field.after) }}<p>Предлагалось: {{ value(field.proposed) }}</p><p>Источник: {{ field.source }} · {{ field.evidence }}</p></dd>{% endfor %}</dl>{% endfor %}</details>{% endif %}
+{% else %}<p>В этой строке нет отличающихся вариантов для выбора. Уточните сведения в источнике и загрузите файл заново.</p><button type="button" data-manual-skip>Пропустить</button>{% endif %}
 {% elif plan %}
-<h2 id="bio-manual-title" tabindex="-1">Подтвердить запись · ID {{ plan.person_id }}</h2>
-<p>{{ plan.identity.fio }} · Проверил: {{ plan.actor }}</p>
-<ul>{% for award in plan.identity.awards %}<li>{{ award.country }} / {{ award.category }} / {{ award.subcategory }} / {{ award.award }} · №{{ award.number }}</li>{% endfor %}</ul>
-<p>Принято: {{ plan.fields.values()|selectattr('decision', 'equalto', 'accept')|list|length }} · Отклонено: {{ plan.fields.values()|selectattr('decision', 'equalto', 'reject')|list|length }} · На проверке: {{ plan.fields.values()|selectattr('decision', 'equalto', 'pending')|list|length }}. Будет записано полей: {{ plan.writes|length }}.</p>
-<dl>{% for name, field in plan.fields.items() %}<dt><strong>{{ fields[name] }} · {{ decisions[field.decision] }}</strong></dt><dd>
-{% if field.decision == 'accept' %}{{ value(field.before) }} → {{ value(field.after) }}<p>{{ 'Будет записано в базу' if field.before != field.after else 'Значение подтверждено; изменения в поле нет' }}</p>{% else %}Предлагалось: {{ value(field.proposed) }}<p>В базе остаётся: {{ value(field.before) }}. Поле не записывается.</p>{% endif %}
-<p>Источник: {{ field.source }} · {{ field.evidence }}</p>
-{% if name in ['fio', 'birthday'] and field.decision == 'accept' %}<p class="notice">Внимание: подтверждается идентифицирующее поле «{{ fields[name] }}». Проверьте награду и номер.</p>{% endif %}
-</dd>{% endfor %}</dl>
-<button type="button" data-manual-undo>Назад к решениям / отменить запись</button>
+<p class="review-eyebrow">Подтверждение</p>
+<h2 id="bio-manual-title" tabindex="-1">Проверьте изменения</h2>
+<p class="review-person-meta">{{ plan.identity.fio }} · ID {{ plan.person_id }}</p>
+{% if plan.writes %}
+<dl class="review-changes">{% for name in plan.writes %}{% set field = plan.fields[name] %}<dt>{{ fields[name] }}</dt><dd><div><span class="review-change-caption">Было</span>{{ text_option(field.before, name == 'biography') }}</div><span aria-hidden="true">→</span><div><span class="review-change-caption">Станет</span>{{ text_option(field.after, name == 'biography') }}</div></dd>{% endfor %}</dl>
+{% else %}<p class="review-no-changes">Значения в базе не изменятся. Будет сохранён ваш выбор.</p>{% endif %}
+{% set pending = namespace(names=[]) %}{% for name in plan.get('review_fields', fields.keys()) %}{% if plan.fields[name].decision == 'pending' %}{% set pending.names = pending.names + [fields[name]] %}{% endif %}{% endfor %}
+{% if pending.names %}<p class="review-unselected">Останется на проверке: {{ pending.names|join(', ') }}.</p>{% endif %}
+{% if plan.identity_pending %}<p class="review-caution">Личность или год рождения ещё требуют проверки. Этот кавалер останется в списке проверки.</p>{% endif %}
 <form action="{{ base }}/review/commit" method="post" data-manual-commit>
-<input type="hidden" name="plan_token" value="{{ plan_token }}">
-<label><input type="checkbox" name="confirm" value="yes" required> Подтверждаю показанные значения до → после, источники и решения. Разрешаю записать принятые изменения и историю проверки.</label>
-<button type="submit">Подтвердить и записать</button></form>
+  <input type="hidden" name="plan_token" value="{{ plan_token }}">
+  <label class="review-confirm"><input type="checkbox" name="confirm" value="yes" required> {% if plan.fields.values()|selectattr('decision', 'equalto', 'accept')|list %}Я проверил(а) источники: сведения относятся к этому кавалеру, награда и номер совпадают. Подтверждаю показанные изменения.{% else %}Подтверждаю выбор: оставить текущие значения. Предлагаемые сведения не будут перенесены.{% endif %}</label>
+  <div class="review-footer"><button type="button" class="secondary-button" data-manual-undo>Вернуться к выбору</button><button type="submit">Подтвердить</button></div>
+</form>
 {% elif event %}
-<h2 id="bio-manual-title" tabindex="-1">Результат проверки · ID {{ event.person_id }}</h2>
-<div role="status" data-manual-result><p>Записано полей: {{ event.writes|length }}. История решений сохранена: {{ event.time }} · {{ event.actor }}.</p>
-<ul>{% for name, field in event.fields.items() %}<li>{{ fields[name] }}: {% if field.decision == 'accept' %}{{ 'Сохранено' if name in event.writes else 'Подтверждено без изменения' }} · {{ value(field.before) }} → {{ value(field.after) }}{% elif field.decision == 'reject' %}Отклонено; поле не записано{% else %}Оставлено на проверке; поле не записано{% endif %}</li>{% endfor %}</ul>
-<p>Принято: {{ event.fields.values()|selectattr('decision', 'equalto', 'accept')|list|length }} · Отклонено: {{ event.fields.values()|selectattr('decision', 'equalto', 'reject')|list|length }} · На проверке: {{ event.fields.values()|selectattr('decision', 'equalto', 'pending')|list|length }}.</p></div>
+<h2 id="bio-manual-title" tabindex="-1">{{ 'Изменения сохранены' if event.writes else 'Выбор сохранён' }}</h2>
+<p class="review-person-meta">{{ event.identity.fio }} · ID {{ event.person_id }}</p>
+<div role="status" data-manual-result data-review-complete="{{ 'true' if review_complete(event) else 'false' }}">
+  <ul class="review-outcomes">{% for name in event.get('review_fields', fields.keys()) %}{% set field = event.fields[name] %}<li>{{ fields[name] }}: {% if field.decision == 'pending' %}осталось на проверке{% elif field.decision == 'reject' %}оставлено текущее значение{% elif name in event.writes %}сохранено{% else %}подтверждено без изменения{% endif %}.</li>{% endfor %}</ul>
+  {% if event.identity_pending %}<p class="review-caution">Личность или год рождения ещё требуют проверки.</p>{% elif not review_complete(event) %}<p>Не выбранные поля остались на проверке.</p>{% endif %}
+</div>
+<div class="review-footer"><button type="button" class="secondary-button" data-manual-close>К списку</button><button type="button" data-manual-next>Следующий кавалер</button></div>
 {% endif %}

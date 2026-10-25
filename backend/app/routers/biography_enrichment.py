@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from ..config import get_settings
 from ..services import biography_enrichment as service
 from ..services import manual_import_review as manual
+from ..services import manual_review_choices as choices
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
@@ -28,8 +29,10 @@ def _render(request, *, level='biographies', status_code=200, **context):
         context['saved_rows'] = [row for row in context['result']['rows'] if row['kind'] == 'Сохранено']
         try:
             context['manual_summaries'] = manual.summaries(settings, context['result']['file_sha256'])
+            context['manual_finished'] = choices.finished_rows(settings, context['result']['file_sha256'])
         except (sqlite3.Error, OSError, ValueError, KeyError):
             context['manual_summaries'] = {}
+            context['manual_finished'] = []
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, **context}, status_code=status_code)
 
@@ -59,7 +62,7 @@ def restored_preview(request: Request, token: str):
 
 def _review_fragment(request, **context):
     return templates.TemplateResponse(request, 'manual_import_review.html',
-        {'base': BASE, 'fields': manual.FIELDS, 'decisions': manual.DECISIONS, **context},
+        {'base': BASE, 'fields': manual.FIELDS, 'decisions': manual.DECISIONS, 'review_complete': choices.complete, **context},
         status_code=context.get('status_code', 200), headers={'Cache-Control': 'no-store'})
 
 
@@ -71,9 +74,9 @@ def _same_origin(request):
 @router.get(BASE + '/review/{token}/{row_number}')
 def review_row(request: Request, token: str, row_number: int):
     try:
-        return _review_fragment(request, review=manual.review(get_settings(), token, row_number))
+        return _review_fragment(request, review=choices.detail(get_settings(), token, row_number))
     except service.ValidationError as exc:
-        return _review_fragment(request, error=str(exc), status_code=409)
+        return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
         return _review_fragment(request, error='Проверка недоступна: не удалось прочитать базу или журнал. Изменений нет.', status_code=503)
 
@@ -83,10 +86,10 @@ async def review_plan(request: Request, token: str, row_number: int):
     _same_origin(request)
     values = dict(await request.form())
     try:
-        plan_token, plan = await run_in_threadpool(manual.prepare, get_settings(), token, row_number, values)
+        plan_token, plan = await run_in_threadpool(choices.prepare, get_settings(), token, row_number, values)
         return _review_fragment(request, plan_token=plan_token, plan=plan)
     except service.ValidationError as exc:
-        return _review_fragment(request, error=str(exc), status_code=400)
+        return _review_fragment(request, error=choices.friendly_error(exc), status_code=400)
     except (sqlite3.Error, OSError):
         return _review_fragment(request, error='Не удалось подготовить план. Изменений в базе нет; повторите проверку.', status_code=503)
 
@@ -96,7 +99,7 @@ def review_history(request: Request, token: str, row_number: int):
     try:
         return _review_fragment(request, history=manual.reviewed_history(get_settings(), token, row_number))
     except service.ValidationError as exc:
-        return _review_fragment(request, error=str(exc), status_code=409)
+        return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
         return _review_fragment(request, error='Не удалось прочитать журнал проверки.', status_code=503)
 
@@ -106,7 +109,7 @@ def durable_review_history(request: Request, person_id: int | None = None):
     try:
         return _review_fragment(request, history=manual.durable_history(get_settings(), person_id), durable=True)
     except service.ValidationError as exc:
-        return _review_fragment(request, error=str(exc), status_code=409)
+        return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
         return _review_fragment(request, error='Не удалось прочитать журнал проверки.', status_code=503)
 
@@ -122,7 +125,7 @@ def review_commit(request: Request, plan_token: str = Form(...), confirm: str = 
     except WriteBlockedError as exc:
         return _review_fragment(request, error=str(exc), status_code=403)
     except service.ValidationError as exc:
-        return _review_fragment(request, error=str(exc), status_code=409)
+        return _review_fragment(request, error=choices.friendly_error(exc), status_code=409)
     except (sqlite3.Error, OSError):
         logging.getLogger(__name__).exception('Manual review transaction failure')
         return _review_fragment(request, error='Не удалось подтвердить сохранение. Повторите этот же запрос: журнал предотвратит повторную запись. При ошибке транзакции все поля и аудит откатываются вместе.', status_code=503)

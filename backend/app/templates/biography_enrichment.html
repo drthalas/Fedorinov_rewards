@@ -9,7 +9,7 @@
   <tr><td>{{ row.person_id }}<small class="bio-row-number">Строка файла: {{ row.row }}</small></td><td>{{ row.fio }}</td><td>
     <p>{{ row.reason }}</p>
     <p data-manual-row-status {% if not manual_summaries.get(row.row) %}hidden{% endif %}>{{ manual_summaries.get(row.row, '') }}</p>
-    {% if row.kind in ['Конфликт', 'Ошибка'] %}<button type="button" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}">Проверить</button><button type="button" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}/history">История проверки</button>{% endif %}
+    {% if row.kind in ['Конфликт', 'Ошибка'] %}<button type="button" data-manual-person="{{ row.row }}" data-review-resolved="{{ 'true' if row.row in manual_finished else 'false' }}" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}">Проверить</button><details class="review-row-history"><summary>История</summary><button type="button" data-manual-open="{{ base }}/review/{{ token }}/{{ row.row }}/history">История проверки</button></details>{% endif %}
     {% set hints = row_guidance(row) %}
     {% if hints %}<ul class="bio-row-guidance" aria-label="Что исправить">{% for hint in hints %}<li>{{ hint }}</li>{% endfor %}</ul>{% endif %}
     <details><summary>Биография, источник и проверка личности</summary>
@@ -149,7 +149,8 @@
       <p><strong>4. Проверить и сохранить.</strong> Загрузите заполненный файл и нажмите «Проверить файл». Результаты появятся здесь; до подтверждения ничего не сохраняется.</p>
     </div>
     {% endif %}
-    <dialog id="bio-manual-dialog" aria-labelledby="bio-manual-title"><button type="button" data-manual-close>Закрыть и вернуться к списку</button><div data-manual-content></div></dialog>
+    <div class="review-list-result" role="status" data-review-list-result hidden></div>
+    <dialog id="bio-manual-dialog" aria-labelledby="bio-manual-title"><button type="button" class="review-back" data-manual-close>← К списку</button><div data-manual-content></div></dialog>
     <p><button type="button" data-manual-open="{{ base }}/review-history">История ручной проверки</button></p>
     <details class="cavalier-form-card bio-card"><summary>Как подготовить данные</summary>
       <p>Сохраните ID кавалера, ФИО, год рождения и награду без изменений. Заполните «Биография» (не более 2 500 символов, включая пробелы и переносы), «Источник» (ссылка на карточку кавалера) и «Статус».</p>

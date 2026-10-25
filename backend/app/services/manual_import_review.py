@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 from ..db import open_write_connection
 from . import biography_enrichment as bio
 from .dates import normalize_birth_year_input
+from .dates import format_birth_year_input
 from .write_guard import ensure_write_allowed
 
 FIELDS = {'biography': 'Биография', 'birthday': 'Год рождения', 'fio': 'ФИО'}
@@ -99,8 +100,12 @@ def summaries(settings, file_sha256):
             if event.get('file_sha256') == file_sha256 and event['row_number'] not in result:
                 parts = [FIELDS[n]+': '+('сохранено' if n in event['writes'] else 'подтверждено без изменения')
                          if f['decision'] == 'accept' else FIELDS[n]+': '+{'reject':'Отклонено', 'pending':'Оставлено на проверке'}[f['decision']]
-                         for n, f in event['fields'].items()]
-                result[event['row_number']] = 'Ручная проверка · '+ ' · '.join(parts)
+                         for n, f in event['fields'].items() if n in event.get('review_fields', FIELDS)]
+                prefix = 'Ручная проверка · '
+                if 'review_fields' in event:
+                    unresolved = event['identity_pending'] or any(event['fields'][n]['decision'] == 'pending' for n in event['review_fields'])
+                    prefix = 'Нужна дальнейшая проверка. ' if unresolved else 'Выбор сохранён. '
+                result[event['row_number']] = prefix + ' · '.join(parts)
     return result
 
 
@@ -147,12 +152,14 @@ def _valid_source(value):
         return False
 
 
-def prepare(settings, token, row_number, submitted):
+def prepare(settings, token, row_number, submitted, *, review_fields=None, identity_pending=False, expected_fields=None):
     # Preparing decisions is read-only for SQLite, including rejected/pending fields.
     with closing(bio._connection(settings.rewards_db_path)) as connection:
         record, values, snapshot, original, row, current = _validated(connection, settings, token, row_number)
+    if expected_fields is not None and current != expected_fields:
+        raise bio.ValidationError('Карточка изменилась после проверки. Откройте кавалера заново; ничего не записано.')
     actor = bio.text(submitted.get('actor'))
-    if actor not in {'Owner', 'Сергей'}:
+    if actor not in {'Owner', 'Сергей', 'Пользователь приложения'}:
         raise bio.ValidationError('Укажите, кто проверил сведения: Owner или Сергей.')
     fields = {}
     for name, label in FIELDS.items():
@@ -162,7 +169,8 @@ def prepare(settings, token, row_number, submitted):
         proposed = str(submitted.get(name+'_proposal', ''))
         source = bio.text(submitted.get(name+'_source'))
         evidence = bio.text(submitted.get(name+'_evidence'))
-        if len(proposed) > (2500 if name == 'biography' else 250) or len(evidence) > 2500 or len(source) > 4000:
+        limit = (2500 if name == 'biography' else 250) if decision == 'accept' else 32000
+        if len(proposed) > limit or len(evidence) > 2500 or len(source) > 4000:
             raise bio.ValidationError(f'{label}: превышен лимит текста; данные не обрезаны.')
         if decision == 'accept':
             if not _valid_source(source) or len(evidence) < 10:
@@ -183,13 +191,20 @@ def prepare(settings, token, row_number, submitted):
                 raise bio.ValidationError('Для года/ФИО подтвердите личную проверку источника и точной награды с номером. Неподтверждённый вариант фамилии недостаточен.')
         if any(unicodedata.category(c) == 'Cc' and c not in '\n\r\t' for c in proposed+evidence):
             raise bio.ValidationError(f'{label}: управляющие символы недопустимы.')
+        after = proposed if decision == 'accept' else current[name]
+        if name == 'birthday' and decision == 'accept' and proposed == format_birth_year_input(current[name]):
+            after = current[name]  # Confirming a year must not erase a legacy full date.
         fields[name] = {'before': current[name], 'proposed': proposed, 'decision': decision,
-                        'after': proposed if decision == 'accept' else current[name], 'source': source, 'evidence': evidence}
+                        'after': after, 'source': source, 'evidence': evidence}
     plan_token = secrets.token_hex(32)
     plan = {'created': time.time(), 'state': 'manual_plan', 'token': token, 'row_number': row_number,
             'person_id': snapshot['person']['person_id'], 'identity': snapshot['person'], 'expected': current,
             'actor': actor, 'fields': fields, 'file_sha256': record['file_sha256'],
             'writes': [n for n, f in fields.items() if f['decision'] == 'accept' and f['before'] != f['after']]}
+    if review_fields is not None:
+        if any(n not in FIELDS for n in review_fields):
+            raise bio.ValidationError('Неизвестное поле проверки.')
+        plan.update(review_fields=review_fields, identity_pending=identity_pending)
     # A new immutable plan per submission prevents parallel tabs from changing what
     # the confirmation screen will commit. Integrity is rechecked at commit.
     plan['signature'] = bio._sign(settings, bio.canonical(plan))

@@ -6,6 +6,21 @@
     const content = dialog?.querySelector("[data-manual-content]");
     let opener = null;
     let draft = null;
+    const notice = document.querySelector("[data-review-list-result]");
+    function announce(message) {
+      if (!notice) return;
+      notice.textContent = message;
+      notice.hidden = false;
+    }
+    function updateChoices() {
+      const form = content?.querySelector("[data-manual-plan]");
+      if (!form) return;
+      const save = form.querySelector("[data-review-save]");
+      if (save) save.disabled = !form.querySelector("input[type=radio]:checked");
+      form.querySelectorAll("[data-review-field]").forEach((field) => {
+        field.querySelector("[data-review-reset]").hidden = !field.querySelector("input:checked");
+      });
+    }
     function focusPanel() {
       if (!content.querySelector("h2")) {
         const heading = document.createElement("h2");
@@ -22,25 +37,52 @@
       if (!response.headers.get("content-type")?.includes("text/html")) throw new Error("Неожиданный ответ сервера");
       content.innerHTML = await response.text();
       focusPanel();
+      updateChoices();
       return response;
     }
+    async function openPerson(button) {
+      opener = button;
+      draft = null;
+      if (!dialog.open) dialog.showModal();
+      content.textContent = "Открываем кавалера…";
+      try { await loadPanel(button.dataset.manualOpen); }
+      catch { content.textContent = "Не удалось открыть проверку. Вернитесь к списку и попробуйте ещё раз."; focusPanel(); }
+    }
+    function advance(message) {
+      announce(message);
+      const people = Array.from(document.querySelectorAll("[data-manual-person]"));
+      const current = people.indexOf(opener);
+      const following = [...people.slice(current + 1), ...people.slice(0, Math.max(0, current))];
+      const next = following.find((button) => button.dataset.reviewResolved !== "true");
+      if (next) void openPerson(next);
+      else dialog.close();
+    }
     document.querySelectorAll("[data-manual-open]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        opener = button;
-        draft = null;
-        dialog.showModal();
-        content.textContent = "Загрузка проверки…";
-        try { await loadPanel(button.dataset.manualOpen); }
-        catch { content.textContent = "Не удалось загрузить проверку. Закройте панель и повторите попытку."; focusPanel(); }
-      });
+      button.addEventListener("click", () => void openPerson(button));
     });
     dialog?.addEventListener("close", () => opener?.focus({ preventScroll: true }));
     dialog?.querySelector("[data-manual-close]").addEventListener("click", () => dialog.close());
+    content?.addEventListener("change", updateChoices);
     content?.addEventListener("click", (event) => {
+      const option = event.target.closest(".review-option");
+      if (option && !event.target.closest("input, label, details, button, a")) {
+        const radio = option.querySelector("input[type=radio]");
+        if (radio && !radio.disabled) radio.click();
+      }
+      if (event.target.closest("[data-manual-close]")) { dialog.close(); return; }
+      if (event.target.closest("[data-manual-skip]")) { advance("Кавалер пропущен. Данные не изменены."); return; }
+      if (event.target.closest("[data-manual-next]")) { advance("Выбор сохранён. Можно проверить следующего кавалера."); return; }
+      const reset = event.target.closest("[data-review-reset]");
+      if (reset) {
+        reset.closest("[data-review-field]").querySelectorAll("input[type=radio]").forEach((input) => { input.checked = false; });
+        updateChoices();
+        return;
+      }
       if (!event.target.closest("[data-manual-undo]") || !draft) return;
       content.replaceChildren(...draft);
       draft = null;
       focusPanel();
+      updateChoices();
     });
     content?.addEventListener("submit", async (event) => {
       const form = event.target;
@@ -76,6 +118,8 @@
             status.textContent = content.querySelector("[data-manual-result]").textContent;
             status.hidden = false;
           }
+          opener.dataset.reviewResolved = content.querySelector("[data-manual-result]").dataset.reviewComplete;
+          announce(content.querySelector("[data-manual-result]").textContent);
         }
       } catch {
         content.replaceChildren(...prior);

@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 
 from backend.app.config import Settings
 from backend.app.main import app
-from backend.app.services import biography_enrichment as bio, manual_import_review as manual
+from backend.app.services import biography_enrichment as bio, manual_import_review as manual, manual_review_choices as choices
 from backend.app.services.write_guard import WriteBlockedError
 from tests.test_ale475_person_import import create_database
 
@@ -224,9 +224,9 @@ class ManualReviewTests(unittest.TestCase):
             self.assertEqual(response.status_code,200)
             self.assertIn('Ермакова (Зайцева)',response.text)
             self.assertIn('Оставить на проверке',response.text)
-            response=client.post(f'{base}/review/{token}/2/plan',data=self.submitted())
+            response=client.post(f'{base}/review/{token}/2/plan',data={'biography_choice':'current','review_revision':choices.detail(self.settings,token,2)['revision']})
             self.assertEqual(response.status_code,200)
-            self.assertIn('Подтвердить запись',response.text)
+            self.assertIn('Проверьте изменения',response.text)
             p,_=self.plan(token)
             self.assertEqual(client.post(base+'/review/commit',data={'plan_token':p}).status_code,409)
             self.assertEqual(client.post(base+'/review/commit',data={'plan_token':p,'confirm':'yes'},headers={'origin':'https://elsewhere.example'}).status_code,403)
