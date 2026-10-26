@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Исправление данных{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('fio_corrections.js') }}" defer></script>{% endblock %}
+{% block content %}<section class="bio-page" data-fio-corrections data-base="{{ base }}">
+<header class="import-page-header"><a class="button secondary-button" href="/data-maintenance?menu=1">← Назад</a><h1>Исправление данных</h1></header>
+<section class="cavalier-form-card bio-card"><h2>Латинские двойники в ФИО</h2><p>Проверка охватывает всех кавалеров. Исправляются только визуально одинаковые буквы из утверждённой таблицы в ФИО с кириллицей. Полностью латинские и неоднозначные записи будут пропущены.</p>
+<div class="correction-actions"><button type="button" data-fio-audit>Проверить ФИО</button><button type="button" data-fio-apply disabled>Исправить</button></div>
+<p>«Проверить ФИО» не меняет базу. «Исправить» сохранит показанный безопасный набор после создания и проверки резервной копии.</p>
+<div data-fio-status role="status" aria-live="polite" hidden><strong data-fio-phase></strong><progress max="100" data-fio-progress></progress><p><span data-fio-count></span> · <span data-fio-percent></span> · <span data-fio-eta>Оцениваем время</span></p></div>
+<p role="alert" class="notice notice-error" data-fio-error hidden></p><p class="review-success" data-fio-result hidden></p>
+</section><div data-fio-preview></div></section>{% endblock %}

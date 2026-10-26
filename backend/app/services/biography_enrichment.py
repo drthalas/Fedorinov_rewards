@@ -354,11 +354,11 @@ def _merge_proposals(workbook, rows):
     mapping = {'ID кавалера':'person_id', 'ФИО в источнике':'ФИО в карточке',
                'Год в источнике':'Год в карточке', 'Награда в источнике':'Награда в карточке',
                'Номер в источнике':'Номер в карточке', 'Источник':'source_url',
-               'Подтверждённые факты':'notes', 'Проверка личности':'Идентификация'}
+               'Подтверждённые факты':'notes', 'Проверка личности':'Идентификация','Год подтверждён':'Год подтверждён'}
     iterator = workbook[PROPOSALS_SHEET].iter_rows()
     header = next(iterator, ())
     names = [text(c.value) for c in header]
-    required = set(mapping)-{'Проверка личности'}
+    required = set(mapping)-{'Проверка личности','Год подтверждён'}
     if not required <= set(names) or len(names)!=len(set(names)) or set(names)-set(mapping) or any(c.data_type in {'f','e'} for c in header):
         raise ValidationError('Неверные колонки листа «Предложения». Исходные сведения изменять нельзя.')
     by_id = {e['values']['person_id']:e for e in rows}
@@ -371,6 +371,8 @@ def _merge_proposals(workbook, rows):
         if len(cells)>len(names) or any(c.data_type in {'f','e'} or len(text(c.value))>32000 for c in cells):
             raise ValidationError('На листе «Предложения» есть формула, ошибка или слишком длинный текст.')
         values = {mapping[n]:text(cells[i].value) if i<len(cells) else '' for i,n in enumerate(names)}
+        if 'Год подтверждён' in values and key(values['Год подтверждён']) not in {'да','нет','спорный'}:
+            raise ValidationError('Укажите достоверность года: да, нет или спорный.')
         pid = values.pop('person_id')
         if pid in seen or pid not in by_id:
             raise ValidationError('ID в предложениях повторяется или отсутствует в подписанной выгрузке.')

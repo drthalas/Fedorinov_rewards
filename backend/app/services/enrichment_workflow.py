@@ -16,70 +16,25 @@ BATCH_PREFIX = 'enrichment_import:'
 
 
 def stage(settings, token, row_number, submitted):
-    """Owner decisions remain private signed plans, never SQLite writes."""
-    review = choices.detail(settings,token,row_number)
-    if review['state']!='manual' or not hmac.compare_digest(str(submitted.get('review_revision','')),review['revision']):
-        raise bio.ValidationError('Карточка изменилась или больше не требует решения. Обновите список.')
-    identity = submitted.get('identity_choice') or None
-    if review['identity_required'] and not identity:
-        raise bio.ValidationError('Сначала подтвердите или отклоните принадлежность источника.')
-    if not review['identity_required'] and identity:
-        raise bio.ValidationError('Подтверждение личности здесь недоступно.')
-    effective = choices.detail(settings,token,row_number,identity_choice=identity)
-    decisions = {n:'accept' for n in effective['automatic']}
-    for name in effective['fields']:
-        value=submitted.get(name+'_choice','')
-        if value not in {'','current','proposed'}:
-            raise bio.ValidationError('Неизвестный вариант поля.')
-        if value:decisions[name]='accept' if value=='proposed' else 'reject'
-    if not decisions and not identity:
-        raise bio.ValidationError('Выберите значение или вернитесь к списку без решения.')
-    operation,plan=choices.row_plan(settings,token,row_number,decisions,expected=review['current'],identity_choice=identity)
-    plan.pop('signature');plan['workflow_version']=4
-    plan['signature']=bio._sign(settings,bio.canonical(plan));bio._save(settings,operation,plan)
-    return operation,plan
-
-
-def _staged(settings, token, operations, connection):
-    if not isinstance(operations,list) or len(operations)>bio.MAX_ROWS:
-        raise bio.ValidationError('Неверный набор решений. Откройте файл заново.')
-    result={}
-    for operation in operations:
-        plan=bio.load_preview(settings,operation);unsigned=dict(plan);mac=unsigned.pop('signature','')
-        if plan.get('workflow_version')!=4 or plan.get('state')!='manual_plan' or plan.get('token')!=token or not hmac.compare_digest(mac,bio._sign(settings,bio.canonical(unsigned))):
-            raise bio.ValidationError('Подтверждение решения повреждено. Повторите проверку.')
-        if plan['row_number'] in result:raise bio.ValidationError('Повторяющееся решение по кавалеру.')
-        manual.check_plan(connection,settings,unsigned)
-        result[plan['row_number']]=plan
-    return result
+    raise bio.ValidationError('Ручные решения удалены. Доступен только общий импорт проверенных данных.')
 
 
 def workspace(settings, token, operations=()):
+    if operations:raise bio.ValidationError('План относится к прежнему ручному интерфейсу. Загрузите файл заново.')
     view=present(settings,token)
-    with closing(bio._connection(settings.rewards_db_path)) as connection:
-        staged=_staged(settings,token,list(operations),connection)
-    buckets={'ready':[],'manual':[],'insufficient':[]}
-    fatal=any(row['review'] is None for row in view['rows'])
-    totals={n:0 for n in manual.FIELDS};accepted=0;eligible=0
+    buckets={'ready':[],'insufficient':[]};unchanged=[]
+    totals={n:0 for n in manual.FIELDS}
     for row in view['rows']:
         if row['state']=='confirmed':continue
-        row['bucket']='manual' if row['state']=='manual' else 'ready' if row['automatic'] else 'insufficient'
-        row['staged']=staged.get(row['row'])
-        if row['staged']:
-            plan=row['staged'];pending=plan.get('identity_pending') or any(plan['fields'][n]['decision']=='pending' for n in plan['review_fields'])
-            row['status']='Частично принято' if pending else 'Принято'
-            row['reason']='Решение подготовлено. Запись — только общей кнопкой «Импортировать».'
-            row['accepted']=not pending
-            accepted+=int(not pending)
-            writes=plan['writes']
-            eligible+=1  # A rejection without a field write is still audited.
-        else:
-            writes=list(row['automatic']);eligible+=int(bool(writes))
-        for n in writes:totals[n]+=1
-        buckets[row['bucket']].append(row)
-    revision=bio._sign(settings,bio.canonical({'kind':'workspace-v4','base':view['revision'],'operations':list(operations)}))
-    view.update(buckets=buckets,counts={k:len(v) for k,v in buckets.items()},totals=totals,
-                accepted=accepted,eligible=eligible,operations=list(operations),revision=revision,fatal=fatal)
+        if row['state']=='unchanged':unchanged.append(row);continue
+        bucket='ready' if row['automatic'] else 'insufficient'
+        row.update(bucket=bucket,staged=None)
+        for name in row['automatic']:totals[name]+=1
+        buckets[bucket].append(row)
+    view.update(buckets=buckets,counts={k:len(v) for k,v in buckets.items()},unchanged=unchanged,
+        totals=totals,accepted=0,eligible=len(buckets['ready']),operations=[],
+        fatal=any(r['review'] is None for r in view['rows']),
+        revision=bio._sign(settings,bio.canonical({'kind':'workspace-v5','base':view['revision']})))
     return view
 
 
@@ -88,16 +43,12 @@ def prepare_workspace(settings, token, revision, operations):
     if view['fatal'] or not hmac.compare_digest(str(revision),view['revision']):
         raise bio.ValidationError('Файл или карточки изменились. Получите свежую выгрузку; ничего не записано.')
     plans=[]
-    for rows in view['buckets'].values():
-        for row in rows:
-            if row['staged']:plans.append(row['staged'])
-            elif row['automatic']:
-                _,plan=choices.row_plan(settings,token,row['row'],{n:'accept' for n in row['automatic']},expected=row['review']['current'],mode='import')
-                plans.append(plan)
-    if not plans:raise bio.ValidationError('Нет новых изменений или принятых решений для импорта.')
+    for row in view['buckets']['ready']:
+        _,plan=choices.row_plan(settings,token,row['row'],{n:'accept' for n in row['automatic']},expected=row['review']['current'],mode='import')
+        plans.append(plan)
+    if not plans:raise bio.ValidationError('Новых подтверждённых изменений нет. Повторная запись не требуется.')
     return _store_batch(settings,token,view['filename'],plans,
-                        {'fields':view['totals'],'ready':view['counts']['ready'],'accepted':view['accepted'],
-                         'skipped':len(view['rows'])-len(plans),'people':len(plans)})
+        {'fields':view['totals'],'ready':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),'people':len(plans)})
 
 
 def present(settings, token):
@@ -179,6 +130,11 @@ def commit_ordinary(settings, token):
 
 
 def commit_import(settings, operation):
+    from .data_operation_lock import exclusive
+    with exclusive(settings):return _commit_import(settings,operation)
+
+
+def _commit_import(settings, operation):
     ensure_write_allowed(settings)
     plan = bio.load_preview(settings,operation)
     signature = plan.pop('signature','')
@@ -211,10 +167,7 @@ def commit_import(settings, operation):
 
 
 def commit_review(settings, operation):
-    plan = bio.load_preview(settings,operation)
-    if plan.get('workflow_version')!=3:
-        raise bio.ValidationError('Подтверждение создано в старой версии. Откройте кавалера заново.')
-    return manual.commit(settings,operation)
+    raise bio.ValidationError('Построчное сохранение удалено. Подтвердите общий импорт заново.')
 
 
 def result_state(settings, event):

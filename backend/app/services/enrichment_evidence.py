@@ -17,6 +17,36 @@ def sources(raw):
     return result
 
 
+def summary_assertions(values, snapshot):
+    """Strict GSS-II identity compatibility for seven-column research summaries.
+
+    Never infer a birth-year correction from prose. Explicit source year/caveats
+    belong in validated proposal columns; the signed originals remain immutable.
+    """
+    if values.get('ФИО в карточке') or values.get('Награда в карточке'):return values
+    body=bio.text(values.get('biography'));intro=body.split('(',1)[0].strip()
+    names=intro.split()
+    if len(names)!=3 or not all(re.fullmatch(r'[А-Яа-яЁё-]+',n) for n in names):return values
+    current=bio.key(snapshot['person']['fio']).split()
+    if len(current)!=3 or sorted(map(bio.key,names))!=sorted(current):return values
+    if not re.search(r'дважды\s+герой\s+советского\s+союза',body,re.I):return values
+    selected=[a for a in snapshot['person']['awards'] if all(a[bio.IDS[i]]==v for i,v in enumerate(snapshot['selection']))]
+    award=next((a for a in selected if bio.key(a['award'])=='герой советского союза ii'),None)
+    if not award or not award['number']:return values
+    exact=re.search(r'втор(?:ой|ая|ую)\s+медал[ьиью]+[^.\n]{0,55}золотая[^.\n]{0,30}звезда[^.\n]{0,20}№\s*'+re.escape(str(award['number']))+r'(?!\d)',body,re.I)
+    if not exact:return values
+    result=dict(values)
+    result.update({'ФИО в карточке':snapshot['person']['fio'],'Награда в карточке':award['award'],
+        'Номер в карточке':str(award['number']),'notes':'В тексте источника: полное ФИО, дважды ГСС, '+exact.group(0)+'.',
+        'Идентификация':'Полное ФИО и точная вторая Звезда подтверждены текстом','_evidence_origin':'biography-summary'})
+    return result
+
+
+def identity_name(value):
+    value=re.sub(r'\([^)]*\)','',bio.key(value))
+    # Documented patronymic variants; used only with exact award/serial + year.
+    return ' '.join({'артемьевич':'артемович'}.get(x,x) for x in value.split())
+
 def analyze(snapshot, values, current):
     fio = bio.text(values.get('ФИО в карточке'))
     year = bio.text(values.get('Год в карточке'))
@@ -32,6 +62,7 @@ def analyze(snapshot, values, current):
         plain = re.sub(r'\([^)]*\)','',bio.text(value))
         return len([w for w in re.findall(r"[^\W\d_]+(?:['’-][^\W\d_]+)*",plain,re.UNICODE) if len(w)>1])>=2
     same_fio = full_name(fio) and full_name(current['fio']) and bio.key(fio)==bio.key(current['fio'])
+    variant = full_name(fio) and full_name(current['fio']) and identity_name(fio)==identity_name(current['fio'])
     supplied_serial = bio.text(values.get('Номер в карточке'))
     numbered = [a for a in matched if a['number'] not in (None,'',0,'0')]
     serial_match = any((supplied_serial and supplied_serial==str(a['number'])) or re.search(
@@ -69,7 +100,11 @@ def analyze(snapshot, values, current):
     # Without a serial, require two additional matching source attributes. A
     # generic civilian rank and placeholder 1945 cannot corroborate identity.
     corroborated = not numbered and bool(matched) and valid_year and year==current_year and year!='1945' and rank not in {'','гражданский','неизвестно'} and rank==bio.key(snapshot['person']['rank'])
-    verified = bool(valid_source and not problems and same_fio and matched and len(notes)>=10 and (serial_match or corroborated))
+    variant_verified = variant and serial_match and valid_year and year==current_year
+    material = bool(re.search(r'другой (?:человек|кавалер)|не тот (?:человек|кавалер)|номер не совпад|награда не совпад',bio.key(notes+' '+statement)))
+    if (variant_verified or same_fio and serial_match) and not material:
+        problems=[p for p in problems if not p.startswith('ФИО в источнике')]
+    verified = bool(valid_source and not problems and not material and (same_fio or variant_verified) and matched and len(notes)>=10 and (serial_match or corroborated))
     # An omitted parenthesized surname can be reviewed, never auto-approved.
     # Exact signed award/serial and matching birth year independently corroborate
     # the alias. Unrelated names, different awards/serials and contrary evidence
@@ -80,7 +115,7 @@ def analyze(snapshot, values, current):
     manual_identity = bool(warheroes and matched and serial_match and alias and valid_year and bool(current_year)
                            and len(notes)>=10 and not contradiction
                            and not (supplied_serial and not any(supplied_serial==str(a['number']) for a in numbered)))
-    return {'fio':fio,'year':year,'valid_year':valid_year,'source':source,'notes':notes,
+    return {'fio':fio,'year':year,'valid_year':valid_year,'year_reliable':bio.key(values.get('Год подтверждён','да'))=='да','source':source,'notes':notes,
             'sources':sources(source),'same_fio':same_fio,'verified':verified,'auto_verified':verified and warheroes,
             'problems':problems,'selected':selected,'serial_match':bool(serial_match),'manual_identity':manual_identity,
             'award_context':' · '.join(dict.fromkeys(f'{a["award"]} №{a["number"]}' for a in selected))}

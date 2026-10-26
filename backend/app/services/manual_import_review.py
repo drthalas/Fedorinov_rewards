@@ -328,6 +328,8 @@ def check_plan(connection, settings, plan, *, record=None):
 
 def apply_plan(connection, settings, plan, operation, *, record=None):
     """Apply one already-confirmed plan inside the caller's transaction."""
+    if 'fio' in plan['writes']:
+        raise bio.ValidationError('Импорт не переименовывает ФИО по источнику. Используйте отдельный аудит латинских двойников.')
     record = check_plan(connection, settings, plan, record=record)
     changed = {n:f['after'] for n,f in plan['fields'].items() if f['decision'] == 'accept' and f['before'] != f['after']}
     if changed:

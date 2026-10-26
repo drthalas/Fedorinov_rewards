@@ -111,8 +111,11 @@ class ManualReviewTests(unittest.TestCase):
         frozen=self.query('select id,id_rank,comment,person_foto from person'),self.query('select * from rewards')
         p,_=self.plan(token,fio_decision='accept',fio_proposal='Ермакова Мария Владимировна',
                       birthday_decision='accept',birthday_proposal='1938',biography_decision='accept',biography_proposal='Подтверждённый текст')
+        with self.assertRaisesRegex(bio.ValidationError,'не переименовывает'):
+            manual.commit(self.settings,p)
+        p,_=self.plan(token,fio_decision='reject',fio_proposal='Ермакова Мария Владимировна',birthday_decision='accept',birthday_proposal='1938',biography_decision='accept',biography_proposal='Подтверждённый текст')
         event=manual.commit(self.settings,p)
-        self.assertEqual(set(event['writes']),set(manual.FIELDS))
+        self.assertEqual(set(event['writes']),{'biography','birthday'})
         self.assertEqual(len(manual.reviewed_history(self.settings,token,2)),1)
         self.assertEqual(manual.review(self.settings,token,2)['current']['birthday'],'1938')
         self.assertEqual(event,manual.commit(self.settings,p))
