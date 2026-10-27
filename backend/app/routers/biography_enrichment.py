@@ -10,7 +10,7 @@ from ..config import get_settings
 from ..services import biography_enrichment as service
 from ..services import manual_import_review as manual
 from ..services import manual_review_choices as choices
-from ..services import enrichment_workflow as workflow
+from ..services import enrichment_workflow as workflow, enrichment_import_jobs as import_jobs
 from ..services.dates import format_birth_year_input
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -29,6 +29,7 @@ def _render(request, *, level='biographies', status_code=200, **context):
             status_code = 503
     if context.get('result'):
         context['view'] = workflow.workspace(settings,context['token'])
+        context['completed'] = workflow.completed_preview(settings,context['token'],context['view'])
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, 'year_label':format_birth_year_input, **context}, status_code=status_code)
 
@@ -127,6 +128,23 @@ def import_plan(request: Request, token: str, revision: str = Form(...), exclude
         return _review_fragment(request,batch_plan=plan,operation=operation)
     except service.ValidationError as exc:
         return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
+
+
+@router.post(BASE + '/import/start')
+def import_start(request: Request, operation: str=Form(...), confirm: str=Form('')):
+    _same_origin(request)
+    try:
+        if confirm!='yes':raise service.ValidationError('Подтвердите показанные изменения перед импортом.')
+        return import_jobs.jobs.start(get_settings(),operation)
+    except WriteBlockedError as exc:raise HTTPException(403,str(exc)) from exc
+    except service.ValidationError as exc:raise HTTPException(409,choices.friendly_error(exc)) from exc
+
+
+@router.get(BASE + '/import/operations/{operation}')
+def import_status(operation: str):
+    try:return import_jobs.jobs.status(get_settings(),operation)
+    except service.ValidationError as exc:raise HTTPException(409,choices.friendly_error(exc)) from exc
+    except (sqlite3.Error,OSError) as exc:raise HTTPException(503,'Статус временно недоступен. Повторите проверку статуса, не отправляя импорт заново.') from exc
 
 
 @router.post(BASE + '/import/commit')

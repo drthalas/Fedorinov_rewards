@@ -21,8 +21,8 @@
    try{item=await(await request(BASE+'/jobs/'+pending.job_id)).json();failures=0;}catch(e){if(++failures>=3)throw e;await new Promise(r=>setTimeout(r,300*failures));continue;}
    progress(item);
    if(item.state==='succeeded'){
-    if(pending.kind==='audit'){state.audit_token=item.result.audit_token;state.safe=item.result.safe_records;await showPreview(state.audit_token);result.textContent=`Проверено всех кавалеров: ${item.result.checked}. Безопасных записей: ${state.safe}.`;}
-    else{state.audit_token=null;state.safe=0;result.textContent=`Исправлено записей: ${item.result.records}, символов: ${item.result.characters}. Резервная копия проверена. Для затронутых ФИО старый XLSX устарел: нужна свежая выгрузка.`;}
+    if(pending.kind==='audit'){state.audit_token=item.result.audit_token;state.safe=item.result.safe_records;state.skipped=item.result.skipped;await showPreview(state.audit_token);result.textContent=`Проверено всех кавалеров: ${item.result.checked}. Безопасных записей: ${state.safe}.`;}
+    else{state.audit_token=null;state.safe=0;const heading=document.createElement('h2');heading.textContent='Исправление завершено';const counts=document.createElement('p');counts.textContent=`Исправлено записей: ${item.result.records}. Исправлено букв: ${item.result.characters}.`+(Number.isInteger(state.skipped)?` Неоднозначных пропусков: ${state.skipped}.`:'');result.replaceChildren(heading,counts);}
     result.hidden=false;state.pending=null;save();return;
    }
    if(['failed','interrupted'].includes(item.state)){state.pending=null;state.audit_token=null;state.safe=0;save();throw new Error(item.error||'Операция не завершена. Повторите аудит.');}

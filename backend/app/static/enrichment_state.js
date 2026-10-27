@@ -87,14 +87,74 @@
   });
   document.addEventListener('keydown',event=>{
     const tab=event.target.closest?.('[data-bucket]');if(tab&&['ArrowRight','ArrowLeft','Home','End'].includes(event.key)){event.preventDefault();const tabs=[...document.querySelectorAll('[data-bucket]')];const i=tabs.indexOf(tab),n=event.key==='Home'?0:event.key==='End'?tabs.length-1:(i+(event.key==='ArrowRight'?1:tabs.length-1))%tabs.length;tabs[n].click();tabs[n].focus();}
-    if(event.key==='Escape'&&!panel.hidden)close();
+    if(event.key==='Escape'&&!panel.hidden&&!busy)close();
   });
   document.addEventListener('change',event=>{
     if(event.target.closest('[data-manual-plan]')){if(state.active?.row)delete(state.stages||{})[state.active.row];choices();remember();}
   });
+  const previewRegion=document.querySelector('[data-import-preview]'),operationRegion=document.querySelector('[data-import-operation]');
+  let monitoring=false;
+  const initialCompleted=JSON.parse(operationRegion.querySelector('[data-import-initial]').textContent||'null');
+  function operationScreen(kind){
+    previewRegion.hidden=true;panel.hidden=true;page.classList.remove('bio-detail-open');operationRegion.hidden=false;
+    ['progress','success','failure'].forEach(name=>operationRegion.querySelector('[data-import-'+name+']').hidden=name!==kind);
+  }
+  function importing(item={}){
+    operationScreen('progress');state.importMode='importing';state.active=null;busy=true;
+    operationRegion.querySelector('[data-import-phase]').textContent=item.phase||'Импортируем данные…';
+    const done=item.done||0,total=item.total||state.importTotal||0,percent=Math.min(99,item.percent||0);
+    operationRegion.querySelector('[data-import-progress-bar]').value=percent;
+    operationRegion.querySelector('[data-import-processed]').textContent=`Обработано: ${done} / ${total}`;
+    operationRegion.querySelector('[data-import-percent]').textContent=percent+'%';remember();
+  }
+  function imported(value,noChanges=false,already=false){
+    operationScreen('success');state.importMode='success';state.active=null;busy=false;
+    operationRegion.querySelector('[data-import-success] h2').textContent=noChanges?'Изменений нет':'Импорт завершён';
+    for(const name of ['saved','biographies','years','skipped'])operationRegion.querySelector('[data-result-'+name+']').textContent=value[name]||0;
+    let notice=operationRegion.querySelector('[data-import-already]');if(!notice){notice=document.createElement('p');notice.dataset.importAlready='';operationRegion.querySelector('[data-import-success] h2').after(notice);}
+    notice.textContent=already?'Этот файл уже импортирован. Новая запись не выполнялась.':'';
+    const skipped=operationRegion.querySelector('[data-import-skips]'),list=skipped.querySelector('ul');list.replaceChildren();
+    for(const row of value.skipped_reasons||[]){const li=document.createElement('li');li.textContent=`№ ${row.person_id} · ${row.fio}: ${row.reason}`;list.append(li);}
+    skipped.hidden=!list.childElementCount;remember();
+  }
+  function importFailure(item){
+    operationScreen('failure');busy=false;state.importMode='failure';
+    operationRegion.querySelector('[data-import-failure-text]').textContent=item.error||'Статус временно недоступен. Проверьте его снова; импорт повторно не запускается.';
+    operationRegion.querySelector('[data-import-failure-list]').hidden=!['failed','interrupted'].includes(item.state);remember();
+  }
+  async function operationStatus(){
+    const r=await fetch(BASE+'/import/operations/'+state.importOperation,{cache:'no-store'});const data=await r.json();
+    if(!r.ok)throw new Error(data.detail||'Статус временно недоступен.');return data;
+  }
+  async function monitorImport(){
+    if(monitoring)return;monitoring=true;let failures=0;
+    try{while(true){
+      let item;try{item=await operationStatus();failures=0;}catch(e){if(++failures>=3){importFailure({error:e.message});return;}await new Promise(r=>setTimeout(r,300*failures));continue;}
+      if(item.state==='succeeded'){imported(item.result);return;}
+      if(['failed','interrupted','unknown'].includes(item.state)){importFailure(item);return;}
+      importing(item);await new Promise(r=>setTimeout(r,200));
+    }}finally{monitoring=false;}
+  }
+  async function startImport(form){
+    if(busy)return;remember();state.importListScroll=state.scroll;state.importOperation=form.querySelector('[name=operation]').value;state.importTotal=Number(form.dataset.importTotal);state.importMode='importing';
+    importing();operationRegion.scrollIntoView({block:'start'});
+    try{const r=await fetch(form.action,{method:'POST',body:new FormData(form),credentials:'same-origin'});const item=await r.json();
+      if(!r.ok){importFailure({state:'failed',error:item.detail||'Не удалось начать импорт. Ничего не подтверждено.'});return;}
+      if(item.state==='succeeded')imported(item.result);else await monitorImport();
+    }catch(_){await monitorImport();}
+  }
+  async function importList(){
+    state.importMode='list';state.active=null;busy=false;
+    try{await refresh();operationRegion.hidden=true;previewRegion.hidden=false;panel.hidden=true;ws().hidden=false;page.classList.remove('bio-detail-open');
+      document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';paginate();restore(state.importListScroll||state.scroll);remember();
+    }catch(e){importFailure({state:'failed',error:e.message});}
+  }
+  operationRegion.querySelector('[data-import-list]').addEventListener('click',()=>void importList());
+  operationRegion.querySelector('[data-import-failure-list]').addEventListener('click',()=>void importList());
+  operationRegion.querySelector('[data-import-status-retry]').addEventListener('click',()=>{importing();void monitorImport();});
   document.addEventListener('submit',async event=>{
     const form=event.target;if(!form.matches('[data-manual-plan],[data-import-plan],[data-manual-commit]'))return;
-    event.preventDefault();if(busy)return;busy=true;remember();
+    event.preventDefault();if(form.matches('[data-import-start]')){void startImport(form);return;}if(busy)return;busy=true;remember();
     const prior=[...content.childNodes],data=new FormData(form),row=state.active?.row;
     if(form.matches('[data-import-plan]')){data.set('operations',JSON.stringify(operations()));panel.hidden=false;ws().hidden=true;page.classList.add('bio-detail-open');}
     const button=form.querySelector('[type=submit]');button.disabled=true;
@@ -114,7 +174,7 @@
     replacing=true;clear();document.querySelector('[data-upload-status]').textContent='Проверяем файл…';form.requestSubmit();
   }));
   window.addEventListener('pagehide',remember);
-  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
+  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
   async function initialize(){
     if(new URL(location.href).searchParams.has('new'))clear();
     if(!ws()){
@@ -125,6 +185,11 @@
     if(ws().dataset.fatal==='true'){clear();return;}
     invalid=false;if(state.token!==ws().dataset.token)state={};state.token=ws().dataset.token;
     history.replaceState(null,'',BASE+'/preview/'+state.token);
+    if(initialCompleted&&state.importMode!=='list'){
+      state.importOperation=initialCompleted.operation;imported(initialCompleted.summary,initialCompleted.no_changes,initialCompleted.already_done);return;
+    }
+    if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}
+    if(initialCompleted&&state.importMode==='list'){previewRegion.hidden=false;operationRegion.hidden=true;document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';}
     try{if(operations().length)await refresh();paginate();document.querySelectorAll('[data-person-bio]').forEach(d=>d.open=(state.openBiographies||[]).includes(d.dataset.personBio));if(state.active)await open(state.active.url,state.active.row,true);else restore(state.scroll);remember();}
     catch(e){clear();error(e.message);}
   }

@@ -20,8 +20,8 @@ class FioTests(unittest.TestCase):
  def query(self,q):
   with sqlite3.connect(self.db) as c:return c.execute(q).fetchall()
  def test_exact_pairs_context_and_unsupported_skip_entire_record(self):
-  self.assertEqual(len(f.PAIRS),19)
-  for a,b in zip('ABCEHKMOPTXYaceopxy','АВСЕНКМОРТХУасеорху'):
+  self.assertEqual(len(f.PAIRS),20)
+  for a,b in zip('ABCEHKMOPTXYacekopxy','АВСЕНКМОРТХУасекорху'):
    r=f.classify({'fio':'Иван '+a+' ё- (имя)'});self.assertTrue(r['safe']);self.assertEqual(r['after']['fio'],'Иван '+b+' ё- (имя)')
   for v in ['John Smith','ACE','Иван Sидоров','Иван Iванов','Иван Ḁ','Иван sC']:
    r=f.classify({'fio':v});self.assertFalse(r['safe']);self.assertEqual(r['before'],r['after'])

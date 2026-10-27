@@ -208,3 +208,12 @@
 [data-fio-progress] { display:block; width:100%; height:22px; margin:18px 0 10px; accent-color:#b49a64; }
 [data-fio-preview] mark { background:#64512c; color:#fff3cb; padding:1px 2px; font-weight:bold; }
 [data-fio-preview] td p { white-space:pre-wrap; }
+
+.import-operation { min-height:280px; padding:30px; margin:24px 0; }
+.import-operation h2 { font-size:30px; color:#f4dfb7; margin:0 0 24px; }
+[data-import-progress-bar] { width:100%; height:26px; accent-color:#b49a64; }
+.import-result-counts { display:grid; grid-template-columns:repeat(4,1fr); gap:18px; padding:18px 0; }
+.import-result-counts div { padding:18px; background:#243324; border:1px solid #6c8559; border-radius:6px; }
+.import-result-counts dt { font-size:15px; color:#e6ddc6; }
+.import-result-counts dd { margin:10px 0 0; font-size:34px; color:#d8efc6; font-weight:bold; }
+@media(max-width:800px){.import-result-counts{grid-template-columns:repeat(2,1fr)}}

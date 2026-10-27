@@ -18,7 +18,7 @@ from . import biography_enrichment as bio, manual_import_review as manual
 from .data_operation_lock import exclusive
 from .write_guard import ensure_write_allowed
 
-PAIRS=dict(zip('ABCEHKMOPTXYaceopxy','АВСЕНКМОРТХУасеорху'))
+PAIRS=dict(zip('ABCEHKMOPTXYacekopxy','АВСЕНКМОРТХУасекорху'))
 TRANSLATION=str.maketrans(PAIRS)
 NAME_COLUMNS=('fio','фио','last_name','surname','lastname','family_name','first_name','firstname','patronymic','middle_name','otchestvo','fam','imya','фамилия','имя','отчество')
 PREFIX='fio_correction:'

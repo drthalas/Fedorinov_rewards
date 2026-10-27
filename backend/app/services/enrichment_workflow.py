@@ -100,7 +100,10 @@ def prepare_import(settings, token, revision, exclude=()):
 def _store_batch(settings, token, filename, plans, summary=None):
     operation = secrets.token_hex(32)
     plan = {'created':time.time(),'state':'file_import_plan','token':token,'rows':plans,'filename':filename}
-    if summary is not None:plan['summary']=summary
+    if summary is not None:
+        plan['summary']=summary
+        view=present(settings,token);selected={p['person_id'] for p in plans}
+        plan['skipped_reasons']=[{'person_id':r['person_id'],'fio':r['fio'],'reason':r['reason']} for r in view['rows'] if int(r['person_id']) not in selected]
     plan['signature'] = bio._sign(settings,bio.canonical(plan))
     bio._save(settings,operation,plan)
     return operation,plan
@@ -129,17 +132,18 @@ def commit_ordinary(settings, token):
     return record
 
 
-def commit_import(settings, operation):
+def commit_import(settings, operation, progress=lambda *args:None):
     from .data_operation_lock import exclusive
-    with exclusive(settings):return _commit_import(settings,operation)
+    with exclusive(settings):return _commit_import(settings,operation,progress)
 
 
-def _commit_import(settings, operation):
+def _commit_import(settings, operation, progress=lambda *args:None):
     ensure_write_allowed(settings)
     plan = bio.load_preview(settings,operation)
     signature = plan.pop('signature','')
     if plan.get('state')!='file_import_plan' or not hmac.compare_digest(signature,bio._sign(settings,bio.canonical(plan))):
         raise bio.ValidationError('Подтверждение импорта повреждено. Откройте список заново.')
+    progress('Импортируем данные…',0,len(plan['rows']))
     with closing(open_write_connection(settings.rewards_db_path,settings.write_mode)) as connection:
         connection.execute('begin immediate')
         try:
@@ -155,15 +159,50 @@ def _commit_import(settings, operation):
                 if child.get('token')!=plan['token'] or not hmac.compare_digest(child_signature,bio._sign(settings,bio.canonical(child))):
                     raise bio.ValidationError('Подтверждение строки повреждено. Импорт отменён.')
                 events.append(manual.apply_plan(connection,settings,child,operation+'-'+str(index),record=record))
+                progress('Импортируем данные…',index+1,len(plan['rows']))
             result = {'created':plan['created'],'operation':operation,'events':events,
-                      'saved':sum(bool(e['writes']) for e in events),'fields_saved':sum(len(e['writes']) for e in events)}
+                      'saved':len({e['person_id'] for e in events if e['writes']}),'fields_saved':sum(len(e['writes']) for e in events),
+                      'token':plan['token'],'file_sha256':record['file_sha256'],
+                      'biographies':sum('biography' in e['writes'] for e in events),
+                      'years':sum('birthday' in e['writes'] for e in events),
+                      'skipped':len(record['rows'])-len({e['person_id'] for e in events if e['writes']}),
+                      'skipped_reasons':plan.get('skipped_reasons',[])}
             connection.execute('insert into logs(datetime,action,comment) values(?,?,?)',
                 (events[0]['time'],BATCH_PREFIX+operation,bio.canonical(result)))
+            progress('Сохраняем изменения…',len(plan['rows']),len(plan['rows']))
             connection.commit()
         except BaseException:
             connection.rollback()
             raise
     return result
+
+
+def committed_result(settings,operation):
+    with closing(bio._connection(settings.rewards_db_path)) as connection:
+        manual._audit_available(connection)
+        row=connection.execute('select comment from logs where action=?',(BATCH_PREFIX+operation,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+
+def result_summary(result, total_rows=None):
+    events=result.get('events',[])
+    return {'saved':len({e['person_id'] for e in events if e['writes']}),
+            'biographies':sum('biography' in e['writes'] for e in events),
+            'years':sum('birthday' in e['writes'] for e in events),
+            'skipped':result.get('skipped',max(0,total_rows-len({e['person_id'] for e in events if e['writes']})) if total_rows is not None else 0),'skipped_reasons':result.get('skipped_reasons',[])}
+
+
+def completed_preview(settings,token,view=None):
+    record=bio.load_preview(settings,token)
+    with closing(bio._connection(settings.rewards_db_path)) as connection:
+        manual._audit_available(connection)
+        for row in connection.execute('select comment from logs where action like ? order by rowid desc',(BATCH_PREFIX+'%',)):
+            result=json.loads(row[0]);same_token=result.get('token')==token or any(e.get('token')==token for e in result.get('events',[]))
+            same_file=view is not None and not view['fatal'] and not view['eligible'] and view['confirmed'] and any(e.get('file_sha256')==record['file_sha256'] for e in result.get('events',[]))
+            if same_token or same_file:return {'operation':result['operation'],'summary':result_summary(result,len(record['rows'])),'already_done':bool(same_file and not same_token)}
+    if view is not None and not view['fatal'] and not view['eligible'] and view.get('unchanged') and not view['counts']['insufficient']:
+        return {'operation':None,'no_changes':True,'summary':{'saved':0,'biographies':0,'years':0,'skipped':len(record['rows']),'skipped_reasons':[]}}
+    return None
 
 
 def commit_review(settings, operation):
