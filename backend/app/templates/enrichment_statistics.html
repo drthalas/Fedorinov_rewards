@@ -1,0 +1,8 @@
+<section class="bio-population" aria-label="Статистика наполнения" data-population>
+  <div class="bio-counts">
+    <div><strong data-population-total>{{ stats.total if stats else '—' }}</strong><span>Всего кавалеров</span></div>
+    <div><strong data-population-filled>{{ stats.filled if stats else '—' }}</strong><span>С биографией</span></div>
+    <div><strong data-population-empty>{{ stats.empty if stats else '—' }}</strong><span>Без биографии</span></div>
+  </div>
+  <p data-population-status role="status" {% if stats %}hidden{% endif %}>Статистика временно недоступна.</p>
+</section>

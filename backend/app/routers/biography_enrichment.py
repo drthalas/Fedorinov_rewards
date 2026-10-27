@@ -10,7 +10,7 @@ from ..config import get_settings
 from ..services import biography_enrichment as service
 from ..services import manual_import_review as manual
 from ..services import manual_review_choices as choices
-from ..services import enrichment_workflow as workflow, enrichment_import_jobs as import_jobs
+from ..services import enrichment_workflow as workflow, enrichment_import_jobs as import_jobs, enrichment_export_jobs as export_jobs
 from ..services.dates import format_birth_year_input
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
@@ -21,7 +21,7 @@ BASE = '/data-maintenance/enrichment/biographies'
 
 def _render(request, *, level='biographies', status_code=200, **context):
     settings = get_settings()
-    if level == 'biographies' and not context.get('result') and 'stats' not in context:
+    if level == 'biographies' and 'stats' not in context:
         try:
             context['stats'] = service.statistics(settings)
         except sqlite3.Error:
@@ -234,6 +234,41 @@ def review_commit(request: Request, plan_token: str = Form(...), confirm: str = 
     except (sqlite3.Error, OSError):
         logging.getLogger(__name__).exception('Manual review transaction failure')
         return _review_fragment(request, error='Не удалось подтвердить сохранение. Повторите этот же запрос: журнал предотвратит повторную запись. При ошибке транзакции все поля и аудит откатываются вместе.', status_code=503)
+
+
+@router.get(BASE + '/statistics')
+def statistics():
+    try:
+        return service.population_statistics(get_settings())
+    except (sqlite3.Error, OSError) as exc:
+        raise HTTPException(503, 'Не удалось обновить статистику базы.') from exc
+
+
+@router.post(BASE + '/export/start')
+def export_start(request: Request, operation: str = Form(...), selection: str = Form(''), limit: int = Form(20)):
+    _same_origin(request)
+    try:
+        return export_jobs.jobs.start(get_settings(), operation, selection, limit)
+    except service.ValidationError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get(BASE + '/export/operations/{operation}')
+def export_status(operation: str):
+    try:
+        return export_jobs.jobs.status(get_settings(), operation)
+    except service.ValidationError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@router.get(BASE + '/export/operations/{operation}/file')
+def export_download(operation: str):
+    try:
+        content = export_jobs.jobs.download(get_settings(), operation)
+    except (service.ValidationError, OSError) as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return Response(content, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    headers={'Content-Disposition': 'attachment; filename="biographies.xlsx"', 'Cache-Control': 'no-store'})
 
 
 @router.get(BASE + '/export')

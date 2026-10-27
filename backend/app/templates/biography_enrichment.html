@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}{{ 'Обслуживание данных' if level == 'maintenance' else 'Наполнение данных' if level == 'enrichment' else 'Проверка и импорт' }}{% endblock %}
+{% block title %}{{ 'Обслуживание данных' if level == 'maintenance' else 'Наполнение данных' }}{% endblock %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
-{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('biography_enrichment.js') }}" defer></script><script src="{{ static_url('enrichment_state.js') }}" defer></script>{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}"><script src="{{ static_url('biography_enrichment.js') }}" defer></script><script src="{{ static_url('enrichment_state.js') }}" defer></script><script src="{{ static_url('enrichment_export.js') }}" defer></script>{% endblock %}
 {% block content %}
 <section data-completed-operation="{{ completed.operation if completed else '' }}" data-bio-level="{{ level }}" class="cavalier-standalone-page bio-page"{% if level == 'biographies' %} aria-label="Биографии"{% endif %}>
   {% if level == 'enrichment' %}
@@ -32,21 +32,23 @@
       <a class="button" href="{{ base }}">Открыть биографии →</a>
     </section>
   {% else %}
-    <header class="import-page-header"><a href="/data-maintenance?menu=1" data-maintenance-back class="button secondary-button">← Назад</a><h1>Проверка и импорт</h1></header>
+    <header class="import-page-header"><a href="/data-maintenance?menu=1" data-maintenance-back class="button secondary-button">← Назад</a><h1>Наполнение данных</h1></header>
+    {% include 'enrichment_statistics.html' %}
+    {% include 'enrichment_export.html' %}
+    <section class="bio-import-block" aria-labelledby="import-block-title"><h2 id="import-block-title">Импорт данных</h2><p>Загрузите заполненный файл.</p>
     <div data-import-preview {% if completed %}hidden{% endif %}>
     <section class="cavalier-form-card bio-card" id="bio-upload">
       <form action="{{ base }}/preview" method="post" enctype="multipart/form-data" data-auto-preview>
-        <div class="bio-file-picker" data-bio-file-picker><label id="bio-file-label" for="bio-file-input">Файл XLSX</label><div class="bio-file-choice"><label class="button bio-file-button" for="bio-file-input"><span id="bio-file-choose-label">Выбрать файл</span><input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label"></label><span data-bio-file-name>{{ view.filename if view else '' }}</span></div><p data-bio-file-error role="alert" hidden></p></div>
+        <div class="bio-file-picker" data-bio-file-picker><label id="bio-file-label" for="bio-file-input">Заполненный файл XLSX</label><div class="bio-file-choice"><label class="button bio-file-button" for="bio-file-input"><span id="bio-file-choose-label">Выбрать файл</span><input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label"></label><span data-bio-file-name>{{ view.filename if view else '' }}</span></div><p data-bio-file-error role="alert" hidden></p></div>
         <p data-upload-status role="status">{{ 'Результаты сохранённого импорта.' if completed else 'Файл проверен. Решения будут записаны только после общего импорта.' if result else 'Выберите XLSX. Проверка начнётся автоматически; данные пока не записываются.' }}</p>
-        {% if not result %}<details class="bio-old-file"><summary>Исходная выгрузка для прежнего формата</summary><input type="file" name="original" accept=".xlsx"></details>{% endif %}
       </form>
     </section>
-    {% if stats and not result %}<details class="cavalier-form-card bio-card"><summary>Скачать данные для заполнения</summary><form action="{{ base }}/export" method="get" class="edit-form bio-download-form" data-no-transition><label>Награда или категория<select name="selection"><option value="">Все кавалеры</option>{% for group in stats.groups %}<option value="{{ group.selection }}">{{ group.label }}</option>{% endfor %}</select></label><label>Количество записей<input name="limit" type="number" min="1" max="5000" value="20" required></label><button type="submit">Скачать данные</button></form></details>{% endif %}
     {% if result %}{% include 'enrichment_workspace.html' %}
     {% else %}<div class="bio-review-hint" id="bio-review">{% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}<p>Загрузите файл, чтобы увидеть готовые изменения и спорные строки. До подтверждения данные не записываются.</p></div>{% endif %}
     </div>
     {% include 'enrichment_operation.html' %}
     <section id="bio-manual-dialog" class="cavalier-form-card" role="region" aria-labelledby="bio-manual-title" hidden><button type="button" class="review-back" data-manual-close>← К списку</button><div data-manual-content></div></section>
+    </section>
   {% endif %}
 </section>
 {% endblock %}

@@ -1,0 +1,18 @@
+<section class="cavalier-form-card bio-card" aria-labelledby="export-block-title" data-export-block>
+  <h2 id="export-block-title">Экспорт данных</h2>
+  <p>Скачайте файл для заполнения пустых биографий. Выберите группу кавалеров и количество записей.</p>
+  <form action="{{ base }}/export/start" method="post" class="edit-form bio-download-form" data-export-form data-no-transition>
+    <label>Награда или категория<select name="selection"><option value="">Все кавалеры</option>{% for group in (stats.groups if stats else []) %}<option value="{{ group.selection }}">{{ group.label }}</option>{% endfor %}</select></label>
+    <label>Количество записей<input name="limit" type="number" min="1" max="5000" value="20" required></label>
+    <button type="submit">Скачать данные для заполнения</button>
+  </form>
+  <div data-export-status hidden>
+    <h3 data-export-phase aria-live="polite">Выбираем записи…</h3>
+    <progress data-export-progress max="100" aria-label="Подготовка экспортного файла"></progress>
+    <p data-export-count></p>
+    <p data-export-error role="alert" hidden></p>
+    <p data-export-ready hidden>Файл готов к скачиванию. Сохранение файла на компьютер подтвердите в браузере.</p>
+    <a data-export-download class="button" download="biographies.xlsx" hidden>Скачать файл XLSX</a>
+    <button type="button" class="secondary-button" data-export-reconnect hidden>Проверить состояние</button>
+  </div>
+</section>

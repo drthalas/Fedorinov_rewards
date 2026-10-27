@@ -115,7 +115,7 @@
     notice.textContent=already?'Этот файл уже импортирован. Новая запись не выполнялась.':'';
     const skipped=operationRegion.querySelector('[data-import-skips]'),list=skipped.querySelector('ul');list.replaceChildren();
     for(const row of value.skipped_reasons||[]){const li=document.createElement('li');li.textContent=`№ ${row.person_id} · ${row.fio}: ${row.reason}`;list.append(li);}
-    skipped.hidden=!list.childElementCount;remember();
+    skipped.hidden=!list.childElementCount;remember();window.dispatchEvent(new Event('enrichment-import-completed'));
   }
   function importFailure(item){
     operationScreen('failure');busy=false;state.importMode='failure';

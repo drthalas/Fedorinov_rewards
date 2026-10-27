@@ -167,9 +167,19 @@ def _selection(selection):
     return values, ' and ' + ' and '.join(f'r.{name}=?' for name in IDS[:len(values)]), values
 
 
+def _population(connection):
+    total, empty = connection.execute('select count(*), coalesce(sum(bio_blank(biography)),0) from person').fetchone()
+    return {'total': total, 'empty': empty, 'filled': total - empty}
+
+
+def population_statistics(settings):
+    with closing(_connection(settings.rewards_db_path)) as connection:
+        return _population(connection)
+
+
 def statistics(settings):
     with closing(_connection(settings.rewards_db_path)) as connection:
-        total, empty = connection.execute('select count(*), coalesce(sum(bio_blank(biography)),0) from person').fetchone()
+        population = _population(connection)
         groups = []
         for depth in range(1, 5):
             ids = ','.join('r.' + name for name in IDS[:depth])
@@ -186,7 +196,7 @@ def statistics(settings):
                                'label': ' / '.join(text(n) or 'Без названия' for n in row[depth:depth*2]),
                                'total': row[-2], 'empty': row[-1], 'filled': row[-2] - row[-1]})
         groups.sort(key=lambda item: (key(item['label']), item['selection']))
-        return {'total': total, 'empty': empty, 'filled': total - empty, 'groups': groups}
+        return {**population, 'groups': groups}
 
 
 def _identity(connection, person_id):
@@ -279,16 +289,18 @@ def _workbook(headers, rows, metadata=None):
     return content
 
 
-def export_workbook(settings, selection='', limit=20):
+def export_workbook(settings, selection='', limit=20, progress=lambda *args: None):
     if not 1 <= limit <= MAX_ROWS:
         raise ValidationError(f'Количество записей: от 1 до {MAX_ROWS}.')
     selected, clause, params = _selection(selection)
     rows = []
     metadata = []
+    progress('Выбираем записи…', 0, None)
     with closing(_connection(settings.rewards_db_path)) as connection:
         eligible = connection.execute('''select p.id from person p where bio_blank(p.biography)=1'''
             + (f' and exists(select 1 from rewards r where r.person_id=p.id {clause})' if selected else '')
             + ' order by p.id limit ?', (*params, limit)).fetchall()
+        progress('Подготавливаем записи…', 0, len(eligible))
         for row in eligible:
             snapshot = {'version': 2, 'contract': 'visible-7-v2', 'selection': selected,
                         'person': _identity(connection, row[0])}
@@ -299,8 +311,10 @@ def export_workbook(settings, selection='', limit=20):
                              if original['Год рождения'] == '1945' else ''})
             metadata.append([original.get(header, '') for header in HEADERS])
             rows.append([original['person_id'], original['ФИО'], original['Год рождения'], original['Награда'], '', '', ''])
+            progress('Подготавливаем записи…', len(rows), len(eligible))
     if not rows:
         raise ValidationError('В выбранной группе нет пустых биографий для экспорта.')
+    progress('Формируем файл XLSX…', len(rows), len(rows))
     return _workbook(VISIBLE_HEADERS, rows, metadata)
 
 
@@ -435,7 +449,7 @@ def _snapshot(settings, values):
     serialized = values.get('snapshot', '')
     signature = values.get('snapshot_signature', '')
     if not serialized or not hmac.compare_digest(signature, _sign(settings, serialized)):
-        raise ValidationError('Исходные служебные данные отсутствуют или изменены. Приложите исходный файл данных с теми же кавалерами либо скачайте новую выгрузку и перенесите только найденные биографии, источники и статусы.')
+        raise ValidationError('Не удалось проверить исходные данные файла. Скачайте актуальный шаблон в блоке «Экспорт данных» и перенесите только биографии, источники и статусы.')
     try:
         snapshot = json.loads(serialized)
         if snapshot['version'] not in {1, 2} or not isinstance(snapshot['person']['person_id'], int):
