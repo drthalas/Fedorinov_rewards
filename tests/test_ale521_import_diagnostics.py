@@ -31,7 +31,7 @@ class ImportDiagnosticsTests(unittest.TestCase):
             self.assertEqual(self.db.read_bytes(),before)
             self.execute("update person set fio='Изменённая карточка' where id=1")
             d=diagnose(self.settings,self.content,state_root=self.root)
-            self.assertTrue(d['fatal']);self.assertEqual(d['failure_counts'],{'stale_identity':1});self.assertEqual(d['hmac_valid_rows'],8)
+            self.assertTrue(d['fatal']);self.assertEqual(d['failure_counts'],{'identity_mismatch_unconfirmed':1});self.assertEqual(d['hmac_valid_rows'],8)
             self.assertEqual(d['guard_failures'][0]['person_id'],'1');self.assertIn('ФИО',d['guard_failures'][0]['fields'])
             self.assertIn('stale_identity',f.workspace(self.settings,token)['guard_counts'])
         self.execute("update person set fio='Тестов Человек Номер1' where id=1")
