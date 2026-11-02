@@ -141,19 +141,24 @@ def main():
     output = args.output.resolve()
     if output.exists() or output.suffix.lower()!='.json':
         parser.error('Укажите новый отдельный JSON-отчёт.')
+    baseline={'schema':'enrichment-diagnostic-v2','app_version':None}
     try:
+        content=args.xlsx.read_bytes()
+        baseline.update(file_sha256=hashlib.sha256(content).hexdigest(),file_bytes=len(content),
+                        canonical_final_sha256_match=hashlib.sha256(content).hexdigest()=='a84c785b90849f09ff4a77931de563ec430d9c36b39422981308592c5ffcdc2f')
         from dotenv import load_dotenv
         load_dotenv(args.app_dir.resolve()/'.env',override=True)
         from backend.app.config import get_settings
         from backend.app.version import APP_VERSION
+        baseline['app_version']=APP_VERSION
         settings=get_settings()
         if output==settings.rewards_db_path.resolve() or output==args.xlsx.resolve() or output.is_relative_to(settings.rewards_data_dir.resolve()):
             raise ValueError('report_destination_must_be_outside_data')
-        result=diagnose(settings,args.xlsx.read_bytes());result['app_version']=APP_VERSION
+        result=diagnose(settings,content);result['app_version']=APP_VERSION
     except Exception as exc:
         known={'invalid_database_header','wal_mode_not_supported_readonly_diagnostic','active_journal_read_consistency_not_confirmed','report_destination_must_be_outside_data'}
         code=str(exc) if str(exc) in known else type(exc).__name__
-        result={'schema':'enrichment-diagnostic-v2','fatal':True,'diagnostic_error_code':code,
+        result={**baseline,'fatal':True,'diagnostic_error_code':code,
                 'database_write':False,'key_created_or_changed':False,'live_consistency':'not_proven'}
     # Refuse writing into the installation or onto an input even on errors.
     if output==args.xlsx.resolve() or output.is_relative_to(args.app_dir.resolve()):
