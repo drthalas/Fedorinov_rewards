@@ -91,11 +91,11 @@ def progress(connection, settings, record, values, snapshot, row_number):
                 except (bio.ValidationError, KeyError, TypeError):
                     valid = False
             if not valid:
-                raise bio.ValidationError('Историю этой строки не удалось подтвердить. Нужна новая выгрузка.')
+                raise bio.ImportGuardError('receipt_invalid', 'Историю этой строки не удалось подтвердить. Нужна новая выгрузка.')
             if event.get('source_snapshot_digest', _source_digest(record, values)) != _source_digest(record, values):
-                raise bio.ValidationError('История относится к другой выгрузке. Нужна новая проверка.')
+                raise bio.ImportGuardError('receipt_invalid', 'История относится к другой выгрузке. Нужна новая проверка.')
             if not _same_state(event['identity'],expected_identity, bool(events)):
-                raise bio.ValidationError('Последовательность изменений карточки нарушена. Нужна новая выгрузка.')
+                raise bio.ImportGuardError('receipt_invalid', 'Последовательность изменений карточки нарушена. Нужна новая выгрузка.')
             if not events:
                 # Re-uploading the identical workbook starts at the same receipt
                 # chain, not at today's already-updated values.
@@ -115,7 +115,7 @@ def progress(connection, settings, record, values, snapshot, row_number):
 def _audit_available(connection):
     columns = {r['name'] for r in connection.execute('pragma table_info(logs)')}
     if not {'datetime', 'action', 'comment'} <= columns:
-        raise bio.ValidationError('В этой базе нет совместимого журнала logs. Проверка остановлена: требуется решение владельца о миграции; схема не изменена.')
+        raise bio.ImportGuardError('audit_unavailable', 'В этой базе нет совместимого журнала logs. Проверка остановлена: требуется решение владельца о миграции; схема не изменена.', ['logs'])
 
 
 def _fields(connection, person_id):
@@ -128,7 +128,7 @@ def _fields(connection, person_id):
 def _validated(connection, settings, token, row_number, *, record=None):
     record = bio.load_preview(settings, token) if record is None else record
     if record.get('state') == 'commit_pending':
-        raise bio.ValidationError('Исход предыдущей записи не подтверждён. Загрузите файл для новой проверки текущей базы.')
+        raise bio.ImportGuardError('receipt_pending', 'Исход предыдущей записи не подтверждён. Загрузите файл для новой проверки текущей базы.')
     entries = [e for e in record['entries'] if e['row'] == row_number]
     if len(entries) != 1:
         raise bio.ValidationError('Строка не найдена. Загрузите файл заново.')
@@ -136,28 +136,28 @@ def _validated(connection, settings, token, row_number, *, record=None):
     values = entry['values']
     raw_id = values.get('person_id', '')
     if entry['invalid'] or not re.fullmatch(r'[1-9][0-9]{0,18}', raw_id) or int(raw_id) > 2**63-1:
-        raise bio.ValidationError('Повреждённая строка или ID. Исправьте файл и загрузите заново.')
+        raise bio.ImportGuardError('row_invalid', 'Повреждённая строка или ID. Исправьте файл и загрузите заново.', ['person_id'])
     person_id = int(raw_id)
     if person_id in record['duplicates']:
-        raise bio.ValidationError('Повторяющийся ID: оставьте одну согласованную строку и загрузите файл заново.')
+        raise bio.ImportGuardError('duplicate_id', 'Повторяющийся ID: оставьте одну согласованную строку и загрузите файл заново.', ['person_id'])
     snapshot = bio._snapshot(settings, values if values.get('snapshot') else record['originals'].get(raw_id, {}))
     if values.get('_format') == 'visible-7-v2' and (snapshot['version'] != 2 or snapshot.get('contract') != 'visible-7-v2'):
-        raise bio.ValidationError('Подпись относится к другому формату. Нужна новая выгрузка.')
+        raise bio.ImportGuardError('format_mismatch', 'Подпись относится к другому формату. Нужна новая выгрузка.', ['contract'])
     own = progress(connection, settings, record, values, snapshot, row_number)
     live = bio._identity(connection, person_id)
     if not _same_state(own['identity'],live,bool(own['events'])):
         labels = {'person_id':'ID кавалера', 'fio':'ФИО', 'birthday':'Год рождения', 'id_rank':'Звание', 'rank':'Звание', 'awards':'Награды и номера'}
         changed = ', '.join(dict.fromkeys(labels[n] for n in own['identity'] if live is None or own['identity'][n] != live.get(n)))
-        raise bio.ValidationError(f'ID {person_id}: исходные данные устарели; изменены поля: {changed}. Скачайте свежие данные и повторите проверку.')
+        raise bio.ImportGuardError('person_missing' if live is None else 'stale_identity', f'ID {person_id}: исходные данные устарели; изменены поля: {changed}. Скачайте свежие данные и повторите проверку.', [labels[n] for n in own['identity'] if live is None or own['identity'][n] != live.get(n)])
     original = bio._original(snapshot)
     for name, expected in original.items():
         if bio.key(values.get(name)) != bio.key(expected):
-            raise bio.ValidationError(f'Изменено исходное поле «{name}». Принять такую строку нельзя. Восстановите исходную выгрузку; предложения вводите в панели проверки.')
+            raise bio.ImportGuardError('protected_field_changed', f'Изменено исходное поле «{name}». Принять такую строку нельзя. Нужна подлинная выгрузка с сохранёнными найденными сведениями.', [name])
     _audit_available(connection)
     row = next(r for r in record['rows'] if r['row'] == row_number)
     current = _fields(connection, person_id)
     if own['expected'] is not None and not _same_state(current,own['expected'],bool(own['events'])):
-        raise bio.ValidationError('Поля изменены после проверки вне этого импорта. Нужна новая выгрузка.')
+        raise bio.ImportGuardError('concurrent_fields', 'Поля изменены после проверки вне этого импорта. Нужна новая выгрузка.', [n for n in current if current[n] != own['expected'].get(n)])
     if own['events']:
         own['identity'] = live
         own['expected'] = current

@@ -95,6 +95,14 @@ class ValidationError(ValueError):
     pass
 
 
+class ImportGuardError(ValidationError):
+    """Safe structured reason; never includes a key, signature or BIO text."""
+    def __init__(self, code, message, fields=()):
+        super().__init__(message)
+        self.code = code
+        self.fields = list(fields)
+
+
 def text(value):
     return '' if value is None else str(value).strip()
 
@@ -118,10 +126,15 @@ def canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
 
 
+def _state_path(settings):
+    # Pure path calculation also supports diagnostics without creating state.
+    identity = hashlib.sha256(str(settings.rewards_db_path.resolve()).encode()).hexdigest()
+    return Path(tempfile.gettempdir()) / 'fedorinov-biography-enrichment' / identity
+
+
 def _state(settings):
     # Separate databases cannot share tokens or signatures. Never inside DB/media.
-    identity = hashlib.sha256(str(settings.rewards_db_path.resolve()).encode()).hexdigest()
-    root = Path(tempfile.gettempdir()) / 'fedorinov-biography-enrichment' / identity
+    root = _state_path(settings)
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     return root
 
@@ -448,15 +461,20 @@ def read_rows(content):
 def _snapshot(settings, values):
     serialized = values.get('snapshot', '')
     signature = values.get('snapshot_signature', '')
-    if not serialized or not hmac.compare_digest(signature, _sign(settings, serialized)):
-        raise ValidationError('Не удалось проверить исходные данные файла. Скачайте актуальный шаблон в блоке «Экспорт данных» и перенесите только биографии, источники и статусы.')
+    if not serialized:
+        raise ImportGuardError('snapshot_missing', 'В строке отсутствуют исходные данные подписанной выгрузки.', ['snapshot'])
+    if not signature:
+        raise ImportGuardError('signature_missing', 'В строке отсутствует подпись исходной выгрузки.', ['snapshot_signature'])
+    if not isinstance(signature,str) or not re.fullmatch(r'[0-9a-f]{64}',signature) or not hmac.compare_digest(signature, _sign(settings, serialized)):
+        raise ImportGuardError('signature_invalid', 'Подпись исходных данных не подтверждена: файл изменён либо подписан другим ключом. Скачайте актуальный шаблон только после проверки установки.', ['snapshot_signature'])
     try:
         snapshot = json.loads(serialized)
-        if snapshot['version'] not in {1, 2} or not isinstance(snapshot['person']['person_id'], int):
+        if snapshot['version'] not in {1, 2} or type(snapshot['person']['person_id']) is not int:
             raise ValueError()
+        _original(snapshot)  # Shape required by both preview and final guard.
         return snapshot
-    except (ValueError, KeyError, TypeError) as exc:
-        raise ValidationError('Повреждены служебные данные исходной выгрузки. Скачайте данные заново.') from exc
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
+        raise ImportGuardError('snapshot_invalid', 'Повреждена структура исходных данных выгрузки.', ['snapshot']) from exc
 
 
 def _assess(connection, settings, entry, originals, duplicates):

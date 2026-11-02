@@ -332,10 +332,13 @@ def report(token: str):
     # uncertain outcome. It must never be reported as a confirmed write.
     if result['state'] == 'commit_pending':
         result['warning'] = 'Результат транзакции не подтверждён. Нужен новый preview текущей базы.'
-    view = workflow.present(get_settings(),token)
+    view = workflow.workspace(get_settings(),token)
     payload = {name: result[name] for name in ('created', 'state', 'file_sha256')}
-    payload.update(ready=view['ready'],confirmed=view['confirmed'],pending=view['pending'],
-                   rows=[{'person_id':r['person_id'],'fio':r['fio'],'status':r['status'],'reason':r['reason']} for r in view['rows']])
+    payload.update(fatal=view['fatal'],guard_counts=view['guard_counts'],guard_failures=view['guard_failures'],
+                   ready=view['ready'],prepared=view['ready'],import_allowed=not view['fatal'] and bool(view['eligible']),
+                   confirmed=view['confirmed'],pending=view['pending'],
+                   rows=[{'row':r['row'],'person_id':r['person_id'],'fio':r['fio'],'status':r['status'],'reason':r['reason'],
+                          'guard':r['guard']} for r in view['rows']])
     if result.get('warning'):
         payload['warning'] = result['warning']
     return Response(service.canonical(payload), media_type='application/json',

@@ -40,7 +40,7 @@
     <section class="cavalier-form-card bio-card" id="bio-upload">
       <form action="{{ base }}/preview" method="post" enctype="multipart/form-data" data-auto-preview>
         <div class="bio-file-picker" data-bio-file-picker><label id="bio-file-label" for="bio-file-input">Заполненный файл XLSX</label><div class="bio-file-choice"><label class="button bio-file-button" for="bio-file-input"><span id="bio-file-choose-label">Выбрать файл</span><input id="bio-file-input" type="file" name="file" accept=".xlsx" required aria-labelledby="bio-file-choose-label bio-file-label"></label><span data-bio-file-name>{{ view.filename if view else '' }}</span></div><p data-bio-file-error role="alert" hidden></p></div>
-        <p data-upload-status role="status">{{ 'Результаты сохранённого импорта.' if completed else 'Файл проверен. Решения будут записаны только после общего импорта.' if result else 'Выберите XLSX. Проверка начнётся автоматически; данные пока не записываются.' }}</p>
+        <p data-upload-status role="status">{{ 'Результаты сохранённого импорта.' if completed else 'Проверка остановлена. Готовые биографии в файле сохранены; причины указаны ниже.' if view and view.fatal else 'Файл проверен. Решения будут записаны только после общего импорта.' if result else 'Выберите XLSX. Проверка начнётся автоматически; данные пока не записываются.' }}</p>
       </form>
     </section>
     {% if result %}{% include 'enrichment_workspace.html' %}

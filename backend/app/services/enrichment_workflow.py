@@ -1,5 +1,6 @@
 """Explicit, atomic file import plus resumable field review. No migrations."""
 from contextlib import closing
+from collections import Counter
 from datetime import datetime
 import hmac
 import json
@@ -34,6 +35,8 @@ def workspace(settings, token, operations=()):
     view.update(buckets=buckets,counts={k:len(v) for k,v in buckets.items()},unchanged=unchanged,
         totals=totals,accepted=0,eligible=len(buckets['ready']),operations=[],
         fatal=any(r['review'] is None for r in view['rows']),
+        guard_failures=[{'row':r['row'],'person_id':r['person_id'],**r['guard']} for r in view['rows'] if r.get('guard')],
+        guard_counts=dict(Counter(r['guard']['code'] for r in view['rows'] if r.get('guard'))),
         revision=bio._sign(settings,bio.canonical({'kind':'workspace-v5','base':view['revision']})))
     return view
 
@@ -57,11 +60,14 @@ def present(settings, token):
     with closing(bio._connection(settings.rewards_db_path)) as connection:
         for original in record['rows']:
             row = dict(original)
+            row['guard'] = None
             try:
                 review = choices.detail(settings,token,row['row'],connection=connection,record=record)
                 row.update(review=review, fio=review['fio'],state=review['state'],status=review['status'],reason=review['reason'])
             except bio.ValidationError as exc:
-                row.update(review=None,state='blocked',status='Нужна новая проверка',reason=choices.friendly_error(exc))
+                reason=str(exc) if isinstance(exc,bio.ImportGuardError) else choices.friendly_error(exc)
+                row.update(review=None,state='blocked',status='Проверка остановлена',reason=reason,
+                    guard={'code':getattr(exc,'code','guard_unknown'),'fields':getattr(exc,'fields',[]),'reason':reason,'display_reason':reason.removeprefix(f"ID {row['person_id']}: " )})
             row['fio'] = evidence.display_fio(row['fio'])
             row['automatic'] = row['review']['automatic'] if row['review'] else {}
             row['changes'] = [{'name':n,'label':manual.FIELDS[n], 'before':row['review']['current'][n], 'after':v}
