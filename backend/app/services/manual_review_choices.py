@@ -33,6 +33,8 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
         elif len(text)>2500:blockers.append('Текст длиннее 2 500 символов. Нужна подготовленная краткая биография.')
         elif (trusted or ordinary) and 'biography' not in resolved:automatic['biography']=text
         else:blockers.append(proof['problems'][0] if proof['problems'] else 'Нет отдельного подтверждения полного ФИО, точной награды и номера источником.')
+    if not declined and trusted and proof['source_fio_verified'] and proof['fio'] != current['fio'] and 'fio' not in resolved:
+        automatic['fio'] = proof['fio']
     if not automatic and not blockers:
         if bio.blank(text) and bio.blank(current['biography']):blockers.append('В XLSX нет текста биографии. Одна ссылка не содержит подготовленного текста для импорта.')
         elif not proposed_year or proposed_year==year or not proof['year_reliable']:
@@ -40,7 +42,11 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
     confirmed=bool(events) and not automatic and not blockers
     state='confirmed' if confirmed else 'ready' if automatic else 'blocked' if blockers else 'unchanged'
     status={'confirmed':'Подтверждено','ready':'Готово к импорту','blocked':'Недостаточно данных','unchanged':'Без изменений'}[state]
-    reason=('Будут добавлены: '+', '.join(manual.FIELDS[n].lower() for n in automatic)+'.') if automatic else (blockers[0] if blockers else information[-1])
+    if automatic:
+        prefix = 'Точная награда и её номер подтверждают личность. Будут записаны: ' if 'fio' in automatic else 'Будут добавлены: '
+        reason = prefix + ', '.join(manual.FIELDS[n] if n=='fio' else manual.FIELDS[n].lower() for n in automatic) + '.'
+    else:
+        reason = blockers[0] if blockers else information[-1]
     return {'token':token,'row_number':row_number,'person_id':snapshot['person']['person_id'],
         'fio':evidence.display_fio(current['fio']),'raw_fio':current['fio'],'award_context':proof['award_context'],
         'fields':{},'automatic':automatic,'blockers':blockers,'information':information,

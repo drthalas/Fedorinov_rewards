@@ -411,6 +411,36 @@ def _merge_proposals(workbook, rows):
     return rows
 
 
+def _merge_full_evidence(workbook, rows):
+    """Keep self-contained research evidence bound to its ID and source.
+
+    These are untrusted assertions, never a substitute for snapshot/HMAC guards.
+    The evidence analyzer checks the referenced digest and award linkage.
+    """
+    title = 'Полные доказательства'
+    if title not in workbook.sheetnames:
+        return rows
+    iterator = workbook[title].iter_rows()
+    header = next(iterator, ())
+    if [text(c.value) for c in header] != ['ID кавалера', 'Источник', 'Полные доказательства JSON']:
+        raise ValidationError('Неверные колонки листа «Полные доказательства».')
+    by_id = {e['values']['person_id']: e for e in rows}
+    seen = set()
+    for number, cells in enumerate(iterator, 2):
+        if number > MAX_ROWS+1:
+            raise ValidationError('Слишком много строк доказательств.')
+        if not any(text(c.value) for c in cells):
+            continue
+        if len(cells) != 3 or any(c.data_type in {'f', 'e'} or len(text(c.value)) > 32000 for c in cells):
+            raise ValidationError('В полных доказательствах есть формула, ошибка или слишком длинный текст.')
+        pid, source, payload = [text(c.value) for c in cells]
+        if pid in seen or pid not in by_id:
+            raise ValidationError('ID полных доказательств повторяется или отсутствует в выгрузке.')
+        seen.add(pid)
+        by_id[pid]['values']['_full_evidence'] = {'source': source, 'json': payload}
+    return rows
+
+
 def read_rows(content):
     if not content or len(content) > MAX_BYTES:
         raise ValidationError('Выберите XLSX размером не более 10 МБ.')
@@ -445,10 +475,10 @@ def read_rows(content):
                 values.update(visible)
                 values['_format'] = 'visible-7-v2'
                 entry['values'] = values
-            return _merge_proposals(workbook, rows)
+            return _merge_full_evidence(workbook, _merge_proposals(workbook, rows))
         required = {'person_id', 'ФИО', 'Год рождения', 'Звание', 'Награда', 'Иерархия ID',
                     'Номер(а) награды', 'biography', 'source_url', 'status'}
-        return _merge_proposals(workbook, _sheet_rows(sheet, required))
+        return _merge_full_evidence(workbook, _merge_proposals(workbook, _sheet_rows(sheet, required)))
     except ValidationError:
         raise
     except Exception as exc:

@@ -166,7 +166,8 @@ class ManualReviewTests(unittest.TestCase):
         other=self.root/'other-install';other.mkdir()
         with patch.object(bio,'_state',return_value=other):
             token,_=bio.preview(self.settings,content)
-            with self.assertRaisesRegex(bio.ValidationError,'служебные данные'): manual.review(self.settings,token,2)
+            with self.assertRaises(bio.ImportGuardError) as caught: manual.review(self.settings,token,2)
+            self.assertEqual(caught.exception.code,'signature_invalid')
         token,_=self.preview()
         p,_=self.plan(token,birthday_decision='accept',birthday_proposal='1938')
         self.execute('update rewards set number=726')

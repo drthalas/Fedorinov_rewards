@@ -171,6 +171,7 @@ def _commit_import(settings, operation, progress=lambda *args:None):
                       'token':plan['token'],'file_sha256':record['file_sha256'],
                       'biographies':sum('biography' in e['writes'] for e in events),
                       'years':sum('birthday' in e['writes'] for e in events),
+                      'names':sum('fio' in e['writes'] for e in events),
                       'skipped':len(record['rows'])-len({e['person_id'] for e in events if e['writes']}),
                       'skipped_reasons':plan.get('skipped_reasons',[])}
             connection.execute('insert into logs(datetime,action,comment) values(?,?,?)',
@@ -195,6 +196,7 @@ def result_summary(result, total_rows=None):
     return {'saved':len({e['person_id'] for e in events if e['writes']}),
             'biographies':sum('biography' in e['writes'] for e in events),
             'years':sum('birthday' in e['writes'] for e in events),
+            'names':sum('fio' in e['writes'] for e in events),
             'skipped':result.get('skipped',max(0,total_rows-len({e['person_id'] for e in events if e['writes']})) if total_rows is not None else 0),'skipped_reasons':result.get('skipped_reasons',[])}
 
 
@@ -207,7 +209,7 @@ def completed_preview(settings,token,view=None):
             same_file=view is not None and not view['fatal'] and not view['eligible'] and view['confirmed'] and any(e.get('file_sha256')==record['file_sha256'] for e in result.get('events',[]))
             if same_token or same_file:return {'operation':result['operation'],'summary':result_summary(result,len(record['rows'])),'already_done':bool(same_file and not same_token)}
     if view is not None and not view['fatal'] and not view['eligible'] and view.get('unchanged') and not view['counts']['insufficient']:
-        return {'operation':None,'no_changes':True,'summary':{'saved':0,'biographies':0,'years':0,'skipped':len(record['rows']),'skipped_reasons':[]}}
+        return {'operation':None,'no_changes':True,'summary':{'saved':0,'biographies':0,'years':0,'names':0,'skipped':len(record['rows']),'skipped_reasons':[]}}
     return None
 
 

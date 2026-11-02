@@ -110,7 +110,7 @@
   function imported(value,noChanges=false,already=false){
     operationScreen('success');state.importMode='success';state.active=null;busy=false;
     operationRegion.querySelector('[data-import-success] h2').textContent=noChanges?'Изменений нет':'Импорт завершён';
-    for(const name of ['saved','biographies','years','skipped'])operationRegion.querySelector('[data-result-'+name+']').textContent=value[name]||0;
+    for(const name of ['saved','biographies','years','names','skipped'])operationRegion.querySelector('[data-result-'+name+']').textContent=value[name]||0;
     let notice=operationRegion.querySelector('[data-import-already]');if(!notice){notice=document.createElement('p');notice.dataset.importAlready='';operationRegion.querySelector('[data-import-success] h2').after(notice);}
     notice.textContent=already?'Этот файл уже импортирован. Новая запись не выполнялась.':'';
     const skipped=operationRegion.querySelector('[data-import-skips]'),list=skipped.querySelector('ul');list.replaceChildren();

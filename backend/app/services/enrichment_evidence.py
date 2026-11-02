@@ -1,5 +1,8 @@
 """Source assertions are separate from, and never modify, signed originals."""
 import re
+import json
+import hashlib
+import unicodedata
 from urllib.parse import urlsplit, parse_qs
 
 from . import biography_enrichment as bio
@@ -46,6 +49,76 @@ def identity_name(value):
     value=re.sub(r'\([^)]*\)','',bio.key(value))
     # Documented patronymic variants; used only with exact award/serial + year.
     return ' '.join({'артемьевич':'артемович'}.get(x,x) for x in value.split())
+
+def source_name(value, current=''):
+    """person stores one fio string: preserve compound names and Unicode as-is.
+
+    Do not guess component boundaries or silently erase a known patronymic.
+    Parenthesized surname variants are retained, never flattened into tokens.
+    """
+    value = bio.text(value)
+    if not 5 <= len(value) <= 250 or any(not (c.isalpha() or unicodedata.category(c).startswith('M') or c in " '-’()") for c in value):
+        return False
+    if value.count('(') != value.count(')') or value.count('(') > 1 or '(' in value and value.index(')') < value.index('('):
+        return False
+    words = re.sub(r'\([^)]*\)', '', value).split()
+    old_words = re.sub(r'\([^)]*\)', '', bio.text(current)).split()
+    return len(words) >= max(2, len(old_words)) and all(sum(c.isalpha() for c in w) >= 2 for w in words)
+
+
+def _hsu_evidence(snapshot, values, relevant):
+    """HSU3489 v1: exact selected Gold Star set, ordinal, ID/source/digest.
+
+    Hashes establish internal consistency only, not a trusted research signer.
+    No inference from an arbitrary medal number or a name's edit distance.
+    """
+    try:
+        notes = json.loads(values.get('notes', ''))
+    except (ValueError, TypeError, RecursionError):
+        return False, None
+    if not isinstance(notes, dict) or notes.get('full_evidence_sheet') != 'Полные доказательства':
+        return False, None
+    problem = 'Нет согласованных полных доказательств личности, выбранной награды и её номера.'
+    try:
+        attached = values['_full_evidence'];raw = attached['json'];proof = json.loads(raw)
+        if not isinstance(proof, dict):return False, problem
+        pid = str(snapshot['person']['person_id'])
+        if str(notes.get('full_evidence_ID')) != pid or hashlib.sha256(raw.encode()).hexdigest() != notes.get('full_evidence_SHA256'):
+            return False, problem
+        if attached['source'] != values['source_url'] or proof.get('source_url') != values['source_url'] or proof.get('source_fio') != values.get('ФИО в карточке'):
+            return False, problem
+        if proof.get('state') != 'confirmed' or notes.get('research_state') != 'confirmed' or proof.get('identity_path') != 'A_HSU_EXACT_GOLD_STAR_SET' or notes.get('identity_path') != proof['identity_path']:
+            return False, problem
+        if proof.get('profile_sha256') != notes.get('source_HTML_SHA256') or not re.fullmatch('[0-9a-f]{64}', proof.get('profile_sha256', '')):
+            return False, problem
+        if re.search(r'личность не подтвержд|другой человек|неразреш[её]н|несколько кандидатов', bio.key(proof.get('source_caveats', ''))):
+            return False, 'В доказательствах есть неразрешённое противоречие личности.'
+        original = proof['input_rechecked']
+        if bio.key(original['fio']) != bio.key(snapshot['person']['fio']):return False, problem
+        selected = {(bio.key(a['award']), str(a['number'])) for a in relevant}
+        if not selected or any(a[0] not in {'герой советского союза', 'герой советского союза ii', 'герой советского союза iii'} or a[1] in {'', 'None', '0'} for a in selected):
+            return False, problem
+        if set(map(str, original['serials'])) != {a[1] for a in selected} or bio.key(original['award']) not in {a[0] for a in selected}:
+            return False, problem
+        for candidate in proof.get('candidate_assessments', []):
+            # A documented other award/serial resolves a rejected candidate.
+            # An unexamined candidate or another exact match stays unresolved.
+            other = {(bio.key(a['award']), str(a['serial'])) for a in candidate.get('public_award_links', [])}
+            ruled_out = candidate.get('gss_title') is False or bool(other) and not (other & selected)
+            if not ruled_out:
+                return False, 'Несколько неразрешённых кандидатов: требуется проверка личности.'
+        links = proof['source_selected_award_links']
+        if not links or {(bio.key(a['award']), str(a['serial'])) for a in links} != selected:return False, problem
+        for link in links:
+            ordinal = {'герой советского союза':1, 'герой советского союза ii':2, 'герой советского союза iii':3}[bio.key(link['award'])]
+            if type(link.get('ordinal')) is not int or link['ordinal'] != ordinal or not link.get('method'):
+                return False, problem
+        if {(str(a['serial']), a['ordinal']) for a in notes['confirmed_GoldStars']} != {(str(a['serial']), a['ordinal']) for a in links}:
+            return False, problem
+        return True, None
+    except (KeyError, TypeError, ValueError, AttributeError, RecursionError):
+        return False, problem
+
 
 def analyze(snapshot, values, current):
     fio = bio.text(values.get('ФИО в карточке'))
@@ -102,9 +175,25 @@ def analyze(snapshot, values, current):
     corroborated = not numbered and bool(matched) and valid_year and year==current_year and year!='1945' and rank not in {'','гражданский','неизвестно'} and rank==bio.key(snapshot['person']['rank'])
     variant_verified = variant and serial_match and valid_year and year==current_year
     material = bool(re.search(r'другой (?:человек|кавалер)|не тот (?:человек|кавалер)|номер не совпад|награда не совпад',bio.key(notes+' '+statement)))
+    structured, structured_problem = _hsu_evidence(snapshot, values, relevant)
+    if structured_problem:
+        problems.append(structured_problem)
+    # Explicit same-person assertion is required for a differing source name.
+    # A generic 'ФИО совпали' and a serial alone cannot authorize a rename.
+    explicit = bool(re.search(r'личность подтверждена|тот же кавалер|идентичность подтверждена', statement))
+    ambiguous = bool(re.search(r'несколько кандидатов|неразреш[её]н|неоднознач|другой кандидат', bio.key(notes+' '+statement)))
+    name_complete = source_name(fio, current['fio'])
+    if (structured or explicit) and fio and not name_complete:
+        problems.append('ФИО источника неполно или неоднозначно; известные части имени не будут удалены.')
+    source_identity = bool(warheroes and matched and serial_match and not negative and not material and not ambiguous
+                           and len(notes)>=10 and (structured or explicit and not structured_problem)
+                           and name_complete)
+    if source_identity:
+        problems = [p for p in problems if not p.startswith(('ФИО в источнике', 'Для надёжной сверки'))]
     if (variant_verified or same_fio and serial_match) and not material:
         problems=[p for p in problems if not p.startswith('ФИО в источнике')]
-    verified = bool(valid_source and not problems and not material and (same_fio or variant_verified) and matched and len(notes)>=10 and (serial_match or corroborated))
+    problems.sort(key=lambda p: p.startswith('ФИО в источнике'))
+    verified = bool(valid_source and not problems and not material and (same_fio or variant_verified or source_identity) and matched and len(notes)>=10 and (serial_match or corroborated))
     # An omitted parenthesized surname can be reviewed, never auto-approved.
     # Exact signed award/serial and matching birth year independently corroborate
     # the alias. Unrelated names, different awards/serials and contrary evidence
@@ -116,7 +205,7 @@ def analyze(snapshot, values, current):
                            and len(notes)>=10 and not contradiction
                            and not (supplied_serial and not any(supplied_serial==str(a['number']) for a in numbered)))
     return {'fio':fio,'year':year,'valid_year':valid_year,'year_reliable':bio.key(values.get('Год подтверждён','да'))=='да','source':source,'notes':notes,
-            'sources':sources(source),'same_fio':same_fio,'verified':verified,'auto_verified':verified and warheroes,
+            'sources':sources(source),'same_fio':same_fio,'source_fio_verified':source_identity and verified,'verified':verified,'auto_verified':verified and warheroes,
             'problems':problems,'selected':selected,'serial_match':bool(serial_match),'manual_identity':manual_identity,
             'award_context':' · '.join(dict.fromkeys(f'{a["award"]} №{a["number"]}' for a in selected))}
 

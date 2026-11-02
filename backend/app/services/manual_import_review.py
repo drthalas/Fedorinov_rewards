@@ -284,8 +284,8 @@ def prepare(settings, token, row_number, submitted, *, review_fields=None, ident
                     raise bio.ValidationError(str(exc)) from exc
             if name == 'fio':
                 proposed = proposed.strip()
-                if len(proposed) < 5 or len(proposed.split()) < 2 or not any(c.isalpha() for c in proposed) or any(
-                        not (c.isalpha() or c in " '-’().") for c in proposed):
+                from .enrichment_evidence import source_name
+                if not source_name(proposed, current['fio']):
                     raise bio.ValidationError('ФИО: укажите полное имя, без цифр, ссылок и управляющих символов.')
             if name in {'birthday', 'fio'} and submitted.get('identity_confirm') != 'yes':
                 raise bio.ValidationError('Для года/ФИО подтвердите личную проверку источника и точной награды с номером. Неподтверждённый вариант фамилии недостаточен.')
@@ -328,9 +328,18 @@ def check_plan(connection, settings, plan, *, record=None):
 
 def apply_plan(connection, settings, plan, operation, *, record=None):
     """Apply one already-confirmed plan inside the caller's transaction."""
-    if 'fio' in plan['writes']:
-        raise bio.ValidationError('Импорт не переименовывает ФИО по источнику. Используйте отдельный аудит латинских двойников.')
     record = check_plan(connection, settings, plan, record=record)
+    if 'fio' in plan['writes']:
+        from . import enrichment_evidence as evidence
+        values = next(e['values'] for e in record['entries'] if e['row'] == plan['row_number'])
+        snapshot = bio._snapshot(settings, values if values.get('snapshot') else record['originals'].get(values['person_id'], {}))
+        proof = evidence.analyze(snapshot, values, plan['expected'])
+        allowed_status = bio.key(values.get('status')) in {'найдено','требует проверки','биография подтверждена',
+            'подтверждено','confirmed','requires review','requires verification'}
+        if (not allowed_status or not proof['auto_verified'] or not proof['source_fio_verified']
+                or plan['fields']['fio']['after'] != proof['fio']
+                or plan['fields']['fio']['source'] != proof['source']):
+            raise bio.ValidationError('Импорт не переименовывает ФИО без доказанной личности и точной награды с номером.')
     changed = {n:f['after'] for n,f in plan['fields'].items() if f['decision'] == 'accept' and f['before'] != f['after']}
     if changed:
         names = [n for n in FIELDS if n in changed]
