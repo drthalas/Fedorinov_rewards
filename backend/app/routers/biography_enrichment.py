@@ -91,6 +91,7 @@ def workspace_plan(request: Request, token: str, revision: str=Form(...), operat
     _same_origin(request)
     try:
         operation,plan=workflow.prepare_workspace(get_settings(),token,revision,_operations(operations))
+        if operation is None:return _review_fragment(request,no_changes=plan)
         return _review_fragment(request,batch_plan=plan,operation=operation)
     except service.ValidationError as exc:
         return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
@@ -335,7 +336,7 @@ def report(token: str):
     view = workflow.workspace(get_settings(),token)
     payload = {name: result[name] for name in ('created', 'state', 'file_sha256')}
     payload.update(fatal=view['fatal'],guard_counts=view['guard_counts'],guard_failures=view['guard_failures'],
-                   ready=view['ready'],prepared=view['ready'],import_allowed=not view['fatal'] and bool(view['eligible']),
+                   stale_skipped=view['stale_skipped'],ready=view['ready'],prepared=view['ready'],import_allowed=not view['fatal'] and bool(view['eligible']),
                    confirmed=view['confirmed'],pending=view['pending'],
                    rows=[{'row':r['row'],'person_id':r['person_id'],'fio':r['fio'],'status':r['status'],'reason':r['reason'],
                           'guard':r['guard']} for r in view['rows']])

@@ -34,7 +34,9 @@ def workspace(settings, token, operations=()):
         buckets[bucket].append(row)
     view.update(buckets=buckets,counts={k:len(v) for k,v in buckets.items()},unchanged=unchanged,
         totals=totals,accepted=0,eligible=len(buckets['ready']),operations=[],
-        fatal=any(r['review'] is None for r in view['rows']),
+        fatal=any(r['review'] is None and r['state']!='stale' for r in view['rows']),
+        stale_skipped=sum(r['state']=='stale' for r in view['rows']),
+        fatal_failures=[{'row':r['row'],'person_id':r['person_id'],**r['guard']} for r in view['rows'] if r.get('guard') and r['state']!='stale'],
         guard_failures=[{'row':r['row'],'person_id':r['person_id'],**r['guard']} for r in view['rows'] if r.get('guard')],
         guard_counts=dict(Counter(r['guard']['code'] for r in view['rows'] if r.get('guard'))),
         revision=bio._sign(settings,bio.canonical({'kind':'workspace-v5','base':view['revision']})))
@@ -43,15 +45,20 @@ def workspace(settings, token, operations=()):
 
 def prepare_workspace(settings, token, revision, operations):
     view=workspace(settings,token,operations)
-    if view['fatal'] or not hmac.compare_digest(str(revision),view['revision']):
+    if view['fatal']:
         raise bio.ValidationError('Файл или карточки изменились. Получите свежую выгрузку; ничего не записано.')
+    refreshed=not hmac.compare_digest(str(revision),view['revision'])
     plans=[]
     for row in view['buckets']['ready']:
         _,plan=choices.row_plan(settings,token,row['row'],{n:'accept' for n in row['automatic']},expected=row['review']['current'],mode='import')
         plans.append(plan)
-    if not plans:raise bio.ValidationError('Новых подтверждённых изменений нет. Повторная запись не требуется.')
-    return _store_batch(settings,token,view['filename'],plans,
-        {'fields':view['totals'],'ready':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),'people':len(plans)})
+    summary={'fields':view['totals'],'ready':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),
+             'stale_skipped':view['stale_skipped'],'people':len(plans),'refreshed':refreshed}
+    if not plans:
+        if view['stale_skipped']:
+            return None, {'summary':summary,'skipped_reasons':_skipped_rows(view,plans)}
+        raise bio.ValidationError('Новых подтверждённых изменений нет. Повторная запись не требуется.')
+    return _store_batch(settings,token,view['filename'],plans,summary,view=view)
 
 
 def present(settings, token):
@@ -64,6 +71,10 @@ def present(settings, token):
             try:
                 review = choices.detail(settings,token,row['row'],connection=connection,record=record)
                 row.update(review=review, fio=review['fio'],state=review['state'],status=review['status'],reason=review['reason'])
+            except manual.RowStaleError as exc:
+                reason=str(exc)
+                row.update(review=None,state='stale',status='Карточка изменена после выгрузки — пропущена',reason=reason,
+                    guard={'code':exc.code,'fields':exc.fields,'reason':reason,'display_reason':reason,'row_local':True,'live_revision':exc.live_revision})
             except bio.ValidationError as exc:
                 reason=str(exc) if isinstance(exc,bio.ImportGuardError) else choices.friendly_error(exc)
                 row.update(review=None,state='blocked',status='Проверка остановлена',reason=reason,
@@ -78,16 +89,17 @@ def present(settings, token):
             rows.append(row)
     ready = [r for r in rows if r['automatic']]
     revision = bio._sign(settings,bio.canonical({'kind':'file-import-view','token':token,
-        'rows':[(r['row'],r['review']['revision'] if r['review'] else r['reason']) for r in rows]}))
+        'rows':[(r['row'],r['review']['revision'] if r['review'] else r.get('guard') or r['reason']) for r in rows]}))
     return {'token':token,'created':record['created'],'file_sha256':record['file_sha256'],
             'filename':record.get('filename','Загруженный файл'),'rows':rows,'ready':len(ready),
             'change_count':sum(len(r['automatic']) for r in ready),
             'confirmed':sum(r['state']=='confirmed' for r in rows),
-            'pending':sum(r['state'] in {'manual','blocked'} for r in rows),'revision':revision}
+            'pending':sum(r['state'] in {'manual','blocked','stale'} for r in rows),'revision':revision}
 
 
 def prepare_import(settings, token, revision, exclude=()):
     view = present(settings,token)
+    if workspace(settings,token)['fatal']:raise bio.ValidationError('Подлинность файла не подтверждена. Импорт остановлен.')
     if not hmac.compare_digest(str(revision),view['revision']):
         raise bio.ValidationError('Данные изменились после проверки. Обновите список перед импортом.')
     plans = []
@@ -103,13 +115,23 @@ def prepare_import(settings, token, revision, exclude=()):
     return _store_batch(settings,token,view['filename'],plans)
 
 
-def _store_batch(settings, token, filename, plans, summary=None):
+def _skipped_rows(view, plans):
+    selected={str(p['person_id']) for p in plans}
+    return [{'person_id':r['person_id'],'fio':r['fio'],'reason':r['reason'],
+             'stale':r['state']=='stale','fields':r['guard']['fields'] if r.get('guard') else []}
+            for r in view['rows'] if str(r['person_id']) not in selected and r['state']!='confirmed']
+
+
+def _store_batch(settings, token, filename, plans, summary=None, *, view=None):
     operation = secrets.token_hex(32)
     plan = {'created':time.time(),'state':'file_import_plan','token':token,'rows':plans,'filename':filename}
-    if summary is not None:
-        plan['summary']=summary
-        view=present(settings,token);selected={p['person_id'] for p in plans}
-        plan['skipped_reasons']=[{'person_id':r['person_id'],'fio':r['fio'],'reason':r['reason']} for r in view['rows'] if int(r['person_id']) not in selected]
+    view=workspace(settings,token) if view is None else view
+    if view['fatal']:raise bio.ValidationError('Подлинность файла не подтверждена. Импорт остановлен.')
+    plan.update(workspace_revision=view['revision'],stale_skipped=view['stale_skipped'],skipped_reasons=_skipped_rows(view,plans))
+    if summary is None:
+        summary={'fields':{n:sum(n in p['writes'] for p in plans) for n in manual.FIELDS},'ready':len(plans),
+                 'people':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),'stale_skipped':view['stale_skipped']}
+    plan['summary']=summary
     plan['signature'] = bio._sign(settings,bio.canonical(plan))
     bio._save(settings,operation,plan)
     return operation,plan
@@ -125,7 +147,10 @@ def commit_ordinary(settings, token):
     record = bio.load_preview(settings,token)
     eligible = {r['row'] for r in record['rows'] if r['kind']==bio.READY}
     plans = []
-    for row in present(settings,token)['rows']:
+    view=workspace(settings,token)
+    if view['fatal']:raise bio.ValidationError('Подлинность файла не подтверждена. Импорт остановлен.')
+    for row in view['rows']:
+        if row['state']=='stale':continue
         if row['row'] not in eligible or row['state']=='confirmed':
             continue
         if not row['review'] or 'biography' not in row['automatic']:
@@ -158,6 +183,8 @@ def _commit_import(settings, operation, progress=lambda *args:None):
             if old:
                 return json.loads(old['comment'])
             record = bio.load_preview(settings,plan['token'])
+            # Re-authenticate every original, never disguise a trust error as a skip.
+            for row in record['rows']:manual.validated_original(settings,record,row['row'])
             events = []
             for index, signed in enumerate(plan['rows']):
                 child = dict(signed)
@@ -173,11 +200,15 @@ def _commit_import(settings, operation, progress=lambda *args:None):
                       'years':sum('birthday' in e['writes'] for e in events),
                       'names':sum('fio' in e['writes'] for e in events),
                       'skipped':len(record['rows'])-len({e['person_id'] for e in events if e['writes']}),
+                      'stale_skipped':plan.get('stale_skipped',0),
                       'skipped_reasons':plan.get('skipped_reasons',[])}
             connection.execute('insert into logs(datetime,action,comment) values(?,?,?)',
                 (events[0]['time'],BATCH_PREFIX+operation,bio.canonical(result)))
             progress('Сохраняем изменения…',len(plan['rows']),len(plan['rows']))
             connection.commit()
+        except manual.RowStaleError as exc:
+            connection.rollback()
+            raise bio.ValidationError('Карточки изменились после подтверждения. Все изменения отменены. Обновите проверку и подтвердите импорт заново.') from exc
         except BaseException:
             connection.rollback()
             raise
@@ -197,6 +228,7 @@ def result_summary(result, total_rows=None):
             'biographies':sum('biography' in e['writes'] for e in events),
             'years':sum('birthday' in e['writes'] for e in events),
             'names':sum('fio' in e['writes'] for e in events),
+            'stale_skipped':result.get('stale_skipped',0),
             'skipped':result.get('skipped',max(0,total_rows-len({e['person_id'] for e in events if e['writes']})) if total_rows is not None else 0),'skipped_reasons':result.get('skipped_reasons',[])}
 
 
@@ -208,6 +240,10 @@ def completed_preview(settings,token,view=None):
             result=json.loads(row[0]);same_token=result.get('token')==token or any(e.get('token')==token for e in result.get('events',[]))
             same_file=view is not None and not view['fatal'] and not view['eligible'] and view['confirmed'] and any(e.get('file_sha256')==record['file_sha256'] for e in result.get('events',[]))
             if same_token or same_file:return {'operation':result['operation'],'summary':result_summary(result,len(record['rows'])),'already_done':bool(same_file and not same_token)}
+    if view is not None and not view['fatal'] and not view['eligible'] and view['stale_skipped']:
+        return {'operation':None,'no_changes':True,'all_stale':view['stale_skipped']==len(record['rows']),
+                'summary':{'saved':0,'biographies':0,'years':0,'names':0,'stale_skipped':view['stale_skipped'],
+                           'skipped':len(record['rows']),'skipped_reasons':_skipped_rows(view,[])}}
     if view is not None and not view['fatal'] and not view['eligible'] and view.get('unchanged') and not view['counts']['insufficient']:
         return {'operation':None,'no_changes':True,'summary':{'saved':0,'biographies':0,'years':0,'names':0,'skipped':len(record['rows']),'skipped_reasons':[]}}
     return None
@@ -247,7 +283,14 @@ def confirmation(settings, operation):
             child = dict(child_signed); child_mac = child.pop('signature','')
             if not hmac.compare_digest(child_mac,bio._sign(settings,bio.canonical(child))):
                 raise bio.ValidationError('Подтверждение строки повреждено.')
-            manual.check_plan(connection,settings,child,record=record)
+            if not batch or not plan.get('workspace_revision'):
+                manual.check_plan(connection,settings,child,record=record)
+    if batch and plan.get('workspace_revision'):
+        view=workspace(settings,plan['token'])
+        if view['revision']!=plan['workspace_revision']:
+            new_operation,new_plan=prepare_workspace(settings,plan['token'],plan['workspace_revision'],[])
+            if new_operation is None:return {'no_changes':new_plan}
+            return {'batch_plan':new_plan,'operation':new_operation}
     return {'batch_plan':signed,'operation':operation} if batch else {'plan':signed,'plan_token':operation}
 
 

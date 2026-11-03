@@ -26,6 +26,13 @@ AUDIT_PREFIX = 'manual_import_review:'
 _UNSET = object()
 
 
+class RowStaleError(bio.ImportGuardError):
+    """A live mismatch only after authentic original/protected fields passed."""
+    def __init__(self, code, person_id, fields, live):
+        super().__init__(code, 'Карточка изменена после выгрузки: исходные данные устарели. Получите свежую выгрузку только этих записей и перенесите готовые результаты.', fields)
+        self.live_revision = hashlib.sha256(bio.canonical(live).encode()).hexdigest()
+
+
 def _stored_year_equal(left, right):
     # SQLite DATE/NUMERIC columns store a submitted four-digit year as INTEGER.
     # This is deliberately narrower than date normalization: no full-date or
@@ -125,10 +132,8 @@ def _fields(connection, person_id):
     return dict(row)
 
 
-def _validated(connection, settings, token, row_number, *, record=None):
-    record = bio.load_preview(settings, token) if record is None else record
-    if record.get('state') == 'commit_pending':
-        raise bio.ImportGuardError('receipt_pending', 'Исход предыдущей записи не подтверждён. Загрузите файл для новой проверки текущей базы.')
+def validated_original(settings, record, row_number):
+    """Authenticate row addressing and protected XLSX before consulting live data."""
     entries = [e for e in record['entries'] if e['row'] == row_number]
     if len(entries) != 1:
         raise bio.ValidationError('Строка не найдена. Загрузите файл заново.')
@@ -143,17 +148,26 @@ def _validated(connection, settings, token, row_number, *, record=None):
     snapshot = bio._snapshot(settings, values if values.get('snapshot') else record['originals'].get(raw_id, {}))
     if values.get('_format') == 'visible-7-v2' and (snapshot['version'] != 2 or snapshot.get('contract') != 'visible-7-v2'):
         raise bio.ImportGuardError('format_mismatch', 'Подпись относится к другому формату. Нужна новая выгрузка.', ['contract'])
-    own = progress(connection, settings, record, values, snapshot, row_number)
-    live = bio._identity(connection, person_id)
-    if not _same_state(own['identity'],live,bool(own['events'])):
-        labels = {'person_id':'ID кавалера', 'fio':'ФИО', 'birthday':'Год рождения', 'id_rank':'Звание', 'rank':'Звание', 'awards':'Награды и номера'}
-        changed = ', '.join(dict.fromkeys(labels[n] for n in own['identity'] if live is None or own['identity'][n] != live.get(n)))
-        raise bio.ImportGuardError('person_missing' if live is None else 'stale_identity', f'ID {person_id}: исходные данные устарели; изменены поля: {changed}. Скачайте свежие данные и повторите проверку.', [labels[n] for n in own['identity'] if live is None or own['identity'][n] != live.get(n)])
     original = bio._original(snapshot)
     for name, expected in original.items():
         if bio.key(values.get(name)) != bio.key(expected):
             raise bio.ImportGuardError('protected_field_changed', f'Изменено исходное поле «{name}». Принять такую строку нельзя. Нужна подлинная выгрузка с сохранёнными найденными сведениями.', [name])
+    return values, snapshot, original
+
+
+def _validated(connection, settings, token, row_number, *, record=None):
+    record = bio.load_preview(settings, token) if record is None else record
+    if record.get('state') == 'commit_pending':
+        raise bio.ImportGuardError('receipt_pending', 'Исход предыдущей записи не подтверждён. Загрузите файл для новой проверки текущей базы.')
+    values, snapshot, original = validated_original(settings, record, row_number)
+    person_id = snapshot['person']['person_id']
     _audit_available(connection)
+    own = progress(connection, settings, record, values, snapshot, row_number)
+    live = bio._identity(connection, person_id)
+    if not _same_state(own['identity'],live,bool(own['events'])):
+        labels = {'person_id':'ID кавалера', 'fio':'ФИО', 'birthday':'Год рождения', 'id_rank':'Звание', 'rank':'Звание', 'awards':'Награды и номера'}
+        fields = ['Кавалер удалён'] if live is None else list(dict.fromkeys(labels[n] for n in own['identity'] if own['identity'][n] != live.get(n)))
+        raise RowStaleError('person_missing' if live is None else 'stale_identity', person_id, fields, live)
     row = next(r for r in record['rows'] if r['row'] == row_number)
     current = _fields(connection, person_id)
     if own['expected'] is not None and not _same_state(current,own['expected'],bool(own['events'])):

@@ -69,8 +69,8 @@ class AutoImportTests(unittest.TestCase):
   settings=self.settings.model_copy(update={'update_backup_dir':self.root/'correction-backups'})
   audit=fio_corrections.audit(settings);fio_corrections.apply(settings,audit['audit_token'],'9'*64)
   self.assertEqual(self.query('select fio from person'),[('Сидоров Петр',)])
-  self.assertTrue(f.workspace(self.settings,token)['fatal'])
-  with self.assertRaises(b.ValidationError):f.prepare_workspace(self.settings,token,f.workspace(self.settings,token)['revision'],[])
+  view=f.workspace(self.settings,token);self.assertFalse(view['fatal']);self.assertEqual(view['stale_skipped'],1)
+  operation,plan=f.prepare_workspace(self.settings,token,view['revision'],[]);self.assertIsNone(operation);self.assertEqual(plan['summary']['stale_skipped'],1)
 
  def test_material_identity_contradiction_cannot_be_overridden(self):
   t,_=self.preview(identity='Другой человек')

@@ -107,14 +107,14 @@
     operationRegion.querySelector('[data-import-processed]').textContent=`Обработано: ${done} / ${total}`;
     operationRegion.querySelector('[data-import-percent]').textContent=percent+'%';remember();
   }
-  function imported(value,noChanges=false,already=false){
+  function imported(value,noChanges=false,already=false,allStale=false){
     operationScreen('success');state.importMode='success';state.active=null;busy=false;
-    operationRegion.querySelector('[data-import-success] h2').textContent=noChanges?'Изменений нет':'Импорт завершён';
-    for(const name of ['saved','biographies','years','names','skipped'])operationRegion.querySelector('[data-result-'+name+']').textContent=value[name]||0;
+    operationRegion.querySelector('[data-import-success] h2').textContent=allStale?'Все карточки пропущены':noChanges?'Изменений нет':'Импорт завершён';
+    for(const name of ['saved','biographies','years','names','skipped','stale_skipped'])operationRegion.querySelector('[data-result-'+name.replace('_','-')+']').textContent=value[name]||0;
     let notice=operationRegion.querySelector('[data-import-already]');if(!notice){notice=document.createElement('p');notice.dataset.importAlready='';operationRegion.querySelector('[data-import-success] h2').after(notice);}
     notice.textContent=already?'Этот файл уже импортирован. Новая запись не выполнялась.':'';
     const skipped=operationRegion.querySelector('[data-import-skips]'),list=skipped.querySelector('ul');list.replaceChildren();
-    for(const row of value.skipped_reasons||[]){const li=document.createElement('li');li.textContent=`№ ${row.person_id} · ${row.fio}: ${row.reason}`;list.append(li);}
+    for(const row of value.skipped_reasons||[]){const li=document.createElement('li');li.textContent=`№ ${row.person_id} · ${row.fio}: ${row.reason}${row.fields?.length?' Изменены поля: '+row.fields.join(', ')+'.':''}`;list.append(li);}
     skipped.hidden=!list.childElementCount;remember();window.dispatchEvent(new Event('enrichment-import-completed'));
   }
   function importFailure(item){
@@ -161,6 +161,7 @@
     try{
       const [r,text]=await html(form.action,{method:'POST',body:data});content.innerHTML=text;
       if(!r.ok){const failure=content.textContent;if(r.status===409){clear();ws().querySelector('[data-import-plan] button').disabled=true;}else{content.replaceChildren(...prior);content.querySelectorAll('[role=alert]').forEach(e=>e.remove());error(failure);}return;}
+      if(content.querySelector('[data-no-import]')){await refresh();return;}
       const staged=content.querySelector('[data-staged-operation]');
       if(staged){state.stages||={};state.stages[staged.dataset.row]=staged.dataset.stagedOperation;await refresh();close();return;}
       if(content.querySelector('[data-manual-result]')){state.stages={};state.drafts={};state.active=null;await refresh();close();const target=ws().querySelector('[data-review-list-result]');target.textContent='Импорт завершён. Сохранены только подтверждённые изменения.';target.hidden=false;}
@@ -186,7 +187,7 @@
     invalid=false;if(state.token!==ws().dataset.token)state={};state.token=ws().dataset.token;
     history.replaceState(null,'',BASE+'/preview/'+state.token);
     if(initialCompleted&&state.importMode!=='list'){
-      state.importOperation=initialCompleted.operation;imported(initialCompleted.summary,initialCompleted.no_changes,initialCompleted.already_done);return;
+      state.importOperation=initialCompleted.operation;imported(initialCompleted.summary,initialCompleted.no_changes,initialCompleted.already_done,initialCompleted.all_stale);return;
     }
     if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}
     if(initialCompleted&&state.importMode==='list'){previewRegion.hidden=false;operationRegion.hidden=true;document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';}

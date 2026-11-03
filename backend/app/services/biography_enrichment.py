@@ -499,9 +499,29 @@ def _snapshot(settings, values):
         raise ImportGuardError('signature_invalid', 'Подпись исходных данных не подтверждена: файл изменён либо подписан другим ключом. Скачайте актуальный шаблон только после проверки установки.', ['snapshot_signature'])
     try:
         snapshot = json.loads(serialized)
-        if snapshot['version'] not in {1, 2} or type(snapshot['person']['person_id']) is not int:
+        if type(snapshot['version']) is not int or snapshot['version'] not in {1, 2} or type(snapshot['person']['person_id']) is not int:
             raise ValueError()
-        _original(snapshot)  # Shape required by both preview and final guard.
+        person = snapshot['person']
+        required = {'person_id','fio','birthday','id_rank','rank','awards'}
+        award_fields = {'id','id_gos','id_catigory','id_sub_catigory','id_name','number','id_link','country','category','subcategory','award'}
+        if set(person) != required or person['person_id'] <= 0 or not isinstance(person['awards'],list):
+            raise ValueError()
+        if (person['fio'] is not None and not isinstance(person['fio'],str)) or (person['rank'] is not None and not isinstance(person['rank'],str)):
+            raise ValueError()
+        if type(person['birthday']) not in {str,int,float,type(None)} or type(person['id_rank']) not in {int,type(None)}:
+            raise ValueError()
+        if not isinstance(snapshot['selection'],list) or len(snapshot['selection'])>len(IDS) or any(type(n) is not int for n in snapshot['selection']):
+            raise ValueError()
+        if any(not isinstance(a,dict) or set(a)!=award_fields or type(a['id']) is not int for a in person['awards']):
+            raise ValueError()
+        for award in person['awards']:
+            if any(type(award[k]) not in {int,type(None)} for k in IDS) or type(award['number']) not in {str,int,float,type(None)}:
+                raise ValueError()
+            if any(award[k] is not None and not isinstance(award[k],str) for k in ['id_link','country','category','subcategory','award']):
+                raise ValueError()
+        if len({a['id'] for a in person['awards']}) != len(person['awards']):
+            raise ValueError()
+        _original(snapshot)  # Complete signed identity before any stale decision.
         return snapshot
     except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         raise ImportGuardError('snapshot_invalid', 'Повреждена структура исходных данных выгрузки.', ['snapshot']) from exc

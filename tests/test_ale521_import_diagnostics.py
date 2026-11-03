@@ -54,15 +54,15 @@ class ImportDiagnosticsTests(unittest.TestCase):
                 self.assertEqual(d['failure_counts'],{code:1});self.assertEqual(d['hmac_invalid_rows'],1)
                 self.assertEqual(self.db.read_bytes(),before);self.assertEqual((self.root/'signing.key').read_bytes(),key)
 
-    def test_fatal_ui_and_report_preserve_reason_and_never_promise_import(self):
+    def test_row_local_stale_ui_and_report_preserve_reason_and_safe_import(self):
         token=self.mixed();self.execute("update rewards set number=991 where person_id=1")
         with TestClient(app) as client:
             html=client.get(BASE+'/preview/'+token).text
-            self.assertIn('Импорт остановлен: строк с ошибками проверки — 1.',html)
-            self.assertIn('Подготовлены изменения',html);self.assertNotIn('Файл проверен.',html)
-            self.assertNotIn('К импорту: биографий',html)
+            self.assertNotIn('Импорт остановлен:',html)
+            self.assertIn('Карточка изменена после выгрузки — пропущена',html)
+            self.assertIn('К импорту кавалеров',html)
             report=client.get(BASE+'/report/'+token).json()
-            self.assertFalse(report['import_allowed']);self.assertEqual(report['guard_counts'],{'stale_identity':1})
+            self.assertTrue(report['import_allowed']);self.assertEqual(report['stale_skipped'],1);self.assertEqual(report['guard_counts'],{'stale_identity':1})
             self.assertEqual(report['guard_failures'][0]['person_id'],'1')
             self.assertIn('Награды и номера',report['guard_failures'][0]['fields'])
             serialized=json.dumps(report)
