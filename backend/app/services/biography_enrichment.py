@@ -181,8 +181,13 @@ def _selection(selection):
 
 
 def _population(connection):
-    total, empty = connection.execute('select count(*), coalesce(sum(bio_blank(biography)),0) from person').fetchone()
-    return {'total': total, 'empty': empty, 'filled': total - empty}
+    # An identifiable award is a real name reference, even without serial/date.
+    # Empty/orphan technical links do not count. Build the membership set once,
+    # even in legacy databases without an index on rewards.person_id.
+    total, empty, without_awards = connection.execute('''select count(*), coalesce(sum(bio_blank(p.biography)),0),
+        coalesce(sum(p.id not in(select r.person_id from rewards r join guide_lev_3 g on g.id=r.id_name
+            where r.person_id is not null and bio_blank(g.name)=0)),0) from person p''').fetchone()
+    return {'total': total, 'empty': empty, 'filled': total - empty, 'without_awards': without_awards}
 
 
 def population_statistics(settings):

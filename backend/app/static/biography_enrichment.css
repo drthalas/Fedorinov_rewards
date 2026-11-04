@@ -221,3 +221,6 @@
 .bio-import-block { margin-top: 1.5rem; }
 [data-export-progress] { width: 100%; height: 1.25rem; accent-color: #246542; }
 [data-export-status] { margin-top: 1rem; }
+
+.bio-population .bio-counts { grid-template-columns:repeat(4,minmax(0,1fr)); }
+@media(max-width:800px){.bio-population .bio-counts{grid-template-columns:repeat(2,minmax(0,1fr))}}

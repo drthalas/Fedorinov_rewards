@@ -18,12 +18,13 @@
         <h2 id="enrichment-title"><a href="{{ base }}">Наполнение данных</a></h2>
         <p>Дополняйте пустые биографии через файл данных. Перед сохранением программа проверит каждую запись.</p>
       </section>
+      <section class="cavalier-form-card bio-module"><h2><a href="/data-maintenance/corrections">Исправление данных</a></h2><p>Проверьте все ФИО и приведите латинские двойники и регистр букв к стандарту.</p></section>
       <section class="cavalier-form-card bio-module bio-module-disabled" aria-labelledby="optimization-title" aria-disabled="true">
         <h2 id="optimization-title">Оптимизация изображений</h2>
         <p>Подготовка изображений для хранения и просмотра.</p>
         <span class="bio-development">В разработке</span>
       </section>
-      <section class="cavalier-form-card bio-module"><h2><a href="/data-maintenance/corrections">Исправление данных</a></h2><p>Проверьте все ФИО и исправьте безопасные латинские двойники.</p></section>
+      <section class="cavalier-form-card bio-module" aria-labelledby="new-import-title"><h2 id="new-import-title">{% if settings.write_mode and not settings.read_only %}<a href="/persons/import">Импорт новых кавалеров</a>{% else %}Импорт новых кавалеров{% endif %}</h2><p>{{ 'Создавайте новые карточки кавалеров с выбранной наградой из Excel.' if settings.write_mode and not settings.read_only else 'Доступно в режиме редактирования.' }}</p></section>
     </div>
   {% elif level == 'enrichment' %}
     <h1>Наполнение данных</h1>

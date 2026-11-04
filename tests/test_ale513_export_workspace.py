@@ -81,7 +81,7 @@ class ExportWorkspaceTests(unittest.TestCase):
         token=self.mixed();self.execute("insert into rewards(person_id,id_gos,id_catigory,id_sub_catigory,id_name,number) values(1,1,2,3,4,900);update person set biography='   ' where id=2;update person set biography='' where id=3;")
         # Only biography whitespace changed; signed identity and import subset are preserved.
         before=bio.population_statistics(self.settings)
-        self.assertEqual(before,{'total':8,'filled':0,'empty':8})
+        self.assertEqual(before,{'total':8,'filled':0,'empty':8,'without_awards':0})
         self.assertEqual({k:bio.statistics(self.settings)[k] for k in before},before)
         # The changed reward makes row 1 stale: build the normal fresh preview for commit.
         self.execute("delete from rewards where number=900;update person set biography=null;")

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
-{% block title %}Импорт кавалеров из Excel{% endblock %}
+{% block title %}Импорт новых кавалеров{% endblock %}
 {% block extra_head %}<script src="{{ static_url('person_import_file.js') }}" defer></script>{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme{% endblock %}
 {% block content %}
 <section class="cavalier-standalone-page cavalier-form-page person-import-page">
-  <h1>Импорт кавалеров из Excel</h1>
-  <p class="local-back-nav"><a class="button secondary-button" href="/legacy?tab=rewards">← К кавалерам</a></p>
+  <h1>Импорт новых кавалеров</h1>
+  <p class="local-back-nav"><a class="button secondary-button" href="/data-maintenance?menu=1">← Назад</a></p>
   {% if error %}<section class="notice notice-error" role="alert">{{ error }}</section>{% endif %}
   {% if result is not none %}
   <section class="cavalier-form-card person-import-card" aria-label="Результат импорта">

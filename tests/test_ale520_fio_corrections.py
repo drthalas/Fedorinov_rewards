@@ -22,7 +22,7 @@ class FioTests(unittest.TestCase):
  def test_exact_pairs_context_and_unsupported_skip_entire_record(self):
   self.assertEqual(len(f.PAIRS),20)
   for a,b in zip('ABCEHKMOPTXYacekopxy','АВСЕНКМОРТХУасекорху'):
-   r=f.classify({'fio':'Иван '+a+' ё- (имя)'});self.assertTrue(r['safe']);self.assertEqual(r['after']['fio'],'Иван '+b+' ё- (имя)')
+   r=f.classify({'fio':'Иван '+a+'ванов Ёлкин'});self.assertTrue(r['safe']);self.assertEqual(r['after']['fio'],'Иван '+b.upper()+'ванов Ёлкин')
   for v in ['John Smith','ACE','Иван Sидоров','Иван Iванов','Иван Ḁ','Иван sC']:
    r=f.classify({'fio':v});self.assertFalse(r['safe']);self.assertEqual(r['before'],r['after'])
   for v in [None,'','Иван Ёлкин','  -()']:self.assertIsNone(f.classify({'fio':v}))

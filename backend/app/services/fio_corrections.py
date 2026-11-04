@@ -1,4 +1,4 @@
-"""Audited, reversible homoglyph correction. No transliteration or schema changes."""
+"""Audited Cyrillic name standardization. No transliteration or schema changes."""
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from datetime import datetime, timezone
@@ -24,17 +24,72 @@ NAME_COLUMNS=('fio','фио','last_name','surname','lastname','family_name','fir
 PREFIX='fio_correction:'
 
 
+def _name_case(value):
+    """Cyrillic components; punctuation/spacing/combining marks stay byte-for-byte.
+
+    Dots terminate single-letter initials only. Apostrophes and supported hyphens
+    start a new component. Unbalanced/nested/empty parentheses and other scripts
+    or separators need manual review, never an inferred name repair.
+    """
+    result=[];word=[];depth=0;parenthesis_letters=0;first=True
+    hyphens="-‐‑";apostrophes="'’ʼ"
+    for index,char in enumerate(value):
+        if char in hyphens+apostrophes:
+            if index==0 or index+1==len(value) or not (value[index-1].isalpha() or unicodedata.category(value[index-1]).startswith('M')) or not value[index+1].isalpha():
+                return value,'Неоднозначный дефис или апостроф в ФИО.'
+        elif char.isalpha():
+            if 'CYRILLIC' not in unicodedata.name(char,''):
+                return value,'Неподдерживаемый алфавит в ФИО.'
+            converted=char.upper() if first else char.lower()
+            if len(converted)!=1:return value,'Неоднозначное преобразование Unicode-регистра.'
+            result.append(converted);word.append(char);first=False
+            if depth:parenthesis_letters+=1
+            continue
+        elif unicodedata.category(char).startswith('M'):
+            if first:return value,'Знак ударения или диакритика без буквы.'
+            result.append(char);continue
+        elif char=='.':
+            if len(word)!=1:return value,'Неоднозначное сокращение с точкой; проверьте ФИО вручную.'
+        elif char=='(':
+            if depth:return value,'Вложенные скобки в ФИО требуют проверки.'
+            depth=1;parenthesis_letters=0
+        elif char==')':
+            if not depth or not parenthesis_letters:return value,'Несогласованные или пустые скобки в ФИО.'
+            depth=0
+        elif not (char==' ' or unicodedata.category(char)=='Zs'):
+            return value,'Нестандартный символ или разделитель в ФИО.'
+        result.append(char);word=[];first=True
+    if depth:return value,'Незакрытая скобка в ФИО.'
+    return ''.join(result),None
+
+
 def classify(values):
     strings=[v for v in values.values() if isinstance(v,str)]
     latin=[c for v in strings for c in v if 'LATIN' in unicodedata.name(c,'')]
-    if not latin:return None
-    unsupported=sorted(set(c for c in latin if c not in PAIRS))
-    if unsupported:reason='Неподдерживаемые латинские символы: '+', '.join(unsupported)
-    elif not any('CYRILLIC' in unicodedata.name(c,'') for v in strings for c in v):reason='Полностью латинское ФИО: нет кириллического контекста.'
-    else:reason='Только утверждённые визуальные двойники; остальные символы сохранены.'
-    safe=not unsupported and any('CYRILLIC' in unicodedata.name(c,'') for v in strings for c in v)
-    return {'before':values,'after':{k:v.translate(TRANSLATION) if safe and isinstance(v,str) else v for k,v in values.items()},
-            'safe':safe,'characters':len(latin) if safe else 0,'reason':reason}
+    cyrillic=any('CYRILLIC' in unicodedata.name(c,'') for v in strings for c in v)
+    if any(v is not None and not isinstance(v,str) for v in values.values()):
+        reason='Поле ФИО содержит нетекстовое значение; требуется ручная проверка.'
+    elif not latin and not cyrillic:
+        if not any(c.isalpha() for v in strings for c in v):return None
+        reason='Неподдерживаемый алфавит в ФИО.'
+    elif latin and not cyrillic:reason='Полностью латинское ФИО: нет кириллического контекста.'
+    elif any(c not in PAIRS for c in latin):
+        reason='Неподдерживаемые латинские символы: '+', '.join(sorted(set(c for c in latin if c not in PAIRS)))
+    else:reason=None
+    translated={k:v.translate(TRANSLATION) if isinstance(v,str) else v for k,v in values.items()}
+    after={};case_change=False
+    if reason is None:
+        for name,value in translated.items():
+            proposed,problem=_name_case(value) if isinstance(value,str) and value.strip() else (value,None)
+            if problem:reason=problem;break
+            after[name]=proposed;case_change=case_change or proposed!=value
+    safe=reason is None
+    if safe and after==values:return None
+    causes=(['Латинские двойники'] if safe and latin else [])+(['Регистр букв'] if safe and case_change else [])
+    return {'before':values,'after':after if safe else dict(values),'safe':safe,'has_latin':bool(latin),
+            'homoglyph_change':safe and bool(latin),'case_change':safe and case_change,'reasons':causes,
+            'characters':sum(sum(a!=b for a,b in zip(values[k],v)) for k,v in after.items() if isinstance(v,str)) if safe else 0,
+            'reason':'; '.join(causes)+'.' if safe else reason}
 
 
 def columns(connection):
@@ -64,7 +119,9 @@ def scan(connection, progress=lambda *args:None, collect=True):
                 if candidate:results.append({'id':row['id'],**candidate})
         done+=len(batch);progress('Проверка ФИО',done,total)
     return {'columns':fields,'digest':digest.hexdigest(),'checked':done,'rows':results,
-        'latin_records':len(results),'safe_records':sum(r['safe'] for r in results),
+        'latin_records':sum(r['has_latin'] for r in results),
+        'homoglyph_records':sum(r['homoglyph_change'] for r in results),'case_records':sum(r['case_change'] for r in results),
+        'both_records':sum(r['homoglyph_change'] and r['case_change'] for r in results),'safe_records':sum(r['safe'] for r in results),
         'characters':sum(r['characters'] for r in results),'skipped':sum(not r['safe'] for r in results)}
 
 
@@ -75,15 +132,16 @@ def audit(settings,progress=lambda *args:None):
     with closing(open_readonly_connection(settings.rewards_db_path)) as connection:
         connection.execute('begin');result=scan(connection,progress)
     token=secrets.token_hex(32)
-    plan={'created':time.time(),'state':'fio_audit','database':str(settings.rewards_db_path.resolve()),**result}
+    plan={'created':time.time(),'state':'fio_audit','policy':'fio-standardization-v2','database':str(settings.rewards_db_path.resolve()),**result}
     plan['signature']=_sign(settings,plan);bio._save(settings,token,plan)
-    return {'audit_token':token,**{k:plan[k] for k in ['checked','latin_records','safe_records','characters','skipped']}}
+    return {'audit_token':token,**{k:plan[k] for k in ['checked','latin_records','homoglyph_records','case_records','both_records','safe_records','characters','skipped']}}
 
 
 def load_audit(settings,token):
     plan=bio.load_preview(settings,token);unsigned=dict(plan);mac=unsigned.pop('signature','')
     if plan.get('state')!='fio_audit' or plan.get('database')!=str(settings.rewards_db_path.resolve()) or not hmac.compare_digest(mac,_sign(settings,unsigned)):
         raise bio.ValidationError('Предпросмотр исправления повреждён. Повторите аудит.')
+    if plan.get('policy')!='fio-standardization-v2':raise bio.ValidationError('Правила стандартизации обновлены. Повторите аудит перед исправлением.')
     return plan
 
 
@@ -146,11 +204,19 @@ def apply(settings,token,operation,progress=lambda *args:None):
                     if n%128==0 or n==len(safe):progress('Исправление ФИО',n,len(safe))
                 progress('Сохранение и журнал',0,0)
                 event={'time':datetime.now(timezone.utc).isoformat(),'actor':'Пользователь приложения','audit_token':token,
-                    'operation':operation,'records':len(safe),'characters':plan['characters'],'backup':backup,'changes':safe}
+                    'operation':operation,'records':len(safe),'characters':plan['characters'],'backup':backup,'changes':safe,
+                    'homoglyph_records':plan['homoglyph_records'],'case_records':plan['case_records'],'skipped':plan['skipped']}
                 c.execute('insert into logs(datetime,action,comment) values(?,?,?)',(event['time'],PREFIX+operation,bio.canonical(event)))
                 c.commit()
             except BaseException:c.rollback();raise
         return event
+
+
+def apply_summary(event):
+    result={k:event[k] for k in ['records','characters','backup']}
+    result.update(homoglyph_records=event.get('homoglyph_records',event['records']),case_records=event.get('case_records',0))
+    if 'skipped' in event:result['skipped']=event['skipped']
+    return result
 
 
 class CorrectionJobs:
@@ -183,7 +249,7 @@ class CorrectionJobs:
             if 'kind' not in item or 'job_id' not in item:raise bio.ValidationError('Операция не найдена.')
             if item['state'] in {'queued','running'} and (job not in self.futures or self.futures[job].done()):
                 receipt=_receipt(settings,job) if item['kind']=='apply' else None
-                if receipt:item.update(state='succeeded',percent=100,result={'records':receipt['records'],'characters':receipt['characters'],'backup':receipt['backup']})
+                if receipt:item.update(state='succeeded',percent=100,result=apply_summary(receipt))
                 else:item.update(state='interrupted',error='Операция была прервана. Успех не подтверждён; выполните новый аудит.',percent=min(99,item['percent']))
                 bio._save(settings,job,item)
             return self.public(item)
@@ -208,7 +274,7 @@ class CorrectionJobs:
                 with exclusive(settings):result=audit(settings,progress)
             else:
                 event=apply(settings,item['audit_token'],job,progress)
-                result={k:event[k] for k in ['records','characters','backup']}
+                result=apply_summary(event)
             with self.lock:item.update(state='succeeded',percent=100,phase='Завершено',eta=0,done=result.get('checked',result.get('records',0)),total=result.get('checked',result.get('records',0)),result=result)
         except Exception as exc:
             import logging

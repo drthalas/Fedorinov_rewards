@@ -47,7 +47,8 @@
     if(updating){pendingUpdate=true;return;}updating=true;
     const notice=population.querySelector('[data-population-status]');
     try{const r=await fetch(BASE+'/statistics',{cache:'no-store'});if(!r.ok)throw new Error();const data=await r.json();
-      for(const name of ['total','filled','empty'])population.querySelector('[data-population-'+name+']').textContent=data[name];notice.hidden=true;
+      const keys=['total','filled','empty','without_awards'];if(keys.some(name=>!Number.isInteger(data[name])))throw new Error();
+      for(const name of keys)population.querySelector('[data-population-'+name.replace('_','-')+']').textContent=data[name];notice.hidden=true;
     }catch(_){notice.textContent='Не удалось обновить статистику. Показаны последние полученные значения.';notice.hidden=false;}
     finally{updating=false;if(pendingUpdate){pendingUpdate=false;void updatePopulation();}}
   }

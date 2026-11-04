@@ -179,7 +179,9 @@
   async function initialize(){
     if(new URL(location.href).searchParams.has('new'))clear();
     if(!ws()){
-      if(page.querySelector('[role=alert]'))clear();
+      // Empty file/failure placeholders carry role=alert while hidden. Only a
+      // real server error invalidates the stored workspace on the entry page.
+      if(page.querySelector('.notice-error[role=alert]:not([hidden])'))clear();
       else if(/^[a-f0-9]{64}$/.test(state.token||''))location.replace(BASE+'/preview/'+state.token);
       return;
     }
