@@ -8244,3 +8244,8 @@ body.legacy-rewards-theme::after {
 }
 .legacy-person-search-empty strong { display: block; font-size: 16px; }
 .legacy-person-search-empty p { margin: 8px 0 0; }
+
+/* Photo components use hidden for staged/saved/empty states. Flex rules must
+   never override it, including the draft image and its "Нет фото" sibling. */
+.photo-frame [hidden], .photo-manage-actions [hidden],
+[data-person-gallery] [hidden] { display: none !important; }

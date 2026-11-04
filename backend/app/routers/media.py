@@ -26,17 +26,23 @@ def _placeholder() -> Response:
 
 
 @router.get("/media")
-def media(path: str = ""):
+def media(path: str = "", required: bool = False):
     settings = get_settings()
     resolution = resolve_media(settings, path)
+    if required and resolution.fallback:
+        return Response(status_code=503 if resolution.fallback_reason == "file is not readable" else 404)
     if not resolution.serving_path:
         return _placeholder()
     return FileResponse(resolution.serving_path, media_type=_content_type(resolution.serving_path))
 
 
 @router.head("/media")
-def media_head(path: str = ""):
+def media_head(path: str = "", required: bool = False):
     settings = get_settings()
+    if required:
+        resolution = resolve_media(settings, path)
+        if resolution.fallback:
+            return Response(status_code=503 if resolution.fallback_reason == "file is not readable" else 404)
     resolved = resolve_media_path(settings, path)
     if resolved is None:
         return Response(status_code=404)

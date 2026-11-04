@@ -104,6 +104,7 @@
       if (group && lightboxGroup(link) !== group) {
         return;
       }
+      if (link.closest("[data-gallery-photo][hidden]")) return;
       var src = imageSource(link);
       if (!src) {
         return;

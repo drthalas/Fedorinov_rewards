@@ -1,34 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Фото: {{ person.fio }}{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-photos-theme{% endblock %}
+{% block extra_head %}<script src="{{ static_url('person_gallery.js') }}" defer></script>{% endblock %}
 {% block content %}
-<section class="cavalier-standalone-page cavalier-photos-page">
+<section class="cavalier-standalone-page cavalier-photos-page" data-person-gallery data-gallery-unavailable="{{ 'true' if gallery_unavailable else 'false' }}">
 <h1>Фото: {{ person.fio }}</h1>
 <p class="local-back-nav compact-actions"><a class="button secondary-button" data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">← Назад</a></p>
 {% if current_photo %}
-<section class="slideshow panel">
+<section class="slideshow panel" data-gallery-photo data-gallery-path="{{ current_photo.path }}" hidden>
   <div class="slideshow-nav">
     <a class="button" href="/persons/{{ person.id }}/photos?index={{ previous_index }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">Предыдущее</a>
     <a class="button" href="/persons/{{ person.id }}/photos?index={{ next_index }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">Следующее</a>
     <a href="/persons/{{ person.id }}/photos{% if return_to %}?return_to={{ return_to|urlencode }}{% endif %}">Галерея</a>
   </div>
   <a class="photo-link" href="{{ photo_view_url(current_photo.path, current_photo.label, '/persons/' ~ person.id ~ '/photos?index=' ~ next_index ~ ('&return_to=' ~ return_to|urlencode if return_to else '')) }}">
-    <img class="slideshow-image" src="{{ media_url(current_photo.path) }}" alt="{{ current_photo.label }}">
+    <img class="slideshow-image" src="{{ media_url(current_photo.path, required=True) }}" alt="{{ current_photo.label }}">
   </a>
   <p class="photo-caption">{{ current_photo.label }}</p>
 </section>
 {% endif %}
-<div class="photo-grid">
+<p class="notice" data-gallery-empty role="status" {% if photos or gallery_unavailable %}hidden{% endif %}>Фотографии отсутствуют</p>
+<p class="notice" data-gallery-loading role="status" {% if not photos %}hidden{% endif %}>Загружаем фотографии…</p>
+<div class="notice notice-error" data-gallery-error role="status" {% if not gallery_unavailable %}hidden{% endif %}><p>Не удалось загрузить часть фотографий. Повторите попытку.</p><button type="button" data-gallery-retry>Повторить загрузку</button></div>
+<div class="photo-grid" data-gallery-grid>
   {% for photo in photos %}
-  <div class="card {{ 'placeholder-card' if not has_media_path(photo.path) else '' }}">
+  <div class="card" data-gallery-photo data-gallery-path="{{ photo.path }}" hidden>
     <div class="photo-frame">
-    {% if has_media_path(photo.path) %}
     <a class="photo-link" href="/persons/{{ person.id }}/photos?index={{ available_photos.index(photo) }}{% if return_to %}&return_to={{ return_to|urlencode }}{% endif %}">
-      <img class="photo" src="{{ media_url(photo.path) }}" alt="{{ photo.label }}">
+      <img class="photo" src="{{ media_url(photo.path, required=True) }}" alt="{{ photo.label }}">
     </a>
-    {% else %}
-    <div class="photo photo-placeholder">Нет фото</div>
-    {% endif %}
     </div>
     <p>{{ photo.label }}</p>
   </div>
