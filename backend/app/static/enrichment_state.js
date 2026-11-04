@@ -109,12 +109,20 @@
   }
   function imported(value,noChanges=false,already=false,allStale=false){
     operationScreen('success');state.importMode='success';state.active=null;busy=false;
+    if(state.importOperation){
+      // Only confirmed commit reaches here. Keep the durable identity, release
+      // preview DOM and drafts; unfinished/failure/reconnect paths are untouched.
+      state={token:state.token,filename:state.filename,importOperation:state.importOperation,importMode:'success'};
+      ws().replaceChildren();ws().dataset.terminal='true';ws().hidden=true;
+      content.replaceChildren();prepEpoch++;
+    }
+    previewRegion.hidden=false;
     operationRegion.querySelector('[data-import-success] h2').textContent=allStale?'Все карточки пропущены':noChanges?'Изменений нет':'Импорт завершён';
     for(const name of ['saved','biographies','years','names','skipped','stale_skipped'])operationRegion.querySelector('[data-result-'+name.replace('_','-')+']').textContent=value[name]||0;
     let notice=operationRegion.querySelector('[data-import-already]');if(!notice){notice=document.createElement('p');notice.dataset.importAlready='';operationRegion.querySelector('[data-import-success] h2').after(notice);}
     notice.textContent=already?'Этот файл уже импортирован. Новая запись не выполнялась.':'';
     const skipped=operationRegion.querySelector('[data-import-skips]'),list=skipped.querySelector('ul');list.replaceChildren();
-    for(const row of value.skipped_reasons||[]){const li=document.createElement('li');li.textContent=`№ ${row.person_id} · ${row.fio}: ${row.reason}${row.fields?.length?' Изменены поля: '+row.fields.join(', ')+'.':''}`;list.append(li);}
+    // Detailed skipped rows remain in the explicit full report, not this summary.
     skipped.hidden=!list.childElementCount;remember();window.dispatchEvent(new Event('enrichment-import-completed'));
   }
   function importFailure(item){
@@ -149,7 +157,7 @@
       document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';paginate();restore(state.importListScroll||state.scroll);remember();
     }catch(e){importFailure({state:'failed',error:e.message});}
   }
-  operationRegion.querySelector('[data-import-list]').addEventListener('click',()=>void importList());
+  operationRegion.querySelector('[data-import-list]').addEventListener('click',event=>{event.preventDefault();location.assign(BASE+'/preview/'+state.token+'?details=true');});
   operationRegion.querySelector('[data-import-failure-list]').addEventListener('click',()=>void importList());
   operationRegion.querySelector('[data-import-status-retry]').addEventListener('click',()=>{importing();void monitorImport();});
   // Preparation has its own durable request identity. Losing a response never
@@ -254,22 +262,25 @@
     replacing=true;clear();document.querySelector('[data-upload-status]').textContent='Проверяем файл…';form.requestSubmit();
   }));
   window.addEventListener('pagehide',remember);
-  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}if(state.prepare&&state.prepare.mode!=='list'){preparing(state.prepare);void monitorPrepare(state.prepare);return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
+  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}if(state.importOperation&&state.importMode==='success'){location.reload();return;}if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}if(state.prepare&&state.prepare.mode!=='list'){preparing(state.prepare);void monitorPrepare(state.prepare);return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
   async function initialize(){
     if(new URL(location.href).searchParams.has('new'))clear();
     if(!ws()){
       // Empty file/failure placeholders carry role=alert while hidden. Only a
       // real server error invalidates the stored workspace on the entry page.
+      if(page.hasAttribute('data-resume-error'))return;
       if(page.querySelector('.notice-error[role=alert]:not([hidden])'))clear();
       else if(/^[a-f0-9]{64}$/.test(state.token||''))location.replace(BASE+'/preview/'+state.token);
       return;
     }
     if(ws().dataset.fatal==='true'&&!state.prepare){clear();return;}
     invalid=false;if(state.token!==ws().dataset.token)state={};state.token=ws().dataset.token;
-    history.replaceState(null,'',BASE+'/preview/'+state.token);
-    if(initialCompleted&&state.importMode!=='list'){
+    const details=new URL(location.href).searchParams.has('details');
+    history.replaceState(null,'',BASE+'/preview/'+state.token+(details?'?details=true':''));
+    if(initialCompleted&&!details){
       state.importOperation=initialCompleted.operation;imported(initialCompleted.summary,initialCompleted.no_changes,initialCompleted.already_done,initialCompleted.all_stale);return;
     }
+    if(details){state.importMode='list';}
     if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}
     if(state.prepare&&state.prepare.mode!=='list'){paginate();preparing(state.prepare);void monitorPrepare(state.prepare);return;}
     if(initialCompleted&&state.importMode==='list'){previewRegion.hidden=false;operationRegion.hidden=true;document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';}

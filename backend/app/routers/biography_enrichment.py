@@ -50,11 +50,14 @@ def biographies(request: Request, selection: str = ''):
 
 
 @router.get(BASE + '/preview/{token}')
-def restored_preview(request: Request, token: str):
+def restored_preview(request: Request, token: str, details: bool = False):
     try:
-        return _render(request, token=token, result=service.load_preview(get_settings(), token))
-    except service.ValidationError as exc:
-        return _render(request, error=str(exc), status_code=400)
+        completed = None if details else workflow.terminal_preview(get_settings(),token)
+        if completed:
+            return _render(request, token=token, completed=completed)
+        return _render(request, token=token, result=service.load_preview(get_settings(), token), show_details=details)
+    except (service.ValidationError, sqlite3.Error, OSError, ValueError):
+        return _render(request, error='Не удалось загрузить сохранённый результат. Повторите загрузку страницы; импорт заново не запускается.', resume_error=True, status_code=503)
 
 
 @router.get(BASE + '/state/{token}')

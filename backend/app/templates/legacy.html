@@ -95,9 +95,9 @@
           <input id="legacy-person-search-input" type="search" value="{{ person_query }}" placeholder="Введите первые буквы ФИО" autocomplete="off" aria-label="Быстрый поиск по ФИО кавалера" data-person-quick-search data-person-search-primary>
           <div class="legacy-person-search-hint">Enter открывает первое совпадение.</div>
         </div>
-        <div class="legacy-person-list-title"><strong>Список кавалеров</strong><span>{{ persons_total or persons|length }} записей</span></div>
+        <div class="legacy-person-list-title"><strong>Список кавалеров</strong><span>{% if person_query %}Найдено: {{ persons|length }} · {% endif %}Всего: {{ persons_total }} записей</span></div>
         <div class="legacy-list" tabindex="0" role="listbox" aria-label="Список кавалеров" data-person-list data-active-letter="{{ rewards_active_letter }}" data-person-query="{{ person_query }}" data-canonical-url="{{ selected_person_return if selected_person else rewards_tab_return }}">
-          <div class="legacy-person-indexes">
+          <div class="legacy-person-indexes"{% if person_query and not persons %} hidden{% endif %}>
             <nav class="legacy-digit-index" aria-label="Цифровая навигация по кавалерам" data-person-digits>
               {% for item in rewards_digits %}
                 <button class="legacy-alphabet-letter legacy-digit-group{% if item.active %} active{% endif %}" type="button" data-person-digit="{{ item.digit }}" data-letter-url="{{ item.url }}" title="{{ item.digit }}{% if item.count %}: {{ item.count }}{% endif %}"{% if item.active %} aria-current="true"{% endif %}{% if item.disabled %} disabled aria-disabled="true"{% endif %}>{{ item.digit }}</button>
@@ -115,9 +115,8 @@
               <small class="legacy-list-meta" title="Год рождения: {{ person.birthday|format_birth_year if person.birthday else 'не указан' }}; наград: {{ person.rewards_count }}">{{ person.birthday|format_birth_year if person.birthday else '—' }} г.р. · {{ person.rewards_count }} нагр.</small>
             </button>
           {% else %}
-            <div class="legacy-empty">Нет записей.</div>
+            <div class="legacy-empty{% if person_query %} legacy-person-search-empty{% endif %}" role="status">{% if person_query %}<strong>Ничего не найдено</strong><p>Попробуйте изменить запрос</p>{% else %}Нет записей.{% endif %}</div>
           {% endfor %}
-          <div class="legacy-empty" data-person-empty hidden>Ничего не найдено.</div>
         </div>
         <div class="legacy-person-list-hint">Прокрутка колесом или клавишами ↑ ↓</div>
       </aside>
