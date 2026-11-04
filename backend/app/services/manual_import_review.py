@@ -2,7 +2,7 @@
 
 No schema creation, source workbook rewriting or relaxed import guards.
 """
-from contextlib import closing
+from contextlib import closing, nullcontext
 from datetime import datetime, timezone
 import json
 import hmac
@@ -263,10 +263,10 @@ def _valid_source(value):
         return False
 
 
-def prepare(settings, token, row_number, submitted, *, review_fields=None, identity_pending=False, expected_fields=None, expected_receipt=_UNSET):
-    # Preparing decisions is read-only for SQLite, including rejected/pending fields.
-    with closing(bio._connection(settings.rewards_db_path)) as connection:
-        record, values, snapshot, original, row, current = _validated(connection, settings, token, row_number)
+def prepare(settings, token, row_number, submitted, *, review_fields=None, identity_pending=False, expected_fields=None, expected_receipt=_UNSET, connection=None, record=None, persist=True):
+    # Shared read snapshot avoids reloading the whole file for every row; all guards still run.
+    with (closing(bio._connection(settings.rewards_db_path)) if connection is None else nullcontext(connection)) as connection:
+        record, values, snapshot, original, row, current = _validated(connection, settings, token, row_number, record=record)
     if expected_fields is not None and current != expected_fields:
         raise bio.ValidationError('Карточка изменилась после проверки. Откройте кавалера заново; ничего не записано.')
     last = record['_progress']['events'][-1]['operation'] if record['_progress']['events'] else None
@@ -324,7 +324,7 @@ def prepare(settings, token, row_number, submitted, *, review_fields=None, ident
     # A new immutable plan per submission prevents parallel tabs from changing what
     # the confirmation screen will commit. Integrity is rechecked at commit.
     plan['signature'] = bio._sign(settings, bio.canonical(plan))
-    bio._save(settings, plan_token, plan)
+    if persist:bio._save(settings, plan_token, plan)
     return plan_token, plan
 
 

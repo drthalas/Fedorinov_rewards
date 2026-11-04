@@ -12,7 +12,7 @@
   function restore(p){if(!p)return;const main=document.querySelector('.page');if(main)main.scrollTop=p.page;window.scrollTo(0,p.window||0);const list=document.querySelector('[data-bucket-panel]:not([hidden]) [data-review-list]');if(list)list.scrollTop=p.list||0;}
   function clear(){invalid=true;state={};try{sessionStorage.removeItem(KEY);}catch(_){}window.dispatchEvent(new Event('enrichment-resume-change'));}
   function remember(){
-    if(replacing||invalid||!ws()||ws().dataset.fatal==='true')return;
+    if(replacing||invalid||!ws()||ws().dataset.fatal==='true'&&!state.prepare)return;
     state.openBiographies=[...document.querySelectorAll('[data-person-bio][open]')].map(d=>d.dataset.personBio);state.token=ws().dataset.token;state.filename=ws().dataset.filename;state.savedAt=Date.now();
     if(panel.hidden)state.scroll=position();else state.panelScroll=position();
     const form=content.querySelector('[data-manual-plan]');
@@ -72,7 +72,7 @@
       remember();
     }catch(_){content.textContent='Не удалось открыть данные. Вернитесь к списку и повторите попытку.';}
   }
-  function close(){remember();state.active=null;panel.hidden=true;ws().hidden=false;page.classList.remove('bio-detail-open');paginate();restore(state.scroll);remember();}
+  function close(){remember();if(state.prepare){state.prepare.mode='list';prepEpoch++;}busy=false;state.active=null;panel.hidden=true;ws().hidden=false;page.classList.remove('bio-detail-open');paginate();restore(state.scroll);remember();}
   function error(message){const p=document.createElement('p');p.setAttribute('role','alert');p.className='notice notice-error';p.textContent=message;content.prepend(p);}
   document.addEventListener('click',event=>{
     const t=event.target;if(!(t instanceof Element))return;
@@ -136,7 +136,7 @@
     }}finally{monitoring=false;}
   }
   async function startImport(form){
-    if(busy)return;remember();state.importListScroll=state.scroll;state.importOperation=form.querySelector('[name=operation]').value;state.importTotal=Number(form.dataset.importTotal);state.importMode='importing';
+    if(busy)return;remember();delete state.prepare;prepEpoch++;state.importListScroll=state.scroll;state.importOperation=form.querySelector('[name=operation]').value;state.importTotal=Number(form.dataset.importTotal);state.importMode='importing';
     importing();operationRegion.scrollIntoView({block:'start'});
     try{const r=await fetch(form.action,{method:'POST',body:new FormData(form),credentials:'same-origin'});const item=await r.json();
       if(!r.ok){importFailure({state:'failed',error:item.detail||'Не удалось начать импорт. Ничего не подтверждено.'});return;}
@@ -152,11 +152,90 @@
   operationRegion.querySelector('[data-import-list]').addEventListener('click',()=>void importList());
   operationRegion.querySelector('[data-import-failure-list]').addEventListener('click',()=>void importList());
   operationRegion.querySelector('[data-import-status-retry]').addEventListener('click',()=>{importing();void monitorImport();});
+  // Preparation has its own durable request identity. Losing a response never
+  // changes that identity or implies that the server worker stopped.
+  let prepEpoch=0;
+  const prepareVisible=p=>state.prepare===p&&p.mode!=='list'&&!panel.hidden;
+  function preparing(p){
+    previewRegion.hidden=false;operationRegion.hidden=true;panel.hidden=false;ws().hidden=true;page.classList.add('bio-detail-open');
+    content.replaceChildren(document.querySelector('[data-prepare-template]').content.cloneNode(true));
+    state.active=null;p.mode='preparing';busy=true;remember();
+  }
+  function prepareProgress(item){
+    const root=content.querySelector('[data-prepare-screen]');if(!root)return;
+    root.querySelector('[data-prepare-phase]').textContent=item.phase||'Ожидаем начала проверки…';
+    const bar=root.querySelector('progress'),measurable=Number.isFinite(item.total)&&item.total>0;
+    if(measurable)bar.value=Math.min(99,item.percent||0);else bar.removeAttribute('value');
+    root.querySelector('[data-prepare-count]').textContent=measurable?`Обработано: ${item.done||0} / ${item.total} · этап ${Math.min(99,item.percent||0)}%`:'Объём этого этапа заранее неизвестен.';
+    root.querySelector('[data-prepare-connection]').hidden=true;
+  }
+  function prepareFailure(p,message,known=false){
+    if(!prepareVisible(p))return;
+    const root=content.querySelector('[data-prepare-screen]');if(!root)return;
+    busy=false;p.mode=known?'failed':'unknown';
+    root.querySelector('[data-prepare-heading]').textContent=known?'Подготовка не завершена':'Состояние подготовки не подтверждено';
+    root.querySelector('[data-prepare-meter]').hidden=true;
+    root.querySelector('[data-prepare-error]').textContent=message;
+    root.querySelector('[data-prepare-status-retry]').hidden=known;
+    root.querySelector('[data-prepare-retry]').hidden=!known;remember();
+  }
+  async function prepareRequest(url,options={}){
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+    try{
+      const response=await fetch(url,{cache:'no-store',credentials:'same-origin',...options,signal:controller.signal});
+      const payload=await response.json();return {response,payload};
+    }finally{clearTimeout(timer);}
+  }
+  async function monitorPrepare(p){
+    const epoch=++prepEpoch;let failures=0;
+    while(prepareVisible(p)&&epoch===prepEpoch){
+      try{
+        let response,payload;
+        if(!p.job){
+          const data=new FormData();data.set('revision',p.revision);data.set('request_id',p.request);
+          ({response,payload}=await prepareRequest(BASE+'/workspace/'+p.token+'/prepare',{method:'POST',body:data}));
+          if(!prepareVisible(p)||epoch!==prepEpoch)return;
+          if(!response.ok){prepareFailure(p,payload.detail||'Не удалось начать проверку. Ничего не записано. Повторите проверку.',true);return;}
+          p.job=payload.job;remember();
+        }else{
+          ({response,payload}=await prepareRequest(BASE+'/prepare/operations/'+p.job));
+          if(!prepareVisible(p)||epoch!==prepEpoch)return;
+          if(!response.ok)throw new Error('status');
+        }
+        if(payload.state==='succeeded'){
+          const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);
+          let result,text;
+          try{result=await fetch(BASE+'/prepare/operations/'+p.job+'/result',{cache:'no-store',signal:controller.signal});text=await result.text();}finally{clearTimeout(timer);}
+          if(!prepareVisible(p)||epoch!==prepEpoch)return;
+          if(!result.ok){prepareFailure(p,'Сводка подготовки недоступна. Данные не записывались. Повторите проверку файла.',true);return;}
+          content.innerHTML=text;busy=false;p.mode='ready';remember();content.querySelector('h2')?.focus({preventScroll:true});return;
+        }
+        if(['failed','interrupted','unknown'].includes(payload.state)){
+          prepareFailure(p,payload.error||'Подготовка недоступна. Ничего не записано. Повторите проверку файла.',true);return;
+        }
+        failures=0;prepareProgress(payload);
+        await new Promise(r=>setTimeout(r,500));
+      }catch(_){
+        if(!prepareVisible(p)||epoch!==prepEpoch)return;
+        const notice=content.querySelector('[data-prepare-connection]');if(notice){notice.hidden=false;notice.textContent='Связь прервана, проверяем состояние… Сервер может продолжать подготовку. Данные ещё не сохраняются.';}
+        if(++failures>=3){prepareFailure(p,'Связь с сервером недоступна. Неизвестно, завершилась ли подготовка. Проверьте статус после восстановления связи; повторная работа и запись не запускаются.');return;}
+        await new Promise(r=>setTimeout(r,1000*failures));
+      }
+    }
+  }
+  function beginPrepare(form,retry=false){
+    if(busy)return;remember();
+    if(retry||!state.prepare){state.prepare={token:state.token,revision:form.querySelector('[name=revision]').value,request:crypto.randomUUID().replaceAll('-','')};}
+    const p=state.prepare;preparing(p);panel.scrollIntoView({block:'start'});void monitorPrepare(p);
+  }
+  document.addEventListener('click',event=>{
+    if(event.target.closest('[data-prepare-status-retry]')&&state.prepare){preparing(state.prepare);void monitorPrepare(state.prepare);}
+    if(event.target.closest('[data-prepare-retry]'))beginPrepare(ws().querySelector('[data-import-plan]'),true);
+  });
   document.addEventListener('submit',async event=>{
     const form=event.target;if(!form.matches('[data-manual-plan],[data-import-plan],[data-manual-commit]'))return;
-    event.preventDefault();if(form.matches('[data-import-start]')){void startImport(form);return;}if(busy)return;busy=true;remember();
+    event.preventDefault();if(form.matches('[data-import-plan]')){beginPrepare(form);return;}if(form.matches('[data-import-start]')){void startImport(form);return;}if(busy)return;busy=true;remember();
     const prior=[...content.childNodes],data=new FormData(form),row=state.active?.row;
-    if(form.matches('[data-import-plan]')){data.set('operations',JSON.stringify(operations()));panel.hidden=false;ws().hidden=true;page.classList.add('bio-detail-open');}
     const button=form.querySelector('[type=submit]');button.disabled=true;
     try{
       const [r,text]=await html(form.action,{method:'POST',body:data});content.innerHTML=text;
@@ -175,7 +254,7 @@
     replacing=true;clear();document.querySelector('[data-upload-status]').textContent='Проверяем файл…';form.requestSubmit();
   }));
   window.addEventListener('pagehide',remember);
-  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
+  window.addEventListener('pageshow',event=>{if(event.persisted&&ws()){let current={};try{current=JSON.parse(sessionStorage.getItem(KEY)||'{}');}catch(_){}if(current.token!==state.token){location.replace(current.token?BASE+'/preview/'+current.token:BASE+'?new=1');return;}if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}if(state.prepare&&state.prepare.mode!=='list'){preparing(state.prepare);void monitorPrepare(state.prepare);return;}void refresh().then(()=>{if(state.active)return open(state.active.url,state.active.row,true);}).catch(e=>{clear();error(e.message);});}});
   async function initialize(){
     if(new URL(location.href).searchParams.has('new'))clear();
     if(!ws()){
@@ -185,13 +264,14 @@
       else if(/^[a-f0-9]{64}$/.test(state.token||''))location.replace(BASE+'/preview/'+state.token);
       return;
     }
-    if(ws().dataset.fatal==='true'){clear();return;}
+    if(ws().dataset.fatal==='true'&&!state.prepare){clear();return;}
     invalid=false;if(state.token!==ws().dataset.token)state={};state.token=ws().dataset.token;
     history.replaceState(null,'',BASE+'/preview/'+state.token);
     if(initialCompleted&&state.importMode!=='list'){
       state.importOperation=initialCompleted.operation;imported(initialCompleted.summary,initialCompleted.no_changes,initialCompleted.already_done,initialCompleted.all_stale);return;
     }
     if(state.importOperation&&state.importMode!=='list'){importing();void monitorImport();return;}
+    if(state.prepare&&state.prepare.mode!=='list'){paginate();preparing(state.prepare);void monitorPrepare(state.prepare);return;}
     if(initialCompleted&&state.importMode==='list'){previewRegion.hidden=false;operationRegion.hidden=true;document.querySelector('[data-upload-status]').textContent='Результаты загруженного файла.';}
     try{if(operations().length)await refresh();paginate();document.querySelectorAll('[data-person-bio]').forEach(d=>d.open=(state.openBiographies||[]).includes(d.dataset.personBio));if(state.active)await open(state.active.url,state.active.row,true);else restore(state.scroll);remember();}
     catch(e){clear();error(e.message);}

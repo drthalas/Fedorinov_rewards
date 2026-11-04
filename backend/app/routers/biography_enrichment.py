@@ -86,6 +86,32 @@ def staged_workspace(request: Request, token: str, operations: str=Form('[]')):
         return _review_fragment(request,error=choices.friendly_error(exc),status_code=409)
 
 
+def _render_prepared(plan, operation):
+    context={'base':BASE,'fields':manual.FIELDS,'year_label':format_birth_year_input}
+    context.update({'batch_plan':plan,'operation':operation} if operation else {'no_changes':plan})
+    return templates.env.get_template('manual_import_review.html').render(**context)
+
+
+@router.post(BASE + '/workspace/{token}/prepare')
+def prepare_start(request: Request, token: str, revision: str=Form(...), request_id: str=Form(...)):
+    _same_origin(request)
+    try:return import_jobs.preparations.start(get_settings(),token,revision,request_id,_render_prepared)
+    except service.ValidationError as exc:raise HTTPException(409,import_jobs.preparations.failure(exc)) from exc
+    except (sqlite3.Error,OSError) as exc:raise HTTPException(503,import_jobs.preparations.failure(exc)) from exc
+
+
+@router.get(BASE + '/prepare/operations/{job}')
+def prepare_status(job: str):
+    try:return import_jobs.preparations.status(get_settings(),job)
+    except (service.ValidationError,sqlite3.Error,OSError) as exc:raise HTTPException(503,'Статус подготовки недоступен. Данные не записывались. Повторите проверку статуса.') from exc
+
+
+@router.get(BASE + '/prepare/operations/{job}/result')
+def prepare_result(job: str):
+    try:return Response(import_jobs.preparations.result(get_settings(),job),media_type='text/html',headers={'Cache-Control':'no-store'})
+    except (service.ValidationError,sqlite3.Error,OSError) as exc:raise HTTPException(409,'Сводка подготовки недоступна. Данные не записывались. Повторите проверку файла.') from exc
+
+
 @router.post(BASE + '/workspace/{token}/plan')
 def workspace_plan(request: Request, token: str, revision: str=Form(...), operations: str=Form('[]')):
     _same_origin(request)

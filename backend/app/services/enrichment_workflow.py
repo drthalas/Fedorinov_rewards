@@ -1,5 +1,5 @@
 """Explicit, atomic file import plus resumable field review. No migrations."""
-from contextlib import closing
+from contextlib import closing, nullcontext
 from collections import Counter
 from datetime import datetime
 import hmac
@@ -20,9 +20,9 @@ def stage(settings, token, row_number, submitted):
     raise bio.ValidationError('Ручные решения удалены. Доступен только общий импорт проверенных данных.')
 
 
-def workspace(settings, token, operations=()):
+def workspace(settings, token, operations=(), *, connection=None, record=None, progress=lambda *args:None):
     if operations:raise bio.ValidationError('План относится к прежнему ручному интерфейсу. Загрузите файл заново.')
-    view=present(settings,token)
+    view=present(settings,token,connection=connection,record=record,progress=progress)
     buckets={'ready':[],'insufficient':[]};unchanged=[]
     totals={n:0 for n in manual.FIELDS}
     for row in view['rows']:
@@ -43,29 +43,46 @@ def workspace(settings, token, operations=()):
     return view
 
 
-def prepare_workspace(settings, token, revision, operations):
-    view=workspace(settings,token,operations)
-    if view['fatal']:
-        raise bio.ValidationError('Файл или карточки изменились. Получите свежую выгрузку; ничего не записано.')
-    refreshed=not hmac.compare_digest(str(revision),view['revision'])
-    plans=[]
-    for row in view['buckets']['ready']:
-        _,plan=choices.row_plan(settings,token,row['row'],{n:'accept' for n in row['automatic']},expected=row['review']['current'],mode='import')
-        plans.append(plan)
-    summary={'fields':view['totals'],'ready':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),
-             'stale_skipped':view['stale_skipped'],'people':len(plans),'refreshed':refreshed}
-    if not plans:
-        if view['stale_skipped']:
-            return None, {'summary':summary,'skipped_reasons':_skipped_rows(view,plans)}
-        raise bio.ValidationError('Новых подтверждённых изменений нет. Повторная запись не требуется.')
-    return _store_batch(settings,token,view['filename'],plans,summary,view=view)
-
-
-def present(settings, token):
-    record = bio.load_preview(settings,token)
-    rows = []
+def prepare_workspace(settings, token, revision, operations, *, progress=lambda *args:None, metrics=None):
+    metrics={} if metrics is None else metrics
+    started=time.perf_counter();progress('Читаем загруженный файл…',0,None)
+    record=bio.load_preview(settings,token)
+    metrics['read_seconds']=time.perf_counter()-started
     with closing(bio._connection(settings.rewards_db_path)) as connection:
-        for original in record['rows']:
+        # One read-only snapshot; final commit still revalidates the immutable subset
+        # under BEGIN IMMEDIATE against the then-current cards and receipts.
+        started=time.perf_counter()
+        view=workspace(settings,token,operations,connection=connection,record=record,progress=progress)
+        metrics['revalidation_seconds']=time.perf_counter()-started
+        if view['fatal']:
+            reason=view['fatal_failures'][0]['display_reason']
+            raise bio.ValidationError(reason+' Импорт остановлен; ничего не записано. Получите свежую выгрузку и перенесите найденные сведения.')
+        refreshed=not hmac.compare_digest(str(revision),view['revision'])
+        plans=[];ready=view['buckets']['ready'];started=time.perf_counter()
+        progress('Готовим планы строк…',0,len(ready))
+        for index,row in enumerate(ready):
+            _,plan=choices.row_plan(settings,token,row['row'],{n:'accept' for n in row['automatic']},
+                expected=row['review']['current'],mode='import',connection=connection,record=record)
+            plans.append(plan);progress('Готовим планы строк…',index+1,len(ready))
+        metrics['row_plans_seconds']=time.perf_counter()-started
+        summary={'fields':view['totals'],'ready':len(plans),'accepted':0,'skipped':len(view['rows'])-len(plans),
+                 'stale_skipped':view['stale_skipped'],'people':len(plans),'refreshed':refreshed}
+        if not plans:
+            if view['stale_skipped']:
+                return None, {'summary':summary,'skipped_reasons':_skipped_rows(view,plans)}
+            raise bio.ValidationError('Новых подтверждённых изменений нет. Повторная запись не требуется.')
+        progress('Сохраняем план проверки…',0,None);started=time.perf_counter()
+        result=_store_batch(settings,token,view['filename'],plans,summary,view=view)
+        metrics['serialization_seconds']=time.perf_counter()-started
+        return result
+
+
+def present(settings, token, *, connection=None, record=None, progress=lambda *args:None):
+    record = bio.load_preview(settings,token) if record is None else record
+    rows = []
+    progress('Проверяем карточки…',0,len(record['rows']))
+    with (closing(bio._connection(settings.rewards_db_path)) if connection is None else nullcontext(connection)) as connection:
+        for index,original in enumerate(record['rows']):
             row = dict(original)
             row['guard'] = None
             try:
@@ -87,6 +104,7 @@ def present(settings, token):
             row['action'] = ('Продолжить проверку' if row['review'] and row['review']['events'] else
                              'Объяснение' if row['state']=='blocked' else 'Проверить')
             rows.append(row)
+            progress('Проверяем карточки…',index+1,len(record['rows']))
     ready = [r for r in rows if r['automatic']]
     revision = bio._sign(settings,bio.canonical({'kind':'file-import-view','token':token,
         'rows':[(r['row'],r['review']['revision'] if r['review'] else r.get('guard') or r['reason']) for r in rows]}))

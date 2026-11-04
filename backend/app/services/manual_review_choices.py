@@ -59,8 +59,8 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
             'current':current,'resolved':resolved,'receipt':events[-1]['operation'] if events else None}))}
 
 
-def row_plan(settings, token, row_number, decisions, *, expected=None, mode='review', identity_choice=None):
-    review = detail(settings,token,row_number,identity_choice=identity_choice)
+def row_plan(settings, token, row_number, decisions, *, expected=None, mode='review', identity_choice=None, connection=None, record=None):
+    review = detail(settings,token,row_number,identity_choice=identity_choice,connection=connection,record=record)
     if review['confirmed'] or set(decisions)-set(review['automatic'])-set(review['fields']):
         raise bio.ValidationError('Эти поля уже подтверждены или недоступны. Обновите список.')
     if expected is not None and review['current']!=expected:
@@ -73,7 +73,7 @@ def row_plan(settings, token, row_number, decisions, *, expected=None, mode='rev
         values[name+'_evidence'] = review['notes'] or 'Принадлежность биографии подтверждена автором файла и явным импортом пользователя.'
     active = list(set(review['automatic'])|set(review['fields']))
     plan_token, plan = manual.prepare(settings,token,row_number,values,review_fields=active,
-        identity_pending=bool(review['blockers']),expected_fields=review['current'],expected_receipt=review['receipt'])
+        identity_pending=bool(review['blockers']),expected_fields=review['current'],expected_receipt=review['receipt'],connection=connection,record=record,persist=False)
     plan.pop('signature')
     plan.update(workflow_version=3,mode=mode)
     if identity_choice:plan['identity_decision']=identity_choice
