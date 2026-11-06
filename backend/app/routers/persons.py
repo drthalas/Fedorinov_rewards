@@ -33,6 +33,7 @@ from ..services.person_files import (
     person_folder_status,
 )
 from ..services.person_archive import PersonArchiveError, build_person_archive, save_person_archive
+from ..services.media import resolve_media
 from ..services.photos import REWARD_PHOTO_FIELDS, PhotoValidationError, photo_items
 from ..services.person_create_drafts import (
     add_reward as add_draft_reward,
@@ -858,8 +859,21 @@ def person_photos(request: Request, person_id: int, index: int | None = None, re
         raise HTTPException(status_code=404, detail="Награжденный не найден.")
     rewards = list_person_rewards(settings.rewards_db_path, person_id)
     photos = person_photo_items(person, rewards)
-    photos.extend(person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos]))
-    available_photos = [photo for photo in photos if photo.get("path")]
+    unavailable = False
+    try:
+        photos.extend(person_folder_image_items(settings, person_id, [photo.get("path") for photo in photos]))
+    except OSError:
+        unavailable = True
+    available_photos = []
+    for photo in photos:
+        try:
+            resolution = resolve_media(settings, photo.get("path"))
+            if resolution.serving_path and not resolution.fallback:
+                available_photos.append(photo)
+            elif resolution.fallback_reason == "file is not readable":
+                unavailable = True
+        except OSError:
+            unavailable = True
     safe_back = safe_return_to(return_to)
     current_photo = None
     previous_index = None
@@ -875,11 +889,13 @@ def person_photos(request: Request, person_id: int, index: int | None = None, re
         {
             "settings": settings,
             "person": person,
-            "photos": photos,
+            "photos": available_photos,
+            "gallery_unavailable": unavailable,
             "available_photos": available_photos,
             "current_photo": current_photo,
             "previous_index": previous_index,
             "next_index": next_index,
             "return_to": safe_back,
         },
+        headers={"Cache-Control": "no-store"},
     )

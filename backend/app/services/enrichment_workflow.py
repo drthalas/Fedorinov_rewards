@@ -4,7 +4,9 @@ from collections import Counter
 from datetime import datetime
 import hmac
 import json
+import logging
 import secrets
+import sqlite3
 import time
 
 from ..db import open_write_connection
@@ -230,6 +232,12 @@ def _commit_import(settings, operation, progress=lambda *args:None):
         except BaseException:
             connection.rollback()
             raise
+    # This is only a derived navigation summary. Failure cannot undo or mask
+    # the already durable atomic receipt; recovery still uses the original plan.
+    try:
+        _save_terminal(settings,result,plan.get('filename','Загруженный файл'))
+    except (OSError,sqlite3.Error,bio.ValidationError):
+        logging.getLogger(__name__).warning('Terminal summary unavailable; durable receipt retained',exc_info=True)
     return result
 
 
@@ -248,6 +256,52 @@ def result_summary(result, total_rows=None):
             'names':sum('fio' in e['writes'] for e in events),
             'stale_skipped':result.get('stale_skipped',0),
             'skipped':result.get('skipped',max(0,total_rows-len({e['person_id'] for e in events if e['writes']})) if total_rows is not None else 0),'skipped_reasons':result.get('skipped_reasons',[])}
+
+
+def _terminal_key(settings, token):
+    return bio._sign(settings,'completed-navigation-v1:'+token)
+
+
+def _save_terminal(settings, result, filename):
+    with closing(bio._connection(settings.rewards_db_path)) as connection:
+        row=connection.execute('select rowid from logs where action=?',(BATCH_PREFIX+result['operation'],)).fetchone()
+    if row is None:raise bio.ValidationError('Сохранение импорта не подтверждено.')
+    summary=result_summary(result)
+    summary.pop('skipped_reasons',None)  # Full row audit is loaded only on request.
+    value={'created':time.time(),'token':result['token'],'operation':result['operation'],
+           'receipt_rowid':row[0],'filename':filename,'summary':summary}
+    value['signature']=bio._sign(settings,bio.canonical(value))
+    bio._save(settings,_terminal_key(settings,result['token']),value)
+    return value
+
+
+def terminal_preview(settings, token):
+    """A signed, disposable summary is never evidence of commit on its own."""
+    if not isinstance(token,str) or len(token)!=64 or any(c not in '0123456789abcdef' for c in token):
+        raise bio.ValidationError('Предпросмотр не найден. Загрузите XLSX заново.')
+    try:
+        value=bio.load_preview(settings,_terminal_key(settings,token))
+        signature=value.pop('signature','')
+        valid=value.get('token')==token and hmac.compare_digest(signature,bio._sign(settings,bio.canonical(value)))
+    except bio.ValidationError:
+        value=None;valid=False
+    with closing(bio._connection(settings.rewards_db_path)) as connection:
+        if valid:
+            receipt=connection.execute('select 1 from logs where rowid=? and action=?',
+                (value['receipt_rowid'],BATCH_PREFIX+value['operation'])).fetchone()
+            if receipt:return value
+            # Missing receipt is an unknown outcome, never a cached success.
+            raise bio.ValidationError('Сохранённый итог не подтверждён журналом. Повторите проверку статуса.')
+        # Compatibility/recovery for imports completed before this summary existed.
+        # No classifier, plans, original-row validation or writes are performed.
+        for row in connection.execute('select comment from logs where action like ? order by rowid desc',(BATCH_PREFIX+'%',)):
+            result=json.loads(row[0])
+            if result.get('token')==token:
+                record=bio.load_preview(settings,token)
+                value=_save_terminal(settings,result,record.get('filename','Загруженный файл'))
+                value.pop('signature',None)
+                return value
+    return None
 
 
 def completed_preview(settings,token,view=None):

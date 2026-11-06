@@ -166,3 +166,28 @@ APP_PORT=18080 WRITE_MODE=true READ_ONLY=false REWARDS_DATA_DIR=/Users/hermes/Lo
 - Direct route smoke: PASS.
 - Platform note: локальный bind dev-server из Codex sandbox был заблокирован лимитом эскалаций, поэтому автоматический route smoke выполнен in-process; owner manual QA в Chrome на Mac покрывает браузерную часть.
 - Реальные данные и фото не менялись.
+
+## ALE-524 — фото: просмотр и placeholder (04.11.2026)
+
+- «Показать все фото»: `/persons/{id}/photos`, `person_photos.html`,
+  `person_gallery.js`. Источники — `person_photo_items` и прежний обход только
+  каталога выбранного кавалера; каждый кандидат проходит штатный `resolve_media`.
+  Fallback/пустые/неразрешённые paths не становятся tiles; подпись скрывается вместе
+  с изображением. Для нулевой галереи — «Фотографии отсутствуют».
+- Галерея использует opt-in `/media?...&required=true`: отсутствующий файл даёт404,
+  обычный `/media` сохраняет прежний fallback. Loading/5xx/network/decode failure
+  дают retry, не ложное отсутствие. Валидные соседние изображения сохраняются,
+  скрытые недоступные tiles исключаются из lightbox; порядок/zoom сохранены.
+- Причина «Нет фото» поверх draft preview: CSS `display:flex` перекрывал `hidden`.
+  Scoped photo CSS теперь уважает существующее переключение `hidden`; пустые
+  редакторские слоты и кнопки добавления сохранены для person/reward/mark.
+- `photo_updates.js` уведомляет уже открытую галерею после подтверждённой мутации
+  (также через BroadcastChannel), до очистки toast-маркеров. Канал закрывается на
+  pagehide и восстанавливается на pageshow; polling нет. File upload сохраняет
+  прежний redirect после успеха, при неопределённом/ошибочном ответе сохраняет
+  прежнюю ячейку и показывает retry instruction, без автоматического повторного POST.
+- Focused TEMP:22 tests (gallery, resolver/path guards, photo editor). Browser:
+  0/partial/all,404/503/loading/retry, valid neighbor, zoom, narrow viewport,
+  filechooser upload/replace/cancel/failure, gallery live update без reload,
+  draft person/reward preview/clear/error/crop/save/reload/view-all.
+  Прежние47 checks и3489 flow не повторялись; storage/schema/import guards не менялись.

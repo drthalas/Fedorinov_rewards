@@ -52,7 +52,8 @@ class ImportStateTests(unittest.TestCase):
   with TestClient(app) as client:
    html=client.get('/data-maintenance/enrichment/biographies/preview/'+token).text
    self.assertIn('data-import-success',html);self.assertIn('Импорт завершён',html)
-   self.assertIn('<div data-import-preview hidden>',html)
+   self.assertIn('<div data-import-preview>',html)
+   self.assertNotIn('data-review-row=',html)
    self.assertNotIn('Файл проверен. Решения будут записаны',html)
    self.assertIn('Биографий добавлено',html)
    self.assertEqual(client.get('/data-maintenance/enrichment/biographies/import/operations/'+op).json()['result']['years'],2)

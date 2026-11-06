@@ -43,9 +43,10 @@ def static_url(path: str) -> str:
     ))
 
 
-def media_url(path: object) -> str:
+def media_url(path: object, required: bool = False) -> str:
     value = path if isinstance(path, str) else ""
-    return str(URL(path="/media").include_query_params(path=value))
+    url = URL(path="/media").include_query_params(path=value)
+    return str(url.include_query_params(required="true") if required else url)
 
 
 def photo_view_url(path: object, label: object = "", return_to: object = "") -> str:
