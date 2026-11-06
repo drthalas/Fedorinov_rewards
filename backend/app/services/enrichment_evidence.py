@@ -6,6 +6,7 @@ import unicodedata
 from urllib.parse import urlsplit, parse_qs
 
 from . import biography_enrichment as bio
+from . import structured_enrichment_evidence as contract
 from .dates import format_birth_year_input, normalize_birth_year_input
 
 
@@ -26,7 +27,7 @@ def summary_assertions(values, snapshot):
     Never infer a birth-year correction from prose. Explicit source year/caveats
     belong in validated proposal columns; the signed originals remain immutable.
     """
-    if values.get('ФИО в карточке') or values.get('Награда в карточке'):return values
+    if values.get('_full_evidence') or values.get('ФИО в карточке') or values.get('Награда в карточке'):return values
     body=bio.text(values.get('biography'));intro=body.split('(',1)[0].strip()
     names=intro.split()
     if len(names)!=3 or not all(re.fullmatch(r'[А-Яа-яЁё-]+',n) for n in names):return values
@@ -175,7 +176,9 @@ def analyze(snapshot, values, current):
     corroborated = not numbered and bool(matched) and valid_year and year==current_year and year!='1945' and rank not in {'','гражданский','неизвестно'} and rank==bio.key(snapshot['person']['rank'])
     variant_verified = variant and serial_match and valid_year and year==current_year
     material = bool(re.search(r'другой (?:человек|кавалер)|не тот (?:человек|кавалер)|номер не совпад|награда не совпад',bio.key(notes+' '+statement)))
-    structured, structured_problem = _hsu_evidence(snapshot, values, relevant)
+    typed = contract.validate(snapshot, values, _hsu_evidence)
+    structured = bool(typed and typed.valid)
+    structured_problem = typed.reason if typed else None
     if structured_problem:
         problems.append(structured_problem)
     # Explicit same-person assertion is required for a differing source name.
@@ -194,6 +197,17 @@ def analyze(snapshot, values, current):
         problems=[p for p in problems if not p.startswith('ФИО в источнике')]
     problems.sort(key=lambda p: p.startswith('ФИО в источнике'))
     verified = bool(valid_source and not problems and not material and (same_fio or variant_verified or source_identity) and matched and len(notes)>=10 and (serial_match or corroborated))
+    if typed and typed.category == 'glory-i':
+        # The typed links are the sole serial evidence. In B the signed number
+        # is an input identifier, even though it appears in the JSON notes.
+        serial_match = typed.serial_confirmed
+        identity_denied = bool(re.search(r'личность не подтвержд|фио не совпад|тот же кавалер не подтвержд',
+                                         statement))
+        verified = bool(typed.valid and warheroes and not identity_denied and not material
+                        and not ambiguous and name_complete)
+        source_identity = verified and serial_match
+        if verified:
+            problems = []
     # An omitted parenthesized surname can be reviewed, never auto-approved.
     # Exact signed award/serial and matching birth year independently corroborate
     # the alias. Unrelated names, different awards/serials and contrary evidence
@@ -206,7 +220,8 @@ def analyze(snapshot, values, current):
                            and not (supplied_serial and not any(supplied_serial==str(a['number']) for a in numbered)))
     return {'fio':fio,'year':year,'valid_year':valid_year,'year_reliable':bio.key(values.get('Год подтверждён','да'))=='да','source':source,'notes':notes,
             'sources':sources(source),'same_fio':same_fio,'source_fio_verified':source_identity and verified,'verified':verified,'auto_verified':verified and warheroes,
-            'problems':problems,'selected':selected,'serial_match':bool(serial_match),'manual_identity':manual_identity,
+            'problems':problems,'selected':selected,'serial_match':bool(serial_match),'manual_identity':manual_identity if typed is None else False,
+            'evidence':typed,
             'award_context':' · '.join(dict.fromkeys(f'{a["award"]} №{a["number"]}' for a in selected))}
 
 

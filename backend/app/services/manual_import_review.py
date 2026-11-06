@@ -146,13 +146,17 @@ def validated_original(settings, record, row_number):
     if person_id in record['duplicates']:
         raise bio.ImportGuardError('duplicate_id', 'Повторяющийся ID: оставьте одну согласованную строку и загрузите файл заново.', ['person_id'])
     snapshot = bio._snapshot(settings, values if values.get('snapshot') else record['originals'].get(raw_id, {}))
+    return values, snapshot, protected_original(values, snapshot)
+
+
+def protected_original(values, snapshot):
     if values.get('_format') == 'visible-7-v2' and (snapshot['version'] != 2 or snapshot.get('contract') != 'visible-7-v2'):
         raise bio.ImportGuardError('format_mismatch', 'Подпись относится к другому формату. Нужна новая выгрузка.', ['contract'])
     original = bio._original(snapshot)
     for name, expected in original.items():
         if bio.key(values.get(name)) != bio.key(expected):
             raise bio.ImportGuardError('protected_field_changed', f'Изменено исходное поле «{name}». Принять такую строку нельзя. Нужна подлинная выгрузка с сохранёнными найденными сведениями.', [name])
-    return values, snapshot, original
+    return original
 
 
 def _validated(connection, settings, token, row_number, *, record=None):

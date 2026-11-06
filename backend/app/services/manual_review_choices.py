@@ -1,5 +1,6 @@
 """Only actual unresolved choices; verified additions are explicit import items."""
 from contextlib import closing, nullcontext
+from dataclasses import asdict
 import hmac
 
 from . import biography_enrichment as bio, manual_import_review as manual
@@ -11,29 +12,42 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
     if identity_choice:raise bio.ValidationError('Импорт больше не принимает ручные решения о личности или ФИО.')
     with (closing(bio._connection(settings.rewards_db_path)) if connection is None else nullcontext(connection)) as connection:
         record, values, snapshot, original, row, current = manual._validated(connection,settings,token,row_number,record=record)
+    resolved=record['_progress']['decisions'];events=record['_progress']['events']
+    review = classify(values, snapshot, current, row['kind'], resolved, events)
+    review.update(token=token, row_number=row_number,
+        revision=bio._sign(settings,bio.canonical({'kind':'enrichment-auto-v5','token':token,'row':row_number,
+            'current':current,'resolved':resolved,'receipt':events[-1]['operation'] if events else None})))
+    return review
+
+
+def classify(values, snapshot, current, kind, resolved, events):
+    """Shared decision logic after authenticated or explicitly offline preflight."""
     values=evidence.summary_assertions(values,snapshot)
     proof=evidence.analyze(snapshot,values,current)
-    resolved=record['_progress']['decisions'];events=record['_progress']['events']
-    automatic={};blockers=[];information=[]
+    typed=proof['evidence']
+    automatic = {}
+    blockers = [typed.reason] if typed and not typed.valid and typed.code != 'research_review' else []
+    information = []
     year=format_birth_year_input(current['birthday'])
     proposed_year=proof['year'];year_conflict=bool(proposed_year) and proposed_year!=year
     text=values.get('biography','')
-    ordinary=row['kind']==bio.READY and not proof['problems'] and not year_conflict
+    ordinary=typed is None and kind==bio.READY and not proof['problems'] and not year_conflict
     allowed=bio.key(values.get('status')) in {'найдено','требует проверки','биография подтверждена','подтверждено','confirmed','requires review','requires verification'}
-    trusted=proof['auto_verified'] and allowed
+    trusted=proof['auto_verified'] and allowed and (typed is None or typed.valid)
     declined=any(e.get('identity_decision')=='different' for e in events)
     if declined:blockers.append('Источник ранее отклонён. Для новых сведений нужна свежая выгрузка.')
     elif year_conflict:
         if not proof['valid_year']:blockers.append('В предложении источника неверный год.')
         elif not proof['year_reliable']:information.append('Год источника спорный; текущий год сохранён.')
-        elif trusted and 'birthday' not in resolved:automatic['birthday']=proposed_year
+        elif trusted and (typed is None or typed.serial_confirmed) and 'birthday' not in resolved:automatic['birthday']=proposed_year
         elif not trusted:blockers.append('Для замены года нет достоверной сверки полного ФИО, точной награды и номера.')
     if not declined and not bio.blank(text):
         if not bio.blank(current['biography']):information.append('Биография уже заполнена и не будет перезаписана.')
         elif len(text)>2500:blockers.append('Текст длиннее 2 500 символов. Нужна подготовленная краткая биография.')
         elif (trusted or ordinary) and 'biography' not in resolved:automatic['biography']=text
-        else:blockers.append(proof['problems'][0] if proof['problems'] else 'Нет отдельного подтверждения полного ФИО, точной награды и номера источником.')
-    if not declined and trusted and proof['source_fio_verified'] and proof['fio'] != current['fio'] and 'fio' not in resolved:
+        elif not blockers:blockers.append(proof['problems'][0] if proof['problems'] else 'Нет отдельного подтверждения полного ФИО, точной награды и номера источником.')
+    if (not declined and trusted and (typed is None or typed.serial_confirmed)
+            and proof['source_fio_verified'] and proof['fio'] != current['fio'] and 'fio' not in resolved):
         automatic['fio'] = proof['fio']
     if not automatic and not blockers:
         if bio.blank(text) and bio.blank(current['biography']):blockers.append('В XLSX нет текста биографии. Одна ссылка не содержит подготовленного текста для импорта.')
@@ -47,7 +61,7 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
         reason = prefix + ', '.join(manual.FIELDS[n] if n=='fio' else manual.FIELDS[n].lower() for n in automatic) + '.'
     else:
         reason = blockers[0] if blockers else information[-1]
-    return {'token':token,'row_number':row_number,'person_id':snapshot['person']['person_id'],
+    return {'person_id':snapshot['person']['person_id'],
         'fio':evidence.display_fio(current['fio']),'raw_fio':current['fio'],'award_context':proof['award_context'],
         'fields':{},'automatic':automatic,'blockers':blockers,'information':information,
         'proposals':{'biography':text,'birthday':proposed_year,'fio':proof['fio']},'current':current,
@@ -55,8 +69,7 @@ def detail(settings, token, row_number, *, connection=None, record=None, identit
         'identity_required':False,'identity_decision':None,'source_fio':proof['fio'],'identity_supported':proof['verified'],
         'ambiguous':bool(proof['problems']),'confirmed':confirmed,'state':state,'status':status,'reason':reason,
         'events':events,'ordinary':ordinary,'receipt':events[-1]['operation'] if events else None,
-        'revision':bio._sign(settings,bio.canonical({'kind':'enrichment-auto-v5','token':token,'row':row_number,
-            'current':current,'resolved':resolved,'receipt':events[-1]['operation'] if events else None}))}
+        'evidence':asdict(typed) if typed else None}
 
 
 def row_plan(settings, token, row_number, decisions, *, expected=None, mode='review', identity_choice=None, connection=None, record=None):

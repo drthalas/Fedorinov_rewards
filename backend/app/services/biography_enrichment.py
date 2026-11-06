@@ -502,6 +502,11 @@ def _snapshot(settings, values):
         raise ImportGuardError('signature_missing', 'В строке отсутствует подпись исходной выгрузки.', ['snapshot_signature'])
     if not isinstance(signature,str) or not re.fullmatch(r'[0-9a-f]{64}',signature) or not hmac.compare_digest(signature, _sign(settings, serialized)):
         raise ImportGuardError('signature_invalid', 'Подпись исходных данных не подтверждена: файл изменён либо подписан другим ключом. Скачайте актуальный шаблон только после проверки установки.', ['snapshot_signature'])
+    return decode_snapshot(serialized)
+
+
+def decode_snapshot(serialized):
+    """Validate snapshot structure. Authentication is performed by _snapshot."""
     try:
         snapshot = json.loads(serialized)
         if type(snapshot['version']) is not int or snapshot['version'] not in {1, 2} or type(snapshot['person']['person_id']) is not int:
@@ -578,34 +583,40 @@ def _assess(connection, settings, entry, originals, duplicates):
             return fail(CONFLICT, f'Не совпадает «{label}»: в файле «{given}», в исходной выгрузке «{expected}». Проверьте запись и источник.')
     result['snapshot'] = snapshot
     biography = connection.execute('select biography from person where id=?', (person_id,)).fetchone()[0]
+    return fail(*assess_payload(values, original, current, biography))
+
+
+def assess_payload(values, original, current, biography):
+    """Classify workbook assertions once the original has been checked."""
+    human = values.get('_format') == 'visible-7-v2'
     if not blank(biography):
-        return fail(SKIP, 'Биография уже заполнена; существующий текст сохранён.')
+        return (SKIP, 'Биография уже заполнена; существующий текст сохранён.')
     status = key(values['status'])
     confirmed = {'найдено'} if human else {'биография подтверждена', 'подтверждено', 'confirmed'}
     if 'требует проверки' in status or status in {'requires review', 'requires verification'}:
-        return fail(CONFLICT, 'В файле указан статус «Требует проверки». Уточните личность и источник; строка не будет сохранена.')
+        return (CONFLICT, 'В файле указан статус «Требует проверки». Уточните личность и источник; строка не будет сохранена.')
     if status and status not in confirmed:
-        return fail(CONFLICT, f'Неизвестный статус «{values["status"]}». Используйте «Найдено» или «Требует проверки» в новой выгрузке.')
+        return (CONFLICT, f'Неизвестный статус «{values["status"]}». Используйте «Найдено» или «Требует проверки» в новой выгрузке.')
     if not original['Год рождения'] or original['Год рождения'] == '1945':
-        return fail(CONFLICT, 'Год рождения не подтверждён: он отсутствует либо 1945 мог быть подставлен при старом импорте. Требуется ручная проверка.')
-    if blank(result['biography']):
-        return fail(SKIP, 'Биография в файле не заполнена. Записывать нечего.')
+        return (CONFLICT, 'Год рождения не подтверждён: он отсутствует либо 1945 мог быть подставлен при старом импорте. Требуется ручная проверка.')
+    if blank(values['biography']):
+        return (SKIP, 'Биография в файле не заполнена. Записывать нечего.')
     if status not in confirmed:
-        return fail(CONFLICT, 'Статус не заполнен. Укажите «Найдено» только после подтверждения личности по ФИО, году рождения и награде.')
+        return (CONFLICT, 'Статус не заполнен. Укажите «Найдено» только после подтверждения личности по ФИО, году рождения и награде.')
     if not human and key(values.get('ФИО в карточке')) != key(current['fio']):
-        return fail(CONFLICT, 'ФИО в карточке источника не совпадает с исходным.')
+        return (CONFLICT, 'ФИО в карточке источника не совпадает с исходным.')
     if not human and text(values.get('Год в карточке')) != original['Год рождения']:
-        return fail(CONFLICT, 'Год рождения в карточке источника не совпадает.')
+        return (CONFLICT, 'Год рождения в карточке источника не совпадает.')
     # ALE-491 has no separate source-award column: its accepted three-signal
     # identity statement is an explicit mapping, never inferred from biography.
     source_award = values.get('Награда в карточке', '')
     if not human and source_award:
         if key(source_award) not in {key(a) for a in original['Награда'].split(' | ')}:
-            return fail(CONFLICT, 'Награда в карточке источника не совпадает.')
+            return (CONFLICT, 'Награда в карточке источника не совпадает.')
     elif not human and (values.get('snapshot') or key(values.get('Идентификация')) != 'фио, реальный год и награда совпали'):
-        return fail(CONFLICT, 'В прежнем файле нет подтверждения совпадения ФИО, реального года и награды. Уточните сведения или используйте новую выгрузку.')
+        return (CONFLICT, 'В прежнем файле нет подтверждения совпадения ФИО, реального года и награды. Уточните сведения или используйте новую выгрузку.')
     if not human and (not text(values.get('notes')) or not text(values.get('Идентификация'))):
-        return fail(CONFLICT, 'В прежнем файле не заполнены проверка личности и подтверждённые факты. Уточните сведения или используйте новую выгрузку.')
+        return (CONFLICT, 'В прежнем файле не заполнены проверка личности и подтверждённые факты. Уточните сведения или используйте новую выгрузку.')
     if not human and not blank(values.get('Звание в карточке')) and _rank_key(values['Звание в карточке']) != _rank_key(current['rank']):
         # Pilot profiles can give a later service rank. Require its explicit
         # source comparison, rather than silently treating any rank as equal.
@@ -616,7 +627,7 @@ def _assess(connection, settings, entry, originals, duplicates):
             f'sqlite: {key(current["rank"])};' in comparison and
             f'warheroes (вводная часть): {key(values["Звание в карточке"])}.' in comparison)
         if not pilot_comparison:
-            return fail(CONFLICT, 'Звание источника отличается; требуется ручная проверка.')
+            return (CONFLICT, 'Звание источника отличается; требуется ручная проверка.')
     urls = values['source_url'].splitlines()
     try:
         valid_urls = bool(urls) and all(urlsplit(url).scheme in {'https', 'http'} and urlsplit(url).hostname
@@ -624,10 +635,10 @@ def _assess(connection, settings, entry, originals, duplicates):
     except ValueError:
         valid_urls = False
     if not valid_urls:
-        return fail(ERROR, 'Укажите полный http/https URL карточки источника.')
-    if len(result['biography']) > 2500:
-        return fail(ERROR, 'Биография длиннее 2 500 Unicode символов; текст не обрезан.')
-    return fail(READY, 'Исходные ID, ФИО, год рождения и награды совпали; биография в базе пуста. Личность подтверждена в файле.' +
+        return (ERROR, 'Укажите полный http/https URL карточки источника.')
+    if len(values['biography']) > 2500:
+        return (ERROR, 'Биография длиннее 2 500 Unicode символов; текст не обрезан.')
+    return (READY, 'Исходные ID, ФИО, год рождения и награды совпали; биография в базе пуста. Личность подтверждена в файле.' +
                 (' Различие званий явно пояснено в прежнем файле; звание в базе не меняется.'
                  if key(values.get('Звание в карточке')) and key(values['Звание в карточке']) != key(current['rank']) else ''))
 
