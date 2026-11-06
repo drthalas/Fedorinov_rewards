@@ -43,7 +43,9 @@
 .bio-module-disabled { opacity:.65; }
 .bio-development { display:inline-block; padding:8px 14px; border:1px solid #75654b; border-radius:4px; }
 .bio-steps { display:flex; flex-wrap:wrap; gap:14px 32px; padding:18px 18px 18px 40px; margin:0 0 22px; border-block:1px solid #75654b; }
-.bio-steps a { color:inherit; }
+.bio-steps a, .bio-card [data-without-awards-person] { color:inherit; }
+.bio-card [data-without-awards-person]:focus-visible { text-decoration:underline; }
+.bio-list-pagination { flex-wrap:wrap; }
 .bio-workflow .bio-card { box-sizing:border-box; }
 .bio-workflow { margin-bottom:20px; }
 .bio-old-file { margin:12px 0 20px; }
