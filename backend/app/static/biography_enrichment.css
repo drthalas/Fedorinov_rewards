@@ -7,7 +7,10 @@
 .bio-module { display:block; max-width:640px; padding:24px; text-decoration:none; color:inherit; }
 .bio-module h2 { margin-top:0; }
 .bio-counts { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin:24px 0; }
-.bio-counts>div { padding:18px 22px; border:1px solid #75654b; border-radius:10px; }
+.bio-counts>:is(div,a) { padding:18px 22px; border:1px solid #75654b; border-radius:10px; }
+.bio-counts>a { color:inherit; }
+.bio-counts>a:hover, .bio-counts>a:focus-visible { background:#393125; }
+.bio-counts>a:focus-visible { outline:2px solid #d0ac66; outline-offset:3px; }
 .bio-counts span { display:block; font-size:14px; }
 .bio-counts strong { display:block; margin-top:8px; font-size:30px; }
 .bio-workflow { display:grid; grid-template-columns:1fr; gap:16px; }
@@ -31,7 +34,7 @@
 .bio-confirm label { display:flex; align-items:flex-start; }
 .bio-confirm input { margin-top:4px; }
 .bio-confirm button { justify-self:start; }
-@media(max-width:800px) { .bio-workflow { grid-template-columns:1fr; } .bio-counts { gap:8px; } .bio-counts>div { padding:12px; } }
+@media(max-width:800px) { .bio-workflow { grid-template-columns:1fr; } .bio-counts { gap:8px; } .bio-counts>:is(div,a) { padding:12px; } }
 .bio-landing { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; margin:28px 0; }
 .biography-page-theme .bio-module { box-sizing:border-box; width:auto; max-width:none; padding:28px; margin:0; }
 .bio-module-caption { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:#b5a183; }

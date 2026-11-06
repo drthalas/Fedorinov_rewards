@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Кавалеры без наград{% endblock %}
+{% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
+{% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}">{% endblock %}
+{% block content %}
+<section class="cavalier-standalone-page bio-page" aria-label="Кавалеры без наград">
+  <header class="import-page-header">
+    <a href="{{ back }}" class="button secondary-button">← Назад к наполнению данных</a>
+    <h1>Кавалеры без наград</h1>
+  </header>
+  <div class="cavalier-form-card bio-card">
+    {% if error %}
+    <p class="notice notice-error" role="alert">{{ error }}</p>
+    {% else %}
+    <p>Всего без наград: <strong data-without-awards-total>{{ pager.total }}</strong></p>
+    {% if people %}
+    <ul>
+      {% for person in people %}
+      <li><a data-without-awards-person href="{{ person.url }}">{{ person.fio or ('Кавалер №' ~ person.id) }}</a></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p>Кавалеров без наград нет.</p>
+    {% endif %}
+    {% if pager.total_pages > 1 %}
+    <nav class="search-pagination" aria-label="Страницы списка">
+      {% if pager.has_previous %}<a class="button secondary-button" href="{{ previous_url }}">Предыдущая страница</a>{% endif %}
+      <span>Страница {{ pager.page }} из {{ pager.total_pages }}</span>
+      {% if pager.has_next %}<a class="button secondary-button" href="{{ next_url }}">Следующая страница</a>{% endif %}
+    </nav>
+    {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

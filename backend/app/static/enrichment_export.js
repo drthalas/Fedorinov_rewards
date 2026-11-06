@@ -39,7 +39,16 @@
     void monitor();
   });
   block.querySelector('[data-export-reconnect]').addEventListener('click',()=>void monitor());
-  if(state.operation){form.elements.selection.value=state.selection||'';form.elements.limit.value=state.limit||20;render({state:'queued',phase:'Проверяем состояние выгрузки…'});void monitor();}
+  document.querySelector('[data-without-awards-link]')?.addEventListener('click', () => {
+    state.formDraft = {selection:form.elements.selection.value, limit:form.elements.limit.value};
+    persist();
+  });
+  const savedForm = state.formDraft || (state.operation ? state : null);
+  if(savedForm){
+    form.elements.selection.value = savedForm.selection || '';
+    form.elements.limit.value = savedForm.limit || 20;
+  }
+  if(state.operation){render({state:'queued',phase:'Проверяем состояние выгрузки…'});void monitor();}
   window.addEventListener('pageshow',event=>{if(event.persisted&&state.operation)void monitor();});
 
   const population=document.querySelector('[data-population]');let updating=false,pendingUpdate=false;

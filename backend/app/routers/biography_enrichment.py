@@ -1,6 +1,8 @@
 import logging
 import sqlite3
 import json
+import re
+from urllib.parse import urlencode, urlsplit
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
@@ -12,11 +14,13 @@ from ..services import manual_import_review as manual
 from ..services import manual_review_choices as choices
 from ..services import enrichment_workflow as workflow, enrichment_import_jobs as import_jobs, enrichment_export_jobs as export_jobs
 from ..services.dates import format_birth_year_input
+from ..services.navigation import safe_return_to
 from ..services.write_guard import WriteBlockedError
 from .templates import templates
 
 router = APIRouter()
 BASE = '/data-maintenance/enrichment/biographies'
+WITHOUT_AWARDS_URL = BASE + '/without-awards'
 
 
 def _render(request, *, level='biographies', status_code=200, **context):
@@ -30,6 +34,16 @@ def _render(request, *, level='biographies', status_code=200, **context):
     if context.get('result'):
         context['view'] = workflow.workspace(settings,context['token'])
         context['completed'] = workflow.completed_preview(settings,context['token'],context['view'])
+    token = context.get('token')
+    if token:
+        summary_url = f'{BASE}/preview/{token}'
+        if context.get('show_details'):
+            summary_url += '?details=true'
+    else:
+        summary_url = BASE
+        if request.url.path == BASE and request.url.query:
+            summary_url += '?' + request.url.query
+    context['without_awards_url'] = WITHOUT_AWARDS_URL + '?' + urlencode({'return_to': summary_url})
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, 'year_label':format_birth_year_input, **context}, status_code=status_code)
 
@@ -47,6 +61,32 @@ def enrichment(request: Request):
 @router.get(BASE)
 def biographies(request: Request, selection: str = ''):
     return _render(request, selection=selection)
+
+
+@router.get(WITHOUT_AWARDS_URL)
+def without_awards(request: Request, page: int = 1, return_to: str = ''):
+    settings = get_settings()
+    back = safe_return_to(return_to, BASE)
+    if not re.fullmatch(re.escape(BASE) + r'(?:/preview/[0-9a-f]{64})?', urlsplit(back).path):
+        back = BASE
+
+    def page_url(number):
+        return WITHOUT_AWARDS_URL + '?' + urlencode({'page': number, 'return_to': back})
+
+    try:
+        rows, pager = service.people_without_awards(settings, page)
+    except sqlite3.Error:
+        return templates.TemplateResponse(request, 'enrichment_without_awards.html',
+            {'settings': settings, 'back': back, 'error': 'Не удалось загрузить список. Обновите страницу.'},
+            status_code=503, headers={'Cache-Control': 'no-store'})
+
+    current = page_url(pager['page'])
+    people = [{'id': row['id'], 'fio': row['fio'],
+               'url': f"/persons/{row['id']}?" + urlencode({'return_to': current})} for row in rows]
+    return templates.TemplateResponse(request, 'enrichment_without_awards.html',
+        {'settings': settings, 'back': back, 'people': people, 'pager': pager,
+         'previous_url': page_url(pager['previous_page']), 'next_url': page_url(pager['next_page'])},
+        headers={'Cache-Control': 'no-store'})
 
 
 @router.get(BASE + '/preview/{token}')

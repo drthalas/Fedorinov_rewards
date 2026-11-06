@@ -44,6 +44,38 @@ class Ale523Tests(unittest.TestCase):
         self.execute('delete from rewards;delete from person')
         self.assertEqual(b.population_statistics(self.settings),{'total':0,'empty':0,'filled':0,'without_awards':0})
 
+    def test_without_awards_list_matches_counter_with_stable_pages_and_back_links(self):
+        with closing(sqlite3.connect(self.db)) as connection:
+            connection.executemany("insert into person(id,fio) values(?, 'Одинаковое ФИО')",
+                                   [(pid,) for pid in range(20000, 20028)])
+            connection.execute("insert into rewards(person_id,id_name) values(20000, 999999)")
+            connection.commit()
+        path = BASE + '/without-awards'
+        token = 'a' * 64
+        origin = BASE + '/preview/' + token + '?details=true'
+        with patch.object(flow, 'workspace', side_effect=AssertionError('list must not classify an import')):
+            with TestClient(app) as client:
+                count = client.get(BASE+'/statistics').json()['without_awards']
+                first = client.get(path, params={'return_to': origin}).text
+                second = client.get(path, params={'page': 100, 'return_to': origin}).text
+                self.assertEqual(count, 28)
+                self.assertIn('data-without-awards-total>28', first)
+                self.assertIn('data-without-awards-total>28', second)
+                self.assertEqual(first.count('data-without-awards-person'), 25)
+                self.assertEqual(second.count('data-without-awards-person'), 3)
+                self.assertIn('/persons/20000?', first)
+                self.assertNotIn('/persons/20024?', second)
+                self.assertIn('/persons/20025?', second)
+                self.assertIn(f'href="{origin}"', second)
+                invalid = client.get(path, params={'return_to':'https://example.invalid'}).text
+                self.assertIn(f'href="{BASE}"', invalid)
+        self.execute("delete from person where id >= 20000")
+        with TestClient(app) as client:
+            self.assertEqual(client.get(BASE+'/statistics').json()['without_awards'], 0)
+            empty = client.get(path).text
+            self.assertIn('data-without-awards-total>0', empty)
+            self.assertIn('Кавалеров без наград нет.', empty)
+
     def test_population_failure_does_not_fake_zero(self):
         with patch.object(b,'statistics',side_effect=sqlite3.OperationalError('TEMP unavailable')),TestClient(app) as client:
             response=client.get(BASE);self.assertEqual(response.status_code,503)

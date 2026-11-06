@@ -23,6 +23,7 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.worksheet.datavalidation import DataValidation
 
 from ..db import open_readonly_connection, open_write_connection
+from .display import pagination
 from .write_guard import ensure_write_allowed
 
 MAX_BYTES = 10 * 1024 * 1024
@@ -180,14 +181,33 @@ def _selection(selection):
     return values, ' and ' + ' and '.join(f'r.{name}=?' for name in IDS[:len(values)]), values
 
 
+# A real award has an identifiable name, even without serial/date.
+# NOT IN builds membership once for older databases without a person_id index.
+WITHOUT_AWARDS = """p.id not in (
+    select r.person_id from rewards r join guide_lev_3 g on g.id=r.id_name
+    where r.person_id is not null and bio_blank(g.name)=0
+)"""
+
+
 def _population(connection):
-    # An identifiable award is a real name reference, even without serial/date.
-    # Empty/orphan technical links do not count. Build the membership set once,
-    # even in legacy databases without an index on rewards.person_id.
-    total, empty, without_awards = connection.execute('''select count(*), coalesce(sum(bio_blank(p.biography)),0),
-        coalesce(sum(p.id not in(select r.person_id from rewards r join guide_lev_3 g on g.id=r.id_name
-            where r.person_id is not null and bio_blank(g.name)=0)),0) from person p''').fetchone()
+    total, empty, without_awards = connection.execute(f"""
+        select count(*), coalesce(sum(bio_blank(p.biography)),0),
+               coalesce(sum({WITHOUT_AWARDS}),0)
+        from person p
+    """).fetchone()
     return {'total': total, 'empty': empty, 'filled': total - empty, 'without_awards': without_awards}
+
+
+def people_without_awards(settings, page=1):
+    with closing(_connection(settings.rewards_db_path)) as connection:
+        total = connection.execute(f'select count(*) from person p where {WITHOUT_AWARDS}').fetchone()[0]
+        pager = pagination(total, page, 25)
+        rows = connection.execute(f"""
+            select p.id, p.fio from person p where {WITHOUT_AWARDS}
+            order by p.fio collate nocase, p.id
+            limit ? offset ?
+        """, (pager['page_size'], pager['offset'])).fetchall()
+    return rows, pager
 
 
 def population_statistics(settings):
