@@ -15,10 +15,12 @@ import os
 from pathlib import Path
 import re
 import secrets
+import signal
 import sqlite3
 import stat
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 import urllib.parse
@@ -104,6 +106,10 @@ class Store:
                 status TEXT NOT NULL DEFAULT 'pending', result TEXT, updated REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS events(
                 id INTEGER PRIMARY KEY, at REAL NOT NULL, kind TEXT NOT NULL, detail TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS analysis_jobs(
+                id TEXT PRIMARY KEY, draft_id TEXT NOT NULL, revision INTEGER NOT NULL,
+                payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
+                attempts INTEGER NOT NULL DEFAULT 0, error TEXT, updated REAL NOT NULL);
         """)
 
     @contextmanager
@@ -141,6 +147,24 @@ class Store:
         # Deliberately no raw API errors, credentials, chat IDs or message bodies.
         self.db.execute("INSERT INTO events(at,kind,detail) VALUES(?,?,?)", (time.time(), kind, detail))
 
+    def queue_analysis(self, draft: dict):
+        self.db.execute("UPDATE analysis_jobs SET status='superseded',updated=? WHERE draft_id=? AND status='pending' AND revision<?",
+                        (time.time(), draft["id"], draft["revision"]))
+        self.db.execute("INSERT OR IGNORE INTO analysis_jobs(id,draft_id,revision,payload,updated) VALUES(?,?,?,?,?)",
+                        (f"{draft['id']}:{draft['revision']}", draft["id"], draft["revision"],
+                         json.dumps(draft, ensure_ascii=False), time.time()))
+
+    def recover_analysis(self):
+        with self.transaction():
+            self.db.execute("UPDATE analysis_jobs SET status='pending',updated=? WHERE status='running' AND attempts<2", (time.time(),))
+            for row in self.db.execute("SELECT * FROM analysis_jobs WHERE status='running' AND attempts>=2").fetchall():
+                self.db.execute("UPDATE analysis_jobs SET status='failed',error='interrupted_limit',updated=? WHERE id=?", (time.time(), row["id"]))
+                draft_row = self.db.execute("SELECT body FROM drafts WHERE id=?", (row["draft_id"],)).fetchone()
+                draft = json.loads(draft_row[0]) if draft_row else None
+                if draft and draft["revision"] == row["revision"] and draft["state"] == "analyzing":
+                    draft["state"] = "analysis_failed"
+                    self.save(draft)
+
     def claim(self) -> dict | None:
         with self.transaction():
             row = self.db.execute("SELECT * FROM outbox WHERE status='pending' ORDER BY rowid LIMIT 1").fetchone()
@@ -154,15 +178,29 @@ class Store:
             self.db.execute("UPDATE outbox SET status='uncertain',updated=? WHERE status='sending'", (time.time(),))
 
     def status(self) -> dict:
+        has_analysis = self.db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='analysis_jobs'").fetchone()
         return {"paused": self.meta("paused") == "1", "offset": int(self.meta("offset", "0")),
                 "heartbeat_unix": self.meta("heartbeat"),
                 "linear_connection": self.meta("linear_connection", "not_checked"),
+                "analyst_runtime": self.meta("analyst_runtime", "legacy-questionnaire"),
+                "analysis_jobs": [dict(r) for r in self.db.execute("SELECT status,count(*) AS count FROM analysis_jobs GROUP BY status")] if has_analysis else [],
                 "outbox": [dict(r) for r in self.db.execute(
                     "SELECT kind,status,count(*) AS count FROM outbox GROUP BY kind,status")],
                 "delivery_executor": "not_connected", "physical_updater_gate": "not_connected"}
 
 
 def summary(draft: dict) -> str:
+    if draft.get("analysis"):
+        a = draft["analysis"]
+        marker = "TEST/ALE-528 — только QA, исполнение/release запрещены.\n" if any("TEST/ALE-528" in s["text"] for s in draft["sources"]) else ""
+        text = (marker + f"Задача: {a['title']}\nГде: {a['screen']}\nСейчас: {a['actual']}\nНужно: {a['expected']}\n"
+                + "Scope: " + "; ".join(a["scope"]) + "\n"
+                + "Сохранить: " + "; ".join(a["frozen"]) + "\n"
+                + "Проверка: " + "; ".join(a["acceptance"]) + "\n"
+                + f"Tier: {draft['tier']}. {draft['tier_reason']}\n")
+        if a["image_observations"]:
+            text += "На скриншоте: " + "; ".join(a["image_observations"]) + "\n"
+        return text + "Создать задачу в Linear? Исполнение ещё не подключено."
     answers = draft["answers"]
     return (f"Задача: {draft['request']}\nГде: {answers['screen']}\nСейчас: {answers['actual']}\n"
             f"Нужно: {answers['expected']}\nСохранить: {answers['frozen']}\n"
@@ -180,7 +218,10 @@ def contract(draft: dict) -> dict:
     sources = "\n".join(f"- Telegram message_id={s['message_id']}, update_id={s['update_id']}: {s['text']}"
                         for s in draft["sources"])
     role = "Сергея" if draft["role"] == "sergey" else "Александра (Owner)"
-    test_only = "TEST/ALE-528" in draft["request"]
+    test_only = any("TEST/ALE-528" in s["text"] for s in draft["sources"])
+    title = draft.get("analysis", {}).get("title", draft["request"])[:110]
+    if test_only and "TEST/ALE-528" not in title:
+        title = "TEST/ALE-528: " + title
     test_guard = ("## TEST/ALE-528 — только E2E\n\n"
                   f"Фактический инициатор: {role}. Сценарий имитирует запрос Сергея.\n"
                   "EXECUTION_ALLOWED=false\nRELEASE_ALLOWED=false\n"
@@ -190,7 +231,7 @@ def contract(draft: dict) -> dict:
         # Draft IDs are already uuid4 and are persisted before confirmation.
         # Linear explicitly requires v4: a deterministic uuid5 is rejected.
         "id": str(uuid.UUID(draft["id"])),
-        "title": f"[{draft['tier']}] {draft['request'][:110]}",
+        "title": f"[{draft['tier']}] " + title,
         "tier": draft["tier"],
         "test_only": test_only,
         "description": (
@@ -218,11 +259,12 @@ def contract(draft: dict) -> dict:
 
 
 class Intake:
-    def __init__(self, store: Store, sergey_id: int, owner_id: int):
+    def __init__(self, store: Store, sergey_id: int, owner_id: int, *, contextual: bool = False):
         if min(sergey_id, owner_id) <= 0 or sergey_id == owner_id:
             raise ValueError("Нужны два различных проверенных Telegram user ID")
         self.store = store
         self.roles = {sergey_id: "sergey", owner_id: "owner"}
+        self.contextual = contextual
 
     def process(self, update: dict):
         s = self.store
@@ -296,14 +338,15 @@ class Intake:
                 elif parts[0] == "edit":
                     draft.update(state="asking", answers={}, revision=draft["revision"] + 1)
                     s.save(draft)
-                    reply("Уточним постановку заново. " + QUESTIONS[0][1])
+                    reply("Что изменить в резюме? Остальной контекст сохранён." if self.contextual
+                          else "Уточним постановку заново. " + QUESTIONS[0][1])
                 elif parts[0] == "cancel":
                     draft["state"] = "cancelled"
                     s.save(draft)
                     reply("Создание отменено. Для новой задачи — /new.")
                 return
             if text == "/cancel":
-                if draft and draft["state"] in {"asking", "summary"}:
+                if draft and draft["state"] in {"asking", "summary", "analyzing", "analysis_failed"}:
                     draft["state"] = "cancelled"
                     s.save(draft)
                     reply("Создание отменено.")
@@ -311,12 +354,17 @@ class Intake:
                     reply("Нет неподтверждённой задачи. Подтверждённую запись отменяет Александр в Linear.")
                 return
             if text in {"/start", "/new"}:
-                if draft and draft["state"] in {"asking", "summary", "confirmed"}:
+                if draft and draft["state"] in {"asking", "summary", "confirmed", "analyzing", "analysis_failed"}:
                     reply("Уже есть диалог. Продолжите ответы, /status или /cancel до подтверждения.")
                 else:
                     s.set_meta(f"current:{user_id}", "")
-                    reply("Опишите одну доработку. Не присылайте пароли или токены. "
+                    reply("Опишите одну доработку текстом, голосом или приложите скриншот. "
+                          "Не присылайте пароли или токены." if self.contextual else
+                          "Опишите одну доработку. Не присылайте пароли или токены. "
                           "Текстовый пилот: голос пока нужно расшифровать вручную, скриншот можно приложить как контекст.")
+                return
+            if self.contextual:
+                self.contextual_input(update_id, message, user_id, text, draft, reply)
                 return
             if (message or {}).get("photo"):
                 if not draft or draft["state"] not in {"asking", "summary"}:
@@ -366,6 +414,123 @@ class Intake:
                 else:
                     reply(QUESTIONS[len(draft["answers"])][1])
             s.save(draft)
+
+    def contextual_input(self, update_id, message, user_id, text, draft, reply):
+        s = self.store
+        if text == "/retry":
+            if not draft or draft["state"] != "analysis_failed":
+                reply("Нет неудавшегося анализа. Текущая операция уже сохранена.")
+                return
+            key = f"{draft['id']}:{draft['revision']}"
+            changed = s.db.execute("UPDATE analysis_jobs SET status='pending',updated=? WHERE id=? AND status='failed' AND attempts<2", (time.time(), key)).rowcount
+            if changed:
+                draft["state"] = "analyzing"; s.save(draft)
+                reply("Повторяю анализ сохранённого сообщения. Задача ещё не создаётся.")
+            else:
+                reply("Лимит повторов исчерпан. Добавьте уточнение новым сообщением или /cancel.")
+            return
+        if text.startswith("/"):
+            reply("Команды: /new, /status, /cancel, /retry. Александр: /pause, /resume.")
+            return
+        if draft and draft["state"] in {"confirmed", "created"}:
+            reply("Подтверждённая постановка сохранена. Для новой задачи — /new.")
+            return
+        media = None
+        if message.get("photo"):
+            media = {**message["photo"][-1], "kind": "photo"}
+        elif message.get("voice") or message.get("audio"):
+            media = {**(message.get("voice") or message["audio"]), "kind": "voice" if message.get("voice") else "audio"}
+        elif message.get("document"):
+            document = message["document"]
+            mime = document.get("mime_type", "")
+            if mime in {"image/png", "image/jpeg", "image/webp"}:
+                media = {**document, "kind": "photo"}
+            elif mime.startswith("audio/"):
+                media = {**document, "kind": "audio-document"}
+        if not text and not media:
+            reply("Поддерживаются текст, голос/аудио и PNG/JPEG/WebP. Пришлите понятное описание.")
+            return
+        text = safe_text(text or str(message.get("caption", "")))
+        if len(text) > 4000:
+            reply("Сократите сообщение до 4000 символов.")
+            return
+        if media and (media.get("file_size", 0) > 15 * 1024 * 1024 or media.get("duration", 0) > 180):
+            reply("Вложение слишком большое: до 15 МБ, голос до 3 минут.")
+            return
+        source = {"message_id": message["message_id"], "update_id": update_id,
+                  "text": text or ("[Скриншот]" if media["kind"] == "photo" else "[Голосовое сообщение]")}
+        if media:
+            source.update(media=media, caption=text)
+        if not draft or draft["state"] == "cancelled":
+            draft = {"id": uuid.uuid4().hex, "user_id": user_id, "role": self.roles[user_id],
+                     "request": source["text"], "answers": {}, "sources": [], "revision": 0}
+            s.set_meta(f"current:{user_id}", draft["id"])
+        if len(draft["sources"]) >= 30:
+            reply("Слишком длинный диалог. Сохраните постановку или отмените её командой /cancel.")
+            return
+        draft["sources"].append(source)
+        draft.update(state="analyzing", revision=draft["revision"] + 1)
+        s.save(draft); s.queue_analysis(draft)
+        reply("Сообщение сохранено. Анализирую контекст; задачу создам только после вашего подтверждения.")
+
+
+def analysis_one(store: Store, engine) -> bool:
+    with store.transaction():
+        if store.meta("paused") == "1":
+            return False
+        row = store.db.execute("SELECT * FROM analysis_jobs WHERE status='pending' ORDER BY rowid LIMIT 1").fetchone()
+        if not row:
+            return False
+        store.db.execute("UPDATE analysis_jobs SET status='running',attempts=attempts+1,updated=? WHERE id=?", (time.time(), row["id"]))
+    draft = json.loads(row["payload"])
+    try:
+        prepared, result = engine.analyze(draft)
+        # Engine boundary is also validated in code, even for a replaced adapter.
+        try:
+            from .sergey_analyst import validate_result
+        except ImportError:
+            from sergey_analyst import validate_result
+        result = {k: safe_text(v) if isinstance(v, str) else [safe_text(x) for x in v] if isinstance(v, list) else v
+                  for k, v in result.items()}
+        validate_result(result)
+        with store.transaction():
+            current = store.current(draft["user_id"])
+            if not current or current["id"] != draft["id"] or current["revision"] != draft["revision"] or current["state"] != "analyzing":
+                store.db.execute("UPDATE analysis_jobs SET status='superseded',updated=? WHERE id=?", (time.time(), row["id"]))
+                return True
+            current["sources"] = prepared["sources"]
+            current["analysis_runtime"] = engine.runtime() if hasattr(engine, "runtime") else {"analyst": "test-adapter"}
+            current["analysis"] = result
+            current["answers"] = {k: result[k] for k in ["screen", "actual", "expected", "surface"]}
+            current["answers"].update(frozen="; ".join(result["frozen"]), acceptance="; ".join(result["acceptance"]))
+            guard_tier, guard_reason = classify(current)
+            current["tier"] = max(result["tier"], guard_tier)
+            current["tier_reason"] = safe_text(result["tier_reason"] + (" " + guard_reason if guard_tier > result["tier"] else ""))
+            current["state"] = "summary" if result["ready"] else "asking"
+            store.save(current)
+            payload = {"chat_id": current["user_id"], "text": summary(current) if result["ready"] else "\n".join(result["questions"])}
+            if result["ready"]:
+                payload["reply_markup"] = {"inline_keyboard": buttons(current)}
+            if len(payload["text"]) > 4096:
+                raise ValueError("summary_too_long")
+            store.enqueue(f"analysis:{row['id']}:ready", "telegram", payload)
+            store.db.execute("UPDATE analysis_jobs SET status='done',updated=? WHERE id=?", (time.time(), row["id"]))
+            store.event("analysis_applied", row["id"])
+    except Exception as error:
+        code = str(error) if re.fullmatch(r"[a-z_]{1,60}", str(error)) else "analysis_failed"
+        with store.transaction():
+            store.db.execute("UPDATE analysis_jobs SET status='failed',error=?,updated=? WHERE id=?", (code, time.time(), row["id"]))
+            current = store.current(draft["user_id"])
+            if current and current["id"] == draft["id"] and current["revision"] == draft["revision"] and current["state"] == "analyzing":
+                prepared = getattr(engine, "prepared", None)
+                if prepared and prepared["id"] == current["id"] and prepared["revision"] == current["revision"]:
+                    current["sources"] = prepared["sources"]
+                current["state"] = "analysis_failed"; store.save(current)
+                store.enqueue(f"analysis:{row['id']}:failed:{row['attempts'] + 1}", "telegram", {
+                    "chat_id": current["user_id"], "text": f"Анализ не завершён ({code}). История сохранена, задача не создана. "
+                    "При неразборчивом вложении пришлите другое или уточнение текстом. /retry — повтор, /cancel — отмена."})
+            store.event("analysis_failed", row["id"] + ":" + code)
+    return True
 
 
 class ApiError(RuntimeError):
@@ -676,6 +841,8 @@ def main() -> int:
     parser.add_argument("--state", type=Path, required=True, help="Dedicated private intake SQLite; never product DB")
     parser.add_argument("--credentials-file", type=Path, help="Private 0600 JSON, outside Git; environment overrides")
     parser.add_argument("--intake-only", action="store_true", help="Explicit Telegram-only mode; confirmed Linear writes remain pending")
+    parser.add_argument("--analyst", choices=["legacy", "codex"], default="legacy")
+    parser.add_argument("--analyst-model", help="Explicit agreed CLI model override; leaves UI/global config unchanged")
     args = parser.parse_args()
     if args.intake_only and args.action == "reconcile":
         parser.error("reconcile requires the Linear connection")
@@ -729,21 +896,57 @@ def main() -> int:
             if store.meta("identity") and store.meta("identity") != binding:
                 raise ApiError("Bot/allowlist identity changed; use separate state after explicit review")
             store.set_meta("identity", binding)
-            intake = Intake(store, cfg["SERGEY_USER_ID"], cfg["OWNER_USER_ID"])
+            engine = None
+            stop_analysis = threading.Event()
+            worker = None
+            if args.analyst == "codex":
+                from sergey_analyst import CodexAnalyst
+                engine = CodexAnalyst(Path(__file__).resolve().parents[1], args.state.parent / "multimodal", bot,
+                                      model=args.analyst_model, redactor=safe_text)
+                store.set_meta("analyst_runtime", json.dumps(engine.runtime(), ensure_ascii=False))
+                store.recover_analysis()
+
+                def analysis_loop():
+                    worker_store = Store(args.state)
+                    try:
+                        while not stop_analysis.is_set():
+                            if not analysis_one(worker_store, engine):
+                                stop_analysis.wait(0.5)
+                    finally:
+                        worker_store.db.close()
+
+                def stop_service(signum, frame):
+                    stop_analysis.set()
+                    engine.cancel()
+                    raise KeyboardInterrupt
+
+                signal.signal(signal.SIGTERM, stop_service)
+                worker = threading.Thread(target=analysis_loop, name="intake-analyst", daemon=True)
+                worker.start()
+            else:
+                store.set_meta("analyst_runtime", "legacy-questionnaire")
+            intake = Intake(store, cfg["SERGEY_USER_ID"], cfg["OWNER_USER_ID"], contextual=engine is not None)
             print("Intake running; delivery executor and physical updater gate disconnected", flush=True)
-            while True:
-                try:
-                    updates = bot.call("getUpdates", {"offset": int(store.meta("offset", "0")),
-                                       "timeout": 25, "allowed_updates": ["message", "callback_query"]})
-                    for update in updates:
-                        intake.process(update)
-                    for _ in range(100):
-                        if not dispatch_one(store, bot, linear):
-                            break
-                    store.set_meta("heartbeat", str(time.time()))
-                except ApiError:
-                    store.event("poll_failed", "safe_retry_read_only")
-                    time.sleep(5)
+            try:
+                while True:
+                    try:
+                        updates = bot.call("getUpdates", {"offset": int(store.meta("offset", "0")),
+                                           "timeout": 2 if engine else 25, "allowed_updates": ["message", "callback_query"]})
+                        for update in updates:
+                            intake.process(update)
+                        for _ in range(100):
+                            if not dispatch_one(store, bot, linear):
+                                break
+                        store.set_meta("heartbeat", str(time.time()))
+                    except ApiError:
+                        store.event("poll_failed", "safe_retry_read_only")
+                        time.sleep(5)
+            finally:
+                stop_analysis.set()
+                if engine:
+                    engine.cancel()
+                if worker:
+                    worker.join(timeout=3)
     except (ApiError, ValueError) as exc:
         print(str(exc))
         return 2
