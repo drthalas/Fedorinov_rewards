@@ -136,6 +136,7 @@ Private evidence (0600): `delivery-e2e-evidence.json`, `restart-after-claim.json
 Credentials не входят в эти файлы. Production/main merge/version bump/Windows/candidate/latest.json/release/Telegram
 Сергею не выполнялись. Next stage требует отдельного Owner решения; текущий general queue/release остаются false.
 
-Timing: план 60–90 мин, фактически около 120 мин. Превышение — регистрация/strict SSH handoff,
-выявленный ignore-filter defect и необходимый corrective build/browser verification. Новые широкие проверки
+Timing: план 60–90 мин, фактически около 145 мин с финальным cleanup/evidence/handoff. Превышение —
+регистрация/strict SSH handoff, выявленный ignore-filter defect, необходимый corrective build/browser
+verification и оформление доказательств. Новые широкие проверки
 после бюджета не запускались; выполнялись только действия для устранения конкретных failures и cleanup.
