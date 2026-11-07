@@ -252,6 +252,16 @@ class DeliveryWorker:
             return
         if control != "run" or not self.config.get("enabled", False):
             return
+        if job and job["status"] == "preview_ready":
+            if time.time() >= self.next_poll:
+                self.next_poll = time.time() + self.config["poll_seconds"]
+                try:self.validate_issue()
+                except Exception:
+                    body = json.loads(job["body"]);body["blocker"] = "preview_contract_changed_or_unreadable"
+                    with self.state.transaction():
+                        self.state.db.execute("UPDATE jobs SET status='blocked',body=? WHERE id=? AND status='preview_ready'", (json.dumps(body),job["id"]))
+                        self.state.event("preview_invalidated", job["id"])
+            return
         if job and job["status"] != "active":
             return
         if not job:

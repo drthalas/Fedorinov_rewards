@@ -97,6 +97,16 @@ class DeliveryTests(unittest.TestCase):
         self.assertEqual(contract_hash("- source\n"), contract_hash("* source"))
         self.assertNotEqual(contract_hash("- source"), contract_hash("- changed"))
 
+    def test_preview_ready_polls_exact_issue_without_reexecution(self):
+        adapter=Adapter();w=DeliveryWorker(self.store,self.cfg,{"linear_api_key":"fake","owner_user_id":22},adapter)
+        j=self.store.claim(self.cfg['pilot'],w.owner)
+        self.store.checkpoint(j,w.owner,'preview_ready',{'source_head':'e'*40},'preview_ready')
+        with patch.object(w,'validate_issue') as validate:w.tick();w.tick();validate.assert_called_once()
+        self.assertEqual(adapter.calls,[])
+        w.next_poll=0
+        with patch.object(w,'validate_issue',side_effect=DeliveryBlocked('changed')):w.tick()
+        self.assertEqual(self.store.job()['status'],'blocked');self.assertEqual(adapter.calls,[])
+
     def test_exact_copy_diff_passes_and_extra_files_fail(self):
         work = self.root / "work";work.mkdir()
         def git(*args):return subprocess.run(["git", *args], cwd=work, capture_output=True, text=True, check=True).stdout.strip()
