@@ -11,7 +11,80 @@ Base: `bd91c28896ceb6769da710b8d5c0b881887bf90d`; исходный worktree бы
 STOP `BOT INTAKE READY FOR PILOT` требует реального диалога и подтверждённой Сергеем задачи в Linear.
 При отсутствии credentials этот STOP не достигнут: локальные проверки не заменяют пилот.
 
-## Текущий этап: OWNER TELEGRAM E2E
+## Текущий этап: multimodal intake — E2E BLOCKED
+
+Base продолжения: `bf83e7cf818ecb4cbc3028f8da7d9fdefa17b4fc`; та же сессия/ветка.
+Включён `--analyst codex` в существующем LaunchAgent, с сохранением SQLite, credentials и offset.
+Перед расширением состояния сохранён private SQLite backup. Executor/release по-прежнему выключены.
+
+Actual runtime: **Codex CLI 0.167.0, gpt-6.1-sol, High**, существующая ChatGPT-авторизация.
+Owner обновил CLI: в 0.157.1 live model/list не содержал 6.1, повторный login этого не исправлял;
+после обновления 6.1 появилась и прошла реальные text/image вызовы. Совместимая gpt-6-sol использовалась
+только для диагностического smoke до обновления. Глобальный config, model/reasoning в UI не менялись.
+
+Реализовано:
+
+- `scripts/sergey_analyst.py`: полный текущий диалог + read-only PROJECT_CONTEXT/ARCHITECTURE/LINEAR_PROCESS,
+  structured JSON scope/acceptance/frozen/tier, только недостающие вопросы и учёт correction.
+  LLM не имеет права создавать issue: shell/apps/web/MCP/subagents отключены, sandbox read-only,
+  ephemeral CLI в отдельном TEMP cwd. Нового платного API/credential не вводилось.
+- Durable analysis_jobs: атомарная постановка/claim, одна worker-thread, revision checks, superseded jobs,
+  bounded retry, cancel и recovery прерванного анализа. Сетевые/model calls вне SQLite transaction.
+  Новое сообщение сразу инвалидирует старую кнопку; прежний confirm/issue outbox сохраняется.
+- Telegram voice/audio/audio-document → bounded download → ffprobe/ffmpeg → локальный
+  **whisper.cpp, ggml-large-v3-turbo.bin** из существующего cache → история → Codex.
+  Пустой/слишком тихий/повреждённый файл не превращается в выдуманную постановку.
+- Photo/PNG/JPEG/WebP → bounded private download, header checks и SHA → реальный `--image` Codex.
+  Непрочитанное изображение и malformed output не допускаются в готовое резюме.
+  Контекстный результат и runtime сохраняются в draft, артефакты — только private ignored state.
+
+### Фактические проверки
+
+| Возможность | Результат |
+| --- | --- |
+| Реальный Owner Telegram text → LLM → correction → confirm → Linear | PASS: [ALE-530](https://linear.app/drthalas/issue/ALE-530/t1-testale-528-zamenit-zagolovok-na-poisk-po-fio), revision 2, source messages 33/36. Место/actual сохранены, expected изменён на «Поиск по ФИО», старая кнопка отклонена. Actual createdBy Owner, TEST/ALE-528, execution/release false. После QA Canceled. |
+| Контекстное уточнение | PASS: на metadata voice-запрос без самого вложения аналитик спросил только отсутствующее аудио/расшифровку, не придумал содержание. Message 44, затем реальный /cancel; issue не создавалась. |
+| Локальный ASR | Реальная расшифровка синтетического OGG macOS Milena локальным Whisper; это local smoke, не Telegram voice E2E. Отдельно повреждённый OGG был безопасно отклонён как ffprobe EOF. |
+| Локальный vision | PASS с текущим quality guard: настоящий PNG передан через --image; в result видны уникальный MM528-SCREEN-742, «Список нагрвд», 12 строк и правильный frozen/acceptance. Эти факты не передавались текстом в prompt. Это local smoke с fixture, не Telegram screenshot E2E. |
+| Focused TEMP | 41/41 PASS: прежние 30 + contextual history/correction, stale callbacks/results, cancel, bounded retry, interrupted-job recovery, schema rejection, media limits/path traversal, code risk escalation. |
+| Full repository suite (один запуск) | NOT PASS: 762 tests, failures=3, errors=36, skipped=1. В использованном product venv отсутствуют openpyxl/pypdf; sandbox запрещает localhost bind; есть незатронутые legacy template/version/assertion failures. Product code/tests для их исправления не менялись. Лог /private/tmp/ale528-multimodal-full-suite.log, не в Git. |
+
+### Точный blocker целевого STOP
+
+`OWNER MULTIMODAL INTAKE E2E PASS` **не достигнут**: автоматизированный пользовательский transport
+не смог загрузить подготовленные аудио/PNG в Telegram. Бот не получил ни одного такого реального
+вложения, поэтому voice/screenshot → Linear не заявляются как E2E PASS.
+
+1. В Telegram Web Music оказался каталогом, а не file upload; затем Document/actual input проверены
+   штатным filechooser API. File chooser event не приходит, hidden input возвращает no_visible_match.
+2. Поддержанный browser CDP fallback нашёл правильный file input в composer нужного бота, но
+   `DOM.setFileInputFiles` явно не поддержан и требует тот же filechooser flow. Последний tool call
+   завис примерно на 17 минут; новых повторов/обходов после отказа не выполнялось.
+3. Native picker ChatGPT запрещён CUA; native Telegram не предоставил работающий доступный file picker.
+   Скрытые API Telegram, извлечение сессий, synthetic updates и подмена user ID не применялись.
+4. Последняя ограниченная проверка обычного Chrome нашла уже авторизованный Owner Telegram.
+   Штатный filechooser был получен, но `chooser.setFiles` отказал: в расширении ChatGPT выключено
+   **Allow access to file URLs**. Native Chrome fallback вернул `noWindowsAvailable`.
+   Включение постоянного доступа расширения к локальным file URLs не выполнялось без отдельного
+   Owner решения. Этот вызов драйвера занял ещё около 28 минут.
+
+Нужен работающий user-client upload/filechooser transport к @dev_rewards_bot; затем повторить реальные
+voice и PNG сценарии, подтвердить оба резюме, проверить issue/provenance/dedup и отменить тестовые issue.
+Для Chrome конкретная настройка: chrome://extensions → ChatGPT → Details → Allow access to file URLs.
+После разрешения повторять нужно только реальные attachment E2E и связанный recovery; текстовый PASS сохранён.
+Готовые синтетические fixtures находятся в `data/sergey-intake/multimodal-test-fixtures/` (ignored).
+Это не доступ через Bot API в роли пользователя. Сергею отправлено 0 сообщений.
+
+Private evidence (0600): `multimodal-evidence.json` — реальные drafts/events/outbox; отдельный
+`local-multimodal-smoke-evidence.json` — local ASR/vision, явно помеченные NOT TELEGRAM E2E.
+Пути относятся к `data/sergey-intake/`; credentials туда не копируются. Сервис оставляется работающим,
+с непустым постоянным состоянием; pending user voice-диалог отменён, delivery/updater/production не запускались.
+Последний runtime check: PID 12139, running, свежий heartbeat, stderr 0 bytes, model gpt-6.1-sol High.
+Timing: план 60–90 минут, фактически около 140 минут; два зависших upload driver calls заняли около
+45 минут, дополнительное время ушло на недоступную модель старого CLI и Owner обновление.
+После превышения бюджета новые широкие проверки/повторы full suite не запускались; возвращён точный blocker.
+
+## Принятый ранее этап: OWNER TELEGRAM E2E
 
 **Результат: OWNER TELEGRAM E2E PASS.** Создана через daemon
 [ALE-529](https://linear.app/drthalas/issue/ALE-529/t1-testale-528-ispravit-opechatku-nagrd-na-nagrad-v-testovom-abzace),
