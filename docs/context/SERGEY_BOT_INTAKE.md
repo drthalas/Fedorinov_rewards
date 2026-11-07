@@ -11,6 +11,56 @@ Base: `bd91c28896ceb6769da710b8d5c0b881887bf90d`; исходный worktree бы
 STOP `BOT INTAKE READY FOR PILOT` требует реального диалога и подтверждённой Сергеем задачи в Linear.
 При отсутствии credentials этот STOP не достигнут: локальные проверки не заменяют пилот.
 
+## Текущий этап: OWNER TELEGRAM E2E
+
+Новый верхний ACTIVE ALE-528 заменил текущий пилот Сергея самостоятельным E2E через авторизованный
+Telegram-клиент Owner. Сообщения Сергею запрещены. Проверенный transport — установленный Telegram @ Alex;
+профиль адресата показывает @dev_rewards_bot. Фактический отправитель первого тестового сообщения
+подтверждён daemon как настроенный Owner user ID; ID не подменялся. Bot API не используется как user transport.
+Реальный диалог отмены: request message_id=5, update_id=915725192, draft
+`0bc7dd5022614bfea51392f0d5683cfe` перешёл в cancelled после пользовательского `/cancel`;
+Linear issue не создавалась. Native typeText потерял кириллицу первого тестового текста;
+дальнейшие содержательные сообщения следует отправлять Unicode-safe paste.
+
+Для тестовых постановок с маркером `TEST/ALE-528` contract добавляет явные
+`EXECUTION_ALLOWED=false` и `RELEASE_ALLOWED=false`, реального инициатора и указание отменить issue после QA.
+Private events сохраняют message/update IDs и роль для пользовательских сообщений и callback.
+Ни одна такая задача не передаётся исполнителю; весь delivery executor по-прежнему выключен.
+
+### Защищённое подключение Linear
+
+В Linear открыта Account → Security & access → New API key, имя `ALE-528 daemon intake`.
+Подготовлены только `Read` + `Create and update issues` (так называется scope `issues:create` в текущем UI)
+и только команда Alex. `Write`, `Admin`, `Create comments`, Full access не выбраны.
+Отдельного project-only ограничения ключей нет; adapter жёстко использует PROJECT_ID/TEAM_ID/PARENT_ID
+и проверяет доступ к ним и идентичность Owner до сохранения ключа и старта full mode.
+Создание нового credential завершает Owner в UI; автоматически кнопка Create не нажимается.
+
+```sh
+python3 scripts/sergey_intake.py serve-linear-key --state data/sergey-intake/intake.sqlite3 --credentials-file data/sergey-intake/credentials.json
+```
+
+Команда печатает URL одноразовой локальной формы. Только 127.0.0.1, случайный порт, скрытое поле,
+строгие Host/Origin/CSRF/content-type/size checks, no-store и CSP без внешних ресурсов. Request logging
+отключён. Owner сам вставляет ключ и отправляет форму; ключ уходит только в локальный обработчик,
+затем api.linear.app для read-only identity/project/schema validation. При ошибке исходный credentials.json
+сохраняется, сообщение не содержит ключа. При успехе файл заменяется атомарно с mode 0600, форма очищается,
+сервер завершается. Окно ввода ограничено 15 минутами; при истечении времени повторно запустить команду.
+В ходе ввода не снимать DOM/AX/screenshot с полем секретного значения.
+Есть также `set-linear-key` для ручного ввода Owner в интерактивном локальном terminal через getpass;
+передача секрета argv/stdout/chat не используется. Computer Use доступ к macOS Terminal заблокирован;
+он не применялся для ввода. Используется localhost форма.
+
+После успешного ввода: проверить snapshot количества updates/drafts/outbox, штатно остановить только
+наш LaunchAgent, убрать `--intake-only` из runtime plist, сохранить те же state/credentials paths,
+запустить service. Никакую очередь или offset не обнулять. Дождаться connected/running/heartbeat.
+Проверка прав создания — одна реальная подтверждённая TEST/ALE-528 issue через daemon, без предварительных
+искусственных product tasks. Тестовую issue затем отменить через текущую Linear-интеграцию.
+
+Focused TEMP checks: 29/29 PASS, включая атомарное сохранение ключа, сохранность существующих полей
+при ошибке, read-only identity/project preflight, test-only execution guards и transport evidence.
+E2E до Linear ещё не подтверждён; голосовая обработка — NOT IMPLEMENTED.
+
 ## Подключение после первого этапа
 
 Owner предоставил новый token через системный буфер; значение сохранено только в private credentials.json.

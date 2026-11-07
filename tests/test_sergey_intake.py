@@ -11,6 +11,7 @@ from unittest.mock import patch
 from scripts.sergey_intake import (
     ApiError, Intake, Linear, Store, Telegram, classify, config, dispatch_one,
     protected_config, reconcile_linear, request_json, safe_text, service_lock,
+    install_linear_key, OWNER_LINEAR_ID, TEAM_ID, PROJECT_ID, PARENT_ID,
 )
 
 
@@ -105,6 +106,22 @@ class IntakeTests(unittest.TestCase):
         description = self.linear.calls[0]["description"]
         for value in ["от Сергея", draft["id"], "revision `1`", "message_id=1", "фактический diff", "physical updater"]:
             self.assertIn(value, description)
+
+    def test_owner_e2e_contract_blocks_execution_and_records_real_transport_ids(self):
+        for text in ["TEST/ALE-528: исправить опечатку", "Справка", "Опечатка", "Исправить", "Остальное",
+                     "Прочитать тестовый абзац", "только документация"]:
+            self.send(text, user=22)
+        self.callback(user=22)
+        self.drain()
+        payload = self.linear.calls[0]
+        self.assertTrue(payload["test_only"])
+        self.assertIn("EXECUTION_ALLOWED=false", payload["description"])
+        self.assertIn("RELEASE_ALLOWED=false", payload["description"])
+        self.assertIn("Фактический инициатор: Александра (Owner)", payload["description"])
+        events = [json.loads(r[0]) for r in self.store.db.execute("SELECT detail FROM events WHERE kind='input_accepted'")]
+        self.assertEqual(len(events), 8)
+        self.assertEqual(events[0]["message_id"], 1)
+        self.assertEqual(events[-1]["kind"], "callback")
 
     def test_restart_and_replayed_message_do_not_advance_answers(self):
         first = self.send("Опечатка")
@@ -278,6 +295,37 @@ with service_lock(p.with_suffix('.lock')):
         path.chmod(0o644)
         with self.assertRaisesRegex(ApiError, "0600"):
             protected_config(path)
+
+    def test_linear_key_install_is_atomic_private_and_preserves_other_settings(self):
+        path = self.path.parent / "credentials.json"
+        before = {"SERGEY_INTAKE_BOT_TOKEN": "test-only", "SERGEY_INTAKE_SERGEY_USER_ID": 11,
+                  "SERGEY_INTAKE_OWNER_USER_ID": 22}
+        path.write_text(json.dumps(before)); path.chmod(0o600)
+        key = "lin_api_" + "x" * 32
+        with patch.object(Linear, "preflight"):
+            install_linear_key(path, key)
+        self.assertEqual(json.loads(path.read_text()), {**before, "SERGEY_INTAKE_LINEAR_API_KEY": key})
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(list(path.parent.glob(".credentials-*")), [])
+        original = path.read_bytes()
+        with patch.object(Linear, "preflight", side_effect=ApiError("Denied")):
+            with self.assertRaises(ApiError):
+                install_linear_key(path, "lin_api_" + "y" * 32)
+        self.assertEqual(path.read_bytes(), original)
+
+    def test_preflight_checks_actual_owner_and_project_without_writes(self):
+        schema = {"__type": {"inputFields": [{"name": "id"}]}}
+        scope = {"viewer": {"id": OWNER_LINEAR_ID}, "team": {"id": TEAM_ID},
+                 "project": {"id": PROJECT_ID},
+                 "issue": {"id": PARENT_ID, "team": {"id": TEAM_ID}, "project": {"id": PROJECT_ID}}}
+        client = Linear("withheld", {})
+        with patch.object(client, "call", side_effect=[schema, scope]) as call:
+            client.preflight()
+        self.assertTrue(all("mutation" not in c.args[0] for c in call.call_args_list))
+        scope["viewer"]["id"] = "wrong-user"
+        with patch.object(client, "call", side_effect=[schema, scope]):
+            with self.assertRaisesRegex(ApiError, "mismatch"):
+                client.preflight()
 
     def test_status_reissues_summary_and_ambiguity_does_not_advance(self):
         self.send("Опечатка")

@@ -8,14 +8,20 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 import fcntl
+import getpass
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import os
 from pathlib import Path
 import re
+import secrets
 import sqlite3
 import stat
+import sys
+import tempfile
 import time
 import urllib.request
+import urllib.parse
 import uuid
 
 
@@ -31,6 +37,7 @@ QUESTIONS = (
 TEAM_ID = "cc0f1982-1457-48af-967b-d56a672ee8ae"
 PROJECT_ID = "d7ae5979-8aa5-4bc9-a6ee-479c898e15c2"
 PARENT_ID = "d05f2c4e-b1be-4ab3-a1bb-98ddd7a2c205"
+OWNER_LINEAR_ID = "0b34be60-67c7-46a0-925c-607afdc3180d"
 NAMESPACE = uuid.UUID(PARENT_ID)
 LABEL_IDS = {
     "origin": "eaa83323-49ce-444c-8318-269629aa1f79",
@@ -174,11 +181,19 @@ def contract(draft: dict) -> dict:
     sources = "\n".join(f"- Telegram message_id={s['message_id']}, update_id={s['update_id']}: {s['text']}"
                         for s in draft["sources"])
     role = "Сергея" if draft["role"] == "sergey" else "Александра (Owner)"
+    test_only = "TEST/ALE-528" in draft["request"]
+    test_guard = ("## TEST/ALE-528 — только E2E\n\n"
+                  f"Фактический инициатор: {role}. Сценарий имитирует запрос Сергея.\n"
+                  "EXECUTION_ALLOWED=false\nRELEASE_ALLOWED=false\n"
+                  "Не реализовывать и не выпускать. После проверки перевести задачу в отменённый статус.\n\n"
+                  if test_only else "")
     return {
         "id": str(uuid.uuid5(NAMESPACE, draft["id"])),
         "title": f"[{draft['tier']}] {draft['request'][:110]}",
         "tier": draft["tier"],
+        "test_only": test_only,
         "description": (
+            test_guard +
             f"## Подтверждённая постановка от {role}\n\n{summary(draft)}\n\n"
             f"## Происхождение\n\nДиалог `{draft['id']}`, revision `{draft['revision']}`. "
             "Автор Linear — подключённая интеграция; происхождение не подменяет автора. "
@@ -225,6 +240,9 @@ class Intake:
                     or chat.get("id") != user_id):
                 s.event("input_rejected", "unauthorized_or_unsupported")
                 return
+            s.event("input_accepted", json.dumps({
+                "update_id": update_id, "message_id": message.get("message_id"),
+                "role": self.roles[user_id], "kind": "callback" if callback else "message"}))
             if callback:
                 s.enqueue(f"ack:{update_id}", "telegram_ack", {"callback_query_id": callback["id"]})
 
@@ -397,6 +415,17 @@ class Linear:
         data = self.call('{ __type(name:"IssueCreateInput") { inputFields { name } } }', {})
         if "id" not in {f["name"] for f in data["__type"]["inputFields"]}:
             raise ApiError("Linear IssueCreateInput.id unavailable; dedup contract unsupported")
+        query = ('query($team:String!,$project:String!,$parent:String!){'
+                 'viewer{id} team(id:$team){id} project(id:$project){id} '
+                 'issue(id:$parent){id team{id} project{id}}}')
+        scope = self.call(query, {"team": TEAM_ID, "project": PROJECT_ID, "parent": PARENT_ID})
+        if (scope.get("viewer", {}).get("id") != OWNER_LINEAR_ID
+                or (scope.get("team") or {}).get("id") != TEAM_ID
+                or (scope.get("project") or {}).get("id") != PROJECT_ID
+                or (scope.get("issue") or {}).get("id") != PARENT_ID
+                or (scope["issue"].get("team") or {}).get("id") != TEAM_ID
+                or (scope["issue"].get("project") or {}).get("id") != PROJECT_ID):
+            raise ApiError("Linear identity/team/project mismatch; no writes allowed")
 
     def create(self, payload: dict) -> dict:
         result = self.call("mutation($input:IssueCreateInput!){issueCreate(input:$input){success issue{id identifier url}}}",
@@ -532,9 +561,107 @@ def protected_config(path: Path | None, *, require_linear: bool = True) -> dict:
     return config(values, require_linear=require_linear)
 
 
+def install_linear_key(path: Path, token: str):
+    """Validate read-only, then atomically replace one private credential field."""
+    if not re.fullmatch(r"lin_api_[A-Za-z0-9_-]{20,}", token):
+        raise ApiError("Invalid Linear personal key format; value withheld")
+    cfg = protected_config(path, require_linear=False)
+    Linear(token, cfg["LABEL_IDS"]).preflight()
+    values = json.loads(path.read_text())
+    values["SERGEY_INTAKE_LINEAR_API_KEY"] = token
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".credentials-", delete=False) as handle:
+            temporary = Path(handle.name)
+            os.chmod(temporary, 0o600)
+            json.dump(values, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if temporary and temporary.exists():
+            temporary.unlink()
+
+
+def serve_linear_key(path: Path):
+    """One-shot loopback-only secret input. No request logging or external assets."""
+    csrf = secrets.token_urlsafe(32)
+    done = False
+
+    class PrivateServer(HTTPServer):
+        def handle_error(self, request, client_address):
+            print("Local key input connection interrupted; diagnostic contents suppressed", flush=True)
+
+    class KeyInput(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def page(self, status: int, body: str):
+            content = ("<!doctype html><html lang='ru'><meta charset='utf-8'>"
+                       "<meta name='viewport' content='width=device-width'>"
+                       "<title>ALE-528 · локальный ввод ключа</title>"
+                       "<style>body{font:18px system-ui;max-width:650px;margin:60px auto;padding:24px}"
+                       "input,button{font:inherit;padding:12px;margin:8px 0;width:100%;box-sizing:border-box}"
+                       "small{color:#555}</style><h1>ALE-528 · ключ Linear</h1>" + body + "</html>").encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            self.wfile.write(content)
+
+        def do_GET(self):
+            if self.path != "/" or self.headers.get("Host") != origin.removeprefix("http://"):
+                self.page(404, "<p>Страница недоступна.</p>")
+                return
+            self.page(200, "<p>Вставьте новый Personal API key в скрытое поле. Ключ проверяется "
+                      "через api.linear.app и сохраняется только в локальный файл 0600.</p>"
+                      "<p>Права: Read + Create and update issues, только команда Alex.</p>"
+                      f"<form method='post' action='/'><input type='hidden' name='csrf' value='{csrf}'>"
+                      "<label>Ключ Linear<input name='key' type='password' autocomplete='off' "
+                      "spellcheck='false' maxlength='200' required autofocus></label>"
+                      "<button type='submit'>Проверить и сохранить локально</button></form>"
+                      "<small>Не вводите ключ в чат. Нет сторонних скриптов, аналитики или журналирования запросов.</small>")
+
+        def do_POST(self):
+            nonlocal done
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+                if (self.path != "/" or self.headers.get("Origin") != origin
+                        or self.headers.get("Host") != origin.removeprefix("http://")
+                        or self.headers.get_content_type() != "application/x-www-form-urlencoded"
+                        or not 0 < size <= 1024):
+                    self.page(403, "<p>Запрос отклонён. Откройте локальную форму заново.</p>")
+                    return
+                fields = urllib.parse.parse_qs(self.rfile.read(size).decode())
+                if not secrets.compare_digest(fields.get("csrf", [""])[0], csrf):
+                    self.page(403, "<p>Запрос отклонён.</p>")
+                    return
+                install_linear_key(path, fields.get("key", [""])[0].strip())
+            except Exception:
+                self.page(400, "<p>Ключ не сохранён: проверьте формат, права, аккаунт и доступ к проекту. "
+                          "Значение и подробности не журналируются. Вернитесь назад для повторного ввода.</p>")
+                return
+            done = True
+            print("Linear key validated and saved privately; local input finished", flush=True)
+            self.page(200, "<h2>Ключ сохранён</h2><p>Аккаунт Owner, команда Alex, проект и схема проверены. "
+                      "Поле ввода очищено. Сообщите в чате «готово», не отправляя сам ключ.</p>")
+
+    with PrivateServer(("127.0.0.1", 0), KeyInput) as server:
+        origin = f"http://127.0.0.1:{server.server_port}"
+        server.timeout = 1
+        deadline = time.monotonic() + 900
+        print("Local private key input: " + origin, flush=True)
+        while not done and time.monotonic() < deadline:
+            server.handle_request()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["init", "check-config", "status", "run", "reconcile"])
+    parser.add_argument("action", choices=["init", "check-config", "set-linear-key", "serve-linear-key", "status", "run", "reconcile"])
     parser.add_argument("--state", type=Path, required=True, help="Dedicated private intake SQLite; never product DB")
     parser.add_argument("--credentials-file", type=Path, help="Private 0600 JSON, outside Git; environment overrides")
     parser.add_argument("--intake-only", action="store_true", help="Explicit Telegram-only mode; confirmed Linear writes remain pending")
@@ -543,6 +670,19 @@ def main() -> int:
         parser.error("reconcile requires the Linear connection")
     os.umask(0o077)
     try:
+        if args.action == "serve-linear-key":
+            if not args.credentials_file:
+                raise ApiError("--credentials-file required")
+            protected_config(args.credentials_file, require_linear=False)
+            serve_linear_key(args.credentials_file)
+            return 0
+        if args.action == "set-linear-key":
+            if not args.credentials_file or not sys.stdin.isatty():
+                raise ApiError("Use a local interactive terminal and --credentials-file; key input must not be echoed")
+            token = getpass.getpass("Linear API key (hidden input; paste then Return): ").strip()
+            install_linear_key(args.credentials_file, token)
+            print("Linear identity/team/project and schema verified; key saved privately (0600).")
+            return 0
         if args.action == "check-config":
             protected_config(args.credentials_file, require_linear=not args.intake_only)
             print("Configuration present; identity and API validation require run")
