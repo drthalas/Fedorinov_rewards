@@ -52,7 +52,7 @@ result={'sqlite_snapshot':snapshot,'counts':counts,'media_count':len(media),'med
  'signing_state':sha(keys[0]),'auth_state':hashlib.sha256(os.environ['PREVIEW_AUTH_SHA256'].encode()).hexdigest()}
 identity=Path('/app/delivery_identity.json')
 if identity.exists():
- meta=json.loads(identity.read_text());actual={p:sha(Path('/app')/p) for p in meta['files']}
+ meta=json.loads(identity.read_text());actual={p:sha(Path('/app')/p) if (Path('/app')/p).is_file() else None for p in meta['files']}
  result['source_head']=meta['source_head'];result['code_matches_manifest']=actual==meta['files']
 print(json.dumps(result,sort_keys=True))
 '''
@@ -211,6 +211,7 @@ class PreviewAdapter:
         body = json.loads(job["body"])
         op = self.state.operation(job["id"], "deployment")
         marker = f"ALE-528 DELIVERY {self.pilot['issue_id']} r{self.pilot['revision']} HEAD {body['source_head']}"
+        marker = op["body"]["marker"] if op else marker + f" build {self.config.get('build_revision', 1)}"
         if not op:
             current = self.status()
             if current["latestDeployment"]["id"] != self.config["expected_deployment"] or current["latestDeployment"]["status"] != "SUCCESS":
@@ -218,9 +219,17 @@ class PreviewAdapter:
             self.config["before_fingerprint"] = self.fingerprint()
             self.state.operation(job["id"], "before", "sent", self.config["before_fingerprint"])
             staging = self.package(job, body)
+            # This context contains only git-exported backend and the fixed infrastructure.
+            # Source-controlled app PNG/JPG must not inherit the parent repo's data ignore rules.
+            allowed = {"Dockerfile", "railway.toml", "railway_preview.py", "seed_preview.py", "start-preview.sh", "delivery_identity.json"}
+            for path in staging.rglob("*"):
+                if path.is_file():
+                    relative = path.relative_to(staging).as_posix()
+                    if not (relative.startswith("backend/") or relative in allowed) or path.name == ".env" or path.suffix in {".db", ".sqlite", ".zip"}:
+                        raise DeliveryBlocked("unsafe_deployment_payload")
             self.guard(job)
             self.state.operation(job["id"], "deployment", "started", {"marker": marker, "at": time.time()})
-            try:self.railway(["up", str(staging), "--path-as-root", "--detach", "--json", "--project", PROJECT,
+            try:self.railway(["up", str(staging), "--path-as-root", "--no-gitignore", "--detach", "--json", "--project", PROJECT,
                               "--service", SERVICE, "--environment", ENVIRONMENT, "--message", marker], cwd=staging, timeout=120)
             except Exception:
                 # The request might have succeeded. Reconcile by the exact cliMessage, never repeat up.
