@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 from scripts.sergey_intake import (
@@ -102,6 +103,8 @@ class IntakeTests(unittest.TestCase):
         self.callback()
         self.drain()
         self.assertEqual(len(self.linear.calls), 1)
+        self.assertEqual(uuid.UUID(self.linear.calls[0]["id"]).version, 4)
+        self.assertEqual(self.linear.calls[0]["id"], str(uuid.UUID(draft["id"])))
         self.assertEqual(self.store.current(11)["state"], "created")
         description = self.linear.calls[0]["description"]
         for value in ["от Сергея", draft["id"], "revision `1`", "message_id=1", "фактический diff", "physical updater"]:

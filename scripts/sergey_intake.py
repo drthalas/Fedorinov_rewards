@@ -38,7 +38,6 @@ TEAM_ID = "cc0f1982-1457-48af-967b-d56a672ee8ae"
 PROJECT_ID = "d7ae5979-8aa5-4bc9-a6ee-479c898e15c2"
 PARENT_ID = "d05f2c4e-b1be-4ab3-a1bb-98ddd7a2c205"
 OWNER_LINEAR_ID = "0b34be60-67c7-46a0-925c-607afdc3180d"
-NAMESPACE = uuid.UUID(PARENT_ID)
 LABEL_IDS = {
     "origin": "eaa83323-49ce-444c-8318-269629aa1f79",
     "T1": "6d2b7221-d983-465b-a152-90e9bcab715a",
@@ -188,7 +187,9 @@ def contract(draft: dict) -> dict:
                   "Не реализовывать и не выпускать. После проверки перевести задачу в отменённый статус.\n\n"
                   if test_only else "")
     return {
-        "id": str(uuid.uuid5(NAMESPACE, draft["id"])),
+        # Draft IDs are already uuid4 and are persisted before confirmation.
+        # Linear explicitly requires v4: a deterministic uuid5 is rejected.
+        "id": str(uuid.UUID(draft["id"])),
         "title": f"[{draft['tier']}] {draft['request'][:110]}",
         "tier": draft["tier"],
         "test_only": test_only,
@@ -428,6 +429,8 @@ class Linear:
             raise ApiError("Linear identity/team/project mismatch; no writes allowed")
 
     def create(self, payload: dict) -> dict:
+        if uuid.UUID(payload["id"]).version != 4:
+            raise ApiError("Linear create requires a persisted UUID v4; request not sent")
         result = self.call("mutation($input:IssueCreateInput!){issueCreate(input:$input){success issue{id identifier url}}}",
                            {"input": {"id": payload["id"], "title": payload["title"],
                                       "description": payload["description"], "teamId": TEAM_ID,
