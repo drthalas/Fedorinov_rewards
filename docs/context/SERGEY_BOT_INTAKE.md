@@ -11,6 +11,36 @@ Base: `bd91c28896ceb6769da710b8d5c0b881887bf90d`; исходный worktree бы
 STOP `BOT INTAKE READY FOR PILOT` требует реального диалога и подтверждённой Сергеем задачи в Linear.
 При отсутствии credentials этот STOP не достигнут: локальные проверки не заменяют пилот.
 
+## Подключение после первого этапа
+
+Owner предоставил новый token через системный буфер; значение сохранено только в private credentials.json.
+Telegram `getMe` подтвердил отдельного [@dev_rewards_bot](https://t.me/dev_rewards_bot); webhook отсутствует.
+Сергей подтверждён единственным allowed user в Picture Colorizer, Owner — его ADMIN_USER_ID,
+дополнительно сверенный с allowlist PDLC. Числовые IDs и token в документацию не копируются.
+Telegram закрыт по просьбе Owner.
+
+В основном checkout и этом worktree проверены `.env*`, проектные scripts/docs/config, environment и
+локальный MCP config: отдельный Linear API credential не обнаружен. `linear.whoami` подтвердил доступ
+текущего чата через ChatGPT connection. Credential этой интеграции не извлекался и не переносился.
+Отдельный API key нужен текущему standalone Python adapter, а не чтению/записи Linear из этого чата.
+
+Добавлен явный `--intake-only`: Telegram работает с bot token и двумя ID без ключа Linear.
+Подтверждения сохраняются как `pending`, Linear API не вызывается, бот явно сообщает, что issue ещё
+не создана. После подключения Linear и перезапуска без этого флага та же очередь продолжится один раз.
+Обычный full mode по-прежнему отказывается стартовать без ключа. Это не успешный пилот до Linear.
+Новые focused checks: 26/26 PASS, включая отложенное подтверждение и переход в подключённый режим.
+
+Для запуска Telegram без Linear используется явная команда:
+
+```sh
+python3 scripts/sergey_intake.py run --intake-only --state data/sergey-intake/intake.sqlite3 --credentials-file data/sergey-intake/credentials.json
+```
+
+User LaunchAgent использует source-template ниже с добавленным `--intake-only`; запуск при login,
+KeepAlive и private logs. Полный end-to-end пилот, LLM-аналитик, автоматические voice/screenshot analysis,
+delivery worker и physical updater gate ещё не завершены. Историческое состояние первого этапа ниже
+не является утверждением, что предоставленные позднее token/IDs всё ещё отсутствуют.
+
 ## Аудит и переиспользование
 
 | Компонент | Результат аудита / применение |
@@ -154,8 +184,9 @@ Owner retest после подключения:
 5. Exact accepted line и parity с изменившимся main, тот же ZIP, production и существующий release sender/journal.
    Railway acceptance, updater PASS и установка Сергея сохраняются отдельно.
 
-Перед этапом 4 нужно согласовать process-тексты: текущие CODEX_START_HERE/LINEAR_PROCESS требуют ручной
-Owner apply, а ALE-528 описывает отдельное постоянное делегирование агенту. На intake этапе эти действия
-не выполняются; исключение в общие repo rules молча не добавлено. Также Start.bat из Description и
+По актуальному ACTIVE Description постоянное делегирование ALE-528 точечно закреплено в
+CODEX_START_HERE/LINEAR_PROCESS: для разрешённых T1/T2 после явной приёмки Сергея на Railway агент
+самостоятельно проходит physical updater gate; повторное согласование делегирования не требуется.
+На intake этапе gate не выполняется; общий ручной Owner flow остальных задач сохраняется. Также Start.bat из Description и
 историческое start_windows.bat из context нельзя угадывать: подтвердить фактически существующий путь на Windows.
 Переход к автономному приёму delivery T1/T2 требует полного пилота и Owner acceptance системы.

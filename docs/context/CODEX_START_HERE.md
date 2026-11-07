@@ -21,6 +21,20 @@
 - Candidate и production требуют явного Owner разрешения в scope задачи. После Owner updater/product PASS команда «выпускаем релиз» разрешает controlled merge, публикацию exact принятого ZIP и штатный Telegram обоим в одном production execution, без повторных разрешений на эти действия. Обновление candidate через updater выполняет Owner.
 - Первый запуск постоянной Owner-установки выполняется фактически существующим пользовательским BAT в Public Current; имя и путь подтвердить на physical Windows (по handoff v2.0.27 — `start_windows.bat`). После обновления штатен автоматический restart; ручной повторный запуск этого BAT — только fallback, если приложение не открылось. Не пересоздавать Public Current или BAT.
 
+### Отдельное делегирование ALE-528
+
+Только для разрешённых T1/T2 потока [бота Сергея ALE-528](https://linear.app/drthalas/issue/ALE-528/telegram-bot-sergeya-avtonomnyj-potok-t1t2-do-railway-i-reliza-s)
+действует постоянное Owner-разрешение: Сергей принимает конкретные HEAD/revision на Railway и явно
+разрешает релиз; затем агент самостоятельно выполняет штатный candidate updater на свободном physical
+`COPEW-04C68047F`. Ручной Owner apply для этого потока заменяется доказанным physical updater PASS:
+previous→target update, restart, installed code parity, доступность REAL данных и отсутствие ошибок.
+Перед apply обязательны проверка writers и свежий проверенный online backup REAL; запрещены тестовые
+REAL writes, завершение неизвестных процессов и прерывание работы Owner. При занятости/недоступности
+ждать с диагностикой; FAIL или неполное evidence блокируют production и передаются Owner.
+Изменённые HEAD/контракт инвалидируют приёмку. T3/T4 и защищённые изменения требуют Owner.
+Повторное разрешение на само это делегирование не нужно. Для прочих задач workflow ниже сохраняется.
+Это описание контракта; подключение gate и production в текущий intake-этап не входят.
+
 ## Краткий workflow
 
 **implementation → physical Windows runtime → Owner feature PASS → Owner candidate с обновлением через существующий BAT → Owner updater/product PASS → production + Telegram обоим.**

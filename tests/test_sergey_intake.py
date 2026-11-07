@@ -169,6 +169,31 @@ class IntakeTests(unittest.TestCase):
         self.drain()
         self.assertEqual(len(self.linear.calls), 1)
 
+    def test_explicit_intake_only_keeps_confirmation_pending_then_resumes_once(self):
+        self.store.set_meta("linear_connection", "not_connected")
+        self.ready()
+        self.callback()
+        for _ in range(30):
+            if not dispatch_one(self.store, self.telegram, None):
+                break
+        self.assertEqual(self.store.current(11)["state"], "confirmed")
+        self.assertEqual(self.linear.calls, [])
+        self.assertIn("задача там ещё не создана", str(self.telegram.sent))
+        row = self.store.db.execute("SELECT status FROM outbox WHERE kind='linear'").fetchone()
+        self.assertEqual(row[0], "pending")
+        self.store.set_meta("linear_connection", "connected")
+        self.drain()
+        self.drain()
+        self.assertEqual(len(self.linear.calls), 1)
+        self.assertEqual(self.store.current(11)["state"], "created")
+
+    def test_full_mode_still_requires_linear_credential(self):
+        values = {"SERGEY_INTAKE_BOT_TOKEN": "withheld", "SERGEY_INTAKE_SERGEY_USER_ID": "11",
+                  "SERGEY_INTAKE_OWNER_USER_ID": "22"}
+        with self.assertRaisesRegex(ApiError, "LINEAR_API_KEY"):
+            config(values)
+        self.assertEqual(config(values, require_linear=False)["LINEAR_API_KEY"], "")
+
     def test_ambiguous_create_is_reconciled_read_only_after_restart(self):
         self.ready()
         self.callback()

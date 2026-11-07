@@ -32,6 +32,22 @@ Linear project:
 
 ### Внутреннее разделение подготовки candidate
 
+**Исключение только для потока ALE-528.** Owner постоянно делегировал Сергею приёмку разрешённых
+T1/T2 на Railway и явное разрешение релиза конкретных issue/HEAD/revision, а агенту — самостоятельный
+штатный physical candidate updater gate на `COPEW-04C68047F`. Для этого потока требования ручного
+Owner apply и `READY FOR OWNER MANUAL UPDATE` заменяются обязательным доказанным physical updater PASS;
+для всех остальных задач они сохраняются. Повторно согласовывать это делегирование не требуется.
+Перед gate: свободный Windows, проверка writers, свежий проверенный online backup REAL, существующие
+Public Current и фактический пользовательский BAT (имя/путь проверить, не пересоздавать), только согласованные
+REAL SQLite/media. Агент через UI устанавливает candidate, подтверждает предыдущую/целевую версии,
+реальную операцию обновления и restart, installed code parity, доступность данных и отсутствие ошибок.
+Тестовые REAL writes, завершение неизвестных процессов и прерывание работы Owner запрещены.
+Занятость/недоступность — ожидание с диагностикой; FAIL или неполное evidence — STOP и Owner escalation.
+Уже установленная целевая версия сама по себе не доказывает gate: нужны evidence того же execution.
+Production допустим только после явных Сергей product PASS/release authorization и physical updater PASS,
+с теми же принятыми HEAD/revision и ZIP; изменение HEAD/контракта инвалидирует приёмку.
+T3/T4 и защищённые области остаются у Owner. Реализация gate — следующий этап ALE-528, не текущий intake.
+
 - **Packaging на Mac:** собрать exact Owner-only patch ZIP + manifest, выполнить package/version/SHA/byte parity и разрешённую публикацию в Owner channel. Во время этой операции не подключаться к Windows, не запускать там runtime/Edge/updater и не менять `.env`; не выполнять merge/production до Owner updater/product PASS.
 - **Windows handoff:** после завершения packaging в рамках разрешённого candidate-задания проверить постоянный Public Current, фактически существующий пользовательский BAT и candidate visibility. Имя/путь проверить на physical Windows (по handoff v2.0.27 — `start_windows.bat`), не пересоздавать установку/BAT. При необходимости разрешено менять только согласованный `UPDATE_MANIFEST_URL`; остальные настройки, ACL и реальные DB/media сохранять. Сам updater apply выполняет Owner. Первый запуск через BAT и автоматический post-update restart — разные действия; ручной повторный запуск BAT нужен только при неудаче автоматического открытия приложения.
 - Если scope уже включает packaging и Windows handoff, выполнять их последовательно без новой задачи, промежуточного Owner PASS или повторного разрешения. Если prompt ограничен Mac-only packaging либо Windows-доступ не разрешён, STOP `CANDIDATE PUBLISHED — WINDOWS HANDOFF PENDING`. Не называть такой результат готовым к ручному обновлению; писать «ZIP опубликован, Windows updater visibility НЕ подтверждена». После подтверждённого handoff — STOP `READY FOR OWNER MANUAL UPDATE`, далее действует Owner.

@@ -150,6 +150,7 @@ class Store:
     def status(self) -> dict:
         return {"paused": self.meta("paused") == "1", "offset": int(self.meta("offset", "0")),
                 "heartbeat_unix": self.meta("heartbeat"),
+                "linear_connection": self.meta("linear_connection", "not_checked"),
                 "outbox": [dict(r) for r in self.db.execute(
                     "SELECT kind,status,count(*) AS count FROM outbox GROUP BY kind,status")],
                 "delivery_executor": "not_connected", "physical_updater_gate": "not_connected"}
@@ -250,6 +251,7 @@ class Intake:
                 reply(f"Приём: {'пауза' if s.meta('paused') == '1' else 'включён'}. "
                       f"Диалог: {draft['state'] if draft else 'нет'}. "
                       f"{draft.get('issue_url', '') if draft else ''} "
+                      f"Linear: {'ожидает подключения' if s.meta('linear_connection') == 'not_connected' else 'проверяется сервисом'}. "
                       f"Операций для сверки Александром: {uncertain}. Исполнение и updater gate не подключены.")
                 return
             if s.meta("paused") == "1":
@@ -267,7 +269,11 @@ class Intake:
                     s.save(draft)
                     s.enqueue(f"linear:{draft['id']}", "linear", {"draft_id": draft["id"], **contract(draft)})
                     s.event("confirmed", draft["id"])
-                    reply("Подтверждение сохранено. Создаю задачу в Linear; ссылку пришлю после ответа сервиса.")
+                    if s.meta("linear_connection") == "not_connected":
+                        reply("Подтверждение сохранено локально. Linear ожидает подключения; "
+                              "задача там ещё не создана. Ссылку пришлю после подтверждённой записи.")
+                    else:
+                        reply("Подтверждение сохранено. Создаю задачу в Linear; ссылку пришлю после ответа сервиса.")
                 elif parts[0] == "edit":
                     draft.update(state="asking", answers={}, revision=draft["revision"] + 1)
                     s.save(draft)
@@ -420,9 +426,9 @@ def complete_linear(store: Store, item: dict, result: dict):
     store.event("linear_created", draft["id"])
 
 
-def dispatch_one(store: Store, telegram: Telegram, linear: Linear) -> bool:
+def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> bool:
     # Pause also blocks confirmed-but-not-yet-dispatched Linear writes.
-    if store.meta("paused") == "1":
+    if store.meta("paused") == "1" or linear is None:
         with store.transaction():
             row = store.db.execute("SELECT * FROM outbox WHERE status='pending' AND kind!='linear' ORDER BY rowid LIMIT 1").fetchone()
             item = dict(row) if row else None
@@ -487,14 +493,17 @@ def service_lock(path: Path):
             fcntl.flock(handle, fcntl.LOCK_UN)
 
 
-def config(environ: dict) -> dict:
+def config(environ: dict, *, require_linear: bool = True) -> dict:
     prefix = "SERGEY_INTAKE_"
-    names = ["BOT_TOKEN", "SERGEY_USER_ID", "OWNER_USER_ID", "LINEAR_API_KEY"]
+    names = ["BOT_TOKEN", "SERGEY_USER_ID", "OWNER_USER_ID"]
+    if require_linear:
+        names.append("LINEAR_API_KEY")
     missing = [prefix + n for n in names if not environ.get(prefix + n)]
     if missing:
         raise ApiError("Missing protected configuration: " + ", ".join(missing))
     try:
         result = {n: environ[prefix + n] for n in names}
+        result["LINEAR_API_KEY"] = environ.get(prefix + "LINEAR_API_KEY", "")
         result["LABEL_IDS"] = json.loads(environ[prefix + "LABEL_IDS"]) if environ.get(prefix + "LABEL_IDS") else LABEL_IDS
         for key in ["origin", "T1", "T2", "T3", "T4"]:
             uuid.UUID(result["LABEL_IDS"][key])
@@ -507,7 +516,7 @@ def config(environ: dict) -> dict:
         raise ApiError("Invalid protected configuration; values withheld") from None
 
 
-def protected_config(path: Path | None) -> dict:
+def protected_config(path: Path | None, *, require_linear: bool = True) -> dict:
     values = {}
     if path:
         info = path.lstat()
@@ -520,7 +529,7 @@ def protected_config(path: Path | None) -> dict:
         except (ValueError, UnicodeError):
             raise ApiError("Invalid credentials file; contents withheld") from None
     values.update({k: v for k, v in os.environ.items() if k.startswith("SERGEY_INTAKE_")})
-    return config(values)
+    return config(values, require_linear=require_linear)
 
 
 def main() -> int:
@@ -528,11 +537,14 @@ def main() -> int:
     parser.add_argument("action", choices=["init", "check-config", "status", "run", "reconcile"])
     parser.add_argument("--state", type=Path, required=True, help="Dedicated private intake SQLite; never product DB")
     parser.add_argument("--credentials-file", type=Path, help="Private 0600 JSON, outside Git; environment overrides")
+    parser.add_argument("--intake-only", action="store_true", help="Explicit Telegram-only mode; confirmed Linear writes remain pending")
     args = parser.parse_args()
+    if args.intake_only and args.action == "reconcile":
+        parser.error("reconcile requires the Linear connection")
     os.umask(0o077)
     try:
         if args.action == "check-config":
-            protected_config(args.credentials_file)
+            protected_config(args.credentials_file, require_linear=not args.intake_only)
             print("Configuration present; identity and API validation require run")
             return 0
         if args.action == "status":
@@ -551,10 +563,12 @@ def main() -> int:
                 return 0
             if store.meta("initialized") != "1":
                 raise ApiError("Initialize dedicated state with init before connecting the bot")
-            cfg = protected_config(args.credentials_file)
+            cfg = protected_config(args.credentials_file, require_linear=not args.intake_only)
             bot = Telegram(cfg["BOT_TOKEN"])
-            linear = Linear(cfg["LINEAR_API_KEY"], cfg["LABEL_IDS"])
-            linear.preflight()
+            linear = None if args.intake_only else Linear(cfg["LINEAR_API_KEY"], cfg["LABEL_IDS"])
+            if linear:
+                linear.preflight()
+            store.set_meta("linear_connection", "connected" if linear else "not_connected")
             store.recover()
             if args.action == "reconcile":
                 print(json.dumps({"reconciled": reconcile_linear(store, linear)}))
