@@ -5,10 +5,11 @@ import subprocess
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from scripts.sergey_delivery import DeliveryBlocked, DeliveryStore, DeliveryWorker, contract_hash, validate_config, verify_diff
 from scripts.sergey_intake import Store, contract
+from scripts.sergey_delivery_railway import PreviewAdapter
 
 
 def config(root):
@@ -128,6 +129,40 @@ class DeliveryTests(unittest.TestCase):
         with self.assertRaises(DeliveryBlocked):verify_diff(work,base,p)
         p["tier"]="T3"
         with self.assertRaises(DeliveryBlocked):verify_diff(work,base,p)
+
+    def adapter_fixture(self):
+        a=PreviewAdapter.__new__(PreviewAdapter);a.state=self.store;a.pilot=self.cfg['pilot']
+        a.config={'expected_deployment':'before','build_revision':2};a.guard=Mock()
+        a.status=Mock(return_value={'latestDeployment':{'id':'before','status':'SUCCESS'}})
+        a.fingerprint=Mock(return_value={'copy':'unchanged'})
+        staging=self.root/'deployment';(staging/'backend/static').mkdir(parents=True)
+        (staging/'Dockerfile').write_text('source-only fixture')
+        (staging/'backend/static/tracked.jpg').write_bytes(b'app asset')
+        a.package=Mock(return_value=staging)
+        return a,{'id':'fixture-job','body':json.dumps({'source_head':'e'*40})},staging
+
+    def test_uncertain_upload_reconciles_without_repeating_and_preserves_app_assets(self):
+        a,job,staging=self.adapter_fixture();uploads=[]
+        def railway(args,**kwargs):
+            if args[0]=='up':
+                uploads.append(args);raise RuntimeError('lost response after request')
+            receipt=self.store.operation(job['id'],'deployment')['body']
+            return json.dumps([{'id':'after','status':'SUCCESS','meta':{'cliMessage':receipt['marker']}}])
+        a.railway=Mock(side_effect=railway)
+        self.assertIsNone(a.deploy(job))
+        self.assertIn('--no-gitignore',uploads[0])
+        a.status.return_value={'latestDeployment':{'id':'after','status':'SUCCESS'}}
+        self.assertEqual(a.deploy(job)['deployment_id'],'after')
+        self.assertEqual(a.deploy(job)['deployment_id'],'after')
+        self.assertEqual(len(uploads),1)
+
+    def test_upload_context_rejects_credentials_and_database_before_up(self):
+        a,job,staging=self.adapter_fixture();a.railway=Mock()
+        for filename in ['credentials.json','backend/private.sqlite']:
+            path=staging/filename;path.write_text('TEMP only')
+            with self.assertRaisesRegex(DeliveryBlocked,'unsafe_deployment_payload'):a.deploy(job)
+            path.unlink()
+        a.railway.assert_not_called()
 
 
 if __name__ == "__main__":unittest.main()

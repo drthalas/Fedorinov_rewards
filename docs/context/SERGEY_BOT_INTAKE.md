@@ -1,5 +1,9 @@
 # ALE-528: intake бота Сергея
 
+Следующий этап после multimodal PASS: [durable delivery worker и Owner Railway pilot](SERGEY_DELIVERY_WORKER.md).
+Включён только exact ALE-533 revision 2; прежние TEST задачи 529–532 запрещены навсегда.
+Общая очередь и release выключены.
+
 Канонический scope: [ALE-528](https://linear.app/drthalas/issue/ALE-528/telegram-bot-sergeya-avtonomnyj-potok-t1t2-do-railway-i-reliza-s).
 Прочитаны Description от 07.11.2026 и комментарии; на момент начала комментариев нет.
 Base: `bd91c28896ceb6769da710b8d5c0b881887bf90d`; исходный worktree был clean, detached HEAD.
