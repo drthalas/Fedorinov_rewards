@@ -102,7 +102,7 @@ class CodexAnalyst:
                 except ProcessLookupError:
                     pass
 
-    def run(self, args: list[str], *, timeout: int, input: str | None = None, env=None):
+    def run(self, args: list[str], *, timeout: int, input: str | None = None, env=None, cwd=None):
         with self._lock:
             if self._stopping:
                 raise AnalysisError("analysis_interrupted")
@@ -110,7 +110,7 @@ class CodexAnalyst:
             executable = shutil.which(args[0]) or str(Path("/opt/homebrew/bin") / args[0])
             process = subprocess.Popen([executable, *args[1:]], stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-                                       env=env, start_new_session=True)
+                                       env=env, cwd=cwd, start_new_session=True)
             self._process = process
         try:
             stdout, stderr = process.communicate(input, timeout=timeout)

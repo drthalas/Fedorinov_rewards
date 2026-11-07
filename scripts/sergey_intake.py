@@ -193,6 +193,8 @@ def summary(draft: dict) -> str:
     if draft.get("analysis"):
         a = draft["analysis"]
         marker = "TEST/ALE-528 — только QA, исполнение/release запрещены.\n" if any("TEST/ALE-528" in s["text"] for s in draft["sources"]) else ""
+        if not marker and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"]):
+            marker = "DELIVERY PILOT/ALE-528 — только реализация и Railway preview по exact ID/revision; release выключен.\n"
         text = (marker + f"Задача: {a['title']}\nГде: {a['screen']}\nСейчас: {a['actual']}\nНужно: {a['expected']}\n"
                 + "Scope: " + "; ".join(a["scope"]) + "\n"
                 + "Сохранить: " + "; ".join(a["frozen"]) + "\n"
@@ -219,14 +221,24 @@ def contract(draft: dict) -> dict:
                         for s in draft["sources"])
     role = "Сергея" if draft["role"] == "sergey" else "Александра (Owner)"
     test_only = any("TEST/ALE-528" in s["text"] for s in draft["sources"])
+    delivery_pilot = not test_only and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"])
     title = draft.get("analysis", {}).get("title", draft["request"])[:110]
     if test_only and "TEST/ALE-528" not in title:
         title = "TEST/ALE-528: " + title
+    if delivery_pilot and "DELIVERY PILOT/ALE-528" not in title:
+        title = "DELIVERY PILOT/ALE-528: " + title
     test_guard = ("## TEST/ALE-528 — только E2E\n\n"
                   f"Фактический инициатор: {role}. Сценарий имитирует запрос Сергея.\n"
                   "EXECUTION_ALLOWED=false\nRELEASE_ALLOWED=false\n"
                   "Не реализовывать и не выпускать. После проверки перевести задачу в отменённый статус.\n\n"
                   if test_only else "")
+    pilot_guard = ("## DELIVERY PILOT/ALE-528\n\n"
+                   "Запрошены только реализация согласованного scope и Railway preview. "
+                   "Разрешение задаётся в private pilot config точными issue ID, revision и contract hash. "
+                   "Сам marker не даёт права исполнения. GENERAL_QUEUE_ALLOWED=false; RELEASE_ALLOWED=false.\n"
+                   f"Worker branch: `delivery/{draft['id']}-r{draft['revision']}`. "
+                   "Изолированный worktree/session; ветку живой intake-сессии не переключать.\n\n"
+                   if delivery_pilot else "")
     return {
         # Draft IDs are already uuid4 and are persisted before confirmation.
         # Linear explicitly requires v4: a deterministic uuid5 is rejected.
@@ -234,8 +246,9 @@ def contract(draft: dict) -> dict:
         "title": f"[{draft['tier']}] " + title,
         "tier": draft["tier"],
         "test_only": test_only,
+        "delivery_pilot": delivery_pilot,
         "description": (
-            test_guard +
+            test_guard + pilot_guard +
             f"## Подтверждённая постановка от {role}\n\n{summary(draft)}\n\n"
             f"## Происхождение\n\nДиалог `{draft['id']}`, revision `{draft['revision']}`. "
             "Автор Linear — подключённая интеграция; происхождение не подменяет автора. "
@@ -243,8 +256,9 @@ def contract(draft: dict) -> dict:
             f"## Исходные сообщения и ответы\n\n{sources}\n\n"
             "Private Telegram не даёт общедоступных ссылок: материалы связаны по message_id/update_id "
             "и сохраняются в защищённом локальном журнале диалога.\n\n"
-            "## Ограничения исполнения\n\n"
-            "Статус: intake-only, автоматическое исполнение выключено до Owner acceptance системы. "
+            "## Ограничения исполнения\n\n" +
+            ("Статус: isolated delivery pilot; исполнение только по exact private authorization. " if delivery_pilot else
+             "Статус: intake-only, автоматическое исполнение выключено до Owner acceptance системы. ") +
             "Tier предварительный по docs/context/LINEAR_PROCESS.md. Исполнитель повторно проверяет "
             "сложность, фактический diff и зависимости; неоднозначность и T3/T4 передаются Александру. "
             "Updater/recovery/packaging, schema/migrations, удаление данных, signing/auth/secrets "
@@ -303,6 +317,22 @@ class Intake:
                 else:
                     s.set_meta("paused", "1" if text == "/pause" else "0")
                     reply("Приём приостановлен." if text == "/pause" else "Приём возобновлён.")
+                return
+            if text.startswith("/delivery_"):
+                if self.roles[user_id] != "owner":
+                    reply("Delivery controls доступны только Александру.")
+                    return
+                command, _, argument = text.partition(" ")
+                if command in {"/delivery_pause", "/delivery_resume"}:
+                    s.set_meta("delivery_paused", "1" if command == "/delivery_pause" else "0")
+                    reply("Delivery на паузе." if command == "/delivery_pause" else "Delivery resume запрошен; только точный разрешённый пилот.")
+                elif command == "/delivery_cancel" and re.fullmatch(r"ALE-\d+", argument.strip()):
+                    s.set_meta("delivery_cancel:" + argument.strip(), "1")
+                    reply("Отмена delivery сохранена. Уже отправленный запрос deployment не отзывается.")
+                elif command == "/delivery_status":
+                    reply(s.meta("delivery_status", "Delivery worker не подключён. Общая очередь и release выключены."))
+                else:
+                    reply("Команды: /delivery_status, /delivery_pause, /delivery_resume, /delivery_cancel ALE-ID.")
                 return
             if text == "/status":
                 if draft and draft["state"] == "summary" and s.meta("paused") != "1":
