@@ -213,13 +213,14 @@ class DeliveryWorker:
                 or issue["project"]["id"] != PROJECT_ID or issue["state"]["type"] in {"canceled", "completed"}
                 or "## TEST/ALE-528" in issue["description"]
                 or "## DELIVERY PILOT/ALE-528" not in issue["description"]
+                or p["base_head"] not in issue["description"]
                 or contract_hash(issue["description"]) != p["contract_hash"]):
             raise DeliveryBlocked("linear_contract_or_identity_changed")
         row = self.intake.db.execute("SELECT body FROM drafts WHERE id=?", (p["draft_id"],)).fetchone()
         draft = json.loads(row[0]) if row else {}
         if (draft.get("role") != "owner" or draft.get("state") != "created" or draft.get("revision") != p["revision"]
                 or draft.get("issue_id") != p["issue_uuid"] or not draft.get("confirmation_update")
-                or draft.get("tier") not in {"T1", "T2"}):
+                or draft.get("tier") != p["tier"] or draft.get("tier") not in {"T1", "T2"}):
             raise DeliveryBlocked("intake_confirmation_mismatch")
         return issue
 

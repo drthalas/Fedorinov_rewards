@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import shlex
 import subprocess
 import tarfile
 import tempfile
@@ -168,8 +169,12 @@ class PreviewAdapter:
         return service
 
     def fingerprint(self):
-        output = self.railway(["ssh", "--project", PROJECT, "--environment", ENVIRONMENT, "--service", SERVICE,
-                               "--identity-file", self.config["ssh_key"], "--", "python", "-c", FINGERPRINT], timeout=60)
+        if self.status()["id"] != self.config["ssh_user"]:
+            raise DeliveryBlocked("ssh_service_instance_changed")
+        output = self.command(["ssh", "-T", "-i", self.config["ssh_key"], "-o", "IdentitiesOnly=yes",
+                               "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + self.config["ssh_known_hosts"],
+                               "-o", "ConnectTimeout=10", self.config["ssh_user"] + "@ssh.railway.com",
+                               shlex.join(["python", "-c", FINGERPRINT])], timeout=60)
         for line in reversed(output.splitlines()):
             if line.startswith("{"):return json.loads(line)
         raise DeliveryBlocked("remote_fingerprint_missing")
