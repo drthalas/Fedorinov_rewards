@@ -41,6 +41,14 @@ KeepAlive и private logs. Полный end-to-end пилот, LLM-аналит�
 delivery worker и physical updater gate ещё не завершены. Историческое состояние первого этапа ниже
 не является утверждением, что предоставленные позднее token/IDs всё ещё отсутствуют.
 
+Фактический handoff подключения: установлен `~/Library/LaunchAgents/ru.fedorinov.sergey-intake.plist`
+(mode 0600), label `ru.fedorinov.sergey-intake`, private state/logs в `data/sergey-intake/` этого worktree.
+Owner подтвердил ответ бота после `/start` и `/status`; зафиксированы 2 входящих update и 2 успешные
+Telegram отправки (API message_id 2 и 4), без черновика/пилотной issue. Проверен штатный restart нашего
+LaunchAgent при пустой pending/sending очереди; offset и 2 sent записи сохранены, повторной отправки нет.
+После restart проверяются running/heartbeat; процесс оставлен работающим. Reboot/login recovery не проверялся.
+Linear остаётся `not_connected`, executor и physical updater gate не подключены.
+
 ## Аудит и переиспользование
 
 | Компонент | Результат аудита / применение |
