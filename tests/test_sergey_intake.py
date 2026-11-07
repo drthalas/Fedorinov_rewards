@@ -13,6 +13,7 @@ from scripts.sergey_intake import (
     ApiError, Intake, Linear, Store, Telegram, classify, config, dispatch_one,
     protected_config, reconcile_linear, request_json, safe_text, service_lock,
     install_linear_key, OWNER_LINEAR_ID, TEAM_ID, PROJECT_ID, PARENT_ID,
+    equivalent_linear_description,
 )
 
 
@@ -220,14 +221,22 @@ class IntakeTests(unittest.TestCase):
         self.linear.lose_response = True
         self.drain()
         self.assertEqual(self.store.current(11)["state"], "confirmed")
+        for issue in self.linear.issues.values():
+            issue["description"] = issue["description"].replace("\n- Telegram", "\n* Telegram") + "\n"
         self.store.recover()
         self.drain()
         self.assertEqual(len(self.linear.calls), 1)
+
         self.assertEqual(reconcile_linear(self.store, self.linear), 1)
         self.assertEqual(reconcile_linear(self.store, self.linear), 0)
         self.drain()
         self.assertEqual(self.store.current(11)["state"], "created")
         self.assertEqual(len(self.linear.calls), 1)
+
+    def test_recovery_markdown_normalization_preserves_content_and_indentation(self):
+        self.assertTrue(equivalent_linear_description("* source\n", "- source"))
+        self.assertFalse(equivalent_linear_description("* changed\n", "- source"))
+        self.assertFalse(equivalent_linear_description("  * source\n", "- source"))
 
     def test_crash_before_result_keeps_unsent_work_uncertain(self):
         self.send("Задача")

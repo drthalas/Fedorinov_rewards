@@ -13,6 +13,42 @@ STOP `BOT INTAKE READY FOR PILOT` требует реального диалог
 
 ## Текущий этап: OWNER TELEGRAM E2E
 
+**Результат: OWNER TELEGRAM E2E PASS.** Создана через daemon
+[ALE-529](https://linear.app/drthalas/issue/ALE-529/t1-testale-528-ispravit-opechatku-nagrd-na-nagrad-v-testovom-abzace),
+после проверки переведена в `Canceled`; история и evidence сохранены. Это только приёмка текстового
+Owner E2E, не приёмка всей системы, не пилот Сергея и не разрешение delivery/release.
+
+| Проверка | Фактическое evidence |
+| --- | --- |
+| Пользовательский transport | Native Telegram @ Alex для текста; уже авторизованный Telegram Web для inline callback. Все принятые события имеют role=owner после проверки настроенного user ID. |
+| Отмена | Первый реальный запрос message_id=5 отменён командой `/cancel`; draft cancelled, issue не создавалась. |
+| Уточнения и резюме | Реальные messages 9/11/13/15/17/19/21; summary message_id=22, tier T1, acceptance/frozen проверены визуально и в Linear. |
+| Подтверждение | Реальный callback update_id=915725201; диалог c5c98c62337d48a2b73ebaded77b4746, revision 1. |
+| Linear | UUID c5c98c62-337d-48a2-b73e-baded77b4746, ALE-529, actual createdBy Александр Романов, parent ALE-528, правильные team/project и labels Telegram ALE-528/T1. TEST/ALE-528, execution/release запрещены. |
+| Дубли | Повторные реальные callbacks 915725203 и 915725204 на summary 22 до/после штатного restart отклонены; одна Linear operation, поиск по dialogue ID находит только ALE-529. |
+| Recovery | После restart сохранены dialogue/issue/offset/sent ledger; `/status` возвращает created и тот же URL, неизвестных операций нет. |
+| Cleanup | ALE-529 Canceled; перед отменой добавлен evidence comment, удаление истории не выполнялось. |
+| Секреты | Ключ создан вручную Owner, прошёл identity/team/project/schema preflight и сохранён атомарно 0600. Одноразовая форма завершена и закрыта; секретные значения в чат/Git/журнал не выводились. |
+
+Private evidence: `data/sergey-intake/owner-e2e-evidence.json` (0600) + runtime SQLite events/outbox.
+Там сохранены прежний отклонённый payload, checkpoint до restart, принятые transport IDs, исходные
+сообщения и issue metadata. Файлы игнорируются Git. Сергею сообщений отправлено 0.
+
+Live E2E выявил два отличия настоящего API от fake adapters:
+
+- `IssueCreateInput.id` требует UUID v4; прежний стабильный UUID v5 отвергался. Теперь используется
+  уже сохранённый UUID v4 самого диалога. Старый ID дважды проверен read-only как Entity not found;
+  только известная TEST-запись исправлена с private evidence и снова обработана daemon, без слепого retry.
+- Linear нормализует Markdown-маркеры списков и завершающий newline. Recovery сравнивает текст с
+  нормализацией только этих эквивалентных форм; содержание и indentation остаются обязательными.
+  Совпадение проверено чтением live ALE-529. Изменённый текст не принимается тестом сверки.
+
+Native координатный клик по inline-кнопке блокировался `noWindowsAvailable`; synthetic callback не
+использовался. Авторизованный Telegram Web предоставил доступную настоящую кнопку.
+Focused TEMP checks после исправлений: 30/30 PASS. Full product suite/Windows/production — n/a.
+Голосовая обработка — **NOT IMPLEMENTED**; LLM contextual analyst и автоматический анализ screenshot
+не подключены. Сервис остаётся в full Linear mode, исполнитель и physical updater gate выключены.
+
 Новый верхний ACTIVE ALE-528 заменил текущий пилот Сергея самостоятельным E2E через авторизованный
 Telegram-клиент Owner. Сообщения Сергею запрещены. Проверенный transport — установленный Telegram @ Alex;
 профиль адресата показывает @dev_rewards_bot. Фактический отправитель первого тестового сообщения
@@ -59,7 +95,8 @@ python3 scripts/sergey_intake.py serve-linear-key --state data/sergey-intake/int
 
 Focused TEMP checks: 29/29 PASS, включая атомарное сохранение ключа, сохранность существующих полей
 при ошибке, read-only identity/project preflight, test-only execution guards и transport evidence.
-E2E до Linear ещё не подтверждён; голосовая обработка — NOT IMPLEMENTED.
+Промежуточные инструкции выше описывают подготовку; итог живого E2E указан в начале раздела.
+Голосовая обработка — NOT IMPLEMENTED.
 
 ## Подключение после первого этапа
 

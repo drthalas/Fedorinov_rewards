@@ -492,6 +492,14 @@ def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> boo
     return True
 
 
+def equivalent_linear_description(actual: str, expected: str) -> bool:
+    # Linear canonicalizes unordered list markers and the final newline.
+    # Keep every content character and indentation; semantic edits stay blocked.
+    def canonical(text: str) -> str:
+        return re.sub(r"(?m)^([ \t]*)[-*+] ", r"\1- ", text).strip("\n")
+    return canonical(actual) == canonical(expected)
+
+
 def reconcile_linear(store: Store, linear: Linear) -> int:
     """Read-only lookup after uncertain create. Never repeat issueCreate."""
     count = 0
@@ -499,7 +507,7 @@ def reconcile_linear(store: Store, linear: Linear) -> int:
         payload = json.loads(row["payload"])
         try:
             result = linear.find(payload["id"])
-            if not result or result.get("description") != payload["description"]:
+            if not result or not equivalent_linear_description(result.get("description", ""), payload["description"]):
                 continue
             with store.transaction():
                 complete_linear(store, dict(row), result)
