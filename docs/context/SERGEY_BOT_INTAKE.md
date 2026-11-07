@@ -11,7 +11,43 @@ Base: `bd91c28896ceb6769da710b8d5c0b881887bf90d`; исходный worktree бы
 STOP `BOT INTAKE READY FOR PILOT` требует реального диалога и подтверждённой Сергеем задачи в Linear.
 При отсутствии credentials этот STOP не достигнут: локальные проверки не заменяют пилот.
 
-## Текущий этап: multimodal intake — E2E BLOCKED
+## Текущий результат: OWNER MULTIMODAL INTAKE E2E PASS
+
+После ручного включения Owner **Allow access to file URLs** в ChatGPT extension обычного Chrome
+штатный filechooser заработал. В этом продолжении код не менялся; выполнены недостающие реальные
+attachment E2E из авторизованного Owner Telegram, без synthetic updates и без сообщений Сергею.
+
+| Сценарий | Реальное evidence |
+| --- | --- |
+| Voice → STT → LLM → confirm → Linear | [ALE-531](https://linear.app/drthalas/issue/ALE-531/t1-testale-528-pereimenovanie-zagolovka-v-spravke), Canceled. Telegram **kind=voice**, message_id=49. Синтетический OGG macOS Milena 24.306333 с; hash полученного вложения совпал с fixture. Whisper автоматически извлёк «Быстрый поиск» → «Поиск по фамилии», scope/acceptance/frozen. В caption не было содержания постановки. Summary 51, callback update_id=915725215, tier T1. |
+| Screenshot → vision → confirm → Linear | [ALE-532](https://linear.app/drthalas/issue/ALE-532/t2-testale-528-ispravit-opechatku-v-zagolovke-spiska-nagrad), Canceled. Telegram photo message_id=56. Из реального полученного изображения извлечены MM528-SCREEN-742, «Список нагрвд», /legacy?tab=rewards и текст про 12 строк. Caption содержал только происхождение/QA, не эти факты. Summary 58, callback update_id=915725218, tier T2. |
+| Restart/replay | Готовое screenshot-резюме и файл сохранены перед штатным restart при пустых pending/running очередях. После restart та же кнопка создала одну ALE-532 без повторного анализа. Повтор callback 915725219 отклонён, дубля нет. |
+| Provenance и cleanup | Обе issue созданы daemon, actual createdBy Александр Романов, правильные parent/project/labels, TEST/ALE-528, EXECUTION_ALLOWED=false и RELEASE_ALLOWED=false. Frozen/acceptance и источники проверены; добавлены evidence comments, затем Canceled без удаления истории. |
+
+Actual runtime: Codex CLI 0.167.0 / gpt-6.1-sol / High; локальный whisper.cpp + ggml-large-v3-turbo.bin.
+Прежний реальный текстовый LLM/correction PASS ALE-530 (Canceled) сохраняется. Новый полный product suite
+не запускался: source не менялся, предыдущие 41 focused PASS и известный full-suite NOT PASS не подменяются
+этим E2E. Этот STOP — технический intake PASS, не Owner acceptance всей системы и не delivery/release authorization.
+
+Private evidence: `data/sergey-intake/multimodal-e2e-pass-evidence.json` и
+`attachment-e2e-before-restart.json` (0600, ignored Git), плюс SQLite sources/events/jobs/outbox.
+Содержат реальные message/issue IDs, расшифровку из вложения, source hashes, image observations и checkpoint.
+Credentials в evidence не входят. Никаких REAL product DB/media, Railway, Windows gate или production действий.
+
+### File URL permission: последнее решение Owner
+
+Исходное состояние напрямую инструментом не наблюдалось: chrome://extensions запрещён URL policy.
+Ранее chooser явно сообщал об отсутствии file URL доступа; Owner вручную включил его и сообщил «готово».
+Фактическая работоспособность подтверждена двумя успешными chooser.setFiles.
+После E2E агент запросил ручное восстановление исходного состояния. Owner ответил:
+**«позже уберу, пока пусть будет»**. Поэтому доступ оставлен включённым по последнему явному указанию,
+восстановление исходного состояния не заявляется. Это меняет прежнее требование немедленного restore.
+Автоматический обход политики chrome://extensions не применялся.
+
+Сервис оставлен running в том же LaunchAgent/state, Linear connected, jobs 5 done, новых media jobs 2,
+каждый с attempts=1; executor/updater gate выключены. Сергею отправлено 0 сообщений.
+
+## История предыдущей блокировки multimodal intake
 
 Base продолжения: `bf83e7cf818ecb4cbc3028f8da7d9fdefa17b4fc`; та же сессия/ветка.
 Включён `--analyst codex` в существующем LaunchAgent, с сохранением SQLite, credentials и offset.
