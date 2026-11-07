@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Source template. Replace absolute paths; credentials never belong in this plist. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ru.fedorinov.sergey-intake</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__ABSOLUTE_PYTHON3__</string>
+    <string>__BRANCH_WORKTREE__/scripts/sergey_intake.py</string>
+    <string>run</string>
+    <string>--state</string><string>__PRIVATE_STATE_DIR__/intake.sqlite3</string>
+    <string>--credentials-file</string><string>__PRIVATE_STATE_DIR__/credentials.json</string>
+  </array>
+  <key>WorkingDirectory</key><string>__BRANCH_WORKTREE__</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>__PRIVATE_STATE_DIR__/service.stdout.log</string>
+  <key>StandardErrorPath</key><string>__PRIVATE_STATE_DIR__/service.stderr.log</string>
+</dict>
+</plist>
