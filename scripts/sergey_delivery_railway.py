@@ -5,6 +5,7 @@ import base64
 import hashlib
 import io
 import json
+import inspect
 import os
 from pathlib import Path
 import re
@@ -33,7 +34,56 @@ ENVIRONMENT = "c9060444-0680-4baf-aa63-621b85c1aee8"
 VOLUME = "3cce871a-8598-405f-8335-5a3b575a7c9f"
 ORIGIN = "https://kavaleris-rewards.up.railway.app"
 
-FINGERPRINT = r'''
+def media_check_mode(config, pilot):
+    proof = config.get("full_media_checksum")
+    if proof is None or proof is False:
+        return "sample"
+    if (not isinstance(proof, dict) or proof.get("kind") not in {"owner_request", "media_lifecycle_risk"}
+            or len(proof.get("evidence", "")) < 16 or proof.get("contract_hash") != pilot["contract_hash"]):
+        raise DeliveryBlocked("full_media_checksum_requires_scoped_evidence")
+    return "full"
+
+
+def media_fingerprint(root, mode):
+    """Bounded samples by default; full traversal only for an explicit risk gate."""
+    import hashlib
+    import itertools
+    if mode not in {"sample", "full"}:
+        raise ValueError("Unknown media check mode")
+    files = []
+    for name in ["Source", "SourceMark", "GuideImages", "default"]:
+        base = root / name
+        if base.is_symlink() or not base.is_dir():
+            continue
+        if mode == "full":
+            files.extend(p for p in base.rglob("*") if p.is_file())
+            continue
+        queue = [base]
+        selected = 0
+        visited = 0
+        while queue and visited < 16 and selected < 2:
+            folder = queue.pop(0)
+            visited += 1
+            for p in sorted(itertools.islice(folder.iterdir(), 256), key=lambda p: p.name):
+                if p.is_symlink():
+                    continue
+                if p.is_dir() and len(queue) < 16:
+                    queue.append(p)
+                elif p.is_file() and p.stat().st_size <= 8 * 1024 * 1024:
+                    files.append(p)
+                    selected += 1
+                    if selected == 2:
+                        break
+    digest = hashlib.sha256()
+    for p in sorted(files):
+        with p.open("rb") as f:
+            checksum = hashlib.file_digest(f, "sha256").hexdigest()
+        digest.update((p.relative_to(root).as_posix() + "\0" + checksum + "\n").encode())
+    return {"media_count": len(files), "media_sha256": digest.hexdigest(), "media_check_scope": mode,
+            "media_tree_byte_parity_checked": mode == "full"}
+
+
+FINGERPRINT = inspect.getsource(media_fingerprint) + r'''
 from pathlib import Path
 import sqlite3,json,hashlib,os
 root=Path('/data/rewards');db=root/'database/MyDatabase.sqlite'
@@ -43,12 +93,10 @@ with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True) as c:
  assert c.execute('PRAGMA integrity_check').fetchall()==[('ok',)]
  counts={t:c.execute('SELECT count(*) FROM '+t).fetchone()[0] for t in ['person','rewards']}
  snapshot=hashlib.sha256(c.serialize()).hexdigest()
-media=sorted(p for name in ['Source','SourceMark','GuideImages','default'] for p in (root/name).rglob('*') if p.is_file())
-m=hashlib.sha256()
-for p in media:m.update((p.relative_to(root).as_posix()+'\0'+sha(p)+'\n').encode())
+media_state=media_fingerprint(root,MEDIA_MODE)
 keys=sorted(Path('/data/state/fedorinov-biography-enrichment').glob('*/signing.key'))
 assert len(keys)==1 and keys[0].stat().st_size==32
-result={'sqlite_snapshot':snapshot,'counts':counts,'media_count':len(media),'media_sha256':m.hexdigest(),
+result={'sqlite_snapshot':snapshot,'counts':counts,**media_state,
  'signing_state':sha(keys[0]),'auth_state':hashlib.sha256(os.environ['PREVIEW_AUTH_SHA256'].encode()).hexdigest()}
 identity=Path('/app/delivery_identity.json')
 if identity.exists():
@@ -174,7 +222,7 @@ class PreviewAdapter:
         output = self.command(["ssh", "-T", "-i", self.config["ssh_key"], "-o", "IdentitiesOnly=yes",
                                "-o", "StrictHostKeyChecking=yes", "-o", "UserKnownHostsFile=" + self.config["ssh_known_hosts"],
                                "-o", "ConnectTimeout=10", self.config["ssh_user"] + "@ssh.railway.com",
-                               shlex.join(["python", "-c", FINGERPRINT])], timeout=60)
+                               shlex.join(["python", "-c", FINGERPRINT.replace("MEDIA_MODE", repr(media_check_mode(self.config, self.pilot)))])], timeout=60)
         for line in reversed(output.splitlines()):
             if line.startswith("{"):return json.loads(line)
         raise DeliveryBlocked("remote_fingerprint_missing")
@@ -264,6 +312,8 @@ class PreviewAdapter:
         body = json.loads(job["body"])
         before = self.state.operation(job["id"], "before")["body"]
         after = self.fingerprint()
+        if before.get("media_check_scope") != after.get("media_check_scope"):
+            raise DeliveryBlocked("media_policy_changed_reconcile_required")
         for key in ["sqlite_snapshot", "counts", "media_count", "media_sha256", "signing_state", "auth_state"]:
             if before[key] != after[key]:raise DeliveryBlocked("preview_data_or_credentials_changed")
         if after.get("source_head") != body["source_head"] or not after.get("code_matches_manifest"):

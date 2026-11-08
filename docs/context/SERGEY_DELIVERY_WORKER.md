@@ -182,3 +182,94 @@ pin заголовка только для готового preview и сохр�
 Существующие ResourceWarning о незакрытых test SQLite connections остаются; failures нет.
 Product/full suite/VM не повторялись — accepted product не менялся. Native Telegram QA URL: n/a.
 На checkpoint `waiting`: candidate/Windows/REAL ещё не затронуты; STOP READY FOR OWNER TELEGRAM APPROVAL.
+
+## OWNER PHYSICAL UPDATER PILOT PASS — 08.11.2026
+
+Настоящее Owner approval: callback update `915725225`, исходное сообщение `75`.
+В начале продолжения worker оставался preview_ready; candidate ещё не запускался.
+Owner получил уведомление начала `78`. Следующий единственный apply выполнен агентом по этому
+разрешению и актуальному ACTIVE ALE-528; production/general queue остаются false, Сергей не участвует.
+
+Candidate собран **один раз** из принятой product-линии:
+
+| Provenance | Value |
+| --- | --- |
+| Accepted product HEAD | `62c4307c60d3078a97c23bfc1f73059c2f4aba65` |
+| Candidate/package HEAD | `c6ff156f3c2212dd27ec416a15b82c56f4963db8` |
+| Version | `2.0.33`, date `2026-11-08` |
+| Metadata delta | только `backend/app/version.py`, `release_notes/2.0.33.md` |
+| ZIP | `FedorinovRewards_WebPreview_v2.0.33.zip`, 1,468,737 bytes |
+| SHA256 | `7312f48f8ed9cc0fd0cee8fcfcffaaae9fb96cbef27292fd29e3aada0b261a9e` |
+
+Изолированная product-ветка `delivery/5f29d200a8aa4c4494b8812abbb6eaf0-r2-candidate` сохранена/pushed.
+ZIP не содержит framework/REAL DB/media/secrets. Package safety, ancestry, accepted template parity,
+manifest/version/SHA и HTTP byte parity существующего private LAN Owner channel PASS.
+Historical bytes предыдущего channel сохранены; production GitHub Release/latest не менялись.
+
+На physical `COPEW-04C68047F` использована фактическая постоянная установка
+`C:\Users\codex\Desktop\Fedorinov Rewards - Public Current` и её существующий `start_windows.bat`
+через прежнюю interactive launch task. Установка/BAT/.env/ACL не пересоздавались.
+Перед apply: только три собственных runtime Python процесса, localhost 8080 принадлежал ожидаемому
+backend, сторонних потенциальных writers нет, свободное место >1 GiB. Свежий SQLite online backup
+в отдельном `updates/backups/ale528-533-online` проверен integrity/count/logical parity.
+REAL не использовалась для тестовых Add/Edit/Delete или failure tests.
+
+Реальный Edge 151 в console session 2: About 2.0.32 → штатная «Проверить обновления» →
+виден candidate 2.0.33 → checkbox restart → «Обновить» → штатный confirm → automatic restart.
+Apply только один; durable intent записан до submit/confirm, receipts сохраняют факт попытки и completion.
+Upgrader `success`, `10:19:51–10:20:06 UTC`, backend PID `17012 → 8980`, health OK.
+Installed SHA совпали для всех **182** файлов exact ZIP. `.env` и BAT SHA сохранены.
+SQLite integrity OK, logical SHA и все table counts совпали: 13,708 persons / 24,334 rewards.
+В Edge проверены ожидаемая надпись и неизменный соседний текст, открыта карточка `person_id=1295`,
+галерея из шести загруженных реальных изображений и отдельный viewer фото (480×288).
+Edge оставлен на `http://127.0.0.1:8080/legacy?tab=about` на physical Windows с версией 2.0.33;
+runtime и bot services остаются работающими. Не требуется повторный BAT после штатного restart.
+
+### Сокращение проверок и границы evidence
+
+До уточнения Owner был избыточно выполнен полный read-only baseline media fingerprint:
+59,866 файлов / 58,957,465,998 bytes, **476.81 с**. На момент нового ACTIVE он уже завершился;
+активного обхода не было, никакие процессы для отмены не завершались. После apply полный checksum
+**не выполнялся**. Выборочная карточка/галерея/viewer доказывают доступность этих данных,
+а не byte parity всей медиатеки после обновления.
+
+Новый Owner header сокращения проверок pinned отдельно. Его удаление из Description должно давать
+точно исходный approved framework scope; product/issue/revision/build/callback остаются неизменными.
+Любое иное изменение header/original scope по-прежнему блокирует live `check`.
+
+В Railway adapter действительно был обязательный полный media hash. Теперь обычный путь T1/T2 —
+bounded sample (до двух файлов на root, до восьми суммарно; ограничены поиск directories/entries
+и размер sample). Receipt явно сообщает `media_check_scope=sample`,
+`media_tree_byte_parity_checked=false`. Полный обход требует отдельного pinned proof с kind
+`owner_request`/`media_lifecycle_risk`, evidence и exact contract hash. Смена policy между сохранёнными
+before/after receipts блокируется для явной сверки. Updater/packaging/product не менялись.
+TEMP tests запрещают `rglob` в sample режиме и демонстрируют, что изменение unsampled файла
+не доказывается sample, но обнаруживается explicit full mode. Все **64 focused framework tests PASS**;
+full product suite/VM повторно не запускались. Прежние test SQLite ResourceWarning не выдаются за failure.
+
+### Измеренное время
+
+| Stage | Measurement |
+| --- | --- |
+| Candidate preparation + private channel, wall | 111.10 с (08:47:19.643–08:49:10.746 UTC) |
+| Команда metadata commit + build + package safety | 0.221 с tool execution time |
+| Лишний baseline full media check | 476.81 с (7 мин 56.81 с), завершён до нового ACTIVE |
+| Последний writers + fresh online backup gate | 3.403 с; из них copy/verify 0.907 с |
+| Штатный updater + restart | 15 с, по durable updater timestamps |
+| Post SQLite integrity/logical + 182 file parity | 1.076 с |
+
+С начала execution до apply прошло **92 мин 29.49 с** wall time; это включает разработку/настройку
+framework, диагностику Edge, context/approval/tool ожидания и перечисленные подготовительные проверки,
+а не длительность updater. Edge application launcher и installed Edge157 завершались кодом 21;
+уже установленный подписанный Edge151 запустился. Renderer был hidden: обычный focus и один End key
+на проверенном Default input desktop восстановили visible state, затем все updater действия выполнялись
+нормальными Playwright clicks/dialog. Security policies не менялись, unknown processes не завершались.
+Временные metadata/focus/app-only capture tasks удалены; full desktop capture был отклонён review и
+не выполнялся. Последующий wall interval также включает framework scope-policy fix, TEMP checks и
+оформление evidence; его нельзя приписывать времени установки. На gate PASS общий wall был 118.9 мин.
+
+Private evidence (0600, ignored Git): `physical-pilot-pass-evidence.json`, `candidate33-evidence.json`,
+`physical/baseline.json`, `physical/backup.json`, `physical/post-verify.json`,
+`physical/timing-corrected.json`, app-only browser snapshots/screenshots и photo loaded assertions.
+Данные/медиа/секреты не входят в Git. Следующий production шаг требует отдельного Owner authorization;
+Needs Test ALE-528/ALE-533 сохранён.

@@ -250,6 +250,10 @@ class DeliveryWorker:
             body = json.loads(job["body"])
             text = f"{job['issue_id']} r{job['revision']}: {job['status']}/{job['stage']}. " + body.get("url", "") + " HEAD " + body.get("source_head", "")
             if body.get("blocker"):text += " Blocker: " + body["blocker"]
+            gate = self.state.operation(job["id"], "candidate_physical_pilot")
+            if gate:
+                text += f" Candidate/physical: {gate['status']} / {gate['body'].get('phase', 'unknown')}."
+                if gate["body"].get("blocker"):text += " Blocker: " + gate["body"]["blocker"]
         else:
             text = "Delivery: один exact pilot; ожидание poll."
         self.intake.set_meta("delivery_status", text + " Общая очередь и release выключены.")

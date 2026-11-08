@@ -87,6 +87,24 @@ def require_approval(store, build):
     return record
 
 
+def framework_scope(description, config):
+    """Explicit Owner reduction may prepend a pinned header; accepted scope stays byte-bound."""
+    try:
+        from .sergey_delivery import contract_hash
+    except ImportError:
+        from sergey_delivery import contract_hash
+    reduction = config.get("framework_scope_reduction")
+    if not reduction:
+        return description
+    header, separator, original = description.partition("\n---\n")
+    original = original.lstrip("\n")
+    if (not separator or not header.startswith("## ACTIVE — сократить candidate/updater проверки по риску")
+            or contract_hash(header) != reduction["header_hash"]
+            or contract_hash(original) != reduction["previous_scope_hash"]):
+        raise ValueError("Owner scope reduction pin changed")
+    return original
+
+
 def snapshot(config):
     """Read-only live preflight. No packaging, Windows contact, or publication."""
     import base64
@@ -106,6 +124,8 @@ def snapshot(config):
     try:
         issue = worker.validate_issue()
         framework = worker.linear.call("query($id:String!){issue(id:$id){description state{type}}}", {"id": "ALE-528"})["issue"]
+        if framework:
+            framework["description"] = framework_scope(framework["description"], config)
         job = state.job()
         if not job or job["stage"] != "preview_ready" or job["status"] != "preview_ready":
             raise ValueError("Verified preview-ready job required")

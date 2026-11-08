@@ -9,7 +9,7 @@ from unittest.mock import patch, Mock
 
 from scripts.sergey_delivery import DeliveryBlocked, DeliveryStore, DeliveryWorker, contract_hash, validate_config, verify_diff
 from scripts.sergey_intake import Store, contract
-from scripts.sergey_delivery_railway import PreviewAdapter
+from scripts.sergey_delivery_railway import PreviewAdapter, media_check_mode, media_fingerprint
 
 
 def config(root):
@@ -32,6 +32,27 @@ class Adapter:
 
 
 class DeliveryTests(unittest.TestCase):
+    def test_small_tasks_never_require_full_media_scan_without_explicit_scoped_evidence(self):
+        for tier in ['T1','T2']:
+            pilot={'tier':tier,'contract_hash':'a'*64}
+            self.assertEqual(media_check_mode({},pilot),'sample')
+            with self.assertRaises(DeliveryBlocked):media_check_mode({'full_media_checksum':True},pilot)
+            proof={'kind':'owner_request','evidence':'Explicit Owner full checksum request','contract_hash':'a'*64}
+            self.assertEqual(media_check_mode({'full_media_checksum':proof},pilot),'full')
+            proof['contract_hash']='b'*64
+            with self.assertRaises(DeliveryBlocked):media_check_mode({'full_media_checksum':proof},pilot)
+
+    def test_sample_check_is_bounded_and_does_not_claim_complete_media_parity(self):
+        folder=self.root/'media'/'Source';folder.mkdir(parents=True)
+        for i in range(32):(folder/f'{i:02d}.jpg').write_bytes(b'TEMP fixture')
+        with patch.object(Path,'rglob',side_effect=AssertionError('Full traversal forbidden')):
+            sample=media_fingerprint(self.root/'media','sample')
+        self.assertEqual(sample['media_count'],2)
+        self.assertFalse(sample['media_tree_byte_parity_checked'])
+        full=media_fingerprint(self.root/'media','full')
+        (folder/'31.jpg').write_bytes(b'changed unsampled TEMP fixture')
+        self.assertEqual(sample,media_fingerprint(self.root/'media','sample'))
+        self.assertNotEqual(full['media_sha256'],media_fingerprint(self.root/'media','full')['media_sha256'])
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory();self.root = Path(self.temp.name)
         self.cfg = config(self.root);self.store = DeliveryStore(Path(self.cfg["state"]))
@@ -97,6 +118,15 @@ class DeliveryTests(unittest.TestCase):
     def test_contract_hash_ignores_only_linear_markdown_normalization(self):
         self.assertEqual(contract_hash("- source\n"), contract_hash("* source"))
         self.assertNotEqual(contract_hash("- source"), contract_hash("- changed"))
+
+    def test_status_reports_separate_candidate_gate_without_claiming_a_pass(self):
+        w=DeliveryWorker(self.store,self.cfg,{"linear_api_key":"fake","owner_user_id":22},Adapter())
+        j=self.store.claim(self.cfg['pilot'],w.owner)
+        self.store.operation(j['id'],'candidate_physical_pilot','started',{'phase':'physical_read_only_baseline'})
+        w.status(j)
+        self.assertIn('started / physical_read_only_baseline',self.intake.meta('delivery_status'))
+        self.assertNotIn('PHYSICAL UPDATER PILOT PASS',self.intake.meta('delivery_status'))
+        w.intake.db.close()
 
     def test_preview_ready_polls_exact_issue_without_reexecution(self):
         adapter=Adapter();w=DeliveryWorker(self.store,self.cfg,{"linear_api_key":"fake","owner_user_id":22},adapter)

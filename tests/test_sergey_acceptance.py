@@ -6,13 +6,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from scripts.sergey_acceptance import arm, require_approval, snapshot
+from scripts.sergey_acceptance import arm, require_approval, snapshot, framework_scope
 from scripts.sergey_intake import Intake, Store
 from scripts.sergey_delivery import DeliveryStore, DeliveryWorker, contract_hash
 from tests.test_sergey_delivery import config
 
 
 class AcceptanceTests(unittest.TestCase):
+    def test_explicit_reduction_preserves_original_approval_without_accepting_other_scope_edits(self):
+        old='## ACTIVE — после Owner feature PASS\naccepted scope'
+        header='## ACTIVE — сократить candidate/updater проверки по риску ALE-533\nOwner: retain artifact/approval'
+        cfg={'framework_scope_reduction':{'header_hash':contract_hash(header),'previous_scope_hash':contract_hash(old)}}
+        self.assertEqual(framework_scope(header+'\n\n---\n\n'+old,cfg),old)
+        for description in [header+'changed\n---\n'+old,header+'\n---\n'+old+'changed',old]:
+            with self.assertRaises(ValueError):framework_scope(description,cfg)
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.path = Path(self.temp.name) / "intake.sqlite3"
