@@ -42,7 +42,7 @@ def sha(path):
 
 
 def controls(store):
-    return (store.meta('paused') != '1' and store.meta('delivery_paused') != '1'
+    return (store.meta('owner_preview_only')!='1' and store.meta('paused') != '1' and store.meta('delivery_paused') != '1'
             and store.meta('delivery_cancel:ALE-533') != '1')
 
 

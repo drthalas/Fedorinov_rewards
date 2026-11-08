@@ -48,6 +48,7 @@ def arm(store, owner_id, build):
 def callback(store, update, user_id, role):
     """Called inside Intake's update transaction, after normal allowlist checks."""
     query = update["callback_query"]
+    if store.meta('owner_preview_only')=='1':return 'Candidate/Windows отключены: Owner preview pilot только до Railway.'
     parts = query.get("data", "").split(":")
     record = json.loads(store.meta("acceptance_current", "null"))
     invalid = "Кнопка недействительна или уже обработана. Новый этап не запущен."
@@ -78,6 +79,7 @@ def callback(store, update, user_id, role):
 
 def require_approval(store, build):
     """Caller supplies freshly verified Linear + source + deployed identity before each stage."""
+    if store.meta('owner_preview_only')=='1':raise ValueError('Owner preview mode forbids candidate/updater/release')
     record = json.loads(store.meta("acceptance_current", "null"))
     if (not record or record["state"] != "owner_approved" or not record.get("callback_update_id")
             or record["fingerprint"] != identity(build) or time.time() > record["expires"]

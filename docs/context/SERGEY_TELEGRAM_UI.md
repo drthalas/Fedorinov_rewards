@@ -1,6 +1,8 @@
 # ALE-534: Telegram UI и составная заявка
 
-**OWNER TELEGRAM UI READY FOR LIVE TASK.** Продолжена framework-сессия/ветка ALE-528 от `8389fcd`.
+> Актуальный режим и навигация: [Owner preview pilot](SERGEY_OWNER_PREVIEW.md). Ниже — evidence предыдущего UI-этапа; прежняя двухкнопочная reply keyboard заменена одной «Меню».
+
+**Предыдущий STOP: OWNER TELEGRAM UI READY FOR LIVE TASK.** Продолжена framework-сессия/ветка ALE-528 от `8389fcd`.
 Product main/Rewards, опубликованный 2.0.33, старые TEST и действующий delivery/release не изменялись.
 Общая очередь выключена. Сергею в этом этапе сообщений не отправляли.
 

@@ -24,6 +24,7 @@ import threading
 import time
 import urllib.request
 import urllib.parse
+import urllib.error
 import uuid
 
 
@@ -115,6 +116,12 @@ class Store:
                 status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, error TEXT, updated REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS task_cache(
                 draft_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, body TEXT NOT NULL, fetched REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS preview_queue(
+                draft_id TEXT PRIMARY KEY,user_id INTEGER NOT NULL,issue_id TEXT NOT NULL,identifier TEXT NOT NULL,
+                revision INTEGER NOT NULL,contract_revision INTEGER NOT NULL,contract_hash TEXT NOT NULL,
+                stage TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 0,owner TEXT,fence INTEGER NOT NULL DEFAULT 0,
+                lease_until REAL NOT NULL DEFAULT 0,body TEXT NOT NULL,updated REAL NOT NULL);
+            CREATE UNIQUE INDEX IF NOT EXISTS one_owner_preview ON preview_queue(active) WHERE active=1;
         """)
 
     @contextmanager
@@ -182,6 +189,10 @@ class Store:
     def recover(self):
         with self.transaction():
             self.db.execute("UPDATE outbox SET status='pending' WHERE status IN ('sending','uncertain') AND kind='ui_read'")
+            self.db.execute("UPDATE outbox SET status='pending' WHERE status IN ('sending','uncertain') AND kind IN ('telegram_markup')")
+            for r in self.db.execute("SELECT key,payload FROM outbox WHERE status IN ('sending','uncertain') AND kind='ui_screen'").fetchall():
+                user=json.loads(r['payload'])['user_id'];nav=json.loads(self.meta('nav:'+str(user),'{}'))
+                if nav.get('message_id'):self.db.execute("UPDATE outbox SET status='pending' WHERE key=?",(r['key'],))
             self.db.execute("UPDATE outbox SET status='uncertain',updated=? WHERE status='sending'", (time.time(),))
 
     def status(self) -> dict:
@@ -209,7 +220,8 @@ def summary(draft: dict) -> str:
                 + f"Tier: {draft['tier']}. {draft['tier_reason']}\n")
         if a["image_observations"]:
             text += "На скриншоте: " + "; ".join(a["image_observations"]) + "\n"
-        return text + "Создать задачу в Linear? После подтверждения она появится в «Мои задачи»; исполнение требует разрешения."
+        footer=('Подтверждение создаст одну Linear issue и поставит T1/T2 в Owner-очередь реализации до Railway. T3/T4 ждут решения Owner; candidate/Windows/main/production выключены.' if draft.get('owner_preview_mode') and not marker.startswith('TEST') else 'После подтверждения она появится в «Мои задачи»; исполнение требует разрешения.')
+        return text + ('Подтвердить доработку той же задачи Linear? Новая issue не создаётся; затем новый Railway preview.' if draft.get('feedback_for') else "Создать задачу в Linear? "+footer)
     answers = draft["answers"]
     return (f"Задача: {draft['request']}\nГде: {answers['screen']}\nСейчас: {answers['actual']}\n"
             f"Нужно: {answers['expected']}\nСохранить: {answers['frozen']}\n"
@@ -220,7 +232,7 @@ def summary(draft: dict) -> str:
 
 def buttons(draft: dict) -> list:
     return [[{"text": title, "callback_data": f"{action}:{draft['id']}:{draft['revision']}"}]
-            for title, action in [("Создать задачу", "create"), ("Уточнить", "edit"), ("Отмена", "cancel")]]
+            for title, action in [("Подтвердить доработку" if draft.get('feedback_for') else "Создать задачу", "create"), ("Уточнить", "edit"), ("Отменить замечания" if draft.get('feedback_for') else "Отмена", "cancel")]]
 
 
 def contract(draft: dict) -> dict:
@@ -229,7 +241,7 @@ def contract(draft: dict) -> dict:
                         for s in draft["sources"])
     role = "Сергея" if draft["role"] == "sergey" else "Александра (Owner)"
     test_only = bool(draft.get("test_only")) or any("TEST/ALE-528" in s["text"] for s in draft["sources"])
-    delivery_pilot = not test_only and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"])
+    delivery_pilot = not draft.get('owner_preview_mode') and not test_only and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"])
     title = draft.get("analysis", {}).get("title", draft["request"])[:110]
     if test_only and "TEST/ALE-528" not in title:
         title = "TEST/ALE-528: " + title
@@ -247,6 +259,12 @@ def contract(draft: dict) -> dict:
                    f"Worker branch: `delivery/{draft['id']}-r{draft['revision']}`. "
                    "Изолированный worktree/session; ветку живой intake-сессии не переключать.\n\n"
                    if delivery_pilot else "")
+    owner_guard=("## OWNER PREVIEW PILOT\n\n"
+                 f"Code-assigned mode {draft['owner_preview_mode']}; issue/revision assigned after confirmed Linear create. "
+                 "Owner confirmed task; T1/T2 implementation and Railway only. One active delivery, others queued. "
+                 "T3/T4 require Owner decision. CANDIDATE_ALLOWED=false; WINDOWS_UPDATER_ALLOWED=false; "
+                 "PRODUCT_MAIN_ALLOWED=false; RELEASE_ALLOWED=false; SERGEY_NOTIFICATIONS_ALLOWED=false.\n\n"
+                 if draft.get('owner_preview_mode') and not test_only else '')
     return {
         # Draft IDs are already uuid4 and are persisted before confirmation.
         # Linear explicitly requires v4: a deterministic uuid5 is rejected.
@@ -256,7 +274,7 @@ def contract(draft: dict) -> dict:
         "test_only": test_only,
         "delivery_pilot": delivery_pilot,
         "description": (
-            test_guard + pilot_guard +
+            test_guard + owner_guard + pilot_guard +
             f"## Подтверждённая постановка от {role}\n\n{summary(draft)}\n\n"
             f"## Происхождение\n\nДиалог `{draft['id']}`, revision `{draft['revision']}`. "
             "Автор Linear — подключённая интеграция; происхождение не подменяет автора. "
@@ -268,7 +286,7 @@ def contract(draft: dict) -> dict:
             "и сохраняются в защищённом локальном журнале диалога.\n\n"
             "## Ограничения исполнения\n\n" +
             ("Статус: isolated delivery pilot; исполнение только по exact private authorization. " if delivery_pilot else
-             "Статус: intake-only, автоматическое исполнение выключено до Owner acceptance системы. ") +
+             ('Статус: Owner preview queue; только T1/T2 до Railway, T3/T4 — решение Owner; релизные стадии запрещены. ' if owner_guard else "Статус: intake-only, автоматическое исполнение выключено до Owner acceptance системы. ")) +
             "Tier предварительный по docs/context/LINEAR_PROCESS.md. Исполнитель повторно проверяет "
             "сложность, фактический diff и зависимости; неоднозначность и T3/T4 передаются Александру. "
             "Updater/recovery/packaging, schema/migrations, удаление данных, signing/auth/secrets "
@@ -311,10 +329,16 @@ class Intake:
             s.event("input_accepted", json.dumps({
                 "update_id": update_id, "message_id": message.get("message_id"),
                 "role": self.roles[user_id], "kind": "callback" if callback else "message"}))
+            if s.meta('owner_preview_only')=='1' and self.roles[user_id]!='owner':
+                s.event('owner_preview_input_held','non_owner');return
             if callback:
                 s.enqueue(f"ack:{update_id}", "telegram_ack", {"callback_query_id": callback["id"]})
 
             def reply(text: str, keyboard: list | None = None):
+                if s.meta('navigation_enabled') == '1':
+                    try:from .sergey_navigation import emit
+                    except ImportError:from sergey_navigation import emit
+                    emit(s,user_id,f'reply:{update_id}',text,keyboard);return
                 payload = {"chat_id": user_id, "text": text}
                 if keyboard:
                     payload["reply_markup"] = {"inline_keyboard": keyboard}
@@ -322,6 +346,23 @@ class Intake:
 
             text = safe_text(str((message or {}).get("text", "")).strip()) if not callback else ""
             draft = s.current(user_id)
+            if s.meta('owner_preview_only')=='1' and callback and callback.get('data','').startswith(('prod:','gate:')):
+                reply('В Owner preview-пилоте candidate, Windows updater и production отключены.');return
+            if s.meta('navigation_enabled')=='1':
+                try:from .sergey_navigation import before as navigation_before
+                except ImportError:from sergey_navigation import before as navigation_before
+                try:consumed,text,callback=navigation_before(s,user_id,text,callback)
+                except (ValueError,KeyError,IndexError):reply('Кнопка устарела. Откройте «Меню»; данные сохранены.');return
+                if consumed:return
+                if callback:
+                    update={**update,'callback_query':callback}
+                draft=s.current(user_id)
+            if s.meta('owner_preview_only')=='1' and callback and callback.get('data','').startswith(('prod:','gate:')):
+                reply('Релизные стадии отключены в Owner preview-пилоте.');return
+            if s.meta('owner_preview_only')=='1':
+                try:from .sergey_preview import handle_feedback
+                except ImportError:from sergey_preview import handle_feedback
+                if handle_feedback(self,update,message,callback,user_id,text):return
             if callback and callback.get("data", "").startswith("prod:"):
                 try:
                     from .sergey_production import callback as production_callback
@@ -390,8 +431,17 @@ class Intake:
                     reply("Эта кнопка уже обработана или резюме изменилось. Используйте /status.")
                     return
                 if parts[0] == "create":
+                    if draft.get('feedback_for'):
+                        if s.meta('owner_preview_only')!='1':reply('Owner preview-пилот отключён; доработка сохранена.');return
+                        try:from .sergey_preview import confirm_revision
+                        except ImportError:from sergey_preview import confirm_revision
+                        try:confirm_revision(s,draft,update_id)
+                        except ValueError:reply('Шаг доработки изменился. Обновите карточку, материалы сохранены.');return
+                        reply('Новая постановка подтверждена. Обновляю ту же задачу Linear; затем доработка и новый preview.');return
                     draft["state"] = "confirmed"
                     draft["confirmation_update"] = update_id
+                    if s.meta('owner_preview_only')=='1' and self.roles[user_id]=='owner':
+                        draft['owner_preview_mode']=s.meta('owner_preview_mode')
                     s.save(draft)
                     s.enqueue(f"linear:{draft['id']}", "linear", {"draft_id": draft["id"], **contract(draft)})
                     s.event("confirmed", draft["id"])
@@ -406,6 +456,10 @@ class Intake:
                     reply("Что изменить в резюме? Остальной контекст сохранён." if self.contextual
                           else "Уточним постановку заново. " + QUESTIONS[0][1])
                 elif parts[0] == "cancel":
+                    if draft.get('feedback_for'):
+                        try:from .sergey_preview import cancel_feedback
+                        except ImportError:from sergey_preview import cancel_feedback
+                        cancel_feedback(s,draft,update_id);reply('Замечания отменены. Сама задача и preview сохранены.');return
                     draft["state"] = "cancelled"
                     s.save(draft)
                     reply("Создание отменено. Для новой задачи — /new.")
@@ -566,6 +620,7 @@ def analysis_one(store: Store, engine) -> bool:
             current["sources"] = prepared["sources"]
             current["analysis_runtime"] = engine.runtime() if hasattr(engine, "runtime") else {"analyst": "test-adapter"}
             current["analysis"] = result
+            if store.meta('owner_preview_only')=='1' and current['role']=='owner':current['owner_preview_mode']=store.meta('owner_preview_mode')
             current["answers"] = {k: result[k] for k in ["screen", "actual", "expected", "surface"]}
             current["answers"].update(frozen="; ".join(result["frozen"]), acceptance="; ".join(result["acceptance"]))
             guard_tier, guard_reason = classify(current)
@@ -587,7 +642,11 @@ def analysis_one(store: Store, engine) -> bool:
                 payload["reply_markup"] = {"inline_keyboard": ui_keyboard(current, [("Отменить", "cancel")])}
             if len(payload["text"]) > 4096:
                 raise ValueError("summary_too_long")
-            store.enqueue(f"analysis:{row['id']}:ready", "telegram", payload)
+            if store.meta('navigation_enabled')=='1':
+                try:from .sergey_navigation import emit
+                except ImportError:from sergey_navigation import emit
+                emit(store,current['user_id'],f"analysis:{row['id']}:ready",payload['text'],payload.get('reply_markup',{}).get('inline_keyboard'),async_draft=current)
+            else:store.enqueue(f"analysis:{row['id']}:ready", "telegram", payload)
             store.db.execute("UPDATE analysis_jobs SET status='done',updated=? WHERE id=?", (time.time(), row["id"]))
             store.event("analysis_applied", row["id"])
     except Exception as error:
@@ -617,6 +676,13 @@ def request_json(url: str, payload: dict, headers: dict | None = None, timeout: 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.load(response)
+    except urllib.error.HTTPError as exc:
+        try:data=json.loads(exc.read(16384))
+        except Exception:data={}
+        error=ApiError('API request rejected')
+        error.api_description=safe_text(str(data.get('description','')))
+        error.api_code=data.get('error_code',exc.code)
+        raise error from None
     except Exception:
         # URL may contain a bot token. Never propagate exception text or chains.
         raise ApiError("API transport failure; result may be uncertain") from None
@@ -629,7 +695,7 @@ class Telegram:
     def call(self, method: str, payload: dict) -> dict | list | bool:
         data = request_json(f"https://api.telegram.org/bot{self.token}/{method}", payload)
         if not data.get("ok"):
-            raise ApiError("Telegram API rejected request")
+            error=ApiError('Telegram API rejected request');error.api_description=safe_text(str(data.get('description','')));error.api_code=data.get('error_code');raise error
         return data["result"]
 
     def preflight(self):
@@ -691,17 +757,33 @@ def complete_linear(store: Store, item: dict, result: dict):
     draft = json.loads(row[0])
     draft.update(state="created", issue_id=result["id"], issue_url=result["url"])
     store.save(draft)
-    store.enqueue(f"created:{draft['id']}", "telegram", {
-        "chat_id": draft["user_id"], "text": f"Задача создана: {result['url']}\n"
-        f"{draft['tier']}. Исполнение ещё не подключено. Для новой задачи — /new."})
+    if store.meta('owner_preview_only')=='1':
+        try:from .sergey_preview import enqueue_created
+        except ImportError:from sergey_preview import enqueue_created
+        enqueue_created(store,draft,payload,result)
+    text=f"Задача создана: {result['url']}\n{draft['tier']}. "+('Owner preview-пилот: T1/T2 — очередь до Railway; T3/T4 — решение Owner. Релизные стадии выключены.' if draft.get('owner_preview_mode') else 'Исполнение ожидает разрешения. Откройте «Мои задачи».')
+    if store.meta('navigation_enabled')=='1':
+        try:from .sergey_navigation import emit
+        except ImportError:from sergey_navigation import emit
+        emit(store,draft['user_id'],f"created:{draft['id']}",text,async_draft=draft)
+    else:store.enqueue(f"created:{draft['id']}",'telegram',{'chat_id':draft['user_id'],'text':text})
     store.event("linear_created", draft["id"])
 
 
 def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> bool:
     # Pause also blocks confirmed-but-not-yet-dispatched Linear writes.
-    if store.meta("paused") == "1" or linear is None:
+    if store.meta('navigation_enabled')=='1':
         with store.transaction():
-            row = store.db.execute("SELECT * FROM outbox WHERE status='pending' AND kind!='linear' ORDER BY rowid LIMIT 1").fetchone()
+            excluded="AND kind NOT IN ('linear','linear_revision')" if store.meta('paused')=='1' or linear is None else ''
+            row=store.db.execute("SELECT * FROM outbox WHERE status='pending' AND kind!='telegram_markup' "+excluded+" ORDER BY rowid LIMIT 1").fetchone()
+            if not row and time.time()-float(store.meta('nav_cleanup_at','0'))>=2:
+                row=store.db.execute("SELECT * FROM outbox WHERE status='pending' AND kind='telegram_markup' ORDER BY rowid LIMIT 1").fetchone()
+                if row:store.set_meta('nav_cleanup_at',str(time.time()))
+            item=dict(row) if row else None
+            if item:store.db.execute("UPDATE outbox SET status='sending',updated=? WHERE key=?",(time.time(),item['key']))
+    elif store.meta("paused") == "1" or linear is None:
+        with store.transaction():
+            row = store.db.execute("SELECT * FROM outbox WHERE status='pending' AND kind NOT IN ('linear','linear_revision') ORDER BY rowid LIMIT 1").fetchone()
             item = dict(row) if row else None
             if item:
                 store.db.execute("UPDATE outbox SET status='sending',updated=? WHERE key=?", (time.time(), item["key"]))
@@ -713,6 +795,21 @@ def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> boo
     try:
         if item["kind"] == "linear":
             result = linear.create(payload)
+        elif item['kind']=='linear_revision':
+            data=linear.call('mutation($id:String!,$t:String!,$d:String!){issueUpdate(id:$id,input:{title:$t,description:$d}){success}}',{'id':payload['id'],'t':payload['title'],'d':payload['description']})
+            if not data['issueUpdate']['success']:raise ApiError('Linear revision unconfirmed')
+            actual=linear.find(payload['id'])
+            if not actual or not equivalent_linear_description(actual['description'],payload['description']):raise ApiError('Linear revision mismatch')
+            result={'updated':True}
+        elif item['kind']=='ui_screen':
+            try:from .sergey_navigation import dispatch_screen
+            except ImportError:from sergey_navigation import dispatch_screen
+            result=dispatch_screen(store,telegram,item,payload)
+        elif item['kind']=='telegram_markup':
+            try:result=telegram.call('editMessageReplyMarkup',payload)
+            except ApiError as error:
+                if not any(x in getattr(error,'api_description','').lower() for x in ['message is not modified','message to edit not found']):raise
+                result={'removed':True}
         elif item["kind"] == "ui_read":
             try:
                 from .sergey_ui import task_read
@@ -725,6 +822,10 @@ def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> boo
         with store.transaction():
             if item["kind"] == "linear":
                 complete_linear(store, item, result)
+            elif item['kind']=='linear_revision':
+                try:from .sergey_preview import complete_revision
+                except ImportError:from sergey_preview import complete_revision
+                complete_revision(store,payload)
             stored = {"message_id": result.get("message_id")} if item["kind"] == "telegram" else result
             store.db.execute("UPDATE outbox SET status='sent',result=?,updated=? WHERE key=?",
                              (json.dumps(stored), time.time(), item["key"]))
@@ -748,14 +849,18 @@ def equivalent_linear_description(actual: str, expected: str) -> bool:
 def reconcile_linear(store: Store, linear: Linear) -> int:
     """Read-only lookup after uncertain create. Never repeat issueCreate."""
     count = 0
-    for row in store.db.execute("SELECT * FROM outbox WHERE status='uncertain' AND kind='linear'").fetchall():
+    for row in store.db.execute("SELECT * FROM outbox WHERE status='uncertain' AND kind IN ('linear','linear_revision')").fetchall():
         payload = json.loads(row["payload"])
         try:
             result = linear.find(payload["id"])
             if not result or not equivalent_linear_description(result.get("description", ""), payload["description"]):
                 continue
             with store.transaction():
-                complete_linear(store, dict(row), result)
+                if row['kind']=='linear_revision':
+                    try:from .sergey_preview import complete_revision
+                    except ImportError:from sergey_preview import complete_revision
+                    complete_revision(store,payload)
+                else:complete_linear(store, dict(row), result)
                 store.db.execute("UPDATE outbox SET status='sent',updated=? WHERE key=?", (time.time(), row["key"]))
             count += 1
         except ApiError:
@@ -1007,13 +1112,16 @@ def main() -> int:
                 worker.start()
             else:
                 store.set_meta("analyst_runtime", "legacy-questionnaire")
-            if store.meta("ui_menu_version") != "ale534-v1":
-                bot.call("setMyCommands", {"commands": [
+            menu_version='ale534-nav-v2' if store.meta('navigation_enabled')=='1' else 'ale534-v1'
+            if store.meta("ui_menu_version") != menu_version:
+                commands=[
                     {"command": "new", "description": "Создать задачу"},
                     {"command": "mytasks", "description": "Мои задачи"},
-                    {"command": "help", "description": "Помощь"}]})
+                    {"command": "help", "description": "Помощь"}]
+                if store.meta('navigation_enabled')=='1':commands=[{'command':'menu','description':'Меню'},{'command':'help','description':'Помощь'}]
+                bot.call("setMyCommands", {"commands": commands})
                 bot.call("setChatMenuButton", {"menu_button": {"type": "commands"}})
-                store.set_meta("ui_menu_version", "ale534-v1")
+                store.set_meta("ui_menu_version", menu_version)
             store.set_meta("delivery_state_path", str(args.state.parent.parent / "sergey-delivery" / "delivery.sqlite3"))
             intake = Intake(store, cfg["SERGEY_USER_ID"], cfg["OWNER_USER_ID"], contextual=engine is not None, menu_ui=engine is not None)
             print("Intake running; delivery executor and physical updater gate disconnected", flush=True)
@@ -1024,6 +1132,8 @@ def main() -> int:
                                            "timeout": 2 if engine else 25, "allowed_updates": ["message", "callback_query"]})
                         for update in updates:
                             intake.process(update)
+                        if linear and store.meta('owner_preview_only')=='1' and time.time()-float(store.meta('preview_linear_reconcile_at','0'))>10:
+                            reconcile_linear(store,linear);store.set_meta('preview_linear_reconcile_at',str(time.time()))
                         for _ in range(100):
                             if not dispatch_one(store, bot, linear):
                                 break

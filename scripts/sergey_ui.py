@@ -15,7 +15,7 @@ except ImportError:
     from sergey_intake import safe_text
 
 CREATE='Создать задачу';MINE='Мои задачи'
-MENU={'keyboard':[[{'text':CREATE},{'text':MINE}]],'is_persistent':True,'one_time_keyboard':False,'resize_keyboard':True}
+MENU={'keyboard':[[{'text':'Меню'}]],'is_persistent':True,'one_time_keyboard':False,'resize_keyboard':True}
 OPEN={'collecting','review','review_wait','asking','answer_wait','analyzing','analysis_failed','summary'}
 TIERS={'T1':'небольшая локальная правка','T2':'узкое изменение поведения','T3':'сложная задача — нужен Owner','T4':'данные/системная область — нужен Owner'}
 PAGE_SIZE=5
@@ -68,7 +68,8 @@ def material_review(d,full=False):
 
 def review_actions(d):
     actions=[]
-    if all_ready(d):actions.append(('Всё верно, передать аналитику','send'))
+    if all_ready(d) and not d.get('analyst_transfer_update'):actions.append(('Всё верно, передать аналитику','send'))
+    elif d.get('analyst_transfer_update'):actions.append(('Продолжить','resume'))
     if any(s.get('media_status')=='error' for s in d['sources']):
         actions.append(('Повторить обработку ошибок','retry'))
         actions.extend((f'Убрать часть {n}',f"drop_{s['update_id']}") for n,s in enumerate(d['sources'],1) if s.get('media_status')=='error')
@@ -95,9 +96,17 @@ def show_draft(d,send):
 
 
 def handle(intake,update,message,callback,user_id,text):
-    s=intake.store;update_id=update['update_id'];d=s.current(user_id);sequence=0
+    s=intake.store;update_id=update['update_id'];d=s.current(user_id);sequence=0;prefix=''
     def send(body,inline=None,menu=False):
-        nonlocal sequence
+        nonlocal sequence,prefix
+        if s.meta('navigation_enabled')=='1':
+            try:from . import sergey_navigation as nav
+            except ImportError:import sergey_navigation as nav
+            if menu:prefix=body
+            elif prefix:body=prefix+'\n\n'+body;prefix=''
+            if callback or text in {CREATE,MINE,'/new','/mytasks','/help','Помощь','/status','/cancel'} or menu:nav.render(s,user_id,body,inline)
+            else:nav.emit(s,user_id,f'ui-reply:{update_id}:{sequence}',body,inline,async_draft=s.current(user_id))
+            sequence+=1;return
         payload={'chat_id':user_id,'text':body}
         if menu:payload['reply_markup']=MENU
         elif inline:payload['reply_markup']={'inline_keyboard':inline}
@@ -140,7 +149,12 @@ def handle(intake,update,message,callback,user_id,text):
                 if group not in {'active','completed'} or page<0 or page>10000:raise ValueError()
             except (ValueError,TypeError):send('Эта карточка недоступна. Откройте «Мои задачи».');return True
         send('Обновляю ваши задачи. Текущий черновик сохранён.',menu=True)
-        s.enqueue(f'ui-read:{update_id}','ui_read',{'user_id':user_id,'group':group,'page':page,'selected':selected,'force':force})
+        payload={'user_id':user_id,'group':group,'page':page,'selected':selected,'force':force}
+        if s.meta('navigation_enabled')=='1':
+            try:from .sergey_navigation import load as nav_load
+            except ImportError:from sergey_navigation import load as nav_load
+            payload['nav_generation']=nav_load(s,user_id)['generation']
+        s.enqueue(f'ui-read:{update_id}','ui_read',payload)
         return True
     if callback and callback.get('data','').startswith('u:'):
         parts=callback['data'].split(':')
@@ -149,6 +163,10 @@ def handle(intake,update,message,callback,user_id,text):
         action=parts[1]
         if action=='resume':show_draft(d,send);return True
         if action=='cancel' and d['state'] in OPEN:
+            if d.get('feedback_for'):
+                try:from .sergey_preview import cancel_feedback
+                except ImportError:from sergey_preview import cancel_feedback
+                cancel_feedback(s,d,update_id);send('Замечания отменены; сама задача и её preview сохранены. Откройте карточку задачи.');return True
             d.update(state='cancelled',revision=d['revision']+1);s.save(d)
             s.db.execute("UPDATE material_jobs SET status='cancelled' WHERE draft_id=? AND status IN ('pending','running')",(d['id'],))
             send('Черновик отменён. Можно создать новую задачу.',menu=True);return True
@@ -163,7 +181,7 @@ def handle(intake,update,message,callback,user_id,text):
         if d['state'] not in {'collecting','review','review_wait','answer_wait'}:
             send('Этот шаг уже завершён. Черновик и подтверждения сохранены.');return True
         if action=='add':
-            d.update(state='answer_wait' if d.get('analyst_transfer_update') else 'collecting',revision=d['revision']+1);s.save(d)
+            d.update(state='answer_wait' if d.get('analyst_transfer_update') else 'collecting');s.save(d)
             if d.get('analyst_transfer_update'):send('Пришлите дополнительный ответ на уточнение; все предыдущие части сохранены.')
             else:show_draft(d,send)
         elif action=='finish':
@@ -171,10 +189,10 @@ def handle(intake,update,message,callback,user_id,text):
                 send('Описание уже передано. Ответы связаны с текущим уточнением.');return True
             if not d['sources']:send('Черновик пуст. Сначала пришлите описание.',collection_actions(d));return True
             d.update(state='review' if not any(x.get('media_status')=='pending' for x in d['sources']) else 'review_wait',
-                     revision=d['revision']+1,description_finished_update=update_id);s.save(d);show_draft(d,send)
+                     description_finished_update=update_id);s.save(d);show_draft(d,send)
         elif action=='send':
             if d['state']!='review' or not all_ready(d):send('Нужно дождаться обработки или исправить ошибку части. Все материалы сохранены.');return True
-            d.update(state='analyzing',revision=d['revision']+1,analyst_transfer_update=update_id)
+            d.update(state='analyzing',analyst_transfer_update=update_id)
             s.save(d);s.queue_analysis(d);send('Материалы переданы аналитику. Создание Linear потребует отдельного подтверждения.')
         elif action=='retry':
             for part in d['sources']:
@@ -201,6 +219,10 @@ def handle(intake,update,message,callback,user_id,text):
         return True
     if text=='/cancel':
         if d and d['state'] in OPEN:
+            if d.get('feedback_for'):
+                try:from .sergey_preview import cancel_feedback
+                except ImportError:from sergey_preview import cancel_feedback
+                cancel_feedback(s,d,update_id);send('Замечания отменены, задача не отменялась.');return True
             d.update(state='cancelled',revision=d['revision']+1);s.save(d);send('Черновик отменён.',menu=True)
         else:send('Нет неподтверждённого черновика. Подтверждённые задачи доступны в «Мои задачи».',menu=True)
         return True
@@ -283,11 +305,20 @@ def material_one(store,engine):
         if current['state']=='answer_wait' and error:actions=review_actions(current)
         if current['state']=='collecting' and error:text+=' Нажмите «Закончить описание», чтобы повторить или убрать ошибочную часть.'
         if current['state']=='review':text=material_review(current)[:3800]
-        store.enqueue('material-result:'+job['id']+':'+str(job['attempts']+1),'telegram',{'chat_id':current['user_id'],'text':text,'reply_markup':{'inline_keyboard':actions}})
+        if store.meta('navigation_enabled')=='1':
+            try:from .sergey_navigation import emit
+            except ImportError:from sergey_navigation import emit
+            emit(store,current['user_id'],'material-result:'+job['id']+':'+str(job['attempts']+1),text,actions,async_draft=current)
+        else:store.enqueue('material-result:'+job['id']+':'+str(job['attempts']+1),'telegram',{'chat_id':current['user_id'],'text':text,'reply_markup':{'inline_keyboard':actions}})
     return True
 
 
 def local_stage(store,d,remote):
+    if store.meta('owner_preview_only')=='1':
+        try:from .sergey_preview import card
+        except ImportError:from sergey_preview import card
+        preview=card(store,d)
+        if preview:return preview[:4]
     if d['state']!='created':
         names={'collecting':('Черновик','Добавьте части или закончите описание.'),'review':('Проверка материалов','Подтвердите передачу аналитику.'),
                'review_wait':('Обработка материалов','Дождитесь обработки; ошибочную часть можно повторить или убрать.'),'asking':('Уточнение','Ответьте на вопрос аналитика.'),
@@ -363,11 +394,19 @@ def task_read(store,payload,linear,key):
             if url and url.startswith('https://'):buttons.append([{'text':label,'url':url}])
         if d['state'] in OPEN and store.meta(f'current:{user}')==d['id']:
             buttons.append([{'text':'Продолжить заявку','callback_data':f"u:resume:{d['id']}:{d['revision']}"}])
+        if d['state'] in OPEN and store.meta('navigation_enabled')=='1' and store.meta(f'current:{user}')!=d['id']:
+            buttons.append([{'text':'Продолжить заявку','callback_data':f"u:resume:{d['id']}:{d['revision']}"}])
+        if store.meta('owner_preview_only')=='1':
+            try:from .sergey_preview import card
+            except ImportError:from sergey_preview import card
+            preview=card(store,d)
+            if preview:buttons.extend(preview[4]);text+=preview[5]
         buttons.extend([[{'text':'Обновить','callback_data':f"q:refresh:{d['id']}:{group}_{page}"}],
                         [{'text':'Назад','callback_data':f'q:list:{group}:{page}'}]])
     else:
         shown=[e for e in entries if e[5]==(group=='completed')];page=min(page,max(0,(len(shown)-1)//PAGE_SIZE))
-        text=('Активные' if group=='active' else 'Завершённые')+f' · {len(shown)}\nСтраница {page+1}. Только ваши заявки.\nОбщая очередь выключена.'
+        mode='Owner-очередь до Railway включена. Релизные стадии выключены.' if store.meta('owner_preview_only')=='1' else 'Общая очередь выключена.'
+        text=('Активные' if group=='active' else 'Завершённые')+f' · {len(shown)}\nСтраница {page+1}. Только ваши заявки.\n'+mode
         timestamps=[e[2] for e in shown if e[2]]
         if timestamps:text+='\nLinear сверялся: '+time.strftime('%d.%m.%Y %H:%M UTC',time.gmtime(min(timestamps)))
         for d,remote,_,stage,_,_,_ in shown[page*PAGE_SIZE:(page+1)*PAGE_SIZE]:
@@ -382,5 +421,9 @@ def task_read(store,payload,linear,key):
     with store.transaction():
         for draft_id,(remote,fetched) in cached.items():
             store.db.execute('INSERT OR REPLACE INTO task_cache VALUES(?,?,?,?)',(draft_id,user,json.dumps(remote),fetched))
-        store.enqueue('ui-read-result:'+key,'telegram',{'chat_id':user,'text':safe_text(text[:3900]),'reply_markup':{'inline_keyboard':buttons}})
+        if store.meta('navigation_enabled')=='1':
+            try:from .sergey_navigation import task_result
+            except ImportError:from sergey_navigation import task_result
+            task_result(store,user,payload,safe_text(text),buttons,key)
+        else:store.enqueue('ui-read-result:'+key,'telegram',{'chat_id':user,'text':safe_text(text[:3900]),'reply_markup':{'inline_keyboard':buttons}})
     return {'read_complete':True}

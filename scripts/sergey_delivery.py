@@ -361,6 +361,17 @@ def main():
     parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args();os.umask(0o077)
     config = private_json(args.config);validate_config(config)
+    if config.get('owner_preview_config') and args.action=='run':
+        try:from .sergey_preview import PreviewWorker
+        except ImportError:from sergey_preview import PreviewWorker
+        scoped=private_json(Path(config['owner_preview_config']))
+        with service_lock(Path(config['state']).with_suffix('.lock')):
+            worker=PreviewWorker(scoped)
+            def stop_preview(signum,frame):worker.cancel();raise KeyboardInterrupt
+            signal.signal(signal.SIGTERM,stop_preview)
+            try:worker.run()
+            except KeyboardInterrupt:pass
+        return 0
     state = DeliveryStore(Path(config["state"]))
     if args.action == "status":
         print(json.dumps(state.job(), ensure_ascii=False));return 0

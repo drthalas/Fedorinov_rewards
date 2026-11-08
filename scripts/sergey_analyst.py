@@ -259,7 +259,7 @@ class CodexAnalyst:
             "TEST/ALE-528 означает только QA, не выполнение. Tier по project policy, "
             "не считать любой UI автоматически T2: зависимости/cross-flow → T3, данные/системные области → T4.\n"
             "READ-ONLY PRODUCT CONTEXT:\n" + self.context + "\n"
-            + json.dumps({"conversation": conversation, "previous_draft": draft.get("analysis")}, ensure_ascii=False)
+            + json.dumps({"conversation": conversation, "previous_draft": draft.get("analysis"),"preview_corrections_context":draft.get('feedback_context')}, ensure_ascii=False)
         )
         destination = self.private_dir / "analysis" / draft["id"] / str(draft["revision"])
         destination.mkdir(parents=True, exist_ok=True, mode=0o700)
