@@ -110,6 +110,11 @@ class Store:
                 id TEXT PRIMARY KEY, draft_id TEXT NOT NULL, revision INTEGER NOT NULL,
                 payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
                 attempts INTEGER NOT NULL DEFAULT 0, error TEXT, updated REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS material_jobs(
+                id TEXT PRIMARY KEY, draft_id TEXT NOT NULL, source_update INTEGER NOT NULL,
+                status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, error TEXT, updated REAL NOT NULL);
+            CREATE TABLE IF NOT EXISTS task_cache(
+                draft_id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, body TEXT NOT NULL, fetched REAL NOT NULL);
         """)
 
     @contextmanager
@@ -131,6 +136,7 @@ class Store:
         self.db.execute("INSERT OR REPLACE INTO meta VALUES(?,?)", (key, value))
 
     def save(self, draft: dict):
+        draft["updated_at"] = time.time()
         self.db.execute("INSERT OR REPLACE INTO drafts VALUES(?,?,?)",
                         (draft["id"], draft["user_id"], json.dumps(draft, ensure_ascii=False)))
 
@@ -175,6 +181,7 @@ class Store:
 
     def recover(self):
         with self.transaction():
+            self.db.execute("UPDATE outbox SET status='pending' WHERE status IN ('sending','uncertain') AND kind='ui_read'")
             self.db.execute("UPDATE outbox SET status='uncertain',updated=? WHERE status='sending'", (time.time(),))
 
     def status(self) -> dict:
@@ -192,7 +199,7 @@ class Store:
 def summary(draft: dict) -> str:
     if draft.get("analysis"):
         a = draft["analysis"]
-        marker = "TEST/ALE-528 — только QA, исполнение/release запрещены.\n" if any("TEST/ALE-528" in s["text"] for s in draft["sources"]) else ""
+        marker = "TEST/ALE-528 — только QA, исполнение/release запрещены.\n" if draft.get("test_only") or any("TEST/ALE-528" in s["text"] for s in draft["sources"]) else ""
         if not marker and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"]):
             marker = "DELIVERY PILOT/ALE-528 — только реализация и Railway preview по exact ID/revision; release выключен.\n"
         text = (marker + f"Задача: {a['title']}\nГде: {a['screen']}\nСейчас: {a['actual']}\nНужно: {a['expected']}\n"
@@ -202,7 +209,7 @@ def summary(draft: dict) -> str:
                 + f"Tier: {draft['tier']}. {draft['tier_reason']}\n")
         if a["image_observations"]:
             text += "На скриншоте: " + "; ".join(a["image_observations"]) + "\n"
-        return text + "Создать задачу в Linear? Исполнение ещё не подключено."
+        return text + "Создать задачу в Linear? После подтверждения она появится в «Мои задачи»; исполнение требует разрешения."
     answers = draft["answers"]
     return (f"Задача: {draft['request']}\nГде: {answers['screen']}\nСейчас: {answers['actual']}\n"
             f"Нужно: {answers['expected']}\nСохранить: {answers['frozen']}\n"
@@ -217,10 +224,11 @@ def buttons(draft: dict) -> list:
 
 
 def contract(draft: dict) -> dict:
-    sources = "\n".join(f"- Telegram message_id={s['message_id']}, update_id={s['update_id']}: {s['text']}"
+    sources = "\n".join(f"- Telegram message_id={s['message_id']}, update_id={s['update_id']}"
+                        + (f", ответ на уточнение {s['question_round']}" if 'question_round' in s else '') + f": {s['text']}"
                         for s in draft["sources"])
     role = "Сергея" if draft["role"] == "sergey" else "Александра (Owner)"
-    test_only = any("TEST/ALE-528" in s["text"] for s in draft["sources"])
+    test_only = bool(draft.get("test_only")) or any("TEST/ALE-528" in s["text"] for s in draft["sources"])
     delivery_pilot = not test_only and draft["role"] == "owner" and any("DELIVERY PILOT/ALE-528" in s["text"] for s in draft["sources"])
     title = draft.get("analysis", {}).get("title", draft["request"])[:110]
     if test_only and "TEST/ALE-528" not in title:
@@ -252,7 +260,9 @@ def contract(draft: dict) -> dict:
             f"## Подтверждённая постановка от {role}\n\n{summary(draft)}\n\n"
             f"## Происхождение\n\nДиалог `{draft['id']}`, revision `{draft['revision']}`. "
             "Автор Linear — подключённая интеграция; происхождение не подменяет автора. "
-            f"Явное подтверждение: update_id={draft['confirmation_update']}.\n\n"
+            f"Явное подтверждение создания: update_id={draft['confirmation_update']}.\n\n" +
+            (f"Завершение описания: update_id={draft.get('description_finished_update')}; "
+             f"явная передача аналитику: update_id={draft.get('analyst_transfer_update')}.\n\n" if draft.get('ui_version') else '') +
             f"## Исходные сообщения и ответы\n\n{sources}\n\n"
             "Private Telegram не даёт общедоступных ссылок: материалы связаны по message_id/update_id "
             "и сохраняются в защищённом локальном журнале диалога.\n\n"
@@ -273,12 +283,13 @@ def contract(draft: dict) -> dict:
 
 
 class Intake:
-    def __init__(self, store: Store, sergey_id: int, owner_id: int, *, contextual: bool = False):
+    def __init__(self, store: Store, sergey_id: int, owner_id: int, *, contextual: bool = False, menu_ui: bool = False):
         if min(sergey_id, owner_id) <= 0 or sergey_id == owner_id:
             raise ValueError("Нужны два различных проверенных Telegram user ID")
         self.store = store
         self.roles = {sergey_id: "sergey", owner_id: "owner"}
         self.contextual = contextual
+        self.menu_ui = menu_ui
 
     def process(self, update: dict):
         s = self.store
@@ -348,6 +359,13 @@ class Intake:
                 else:
                     reply("Команды: /delivery_status, /delivery_pause, /delivery_resume, /delivery_cancel ALE-ID.")
                 return
+            if self.menu_ui:
+                try:
+                    from .sergey_ui import handle as ui_handle
+                except ImportError:
+                    from sergey_ui import handle as ui_handle
+                if ui_handle(self, update, message, callback, user_id, text):
+                    return
             if text == "/status":
                 if draft and draft["state"] == "summary" and s.meta("paused") != "1":
                     reply(summary(draft), buttons(draft))
@@ -554,10 +572,19 @@ def analysis_one(store: Store, engine) -> bool:
             current["tier"] = max(result["tier"], guard_tier)
             current["tier_reason"] = safe_text(result["tier_reason"] + (" " + guard_reason if guard_tier > result["tier"] else ""))
             current["state"] = "summary" if result["ready"] else "asking"
+            if not result["ready"]:
+                current["question_round"] = current.get("question_round", 0) + 1
             store.save(current)
             payload = {"chat_id": current["user_id"], "text": summary(current) if result["ready"] else "\n".join(result["questions"])}
             if result["ready"]:
                 payload["reply_markup"] = {"inline_keyboard": buttons(current)}
+            elif current.get("ui_version"):
+                payload["text"] = "Уточнение по заявке " + current["id"][:8] + ":\n" + payload["text"] + "\nОтветьте voice, текстом или screenshot."
+                try:
+                    from .sergey_ui import keyboard as ui_keyboard
+                except ImportError:
+                    from sergey_ui import keyboard as ui_keyboard
+                payload["reply_markup"] = {"inline_keyboard": ui_keyboard(current, [("Отменить", "cancel")])}
             if len(payload["text"]) > 4096:
                 raise ValueError("summary_too_long")
             store.enqueue(f"analysis:{row['id']}:ready", "telegram", payload)
@@ -686,6 +713,12 @@ def dispatch_one(store: Store, telegram: Telegram, linear: Linear | None) -> boo
     try:
         if item["kind"] == "linear":
             result = linear.create(payload)
+        elif item["kind"] == "ui_read":
+            try:
+                from .sergey_ui import task_read
+            except ImportError:
+                from sergey_ui import task_read
+            result = task_read(store, payload, linear, item["key"])
         else:
             method = "answerCallbackQuery" if item["kind"] == "telegram_ack" else "sendMessage"
             result = telegram.call(method, payload)
@@ -952,12 +985,14 @@ def main() -> int:
                                       model=args.analyst_model, redactor=safe_text)
                 store.set_meta("analyst_runtime", json.dumps(engine.runtime(), ensure_ascii=False))
                 store.recover_analysis()
+                from sergey_ui import recover_material, material_one
+                recover_material(store)
 
                 def analysis_loop():
                     worker_store = Store(args.state)
                     try:
                         while not stop_analysis.is_set():
-                            if not analysis_one(worker_store, engine):
+                            if not material_one(worker_store, engine) and not analysis_one(worker_store, engine):
                                 stop_analysis.wait(0.5)
                     finally:
                         worker_store.db.close()
@@ -972,7 +1007,15 @@ def main() -> int:
                 worker.start()
             else:
                 store.set_meta("analyst_runtime", "legacy-questionnaire")
-            intake = Intake(store, cfg["SERGEY_USER_ID"], cfg["OWNER_USER_ID"], contextual=engine is not None)
+            if store.meta("ui_menu_version") != "ale534-v1":
+                bot.call("setMyCommands", {"commands": [
+                    {"command": "new", "description": "Создать задачу"},
+                    {"command": "mytasks", "description": "Мои задачи"},
+                    {"command": "help", "description": "Помощь"}]})
+                bot.call("setChatMenuButton", {"menu_button": {"type": "commands"}})
+                store.set_meta("ui_menu_version", "ale534-v1")
+            store.set_meta("delivery_state_path", str(args.state.parent.parent / "sergey-delivery" / "delivery.sqlite3"))
+            intake = Intake(store, cfg["SERGEY_USER_ID"], cfg["OWNER_USER_ID"], contextual=engine is not None, menu_ui=engine is not None)
             print("Intake running; delivery executor and physical updater gate disconnected", flush=True)
             try:
                 while True:

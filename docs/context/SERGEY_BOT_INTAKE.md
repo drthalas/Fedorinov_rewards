@@ -398,3 +398,9 @@ CODEX_START_HERE/LINEAR_PROCESS: для разрешённых T1/T2 после 
 На intake этапе gate не выполняется; общий ручной Owner flow остальных задач сохраняется. Также Start.bat из Description и
 историческое start_windows.bat из context нельзя угадывать: подтвердить фактически существующий путь на Windows.
 Переход к автономному приёму delivery T1/T2 требует полного пилота и Owner acceptance системы.
+
+## ALE-534 — постоянное меню и составной черновик
+
+Текущий UI и Owner voice handoff описаны в [SERGEY_TELEGRAM_UI.md](SERGEY_TELEGRAM_UI.md).
+Начальный анализ по первой части заменён сохраняемым сбором материалов и отдельным transfer gate.
+Самостоятельный Owner UI E2E прошёл до TEST ALE-535 (Canceled); общая очередь остаётся выключенной.
