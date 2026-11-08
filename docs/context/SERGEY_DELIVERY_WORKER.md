@@ -140,3 +140,45 @@ Timing: план 60–90 мин, фактически около 145 мин с �
 регистрация/strict SSH handoff, выявленный ignore-filter defect, необходимый corrective build/browser
 verification и оформление доказательств. Новые широкие проверки
 после бюджета не запускались; выполнялись только действия для устранения конкретных failures и cleanup.
+
+## Owner acceptance → candidate / physical gate, 08.11.2026
+
+Owner feature PASS ALE-533 revision 2 принят в актуальном ACTIVE ALE-528.
+Продуктовый HEAD остаётся `62c4307c60d3078a97c23bfc1f73059c2f4aba65`, framework продолжен от `ea3f14c`.
+На этой фазе production/main и общая очередь остаются выключены; Сергей не участвует.
+
+`scripts/sergey_acceptance.py` добавляет отдельный durable permission gate в intake meta/outbox.
+Его identity включает issue/revision, source/deployed HEAD, deployment ID, hashes актуальных
+ALE-533 и framework scope. Перед arm выполняются read-only Linear identity/contract checks,
+clean product worktree/HEAD, authenticated HTTPS identity и проверка текущего SUCCESS deployment Railway.
+Разрешён только принятый ALE-533 r2 product HEAD; arm/restart с тем же identity не дублирует сообщение.
+
+Owner получил сообщение бота №75: «Разрешить candidate + Windows» / «Отложить».
+Callback проверяется обычным private-chat allowlist, ролью Owner, одноразовым token, точным
+message_id отправленного outbox receipt, waiting-state, expiry 24 часа и pause/cancel.
+Записываются реальные callback/update/message IDs. Чужие, старые, повторные, deferred/expired
+кнопки и uncertain send receipts не разрешают переход. Callback не запускает updater или packaging.
+Непосредственно перед каждой из этих стадий обязательна свежая проверка:
+
+```sh
+python3 scripts/sergey_acceptance.py check --config data/sergey-delivery/pilot.json
+```
+
+`check` повторно читает actual Linear/product/Railway и сверяет их с настоящим approval.
+Изменение любого identity поля требует нового запроса приёмки. `status` читает durable состояние,
+`arm` создаёт сообщение только после preflight. Реальные approvals агент за Owner не нажимает.
+Следующее продолжение после callback: packaging exact product lineage с минимальными version metadata,
+без framework-кода; затем отдельный physical handoff на COPEW-04C68047F с manifest/SHA/ZIP,
+свободными writers, свежим verified online SQLite backup, существующим Public Current/BAT и Edge.
+REAL test writes запрещены; production потребует следующего разрешённого этапа.
+
+Worker monitoring учитывает явно pinned Owner PASS header только после preview_ready и только
+если весь исходный контракт сохранён. Новый header сам не разрешает reimplementation/deployment.
+Исходный job ID/contract hash и все receipts сохранены, general_queue/release=false.
+
+TEMP/focused проверки: 60 PASS (9 новых acceptance checks): allowlist, wrong message/action/token,
+expiry/defer, pause/cancel, changed identity, повтор/reopen, свежий deployment/revision preflight,
+pin заголовка только для готового preview и сохранённого original contract.
+Существующие ResourceWarning о незакрытых test SQLite connections остаются; failures нет.
+Product/full suite/VM не повторялись — accepted product не менялся. Native Telegram QA URL: n/a.
+На checkpoint `waiting`: candidate/Windows/REAL ещё не затронуты; STOP READY FOR OWNER TELEGRAM APPROVAL.

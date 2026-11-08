@@ -311,6 +311,13 @@ class Intake:
 
             text = safe_text(str((message or {}).get("text", "")).strip()) if not callback else ""
             draft = s.current(user_id)
+            if callback and callback.get("data", "").startswith("gate:"):
+                try:
+                    from .sergey_acceptance import callback as acceptance_callback
+                except ImportError:
+                    from sergey_acceptance import callback as acceptance_callback
+                reply(acceptance_callback(s, update, user_id, self.roles[user_id]))
+                return
             if text in {"/pause", "/resume"}:
                 if self.roles[user_id] != "owner":
                     reply("Пауза и возобновление доступны Александру.")
@@ -339,11 +346,14 @@ class Intake:
                     reply(summary(draft), buttons(draft))
                     return
                 uncertain = s.db.execute("SELECT count(*) FROM outbox WHERE status='uncertain'").fetchone()[0]
+                acceptance = json.loads(s.meta("acceptance_current", "null"))
                 reply(f"Приём: {'пауза' if s.meta('paused') == '1' else 'включён'}. "
                       f"Диалог: {draft['state'] if draft else 'нет'}. "
                       f"{draft.get('issue_url', '') if draft else ''} "
                       f"Linear: {'ожидает подключения' if s.meta('linear_connection') == 'not_connected' else 'проверяется сервисом'}. "
-                      f"Операций для сверки Александром: {uncertain}. Исполнение и updater gate не подключены.")
+                      f"Операций для сверки Александром: {uncertain}. Delivery: /delivery_status. "
+                      f"Candidate/updater approval: {acceptance['state'] if acceptance else 'не запрошено'}. "
+                      "Production и общая очередь выключены.")
                 return
             if s.meta("paused") == "1":
                 reply("Приём на паузе Александра. Подтверждения сохранены; новые задачи не создаются.")

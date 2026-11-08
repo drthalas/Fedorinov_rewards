@@ -214,7 +214,7 @@ class DeliveryWorker:
                 or "## TEST/ALE-528" in issue["description"]
                 or "## DELIVERY PILOT/ALE-528" not in issue["description"]
                 or p["base_head"] not in issue["description"]
-                or contract_hash(issue["description"]) != p["contract_hash"]):
+                or not self.matches_contract(issue["description"])):
             raise DeliveryBlocked("linear_contract_or_identity_changed")
         row = self.intake.db.execute("SELECT body FROM drafts WHERE id=?", (p["draft_id"],)).fetchone()
         draft = json.loads(row[0]) if row else {}
@@ -223,6 +223,19 @@ class DeliveryWorker:
                 or draft.get("tier") != p["tier"] or draft.get("tier") not in {"T1", "T2"}):
             raise DeliveryBlocked("intake_confirmation_mismatch")
         return issue
+
+    def matches_contract(self, description):
+        p = self.config["pilot"]
+        if contract_hash(description) == p["contract_hash"]:
+            return True
+        # An explicit Owner acceptance header may be pinned after preview. It must
+        # preserve the entire original contract, and cannot authorize execution.
+        job = self.state.job()
+        prefix, separator, original = description.partition("\n---\n")
+        return bool(job and job["stage"] == "preview_ready"
+                    and p.get("accepted_issue_hash") == contract_hash(description)
+                    and prefix.startswith("## Owner feature PASS") and separator
+                    and contract_hash(original.lstrip("\n")) == p["contract_hash"])
 
     def controls(self):
         p = self.config["pilot"]
