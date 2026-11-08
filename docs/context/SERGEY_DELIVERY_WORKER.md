@@ -273,3 +273,7 @@ Private evidence (0600, ignored Git): `physical-pilot-pass-evidence.json`, `cand
 `physical/timing-corrected.json`, app-only browser snapshots/screenshots и photo loaded assertions.
 Данные/медиа/секреты не входят в Git. Следующий production шаг требует отдельного Owner authorization;
 Needs Test ALE-528/ALE-533 сохранён.
+
+Следующий scoped этап production orchestration и новой личной кнопки Owner описан отдельно в
+[SERGEY_PRODUCTION.md](SERGEY_PRODUCTION.md). До её настоящего callback main/production сохраняются;
+старое candidate/updater approval не разрешает публикацию.

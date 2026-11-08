@@ -6,6 +6,7 @@ import datetime as dt
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -54,8 +55,10 @@ def append_log(
     *,
     artifact: Path | None = None,
     message_id: str = "",
+    log_path: Path | None = None,
 ) -> None:
-    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    destination = log_path or LOG_PATH
+    destination.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
         "version": version,
@@ -72,8 +75,54 @@ def append_log(
         payload["artifact_sha256"] = hashlib.sha256(artifact.read_bytes()).hexdigest()
     if message_id:
         payload["message_id"] = str(message_id)
-    with LOG_PATH.open("a", encoding="utf-8") as handle:
+    with destination.open("a", encoding="utf-8") as handle:
+        os.fchmod(handle.fileno(), 0o600)
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def delivery_record(log_path: Path, version: str, role: str, recipient: int, message: str):
+    """Existing journal is canonical, including sends made outside the bot worker."""
+    expected = hashlib.sha256(message.encode()).hexdigest()
+    rows = [json.loads(line) for line in log_path.read_text().splitlines() if line.strip()] if log_path.exists() else []
+    rows = [r for r in rows if r.get("version") == version and r.get("recipient_id") == recipient
+            and r.get("recipient_role") == role and r.get("status") != "sent_test_copy_only"]
+    sent = [r for r in rows if r.get("status") == "sent"]
+    if sent:
+        if any(r.get("message_sha256") != expected or not r.get("message_id") for r in sent):
+            raise RuntimeError("notification_history_conflict")
+        return {"status": "sent", "message_id": str(sent[-1]["message_id"])}
+    if rows:
+        return {"status": "uncertain"}  # No Telegram history API: never infer failure from silence.
+    return None
+
+
+def send_one_durable(version: str, role: str, recipient: int, message: str, token: str,
+                     log_path: Path, *, confirmed: bool = False):
+    """Serialize the existing sender/journal; persist intent before the external call."""
+    import fcntl
+    if not confirmed:
+        raise RuntimeError("production_approval_required")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.with_suffix(log_path.suffix + ".lock").open("a") as lock:
+        os.fchmod(lock.fileno(), 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        existing = delivery_record(log_path, version, role, recipient, message)
+        if existing:
+            if existing["status"] != "sent":
+                raise RuntimeError("notification_uncertain_no_retry")
+            return existing
+        append_log(version, role, recipient, "intent", message, log_path=log_path)
+        try:
+            message_id = daily.send_message(token, recipient, message)
+            if not message_id:
+                raise RuntimeError("missing_message_id")
+        except Exception:
+            append_log(version, role, recipient, "uncertain", message, log_path=log_path)
+            raise RuntimeError("notification_uncertain_no_retry") from None
+        append_log(version, role, recipient, "sent", message, message_id=message_id, log_path=log_path)
+        return {"status": "sent", "message_id": str(message_id)}
 
 
 def build_message(version: str, manifest: str, release_notes: str, correction: bool = False) -> str:

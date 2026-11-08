@@ -24,6 +24,20 @@ def release_title(version: str = APP_VERSION) -> str:
     return f"{APP_NAME} v{version}"
 
 
+def staged_release_command(version: str, notes: Path) -> list[str]:
+    """Orchestrator uploads immutable assets before stable publication changes latest."""
+    return ["release", "create", release_tag(version), "--verify-tag", "--draft",
+            "--title", release_title(version), "--notes-file", str(notes)]
+
+
+def staged_upload_command(version: str, artifact: Path) -> list[str]:
+    return ["release", "upload", release_tag(version), str(artifact)]  # Never --clobber.
+
+
+def staged_publish_command(version: str) -> list[str]:
+    return ["release", "edit", release_tag(version), "--draft=false", "--latest"]
+
+
 def release_assets(version: str = APP_VERSION) -> list[Path]:
     assets = [versioned_zip_path(version)]
     if version in {"2.0.6", "2.0.7"}:

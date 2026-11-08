@@ -257,6 +257,8 @@ class DeliveryWorker:
         else:
             text = "Delivery: один exact pilot; ожидание poll."
         self.intake.set_meta("delivery_status", text + " Общая очередь и release выключены.")
+        if self.intake.meta("production_status"):
+            self.intake.set_meta("delivery_status", text + " Общая очередь выключена. Scoped production: " + self.intake.meta("production_status"))
 
     def tick(self):
         job = self.state.job()
@@ -268,6 +270,8 @@ class DeliveryWorker:
                 self.state.event("cancelled", job["id"])
             return
         if control != "run" or not self.config.get("enabled", False):
+            return
+        if getattr(self, "production", None) and self.production.tick(job):
             return
         if job and job["status"] == "preview_ready":
             if time.time() >= self.next_poll:
@@ -368,6 +372,13 @@ def main():
     with service_lock(Path(config["state"]).with_suffix(".lock")):
         adapter = PreviewAdapter(state, config, credentials)
         worker = DeliveryWorker(state, config, credentials, adapter)
+        if config.get("production_config"):
+            try:
+                from .sergey_production import ProductionRunner, LiveAdapter
+            except ImportError:
+                from sergey_production import ProductionRunner, LiveAdapter
+            production_config = private_json(Path(config["production_config"]))
+            worker.production = ProductionRunner(state, worker.intake, LiveAdapter(production_config), production_config["binding"])
         def stop(signum, frame):
             worker.stop.set();adapter.cancel();raise KeyboardInterrupt
         signal.signal(signal.SIGTERM, stop)

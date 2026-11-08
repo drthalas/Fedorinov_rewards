@@ -311,6 +311,13 @@ class Intake:
 
             text = safe_text(str((message or {}).get("text", "")).strip()) if not callback else ""
             draft = s.current(user_id)
+            if callback and callback.get("data", "").startswith("prod:"):
+                try:
+                    from .sergey_production import callback as production_callback
+                except ImportError:
+                    from sergey_production import callback as production_callback
+                reply(production_callback(s, update, user_id, self.roles[user_id]))
+                return
             if callback and callback.get("data", "").startswith("gate:"):
                 try:
                     from .sergey_acceptance import callback as acceptance_callback
@@ -353,7 +360,7 @@ class Intake:
                       f"Linear: {'ожидает подключения' if s.meta('linear_connection') == 'not_connected' else 'проверяется сервисом'}. "
                       f"Операций для сверки Александром: {uncertain}. Delivery: /delivery_status. "
                       f"Candidate/updater approval: {acceptance['state'] if acceptance else 'не запрошено'}. "
-                      "Production и общая очередь выключены.")
+                      f"Production: {s.meta('production_status', 'не запрошена')}. Общая очередь выключена.")
                 return
             if s.meta("paused") == "1":
                 reply("Приём на паузе Александра. Подтверждения сохранены; новые задачи не создаются.")
