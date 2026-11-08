@@ -155,6 +155,40 @@ class ProductionTests(unittest.TestCase):
         finally:worker.intake.db.close()
 
 
+    def test_recover_persisted_record_intent_when_tag_endpoint_hides_owned_draft(self):
+        from scripts.sergey_production import fingerprint,approved_framework_scope
+        from scripts.sergey_delivery import contract_hash
+        self.press();self.api.crash='record';runner=self.runner()
+        with self.assertRaises(Crash):
+            for _ in range(4):runner.tick(self.job)
+        prior=self.state.operation(self.job['id'],'production')['body']
+        prior['blocker']='record_outcome_uncertain_no_retry'
+        self.state.operation(self.job['id'],'production','blocked',prior)
+        draft={'id':438,'tag_name':'v2.0.33','draft':True,'assets':[],
+               'html_url':'https://example.invalid/draft','body':'ALE-528 artifact '+fingerprint(self.binding)}
+        adapter=LiveAdapter.__new__(LiveAdapter)
+        def read(path,**kwargs):
+            if path=='releases?per_page=100&page=1':return [draft]
+            if path=='releases/438':return draft
+            self.fail('Wrong draft lookup endpoint: '+path)
+        with patch.object(adapter,'api',side_effect=read),patch.object(adapter,'gh') as mutate:
+            receipt=adapter.reconcile('record',self.binding)
+            self.assertEqual(receipt['release_id'],438);mutate.assert_not_called()
+        original='## ACTIVE — подключить production publication к боту\nOriginal grant'
+        header='## ACTIVE — восстановить 2.0.33 после record_outcome_uncertain_no_retry\nKeep saved approval'
+        b={'framework_scope_hash':contract_hash(original)}
+        cfg={'recovery_scope':{'header_hash':contract_hash(header),'previous_scope_hash':b['framework_scope_hash']}}
+        self.assertEqual(approved_framework_scope(header+'\n---\n'+original,b,cfg),original)
+        with self.assertRaises(DeliveryBlocked):approved_framework_scope(header+'\n---\n'+original+'changed',b,cfg)
+        before_callback=prior['approval_update'];before_binding=copy.deepcopy(prior['binding'])
+        prior.pop('blocker');self.state.operation(self.job['id'],'production','active',prior)
+        self.api.remote['record']=receipt;self.finish(self.runner())
+        completed=self.state.operation(self.job['id'],'production')['body']
+        self.assertEqual(completed['approval_update'],before_callback);self.assertEqual(completed['binding'],before_binding)
+        self.assertEqual(self.api.calls.count('merge'),1);self.assertEqual(self.api.calls.count('tag'),1)
+        self.assertEqual(self.api.calls.count('record'),1);self.assertEqual(self.api.calls.count('notify_primary'),1)
+
+
 class NotificationJournalTests(unittest.TestCase):
     def test_existing_sent_and_restart_after_positive_api_receipt_do_not_resend(self):
         with tempfile.TemporaryDirectory() as temp:

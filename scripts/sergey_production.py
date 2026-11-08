@@ -46,6 +46,20 @@ def controls(store):
             and store.meta('delivery_cancel:ALE-533') != '1')
 
 
+def approved_framework_scope(description,binding,config):
+    if contract_hash(description)==binding['framework_scope_hash']:
+        return description
+    proof=config.get('recovery_scope',{})
+    header,separator,original=description.partition('\n---\n')
+    original=original.lstrip('\n')
+    if (not separator or not header.startswith('## ACTIVE — восстановить 2.0.33 после record_outcome_uncertain_no_retry')
+            or contract_hash(header)!=proof.get('header_hash')
+            or proof.get('previous_scope_hash')!=binding['framework_scope_hash']
+            or contract_hash(original)!=binding['framework_scope_hash']):
+        raise DeliveryBlocked('production_linear_scope_changed')
+    return original
+
+
 def arm(store, owner, binding):
     key = fingerprint(binding)
     with store.transaction():
@@ -117,11 +131,26 @@ class LiveAdapter:
         self.journal=Path(config['notification_journal'])
         self.recipients={'primary':primary,'copy':self.owner}
 
+    def diagnostic(self,args,exit_code=None,http_status=None,error=None):
+        if not getattr(self,'root',None):return
+        event={'at':time.time(),'tool':Path(args[0]).name,'action':args[1] if len(args)>1 else '',
+               'exit_code':exit_code,'http_status':http_status,'error':error}
+        if args[:2]==['gh','api'] and args[2].startswith('repos/'+REPO+'/releases'):
+            event['endpoint']=args[2]
+        elif args[:2]==['gh','release'] and args[2] in {'create','upload','edit'}:
+            event['operation']=args[2]
+        path=self.root/'command-diagnostics.jsonl'
+        with path.open('a') as out:
+            os.fchmod(out.fileno(),0o600);out.write(json.dumps(event)+'\n');out.flush()
+
     def command(self,args,*,binary=False,not_found=False):
         try:
             r=subprocess.run(args,cwd=self.work,capture_output=True,timeout=60)
         except (OSError,subprocess.TimeoutExpired):
+            self.diagnostic(args,error='transport_unavailable')
             raise ReadRetry('transport_unavailable') from None
+        status=re.search(rb'HTTP\s+(\d{3})',r.stderr)
+        self.diagnostic(args,exit_code=r.returncode,http_status=int(status[1]) if status else None)
         if r.returncode:
             if not_found and b'HTTP 404' in r.stderr:return None
             diagnostic=(r.stderr+r.stdout).lower()
@@ -142,7 +171,16 @@ class LiveAdapter:
     def refs(self):
         lines=self.git('ls-remote','origin','refs/heads/main','refs/tags/v2.0.33','refs/tags/v2.0.33^{}').splitlines()
         return {line.split()[1]:line.split()[0] for line in lines}
-    def release(self):return self.api('releases/tags/v2.0.33',not_found=True)
+    def release(self):
+        # The tag endpoint returns published releases, not the draft we just created.
+        matches=[]
+        for page in range(1,101):
+            releases=self.api(f'releases?per_page=100&page={page}')
+            matches.extend(r for r in releases if r['tag_name']=='v2.0.33')
+            if len(releases)<100:break
+        else:raise ReadRetry('release_list_pagination_incomplete')
+        if len(matches)>1:raise DeliveryBlocked('duplicate_release_records')
+        return self.api('releases/'+str(matches[0]['id'])) if matches else None
 
     def local(self,b):
         if self.config.get('general_queue') is not False or self.config.get('version')!='2.0.33':
@@ -173,8 +211,8 @@ class LiveAdapter:
     def scope(self,b):
         try:data=self.linear.call('query{framework:issue(id:"ALE-528"){description state{type}} product:issue(id:"ALE-533"){description state{type}}}',{})
         except ApiError:raise ReadRetry('linear_read_unavailable') from None
-        if (contract_hash(data['framework']['description'])!=b['framework_scope_hash']
-                or contract_hash(data['product']['description'])!=b['issue_scope_hash']):
+        approved_framework_scope(data['framework']['description'],b,self.config)
+        if contract_hash(data['product']['description'])!=b['issue_scope_hash']:
             raise DeliveryBlocked('production_linear_scope_changed')
         if (data['framework']['state']['type'] in {'canceled','completed'}
                 or data['product']['state']['type']=='canceled'):
