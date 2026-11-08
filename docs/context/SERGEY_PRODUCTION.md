@@ -85,3 +85,51 @@ real journal/configuration and credentials are not committed. CLI `status` shows
 Publication execution wall time is persisted separately from implementation/preparation time and included
 in the final bot report. Before Owner presses the button the STOP is READY FOR OWNER PRODUCTION APPROVAL.
 After that the service's STOP is RELEASE PUBLISHED — OWNER/SERGEY NOTIFIED, or an exact blocker.
+
+## Recovery complete — 08.11.2026
+
+**RELEASE PUBLISHED — OWNER/SERGEY NOTIFIED**:
+[v2.0.33](https://github.com/drthalas/Fedorinov_rewards/releases/tag/v2.0.33).
+Remote main and v2.0.33 tag point to the same accepted package HEAD `c6ff156f3c2212dd27ec416a15b82c56f4963db8`.
+The accepted ZIP is unchanged: SHA256 `7312f48f8ed9cc0fd0cee8fcfcffaaae9fb96cbef27292fd29e3aada0b261a9e`,
+1,468,737 bytes. Anonymous latest/manifest/ZIP byte parity passed.
+Standard journal confirms Sergey **sent / message_id 674**, Owner **sent / message_id 675**.
+The bot's separate completion report is message **83**. ALE-533 is Done, ALE-528 remains Needs Test;
+the general queue remains disabled.
+
+The real production callback was update `915725227` on approval message `80`. The run stopped at
+stage index 2, `record`, with `record_outcome_uncertain_no_retry`. This was **not Telegram uncertainty**.
+Merge/tag already had positive receipts. The owned draft already existed, with no assets; public latest
+was still 2.0.32 and there were no 2.0.33 notification journal rows.
+
+The cause was the read-after-create probe: the implementation queried the published-release-by-tag
+endpoint, which returned HTTP 404 for the draft. The create call had returned to the code, but no
+positive record receipt was persisted because this lookup returned no result. Original raw CLI
+stdout/stderr were not retained, so no unrecorded HTTP create status is claimed. The diagnosis was
+reproduced read-only: tag lookup 404, while authenticated releases listing and release-by-id returned
+the exact owned draft with its binding marker. This distinction is documented in the
+[GitHub release API](https://docs.github.com/en/rest/releases/releases#list-releases).
+
+Fix `6382207` uses authenticated paginated listing plus exact release-by-id lookup, rejects duplicate
+records and retains the ownership marker check. Command diagnostics now retain only safe operation,
+endpoint, exit/HTTP codes and timestamps: no raw output, token-bearing URLs or credentials.
+One new focused TEMP regression reproduces the hidden draft and recovers a persisted record intent
+without another create, merge, tag or notification. All **18 production tests PASS** for the corrective
+iteration; product, package build and Windows gates were not rerun.
+
+Owner's new recovery header is separately pinned; stripping that exact header must produce the old
+approved scope hash. The original binding, artifact, callback and run start were preserved. While the
+worker was blocked it was briefly unloaded for atomic receipt adoption, then restarted with the fix.
+The existing `record` intent was retained as a confirmed reconciled receipt and the same run resumed
+at stage 2. No execution or notification journal was reset.
+
+The same draft was then used for exactly two uploads and one stable publish. Recovery command
+diagnostics contain no new release create; merge/tag were not replayed. The service completed the
+missing public parity, independent standard deliveries and Linear closure automatically.
+Remaining execution after receipt adoption took **76.60 s**. The original run's **1857.04 s wall time**
+includes the blocked interval and recovery wait; it is not active publication processing time.
+
+Private evidence, ignored Git and mode 0600:
+`data/sergey-delivery/production/recovery-before.json`, `recovery-complete-evidence.json`,
+`command-diagnostics.jsonl`, plus the unchanged candidate and physical PASS receipts.
+The bot/services and existing Windows runtime/Edge were preserved. No new Owner approval was requested.
