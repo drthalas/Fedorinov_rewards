@@ -11,7 +11,8 @@ from uuid import uuid4
 
 from ..config import Settings
 from ..db import open_write_connection
-from ..repositories.persons_write import PersonWriteData, create_person_in_connection
+from ..repositories.persons_write import AwardConfirmationRequired, PersonWriteData, create_person_in_connection
+from ..repositories.reward_reference import reward_reference_from_connection
 from ..repositories.rewards_write import RewardWriteData, create_reward_in_connection, reward_data_from_mapping
 from .audit import log_action
 from .media_filenames import write_collision_safe_media
@@ -314,14 +315,26 @@ def discard_draft(settings: Settings, token: object) -> None:
         shutil.rmtree(directory)
 
 
-def commit_draft(settings: Settings, token: object, person_data: PersonWriteData) -> int:
+def commit_draft(
+    settings: Settings, token: object, person_data: PersonWriteData, *, allow_without_awards: bool = True,
+) -> int:
     ensure_write_allowed(settings)
     draft = load_draft(settings, token)
+    rewards = []
+    for raw in draft["rewards"]:
+        if isinstance(raw, dict):
+            data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
+            if data.get("id_name"):
+                rewards.append((raw.get("token"), RewardWriteData(**data)))
     written_paths: list[str] = []
     created_folder: Path | None = None
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
         connection.execute("begin immediate")
         try:
+            if not allow_without_awards:
+                references = (reward_reference_from_connection(connection, data.id_name) for _, data in rewards)
+                if not any(str(reference["name"] or "").strip() for reference in references if reference):
+                    raise AwardConfirmationRequired
             person_id, created_folder, _fields = create_person_in_connection(connection, settings, person_data)
             for field in PERSON_PHOTO_FIELDS:
                 source = staged_photo_path(settings, token, field.field)
@@ -332,14 +345,8 @@ def commit_draft(settings: Settings, token: object, person_data: PersonWriteData
                 relative = (Path("Source") / str(person_id) / target.name).as_posix()
                 written_paths.append(relative)
                 connection.execute(f"update person set {field.field} = ? where id = ?", (relative, person_id))
-            for raw in draft["rewards"]:
-                if not isinstance(raw, dict):
-                    continue
-                reward_data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
-                if not reward_data.get("id_name"):
-                    continue
-                reward_id = create_reward_in_connection(connection, person_id, RewardWriteData(**reward_data))
-                reward_token = raw.get("token")
+            for reward_token, reward_data in rewards:
+                reward_id = create_reward_in_connection(connection, person_id, reward_data)
                 for field in REWARD_PHOTO_FIELDS:
                     if not reward_token:
                         continue

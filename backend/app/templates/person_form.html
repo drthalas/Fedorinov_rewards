@@ -91,7 +91,7 @@
 
   <div class="actions{% if mode == 'create' %} person-create-actions{% endif %}">
     <button type="submit">Сохранить</button>
-    {% if mode == "create" %}
+    {% if mode == "create" and not award_confirmation_required %}
     <button
       type="submit"
       formaction="/persons/new/draft/{{ draft_token }}/rewards/new"
@@ -102,6 +102,19 @@
     {% if mode == 'edit' %}<a data-escape-back href="{{ return_to or '/persons/' ~ person.id }}">Отмена</a>{% endif %}
   </div>
 </form>
+{% if award_confirmation_required %}
+<div class="notice" role="alert">
+  <p>У кавалера не указана ни одна награда</p>
+  <div class="actions">
+    {% if mode == "create" %}
+    <button form="person-primary-form" type="submit" formaction="/persons/new/draft/{{ draft_token }}/rewards/new">Добавить награду</button>
+    {% else %}
+    <a class="button" data-person-edit-add-award href="/persons/{{ person.id }}/rewards/new?return_to={{ add_award_return_to|urlencode }}">Добавить награду</a>
+    {% endif %}
+    <button form="person-primary-form" type="submit" name="allow_without_awards" value="1">Сохранить без награды</button>
+  </div>
+</div>
+{% endif %}
 
 {% if mode == "edit" and settings.write_mode %}
   </div>

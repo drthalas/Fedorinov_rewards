@@ -47,7 +47,7 @@
     }
   }
 
-  function captureForPerson(personId) {
+  function captureForPerson(personId, reason = "photo") {
     const form = editForm();
     if (!form || String(form.dataset.personId || "") !== String(personId || "")) return false;
     const state = formState(form);
@@ -55,6 +55,7 @@
       window.sessionStorage.setItem(storageKey(form.dataset.personId), JSON.stringify({
         pathname: window.location.pathname,
         personId: String(form.dataset.personId || ""),
+        reason,
         values: state.values,
         checked: state.checked,
         savedAt: Date.now(),
@@ -82,8 +83,9 @@
       params.get("media_cleanup") === "failed";
   }
 
-  function restoreAfterPhoto(form) {
-    if (!form || !hasPhotoResult()) return false;
+  function restoreDraft(form) {
+    const awardReturn = new URLSearchParams(window.location.search).get("resume_award_draft") === "1";
+    if (!form || (!awardReturn && !hasPhotoResult())) return false;
     let snapshot;
     try {
       snapshot = JSON.parse(window.sessionStorage.getItem(storageKey(form.dataset.personId)) || "null");
@@ -91,12 +93,13 @@
       clearSnapshot(form.dataset.personId);
       return false;
     }
+    if ((snapshot?.reason || "photo") !== (awardReturn ? "award" : "photo")) return false;
     clearSnapshot(form.dataset.personId);
     if (
       !snapshot ||
       snapshot.pathname !== window.location.pathname ||
       snapshot.personId !== String(form.dataset.personId || "") ||
-      Date.now() - Number(snapshot.savedAt || 0) > MAX_AGE_MS ||
+      (!awardReturn && Date.now() - Number(snapshot.savedAt || 0) > MAX_AGE_MS) ||
       !snapshot.values
     ) {
       return false;
@@ -205,6 +208,8 @@
   });
 
   document.addEventListener("click", (event) => {
+    const award = event.target?.closest?.("a[data-person-edit-add-award]");
+    if (award) captureForPerson(editForm()?.dataset.personId, "award");
     const target = event.target && event.target.closest ? event.target.closest("a[data-escape-back]") : null;
     if (target && editForm()) clearSnapshot();
   });
@@ -212,7 +217,7 @@
   function init() {
     const edit = editForm();
     const form = personForm();
-    restoreAfterPhoto(edit);
+    restoreDraft(edit);
     initTextEditors(form);
   }
 

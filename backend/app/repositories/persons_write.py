@@ -40,6 +40,10 @@ PERSON_OPTIONAL_FIELDS = ("biography",)
 DUPLICATE_PERSON_MESSAGE = "Кавалер с такими ФИО, годом рождения и званием уже существует."
 
 
+class AwardConfirmationRequired(Exception):
+    pass
+
+
 class PersonValidationError(ValueError):
     def __init__(self, message: str, *, field: str | None = None):
         super().__init__(message)
@@ -284,13 +288,25 @@ def create_person(settings: Settings, data: PersonWriteData) -> int:
     return person_id
 
 
-def update_person(settings: Settings, person_id: int, data: PersonWriteData) -> None:
+def update_person(
+    settings: Settings, person_id: int, data: PersonWriteData, *, allow_without_awards: bool = True,
+) -> None:
     ensure_write_allowed(settings)
     with closing(open_write_connection(settings.rewards_db_path, settings.write_mode)) as connection:
+        if not allow_without_awards:
+            connection.execute("begin immediate")
         existing = connection.execute("select birthday from person where id = ?", (person_id,)).fetchone()
         if existing is None:
             raise PersonValidationError("Награжденный не найден.")
         _validate_person_data(data, existing_birthday=existing["birthday"])
+        if not allow_without_awards:
+            names = connection.execute(
+                """select g.name from rewards r join guide_lev_3 g on g.id = r.id_name
+                   where r.person_id = ?""",
+                (person_id,),
+            )
+            if not any(str(row["name"] or "").strip() for row in names):
+                raise AwardConfirmationRequired
         _ensure_biography_column(connection)
         fields = _active_fields(connection)
         assignments = ", ".join(f"{field} = ?" for field in fields)

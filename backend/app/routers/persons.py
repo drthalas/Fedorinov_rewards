@@ -9,6 +9,7 @@ from ..config import get_settings
 from ..repositories.guides import list_rank_guide
 from ..repositories.persons import count_persons, get_person, list_person_rewards, list_persons, person_photo_items
 from ..repositories.persons_write import (
+    AwardConfirmationRequired,
     PersonDeleteBlockedError,
     PersonValidationError,
     create_person,
@@ -402,24 +403,26 @@ async def person_create(request: Request):
     draft_token = str(form_values.get("draft_token") or "") or new_draft_token()
     try:
         data = person_data_from_mapping(form_values)
-        person_id = commit_draft(settings, draft_token, data)
+        person_id = commit_draft(
+            settings, draft_token, data, allow_without_awards=form_values.get("allow_without_awards") == "1",
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except (PersonValidationError, RewardValidationError, PhotoValidationError, ValueError, OSError) as exc:
+    except (AwardConfirmationRequired, PersonValidationError, RewardValidationError, PhotoValidationError, ValueError, OSError) as exc:
+        warning = isinstance(exc, AwardConfirmationRequired)
         field = exc.field if isinstance(exc, PersonValidationError) else None
+        context = _person_create_context(
+            settings,
+            person=form_values,
+            return_to=return_to,
+            error=None if warning else str(exc),
+            field_errors={field: str(exc)} if field else {},
+            draft_token=draft_token,
+            draft=load_draft(settings, draft_token),
+        )
+        context["award_confirmation_required"] = warning
         return templates.TemplateResponse(
-            request,
-            "person_form.html",
-            _person_create_context(
-                settings,
-                person=form_values,
-                return_to=return_to,
-                error=str(exc),
-                field_errors={field: str(exc)} if field else {},
-                draft_token=draft_token,
-                draft=load_draft(settings, draft_token),
-            ),
-            status_code=400,
+            request, "person_form.html", context, status_code=200 if warning else 400,
         )
     target = with_status(with_query_value(return_to or "/legacy?tab=rewards", "person_id", str(person_id)), "person_created")
     return RedirectResponse(target, status_code=303)
@@ -719,23 +722,33 @@ async def person_update(request: Request, person_id: int):
         if existing_person is None:
             raise PersonValidationError("Награжденный не найден.")
         data = person_data_from_mapping(form_values, existing_birthday=existing_person.get("birthday"))
-        update_person(settings, person_id, data)
+        update_person(
+            settings, person_id, data, allow_without_awards=form_values.get("allow_without_awards") == "1",
+        )
     except WriteBlockedError as exc:
         raise _write_error(exc) from exc
-    except PersonValidationError as exc:
-        person = {"id": person_id, **form_values}
+    except (AwardConfirmationRequired, PersonValidationError) as exc:
+        warning = isinstance(exc, AwardConfirmationRequired)
+        person = {**(existing_person or {}), "id": person_id, **form_values}
+        edit_url = _person_created_edit_url(person_id, return_to) if post_create else with_query_value(
+            f"/persons/{person_id}/edit", "return_to", return_to,
+        )
         return templates.TemplateResponse(
             request,
             "person_form.html",
-            _person_edit_context(
-                settings,
-                person=person,
-                return_to=return_to,
-                error=str(exc),
-                post_create=post_create,
-                field_errors={exc.field: str(exc)} if exc.field else {},
-            ),
-            status_code=400,
+            {
+                **_person_edit_context(
+                    settings,
+                    person=person,
+                    return_to=return_to,
+                    error=None if warning else str(exc),
+                    post_create=post_create,
+                    field_errors={exc.field: str(exc)} if isinstance(exc, PersonValidationError) and exc.field else {},
+                ),
+                "award_confirmation_required": warning,
+                "add_award_return_to": with_query_value(edit_url, "resume_award_draft", "1"),
+            },
+            status_code=200 if warning else 400,
         )
     target = with_status(return_to, "person_updated") if return_to else f"/persons/{person_id}?status=person_updated"
     return RedirectResponse(target, status_code=303)
