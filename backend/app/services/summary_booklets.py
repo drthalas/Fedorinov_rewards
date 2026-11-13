@@ -259,7 +259,7 @@ def _generate_booklets(settings_values, person_ids, directory, connection, pause
             for person_id in person_ids:
                 checkpoint()
                 part = root / f"{person_id}.pdf"
-                generate_person_booklet_pdf(settings, person_id, output_path=part)
+                generate_person_booklet_pdf(settings, person_id, output_path=part, compact=True)
                 writer.append(str(part), import_outline=False)
                 part.unlink()
                 completed += 1

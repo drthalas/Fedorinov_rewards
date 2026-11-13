@@ -62,13 +62,13 @@ class SummaryBookletsTests(unittest.TestCase):
             with self.assertRaises(SummaryBookletError):
                 self.jobs.start(self.settings, token)
 
-    def test_one_matches_ordinary_pdf_every_page(self):
+    def test_one_matches_compact_pdf_every_page(self):
         token = self.snapshot(normalized_summary_filters(name_id='1'))
         job = self.jobs.start(self.settings, token)
         state = self.wait(job)
         self.assertEqual((state['state'], state['completed'], state['percent']), ('ready', 1, 100))
-        ordinary = generate_person_booklet_pdf(self.settings, 1, self.root / 'ordinary.pdf')
-        expected = PdfReader(ordinary.path)
+        compact = generate_person_booklet_pdf(self.settings, 1, self.root / 'compact.pdf', compact=True)
+        expected = PdfReader(compact.path)
         actual = PdfReader(BytesIO(self.jobs.content(self.settings, job['id'])))
         self.assertIn('Содержание буклета', actual.pages[0].extract_text())
         self.assertEqual(len(actual.pages), len(expected.pages) + 1)

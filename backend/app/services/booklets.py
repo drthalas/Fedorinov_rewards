@@ -167,7 +167,9 @@ def person_booklet_context(settings: Settings, person_id: int, return_to: str = 
     }
 
 
-def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path: Path | None = None) -> BookletPDFResult:
+def generate_person_booklet_pdf(
+    settings: Settings, person_id: int, output_path: Path | None = None, *, compact: bool = False,
+) -> BookletPDFResult:
     context = person_booklet_context(settings, person_id)
     person = context["person"]
 
@@ -201,7 +203,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     ink = colors.HexColor("#302d27")
     rule = colors.HexColor("#9d9584")
     styles.add(ParagraphStyle(name="BookletTitle", parent=styles["Title"], fontName=bold_font, fontSize=23, leading=26, alignment=0, textColor=ink))
-    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=12, spaceAfter=7, textColor=ink, keepWithNext=True))
+    styles.add(ParagraphStyle(name="BookletHeading", parent=styles["Heading2"], fontName=bold_font, fontSize=13, leading=16, spaceBefore=8 if compact else 12, spaceAfter=5 if compact else 7, textColor=ink, keepWithNext=True))
     styles.add(ParagraphStyle(name="BookletBody", parent=styles["BodyText"], fontName=font_name, fontSize=10, leading=13, textColor=ink))
     styles.add(ParagraphStyle(name="BookletCaption", parent=styles["BookletBody"], fontSize=8, leading=10, textColor=colors.HexColor("#655d4f")))
     styles.add(ParagraphStyle(name="BookletPhotoCaption", parent=styles["BookletCaption"], alignment=1))
@@ -220,6 +222,8 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     image_cache = {}
 
     def gallery(entries, columns=2, max_height=80 * mm):
+        if compact:
+            max_height = min(max_height, 56 * mm)
         if not entries:
             return []
         columns = min(columns, len(entries))
@@ -230,14 +234,14 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
                 photo = _summary_pdf_image(entry["resolved_path"], Image, width - 12, max_height, image_cache)
             except (OSError, ValueError):
                 continue
-            caption = Table([[Paragraph(_p(entry["label"]), styles["BookletPhotoCaption"])]], colWidths=[photo.drawWidth], hAlign="CENTER")
+            caption = Table([[Paragraph(_p(entry["label"]), styles["BookletPhotoCaption"])]], colWidths=[width - 12 if compact else photo.drawWidth], hAlign="CENTER")
             caption.setStyle(TableStyle([
                 ("LEFTPADDING", (0, 0), (-1, -1), 0),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                 ("TOPPADDING", (0, 0), (-1, -1), 0),
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
             ]))
-            cells.append([photo, Spacer(1, 4), caption])
+            cells.append([photo, Spacer(1, 3 if compact else 4), caption])
         rows = []
         for offset in range(0, len(cells), columns):
             row = cells[offset:offset + columns]
@@ -247,7 +251,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6 if compact else 10),
             ]))
             rows.append(table)
         return rows
@@ -257,7 +261,7 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     identity = [str(value) for value in (person.get("rank_name"), context["birth_line"]) if value]
     if identity:
         story.append(Paragraph(_p(" · ".join(identity)), styles["BookletBody"]))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 6 if compact else 10))
     story.extend(gallery(context["identity_photos"], columns=3, max_height=70 * mm))
 
     story.append(Paragraph("Все награды кавалера", styles["BookletHeading"]))
@@ -275,14 +279,18 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
     if not context["rewards"]:
         story.append(Paragraph("Награды не найдены.", styles["BookletBody"]))
     _add_text_block(story, styles, Paragraph, "Краткая биография", person.get("biography"))
+    gallery_columns = 3 if compact else 2
     if context["person_documents"]:
         story.append(Paragraph("Документы кавалера", styles["BookletHeading"]))
-        story.extend(gallery(context["person_documents"]))
+        story.extend(gallery(context["person_documents"], columns=gallery_columns))
     for group in context["reward_photo_groups"]:
         if not group["photos"]:
             continue
         title = Paragraph(_p(group["title"]), styles["BookletReward"])
-        rows = [[title], *[[row] for row in gallery(group["photos"])]]
+        photo_rows = gallery(group["photos"], columns=gallery_columns)
+        if compact and not photo_rows:
+            continue
+        rows = [[title], *[[row] for row in photo_rows]]
         article = Table(rows, colWidths=[doc.width], repeatRows=1)
         article.setStyle(TableStyle([
             ("BOX", (0, 0), (-1, -1), 0.5, rule),
@@ -291,10 +299,14 @@ def generate_person_booklet_pdf(settings: Settings, person_id: int, output_path:
             ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("LEFTPADDING", (0, 0), (-1, 0), 6),
             ("RIGHTPADDING", (0, 0), (-1, 0), 6),
-            ("TOPPADDING", (0, 0), (-1, 0), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+            ("TOPPADDING", (0, 0), (-1, 0), 5 if compact else 8),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 5 if compact else 8),
         ]))
-        story.extend([Spacer(1, 12), article])
+        if compact:
+            article.spaceBefore = 6
+            story.append(article)
+        else:
+            story.extend([Spacer(1, 12), article])
     _add_links(story, styles, Paragraph, context["links"])
     _add_text_block(story, styles, Paragraph, "Комментарий / заметки", person.get("comment"))
 
