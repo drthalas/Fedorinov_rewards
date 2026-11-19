@@ -4,11 +4,13 @@ import json
 import re
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 from ..config import get_settings
+from ..repositories.guides import guide_cascade_data, guide_cascade_options
+from ..repositories.reward_reference import get_reward_reference
 from ..services import biography_enrichment as service
 from ..services import manual_import_review as manual
 from ..services import manual_review_choices as choices
@@ -64,17 +66,37 @@ def biographies(request: Request, selection: str = ''):
 
 
 @router.get(WITHOUT_AWARDS_URL)
-def without_awards(request: Request, page: int = 1, return_to: str = ''):
+def without_awards(
+    request: Request, page: int = 1, return_to: str = '',
+    country_id: int | None = Query(None, ge=1, le=2**63 - 1),
+    category_id: int | None = Query(None, ge=1, le=2**63 - 1),
+    subcategory_id: int | None = Query(None, ge=1, le=2**63 - 1),
+    name_id: int | None = Query(None, ge=1, le=2**63 - 1),
+):
     settings = get_settings()
     back = safe_return_to(return_to, BASE)
     if not re.fullmatch(re.escape(BASE) + r'(?:/preview/[0-9a-f]{64})?', urlsplit(back).path):
         back = BASE
+    filters = dict(country_id=country_id, category_id=category_id,
+                   subcategory_id=subcategory_id, name_id=name_id)
 
     def page_url(number):
-        return WITHOUT_AWARDS_URL + '?' + urlencode({'page': number, 'return_to': back})
+        values = {'page': number, 'return_to': back}
+        values.update({key: value for key, value in filters.items() if value is not None})
+        return WITHOUT_AWARDS_URL + '?' + urlencode(values)
 
     try:
-        rows, pager = service.people_without_awards(settings, page)
+        reference = get_reward_reference(settings.rewards_db_path, name_id) if name_id is not None else None
+        if name_id is not None:
+            if not reference or service.blank(reference['name']):
+                raise HTTPException(status_code=400, detail='Выберите существующее наименование награды.')
+            filters.update(country_id=reference['id_gos'], category_id=reference['id_catigory'],
+                           subcategory_id=reference['id_sub_catigory'])
+        options = guide_cascade_options(settings.rewards_db_path,
+                                        country_id=filters['country_id'], category_id=filters['category_id'],
+                                        subcategory_id=filters['subcategory_id'])
+        cascade = guide_cascade_data(settings.rewards_db_path)
+        rows, pager = service.people_without_awards(settings, page, name_id)
     except sqlite3.Error:
         return templates.TemplateResponse(request, 'enrichment_without_awards.html',
             {'settings': settings, 'back': back, 'error': 'Не удалось загрузить список. Обновите страницу.'},
@@ -85,6 +107,8 @@ def without_awards(request: Request, page: int = 1, return_to: str = ''):
                'url': f"/persons/{row['id']}?" + urlencode({'return_to': current})} for row in rows]
     return templates.TemplateResponse(request, 'enrichment_without_awards.html',
         {'settings': settings, 'back': back, 'people': people, 'pager': pager,
+         'selected_award': reference, 'filters': filters, 'guide_options': options, 'guide_cascade': cascade,
+         'list_url': WITHOUT_AWARDS_URL, 'reset_url': WITHOUT_AWARDS_URL + '?' + urlencode({'return_to': back}),
          'previous_url': page_url(pager['previous_page']), 'next_url': page_url(pager['next_page'])},
         headers={'Cache-Control': 'no-store'})
 

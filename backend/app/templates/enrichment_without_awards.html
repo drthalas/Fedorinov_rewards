@@ -1,19 +1,57 @@
 {% extends "base.html" %}
-{% block title %}Кавалеры без наград{% endblock %}
+{% block title %}{% if selected_award %}Без награды: {{ selected_award.name }}{% else %}Кавалеры без наград{% endif %}{% endblock %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}">{% endblock %}
 {% block content %}
-<section class="cavalier-standalone-page bio-page" aria-label="Кавалеры без наград">
+<section class="cavalier-standalone-page bio-page" aria-label="{{ 'Без награды: ' ~ selected_award.name if selected_award else 'Кавалеры без наград' }}">
   <header class="import-page-header">
     <a href="{{ back }}" class="button secondary-button">← Назад</a>
-    <h1>Кавалеры без наград</h1>
+    <h1>{% if selected_award %}Без награды: {{ selected_award.name }}{% else %}Кавалеры без наград{% endif %}</h1>
   </header>
   <div class="cavalier-form-card bio-card">
     {% if error %}
     <p class="notice notice-error" role="alert">{{ error }}</p>
     {% else %}
-    <p>Всего без наград: <strong data-without-awards-total>{{ pager.total }}</strong></p>
+    <form class="edit-form guide-cascade" data-managed-validation method="get" action="{{ list_url }}">
+      <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
+      <input type="hidden" name="return_to" value="{{ back }}">
+      <div class="form-grid two-columns">
+        <label>
+          <span>Страна</span>
+          <select name="country_id" data-guide-role="country" data-styled-select required>
+            <option value="">Выберите страну</option>
+            {% for item in guide_options.gos %}<option value="{{ item.id }}" {% if item.id == filters.country_id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Категория</span>
+          <select name="category_id" data-guide-role="category" data-styled-select required>
+            <option value="">Выберите категорию</option>
+            {% for item in guide_options.categories %}<option value="{{ item.id }}" {% if item.id == filters.category_id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Подкатегория</span>
+          <select name="subcategory_id" data-guide-role="subcategory" data-styled-select required>
+            <option value="">Выберите подкатегорию</option>
+            {% for item in guide_options.subcategories %}<option value="{{ item.id }}" {% if item.id == filters.subcategory_id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>
+          <span>Наименование награды</span>
+          <select name="name_id" data-guide-role="name" data-styled-select required>
+            <option value="">Выберите награду</option>
+            {% for item in guide_options.names %}<option value="{{ item.id }}" {% if item.id == filters.name_id %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button type="submit">Показать</button>
+        <a class="button secondary-button" data-without-awards-reset href="{{ reset_url }}">Сброс</a>
+      </div>
+    </form>
+    <p>{% if selected_award %}Всего кавалеров{% else %}Всего без наград{% endif %}: <strong data-without-awards-total>{{ pager.total }}</strong></p>
     {% if people %}
     <ul>
       {% for person in people %}
@@ -21,7 +59,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p>Кавалеров без наград нет.</p>
+    <p>{% if selected_award %}Кавалеров без выбранной награды нет.{% else %}Кавалеров без наград нет.{% endif %}</p>
     {% endif %}
     {% if pager.total_pages > 1 %}
     <nav class="actions bio-list-pagination" aria-label="Страницы списка">
