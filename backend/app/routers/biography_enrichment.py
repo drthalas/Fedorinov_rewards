@@ -23,6 +23,7 @@ from .templates import templates
 router = APIRouter()
 BASE = '/data-maintenance/enrichment/biographies'
 WITHOUT_AWARDS_URL = BASE + '/without-awards'
+WITHOUT_BIOGRAPHIES_URL = BASE + '/without-biographies'
 
 
 def _render(request, *, level='biographies', status_code=200, **context):
@@ -46,6 +47,7 @@ def _render(request, *, level='biographies', status_code=200, **context):
         if request.url.path == BASE and request.url.query:
             summary_url += '?' + request.url.query
     context['without_awards_url'] = WITHOUT_AWARDS_URL + '?' + urlencode({'return_to': summary_url})
+    context['without_biographies_url'] = WITHOUT_BIOGRAPHIES_URL + '?' + urlencode({'return_to': summary_url})
     return templates.TemplateResponse(request, 'biography_enrichment.html',
         {'settings': settings, 'level': level, 'base': BASE, 'row_guidance': service.row_guidance, 'year_label':format_birth_year_input, **context}, status_code=status_code)
 
@@ -66,7 +68,33 @@ def biographies(request: Request, selection: str = ''):
 
 
 @router.get(WITHOUT_AWARDS_URL)
-def without_awards(
+def without_awards(request: Request, page: int = 1, return_to: str = ''):
+    settings = get_settings()
+    back = safe_return_to(return_to, BASE)
+    if not re.fullmatch(re.escape(BASE) + r'(?:/preview/[0-9a-f]{64})?', urlsplit(back).path):
+        back = BASE
+
+    def page_url(number):
+        return WITHOUT_AWARDS_URL + '?' + urlencode({'page': number, 'return_to': back})
+
+    try:
+        rows, pager = service.people_without_awards(settings, page)
+    except sqlite3.Error:
+        return templates.TemplateResponse(request, 'enrichment_people_list.html',
+            {'settings': settings, 'back': back, 'error': 'Не удалось загрузить список. Обновите страницу.'},
+            status_code=503, headers={'Cache-Control': 'no-store'})
+
+    current = page_url(pager['page'])
+    people = [{'id': row['id'], 'fio': row['fio'],
+               'url': f"/persons/{row['id']}?" + urlencode({'return_to': current})} for row in rows]
+    return templates.TemplateResponse(request, 'enrichment_people_list.html',
+        {'settings': settings, 'back': back, 'people': people, 'pager': pager,
+         'previous_url': page_url(pager['previous_page']), 'next_url': page_url(pager['next_page'])},
+        headers={'Cache-Control': 'no-store'})
+
+
+@router.get(WITHOUT_BIOGRAPHIES_URL)
+def without_biographies(
     request: Request, page: int = 1, return_to: str = '',
     country_id: int | None = Query(None, ge=1, le=2**63 - 1),
     category_id: int | None = Query(None, ge=1, le=2**63 - 1),
@@ -83,7 +111,7 @@ def without_awards(
     def page_url(number):
         values = {'page': number, 'return_to': back}
         values.update({key: value for key, value in filters.items() if value is not None})
-        return WITHOUT_AWARDS_URL + '?' + urlencode(values)
+        return WITHOUT_BIOGRAPHIES_URL + '?' + urlencode(values)
 
     try:
         reference = get_reward_reference(settings.rewards_db_path, name_id) if name_id is not None else None
@@ -96,19 +124,24 @@ def without_awards(
                                         country_id=filters['country_id'], category_id=filters['category_id'],
                                         subcategory_id=filters['subcategory_id'])
         cascade = guide_cascade_data(settings.rewards_db_path)
-        rows, pager = service.people_without_awards(settings, page, name_id)
+        rows, pager = service.people_without_biographies(settings, page, name_id)
     except sqlite3.Error:
-        return templates.TemplateResponse(request, 'enrichment_without_awards.html',
-            {'settings': settings, 'back': back, 'error': 'Не удалось загрузить список. Обновите страницу.'},
+        return templates.TemplateResponse(request, 'enrichment_people_list.html',
+            {'settings': settings, 'back': back, 'page_title': 'Кавалеры без биографий', 'error': 'Не удалось загрузить список. Обновите страницу.'},
             status_code=503, headers={'Cache-Control': 'no-store'})
 
+    title = 'Кавалеры без биографий'
+    if reference:
+        title += f' с наградой «{reference["name"]}»'
     current = page_url(pager['page'])
     people = [{'id': row['id'], 'fio': row['fio'],
                'url': f"/persons/{row['id']}?" + urlencode({'return_to': current})} for row in rows]
-    return templates.TemplateResponse(request, 'enrichment_without_awards.html',
+    return templates.TemplateResponse(request, 'enrichment_people_list.html',
         {'settings': settings, 'back': back, 'people': people, 'pager': pager,
-         'selected_award': reference, 'filters': filters, 'guide_options': options, 'guide_cascade': cascade,
-         'list_url': WITHOUT_AWARDS_URL, 'reset_url': WITHOUT_AWARDS_URL + '?' + urlencode({'return_to': back}),
+         'page_title': title, 'show_award_filter': True, 'count_label': 'Всего без биографий',
+         'empty_message': 'Кавалеров без биографий по выбранным условиям нет.',
+         'filters': filters, 'guide_options': options, 'guide_cascade': cascade,
+         'list_url': WITHOUT_BIOGRAPHIES_URL, 'reset_url': WITHOUT_BIOGRAPHIES_URL + '?' + urlencode({'return_to': back}),
          'previous_url': page_url(pager['previous_page']), 'next_url': page_url(pager['next_page'])},
         headers={'Cache-Control': 'no-store'})
 

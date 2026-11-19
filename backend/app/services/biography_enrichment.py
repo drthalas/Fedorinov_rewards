@@ -198,14 +198,7 @@ def _population(connection):
     return {'total': total, 'empty': empty, 'filled': total - empty, 'without_awards': without_awards}
 
 
-def people_without_awards(settings, page=1, name_id=None):
-    condition, params = WITHOUT_AWARDS, ()
-    if name_id is not None:
-        condition = """p.id not in (
-            select r.person_id from rewards r
-            where r.person_id is not null and r.id_name = ?
-        )"""
-        params = (name_id,)
+def _people_page(settings, page, condition, params=()):
     with closing(_connection(settings.rewards_db_path)) as connection:
         total = connection.execute(f'select count(*) from person p where {condition}', params).fetchone()[0]
         pager = pagination(total, page, 25)
@@ -215,6 +208,20 @@ def people_without_awards(settings, page=1, name_id=None):
             limit ? offset ?
         """, (*params, pager['page_size'], pager['offset'])).fetchall()
     return rows, pager
+
+
+def people_without_awards(settings, page=1):
+    return _people_page(settings, page, WITHOUT_AWARDS)
+
+
+def people_without_biographies(settings, page=1, name_id=None):
+    condition, params = 'bio_blank(p.biography)=1', ()
+    if name_id is not None:
+        condition += """ and p.id in (
+            select r.person_id from rewards r where r.id_name = ?
+        )"""
+        params = (name_id,)
+    return _people_page(settings, page, condition, params)
 
 
 def population_statistics(settings):

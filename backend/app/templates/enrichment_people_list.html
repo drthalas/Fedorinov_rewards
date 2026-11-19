@@ -1,18 +1,19 @@
 {% extends "base.html" %}
-{% block title %}{% if selected_award %}Без награды: {{ selected_award.name }}{% else %}Кавалеры без наград{% endif %}{% endblock %}
+{% block title %}{{ page_title|default('Кавалеры без наград') }}{% endblock %}
 {% block document_theme_attribute %} data-document-theme="guide"{% endblock %}
 {% block body_class %}guide-theme cavalier-page-theme cavalier-form-theme biography-page-theme{% endblock %}
 {% block extra_head %}<link rel="stylesheet" href="{{ static_url('biography_enrichment.css') }}">{% endblock %}
 {% block content %}
-<section class="cavalier-standalone-page bio-page" aria-label="{{ 'Без награды: ' ~ selected_award.name if selected_award else 'Кавалеры без наград' }}">
+<section class="cavalier-standalone-page bio-page" aria-label="{{ page_title|default('Кавалеры без наград') }}">
   <header class="import-page-header">
     <a href="{{ back }}" class="button secondary-button">← Назад</a>
-    <h1>{% if selected_award %}Без награды: {{ selected_award.name }}{% else %}Кавалеры без наград{% endif %}</h1>
+    <h1>{{ page_title|default('Кавалеры без наград') }}</h1>
   </header>
   <div class="cavalier-form-card bio-card">
     {% if error %}
     <p class="notice notice-error" role="alert">{{ error }}</p>
     {% else %}
+    {% if show_award_filter %}
     <form class="edit-form guide-cascade" data-managed-validation method="get" action="{{ list_url }}">
       <script type="application/json" data-guide-cascade-options>{{ guide_cascade|tojson }}</script>
       <input type="hidden" name="return_to" value="{{ back }}">
@@ -48,18 +49,19 @@
       </div>
       <div class="actions">
         <button type="submit">Показать</button>
-        <a class="button secondary-button" data-without-awards-reset href="{{ reset_url }}">Сброс</a>
+        <a class="button secondary-button" data-without-biographies-reset href="{{ reset_url }}">Сброс</a>
       </div>
     </form>
-    <p>{% if selected_award %}Всего кавалеров{% else %}Всего без наград{% endif %}: <strong data-without-awards-total>{{ pager.total }}</strong></p>
+    {% endif %}
+    <p>{{ count_label|default('Всего без наград') }}: <strong data-enrichment-list-total {% if show_award_filter %}data-without-biographies-total{% else %}data-without-awards-total{% endif %}>{{ pager.total }}</strong></p>
     {% if people %}
     <ul>
       {% for person in people %}
-      <li><a data-without-awards-person href="{{ person.url }}">{{ person.fio or ('Кавалер №' ~ person.id) }}</a></li>
+      <li><a data-enrichment-list-person {% if show_award_filter %}data-without-biographies-person{% else %}data-without-awards-person{% endif %} href="{{ person.url }}">{{ person.fio or ('Кавалер №' ~ person.id) }}</a></li>
       {% endfor %}
     </ul>
     {% else %}
-    <p>{% if selected_award %}Кавалеров без выбранной награды нет.{% else %}Кавалеров без наград нет.{% endif %}</p>
+    <p>{{ empty_message|default('Кавалеров без наград нет.') }}</p>
     {% endif %}
     {% if pager.total_pages > 1 %}
     <nav class="actions bio-list-pagination" aria-label="Страницы списка">
