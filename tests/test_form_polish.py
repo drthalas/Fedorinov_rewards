@@ -192,6 +192,14 @@ class FormPolishTests(unittest.TestCase):
                 "return_to": "/legacy?tab=rewards",
             }
         )
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
+            warning = asyncio.run(persons_router.person_create(request))
+        self.assertEqual(warning["status_code"], 200)
+        self.assertTrue(warning["context"]["award_confirmation_required"])
+        self.assertEqual(warning["context"]["person"]["fio"], request._values["fio"])
+        with sqlite3.connect(self.db_path) as connection:
+            self.assertEqual(connection.execute("select count(*) from person").fetchone()[0], 1)
+        request = FakeRequest({**request._values, "allow_without_awards": "1"})
         response = asyncio.run(persons_router.person_create(request))
         location = response.headers["location"]
         self.assertEqual(location, "/legacy?tab=rewards&person_id=2&status=person_created")
@@ -204,6 +212,11 @@ class FormPolishTests(unittest.TestCase):
                 "return_to": "/legacy?tab=rewards&person_id=2",
             }
         )
+        with patch.object(persons_router.templates, "TemplateResponse", side_effect=_template_result):
+            warning = asyncio.run(persons_router.person_update(update_request, 2))
+        self.assertEqual(warning["status_code"], 200)
+        self.assertTrue(warning["context"]["award_confirmation_required"])
+        update_request = FakeRequest({**update_request._values, "allow_without_awards": "1"})
         update_response = asyncio.run(persons_router.person_update(update_request, 2))
         self.assertEqual(
             update_response.headers["location"],

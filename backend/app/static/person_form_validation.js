@@ -51,7 +51,18 @@
   }
 
   function initAll(root) {
-    (root || document).querySelectorAll("[data-person-form]").forEach(initForm);
+    const scope = root || document;
+    scope.querySelectorAll("[data-person-form]").forEach(initForm);
+    scope.querySelectorAll("[data-person-award-warning]").forEach((dialog) => {
+      if (dialog.dataset.initialized === "true" || typeof dialog.showModal !== "function") return;
+      dialog.dataset.initialized = "true";
+      dialog.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") event.stopPropagation();
+      });
+      dialog.removeAttribute("open");
+      dialog.showModal();
+      dialog.querySelector("[data-person-add-award]").focus();
+    });
   }
 
   document.addEventListener("DOMContentLoaded", () => initAll(document));

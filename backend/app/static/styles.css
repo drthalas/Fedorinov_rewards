@@ -1121,7 +1121,8 @@ th {
   margin-top: 20px;
 }
 
-.delete-confirmation-dialog {
+.delete-confirmation-dialog,
+.person-award-warning-dialog {
   width: min(500px, calc(100vw - 32px));
   max-width: 500px;
   padding: 0;
@@ -1132,8 +1133,13 @@ th {
   box-shadow: 0 18px 50px rgb(0 0 0 / 55%);
 }
 
-.delete-confirmation-dialog::backdrop {
+.delete-confirmation-dialog::backdrop,
+.person-award-warning-dialog::backdrop {
   background: rgb(0 0 0 / 68%);
+}
+
+.person-award-warning-dialog .actions {
+  flex-wrap: wrap;
 }
 
 .delete-confirmation-dialog [hidden] {
