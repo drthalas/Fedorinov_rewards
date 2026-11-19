@@ -296,6 +296,38 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(matrix["rows"][0]["photo_paths"]["rewards_foto"], "Source/1/rewards.jpg")
         self.assertEqual(matrix["reward_total"], 2)
 
+    def test_matrix_text_fields_support_legacy_database_without_columns(self) -> None:
+        matrix = summary_matrix(self.db_path, normalized_summary_filters(name_id=1))
+        self.assertEqual([row["id"] for row in matrix["rows"]], [1, 2])
+        self.assertTrue(all(row["biography_flag"] == 0 for row in matrix["rows"]))
+        self.assertTrue(all(row["comment"] is None for row in matrix["rows"]))
+
+    def test_matrix_biography_matches_population_rule_and_keeps_exports(self) -> None:
+        from backend.app.services.biography_enrichment import blank
+
+        filters = normalized_summary_filters(name_id=1)
+        before = summary_matrix_table(summary_matrix(self.db_path, filters))
+        comment = "Длинный комментарий " * 50 + "\nВторая строка <текст>"
+        with sqlite3.connect(self.db_path) as connection:
+            connection.execute("alter table person add column biography text")
+            connection.execute("alter table person add column comment text")
+            connection.execute("update person set comment=? where id=1", (comment,))
+        for value in (None, "", " \t\r\n\u00a0\u2003", "Биография", "\u200b"):
+            with self.subTest(value=value):
+                with sqlite3.connect(self.db_path) as connection:
+                    connection.execute("update person set biography=? where id=1", (value,))
+                matrix = summary_matrix(self.db_path, filters, sort_by="fio", sort_dir="desc")
+                first = next(row for row in matrix["rows"] if row["id"] == 1)
+                second = next(row for row in matrix["rows"] if row["id"] == 2)
+                self.assertEqual(first["biography_flag"], int(not blank(value)))
+                self.assertEqual(first["comment"], comment)
+                self.assertEqual(second["biography_flag"], 0)
+                self.assertIsNone(second["comment"])
+                self.assertEqual([row["id"] for row in matrix["rows"]], [2, 1])
+                self.assertEqual(matrix["reward_total"], 2)
+                exported = summary_matrix_table(summary_matrix(self.db_path, filters))
+                self.assertEqual(exported, before)
+
     def test_matrix_sorting_by_visible_columns(self) -> None:
         by_fio_desc = summary_matrix(self.db_path, normalized_summary_filters(), sort_by="fio", sort_dir="desc")
         self.assertEqual([row["fio"] for row in by_fio_desc["rows"]], ["Петров Петр", "Иванов Иван"])

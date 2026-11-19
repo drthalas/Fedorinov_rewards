@@ -828,6 +828,8 @@
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.fio }}">ФИО кавалера{% if summary_matrix_sort.sort == 'fio' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.rank_name }}">Звание / специальность{% if summary_matrix_sort.sort == 'rank_name' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.urls.birthday }}">Год рождения{% if summary_matrix_sort.sort == 'birthday' %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
+                <th>Биография</th>
+                <th class="matrix-comment-cell">Комментарий</th>
                 {% for column in summary_matrix.photo_columns %}
                 {% set sort_key = 'photo:' ~ column.field %}
                 <th><a class="matrix-sort-link" href="{{ summary_matrix_sort.photo_urls.get(column.field) }}">{{ column.label }}{% if summary_matrix_sort.sort == sort_key %} {{ '↓' if summary_matrix_sort.dir == 'desc' else '↑' }}{% endif %}</a></th>
@@ -849,6 +851,8 @@
                 <td><a href="{{ row.detail_url }}">{{ row.fio|dash }}</a></td>
                 <td>{{ row.rank_name|dash }}</td>
                 <td>{{ row.birthday|format_birth_year }}</td>
+                <td class="number-cell {{ 'stock-yes' if row.biography_flag else 'stock-no' }}" data-matrix-biography>{{ row.biography_flag }}</td>
+                <td class="matrix-comment-cell" data-matrix-comment>{{ row.comment|dash }}</td>
                 {% for column in summary_matrix.photo_columns %}
                 <td class="number-cell {{ 'stock-yes' if row.photo_flags.get(column.field) else 'stock-no' }}">{{ row.photo_flags.get(column.field, 0) }}</td>
                 {% endfor %}
@@ -863,11 +867,13 @@
                 <td class="number-cell">{{ row.row_total }}</td>
               </tr>
               {% else %}
-              <tr><td colspan="12">По выбранным фильтрам записей нет.</td></tr>
+              <tr><td colspan="{{ 6 + summary_matrix.photo_columns|length + summary_matrix.reward_photo_columns|length + summary_matrix.reward_columns|length + (1 if summary_matrix.show_numbers else 0) }}">По выбранным фильтрам записей нет.</td></tr>
               {% endfor %}
               <tr class="summary-total-row">
                 <td>Итого</td>
                 <td>Кавалеров: {{ summary_matrix.person_total }}</td>
+                <td>—</td>
+                <td>—</td>
                 <td>—</td>
                 {% for column in summary_matrix.photo_columns %}
                 <td class="number-cell">{{ summary_matrix.photo_totals.get(column.field, 0) }}</td>

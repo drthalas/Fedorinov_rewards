@@ -8,6 +8,7 @@ import io
 
 from ..db import open_readonly_connection, row_to_dict
 from ..services.display import format_date
+from ..services.biography_enrichment import blank
 from .guides import (
     get_guide_level_item,
     guide_cascade_data,
@@ -348,6 +349,9 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
             person_where = f"where p.id in (select distinct rx.person_id from rewards rx {exists_where})"
             person_params.extend(exists_params)
 
+        person_columns = {row["name"] for row in connection.execute("pragma table_info(person)")}
+        biography_expression = "p.biography" if "biography" in person_columns else "null"
+        comment_expression = "p.comment" if "comment" in person_columns else "null"
         person_rows_sql = connection.execute(
             f"""
             select
@@ -361,7 +365,9 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
                 p.book1_foto,
                 p.book2_foto,
                 p.card1_foto,
-                p.card2_foto
+                p.card2_foto,
+                {biography_expression} as biography,
+                {comment_expression} as comment
             from person p
             left join guide g on g.id = p.id_rank
             {person_where}
@@ -459,6 +465,8 @@ def summary_matrix(db_path: Path, filters: SummaryFilters, sort_by: str = "fio",
                 "fio": person.get("fio") or "—",
                 "rank_name": person.get("rank_name") or "—",
                 "birthday": person.get("birthday") or "",
+                "biography_flag": int(not blank(person.get("biography"))),
+                "comment": person.get("comment"),
                 "photo_paths": {
                     field: person.get(field) or ""
                     for field, _label in SUMMARY_MATRIX_PHOTO_COLUMNS

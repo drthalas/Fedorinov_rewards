@@ -8255,3 +8255,12 @@ body.legacy-rewards-theme::after {
    never override it, including the draft image and its "Нет фото" sibling. */
 .photo-frame [hidden], .photo-manage-actions [hidden],
 [data-person-gallery] [hidden] { display: none !important; }
+
+
+.person-reward-matrix .matrix-comment-cell {
+  min-width: 180px;
+  max-width: 320px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
