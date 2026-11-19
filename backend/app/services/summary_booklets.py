@@ -248,22 +248,53 @@ def _generate_booklets(settings_values, person_ids, directory, connection, pause
                 time.sleep(0.05)
 
     try:
-        from pypdf import PdfWriter
+        from io import BytesIO
+        from pypdf import PdfReader, PdfWriter
+        from reportlab.lib import colors
+        from reportlab.lib.units import mm
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.pdfgen.canvas import Canvas
+        from .booklets import _register_booklet_serif
+        from .summary_booklet_contents import generate_contents_pdf
+
         with PdfWriter() as writer:
-            checkpoint()
-            from .summary_booklet_contents import generate_contents_pdf
-            contents = root / "contents.pdf"
-            generate_contents_pdf(contents_rows, contents, selection)
-            writer.append(str(contents), import_outline=False)
-            contents.unlink()
+            page_starts = {}
             for person_id in person_ids:
                 checkpoint()
+                page_starts[person_id] = len(writer.pages) + 1
                 part = root / f"{person_id}.pdf"
-                generate_person_booklet_pdf(settings, person_id, output_path=part, compact=True)
+                generate_person_booklet_pdf(settings, person_id, output_path=part,
+                                           compact=True, page_numbers=False)
                 writer.append(str(part), import_outline=False)
                 part.unlink()
                 completed += 1
                 connection.send(("progress", completed))
+            checkpoint()
+            contents = root / "contents.pdf"
+            generate_contents_pdf(contents_rows, contents, selection, page_starts=page_starts)
+            with contents.open("rb") as stream:
+                contents_count = len(PdfReader(stream).pages)
+            actual_starts = {person_id: page + contents_count for person_id, page in page_starts.items()}
+            generate_contents_pdf(contents_rows, contents, selection, page_starts=actual_starts)
+            with contents.open("rb") as stream:
+                if len(PdfReader(stream).pages) != contents_count:
+                    raise SummaryBookletError("Число страниц содержания изменилось при нумерации.")
+            writer.merge(0, str(contents), import_outline=False)
+            contents.unlink()
+            font, _bold = _register_booklet_serif(pdfmetrics, TTFont)
+            # Contents already number themselves from 1. Person blocks have no local footer.
+            for index in range(contents_count, len(writer.pages)):
+                checkpoint()
+                page = writer.pages[index]
+                buffer = BytesIO()
+                canvas = Canvas(buffer, pagesize=(float(page.mediabox.width), float(page.mediabox.height)))
+                canvas.setFont(font, 8)
+                canvas.setFillColor(colors.HexColor("#302d27"))
+                canvas.drawCentredString(float(page.mediabox.width) / 2, 5 * mm, str(index + 1))
+                canvas.save()
+                overlay = PdfReader(BytesIO(buffer.getvalue()))
+                page.merge_page(overlay.pages[0])
             checkpoint()
             writer.add_metadata({"/Title": "Буклеты кавалеров"})
             writer.write(str(root / "summary_booklets.pdf"))

@@ -1,4 +1,5 @@
 from io import BytesIO
+import re
 import gc
 import sqlite3
 import time
@@ -73,8 +74,9 @@ class SummaryBookletsTests(unittest.TestCase):
         self.assertIn('Содержание буклета', actual.pages[0].extract_text())
         self.assertEqual(len(actual.pages), len(expected.pages) + 1)
         for left, right in zip(actual.pages[1:], expected.pages):
-            self.assertEqual(left.extract_text(), right.extract_text())
-            self.assertEqual(left.get_contents().get_data(), right.get_contents().get_data())
+            actual_text = re.sub(r"\n\d+\s*$", "", left.extract_text()).strip()
+            expected_text = re.sub(r"^\d+\n", "", right.extract_text()).strip()
+            self.assertEqual(actual_text, expected_text)
             self.assertEqual(len(left.images), len(right.images))
 
     def test_membership_snapshot_alphabet_and_page_separation(self):

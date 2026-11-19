@@ -169,6 +169,7 @@ def person_booklet_context(settings: Settings, person_id: int, return_to: str = 
 
 def generate_person_booklet_pdf(
     settings: Settings, person_id: int, output_path: Path | None = None, *, compact: bool = False,
+    page_numbers: bool = True,
 ) -> BookletPDFResult:
     context = person_booklet_context(settings, person_id)
     person = context["person"]
@@ -329,7 +330,8 @@ def generate_person_booklet_pdf(
         canvas.rect(8 * mm, 8 * mm, A4[0] - 16 * mm, A4[1] - 16 * mm, fill=0)
         canvas.setFont(font_name, 8)
         canvas.setFillColor(ink)
-        canvas.drawCentredString(A4[0] / 2, 5 * mm, str(document.page))
+        if page_numbers:
+            canvas.drawCentredString(A4[0] / 2, 5 * mm, str(document.page))
         canvas.restoreState()
 
     doc.build(story, onFirstPage=paper, onLaterPages=paper)

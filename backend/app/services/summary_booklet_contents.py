@@ -72,7 +72,7 @@ def contents_selection(db_path, matrix, filters):
     return dict(title=title)
 
 
-def generate_contents_pdf(rows, output_path, selection=None):
+def generate_contents_pdf(rows, output_path, selection=None, page_starts=None):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle
@@ -89,12 +89,25 @@ def generate_contents_pdf(rows, output_path, selection=None):
     theme = ParagraphStyle('ContentsTheme', parent=title, fontSize=28, leading=32, alignment=1, keepWithNext=True)
     title.keepWithNext = True
     p = lambda value, style=body: Paragraph(escape(str(value or '—')), style)
-    data = [[p(value, heading) for value in ('ФИО', 'Год рождения', 'Звание', 'Номер ордена')]]
+    labels = ['ФИО', 'Год рождения', 'Звание', 'Номер ордена']
+    widths = [78*mm, 25*mm, 43*mm, 36*mm]
+    if page_starts is not None:
+        labels.append('Страница')
+        widths = [62*mm, 25*mm, 37*mm, 36*mm, 22*mm]
+    data = [[p(value, heading) for value in labels]]
     for row in rows:
-        data.append([p(row.get('fio')), p(format_birth_year(row.get('birthday'))),
-                     p(row.get('rank_name')), p(', '.join(str(n) for n in row.get('pdf_reward_numbers') or ()) )])
-    table = Table(data, colWidths=[78*mm, 25*mm, 43*mm, 36*mm], repeatRows=1)
+        cells = [p(row.get('fio')), p(format_birth_year(row.get('birthday'))),
+                 p(row.get('rank_name')), p(', '.join(str(n) for n in row.get('pdf_reward_numbers') or ()))]
+        if page_starts is not None:
+            # Plain table text keeps row height independent of the page number.
+            cells.append(str(page_starts[row['id']]))
+        data.append(cells)
+    table = Table(data, colWidths=widths, repeatRows=1)
     table.setStyle(TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), font),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('LEADING', (0,0), (-1,-1), 13),
+        ('TEXTCOLOR', (0,0), (-1,-1), ink),
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('LINEBELOW', (0,0), (-1,0), .7, rule),
         ('LINEBELOW', (0,1), (-1,-1), .3, rule),
