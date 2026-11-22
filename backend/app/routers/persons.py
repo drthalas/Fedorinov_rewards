@@ -20,7 +20,7 @@ from ..repositories.persons_write import (
 from ..repositories.reward_reference import get_reward_reference, list_reward_references
 from ..repositories.rewards_write import RewardValidationError
 from ..services.delete_preflight import DeletePreflightValidationError, authorize_delete_execution
-from ..services.dates import BIRTH_YEAR_MAXIMUM, BIRTH_YEAR_MINIMUM
+from ..services.dates import BIRTH_YEAR_MINIMUM
 from ..services.display import pagination
 from ..services.booklets import BookletError, generate_person_booklet_pdf, person_booklet_context, person_booklet_filename
 from ..services.booklet2 import booklet2_context, booklet2_filename, generate_booklet2_pdf
@@ -109,7 +109,6 @@ def _person_create_context(
         "error": error,
         "created_message": "",
         "birth_year_min": BIRTH_YEAR_MINIMUM,
-        "birth_year_max": BIRTH_YEAR_MAXIMUM,
         "field_errors": field_errors or {},
         "draft_token": draft_token,
         "draft_rewards": draft_rewards,
@@ -225,7 +224,6 @@ def _person_edit_context(
         "error": error,
         "created_message": POST_CREATE_MESSAGE if post_create else "",
         "birth_year_min": BIRTH_YEAR_MINIMUM,
-        "birth_year_max": BIRTH_YEAR_MAXIMUM,
         "field_errors": field_errors or {},
         "post_create": post_create,
         "post_create_rewards": list_person_rewards(settings.rewards_db_path, person_id) if post_create else [],

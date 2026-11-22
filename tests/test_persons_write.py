@@ -221,11 +221,11 @@ class PersonWriteTests(unittest.TestCase):
             person_data_from_mapping({"fio": "No rank", "birthday": "1913", "id_rank": ""})
         self.assertEqual(str(exc.exception), "Выберите звание / специальность.")
 
-    def test_birthday_accepts_exact_supported_boundaries(self) -> None:
-        minimum = person_data_from_mapping({"fio": "Date user", "birthday": "1800", "id_rank": "2"})
-        maximum = person_data_from_mapping({"fio": "Date user", "birthday": "1999", "id_rank": "2"})
-        self.assertEqual(minimum.birthday, "1800")
-        self.assertEqual(maximum.birthday, "1999")
+    def test_birthday_accepts_minimum_and_later_four_digit_years(self) -> None:
+        for year in ("1800", "2000", "2005", "9999"):
+            with self.subTest(year=year):
+                data = person_data_from_mapping({"fio": "Date user", "birthday": year, "id_rank": "2"})
+                self.assertEqual(data.birthday, year)
 
     def test_birthday_rejects_full_date(self) -> None:
         with self.assertRaises(PersonValidationError) as exc:
@@ -237,13 +237,12 @@ class PersonWriteTests(unittest.TestCase):
             person_data_from_mapping({"fio": "Date user", "birthday": "١٨٠٠", "id_rank": "2"})
         self.assertEqual(str(exc.exception), "Укажите год рождения в формате ГГГГ.")
 
-    def test_birthday_rejects_both_out_of_range_boundaries(self) -> None:
-        for value in ("1799", "2000"):
-            with self.subTest(value=value), self.assertRaises(PersonValidationError) as exc:
-                person_data_from_mapping({"fio": "Date user", "birthday": value, "id_rank": "2"})
-            self.assertEqual(str(exc.exception), "Год рождения должен быть от 1800 до 1999.")
+    def test_birthday_rejects_year_before_minimum(self) -> None:
+        with self.assertRaises(PersonValidationError) as exc:
+            person_data_from_mapping({"fio": "Date user", "birthday": "1799", "id_rank": "2"})
+        self.assertEqual(str(exc.exception), "Год рождения должен быть не раньше 1800.")
 
-    def test_unchanged_out_of_range_legacy_birth_year_is_preserved(self) -> None:
+    def test_unchanged_legacy_birth_date_is_preserved(self) -> None:
         for value in ("1799", "2000"):
             with self.subTest(value=value):
                 existing = f"{value}-05-09"
@@ -259,7 +258,7 @@ class PersonWriteTests(unittest.TestCase):
                 {"fio": "Legacy year", "birthday": "1798", "id_rank": "2"},
                 existing_birthday="1799-05-09",
             )
-        self.assertEqual(str(exc.exception), "Год рождения должен быть от 1800 до 1999.")
+        self.assertEqual(str(exc.exception), "Год рождения должен быть не раньше 1800.")
 
 
 if __name__ == "__main__":

@@ -125,12 +125,12 @@ class PersonImportTests(unittest.TestCase):
         self.assert_counts(self.run_import([row(777), row(888)]), 1, 1, 0)
 
     def test_valid_dates_and_year_boundaries(self):
-        values = [None, '', '  ', '12.05.1918', datetime(1919,6,7), '1920-07-08', 1800, 1999, 1941.0]
+        values = [None, '', '  ', '12.05.1918', datetime(1919,6,7), '1920-07-08', 1800, 2000, "2005-07-08", 1941.0]
         self.assert_counts(self.run_import([row(i+100,value) for i,value in enumerate(values)]), len(values),0,0)
-        self.assertEqual(self.query('select birthday from person where id>1 order by id'), [(x,) for x in ['1945','1945','1945','1918','1919','1920','1800','1999','1941']])
+        self.assertEqual(self.query('select birthday from person where id>1 order by id'), [(x,) for x in ['1945','1945','1945','1918','1919','1920','1800','2000','2005','1941']])
 
     def test_invalid_nonempty_birth_values_are_errors_not_defaults(self):
-        values = ['n/a',1799,2000,'31.02.1918','1918garbage',True,1945.5]
+        values = ['n/a',1799,10000,'31.02.1918','1918garbage',True,1945.5]
         result = self.run_import([row(i+100,value) for i,value in enumerate(values)])
         self.assert_counts(result,0,0,len(values))
         self.assertEqual([error['row'] for error in result.errors], list(range(2,9)))
@@ -200,7 +200,7 @@ class PersonImportTests(unittest.TestCase):
 
     def test_mixed_summary_and_existing_rows_unchanged(self):
         before = self.query('select * from person'),self.query('select * from rewards')
-        result = self.run_import([row(100),row(99),row(101,2000),row(102,rank='unknown')])
+        result = self.run_import([row(100),row(99),row(101,1799),row(102,rank='unknown')])
         self.assert_counts(result,1,1,2)
         self.assertEqual(before,(self.query('select * from person where id=1'),self.query('select * from rewards where id=1')))
 

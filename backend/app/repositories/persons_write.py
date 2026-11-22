@@ -20,7 +20,6 @@ from ..services.deletion_lifecycle import (
     recover_delete_operation,
 )
 from ..services.dates import (
-    BIRTH_YEAR_MAXIMUM,
     BIRTH_YEAR_MINIMUM,
     format_birth_year_input,
     normalize_birth_year_input,
@@ -143,13 +142,12 @@ def person_data_from_mapping(
     raw_birthday = values.get("birthday")
     submitted_year = "" if raw_birthday is None else str(raw_birthday).strip()
     existing_year = format_birth_year_input(existing_birthday)
-    preserves_legacy_year = bool(
-        existing_year.isdigit()
+    preserves_existing_year = bool(
+        existing_year.isascii() and existing_year.isdigit()
         and len(existing_year) == 4
         and submitted_year == existing_year
-        and not BIRTH_YEAR_MINIMUM <= int(existing_year) <= BIRTH_YEAR_MAXIMUM
     )
-    if preserves_legacy_year:
+    if preserves_existing_year:
         birthday = str(existing_birthday)
     else:
         try:
@@ -233,10 +231,10 @@ def _validate_person_data(data: PersonWriteData, *, existing_birthday: object = 
     submitted_year = format_birth_year_input(data.birthday)
     existing_year = format_birth_year_input(existing_birthday)
     preserves_legacy_year = bool(
-        existing_year.isdigit()
+        existing_year.isascii() and existing_year.isdigit()
         and len(existing_year) == 4
         and submitted_year == existing_year
-        and not BIRTH_YEAR_MINIMUM <= int(existing_year) <= BIRTH_YEAR_MAXIMUM
+        and int(existing_year) < BIRTH_YEAR_MINIMUM
     )
     if not preserves_legacy_year:
         try:

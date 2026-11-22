@@ -70,15 +70,15 @@ class Ale317FormCorrectiveTests(unittest.TestCase):
             },
         )
 
-    def test_birth_year_contract_is_exactly_1800_through_1999(self) -> None:
+    def test_birth_year_form_keeps_four_digits_and_minimum(self) -> None:
         template = (ROOT / "backend/app/templates/person_form.html").read_text(encoding="utf-8")
         validation = (ROOT / "backend/app/static/person_form_validation.js").read_text(encoding="utf-8")
 
-        self.assertIn('pattern="(18|19)[0-9]{2}"', template)
+        self.assertIn('pattern="[0-9]{4}"', template)
         self.assertIn('data-min-year="{{ birth_year_min }}"', template)
-        self.assertIn('data-max-year="{{ birth_year_max }}"', template)
-        self.assertIn("Number(value) < minimum || Number(value) > maximum", validation)
-        self.assertIn("Год рождения должен быть от ${minimum} до ${maximum}.", validation)
+        self.assertNotIn('data-max-year', template)
+        self.assertIn("Number(value) < minimum", validation)
+        self.assertIn("Год рождения должен быть не раньше ${minimum}.", validation)
 
     def test_all_edit_forms_use_shared_validation_and_global_autocomplete_policy(self) -> None:
         templates = [
